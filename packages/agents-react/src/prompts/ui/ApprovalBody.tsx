@@ -42,7 +42,7 @@ function ApprovalDetails({ item }: { item: ChatApprovalItem }) {
                                 <UnifiedDiff key={i} change={change} />
                             ))}
                             {edits.map((change, i) => (
-                                <EditDiff key={i} change={change} />
+                                <EditDiff key={i} change={change} allowEditor={false} />
                             ))}
                         </Suspense>
                     </div>

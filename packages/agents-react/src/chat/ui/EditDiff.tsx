@@ -1,5 +1,7 @@
-import { lazy, Suspense, useMemo } from 'react';
+import { Suspense, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { lazyNamed } from '../../lazy';
+import { DiffFallbackBoundary } from './diff/DiffFallbackBoundary';
 import { canRenderEditorEdit } from './diff/editor-edit-model';
 import { MultiFileDiff } from '@pierre/diffs/react';
 import { chatHost } from '../../host';
@@ -30,18 +32,21 @@ function LegacyEditDiff({ change }: { change: FileChange }) {
     );
 }
 
-const EditorEditDiff = lazy(() => import('./diff/EditorEditDiff'));
+const EditorEditDiff = lazyNamed(() => import('./diff/EditorEditDiff'), 'default');
 
-export default function EditDiff({ change }: { change: FileChange }) {
+export default function EditDiff({ change, allowEditor = true }: { change: FileChange; allowEditor?: boolean }) {
     const { t } = useTranslation('agent-chat');
     const loadEngine = chatHost().code.editor;
+    const withinLimits = useMemo(() => canRenderEditorEdit({ before: change.before, after: change.after }), [change.before, change.after]);
     const fallback = <LegacyEditDiff change={change} />;
-    if (loadEngine === undefined || !canRenderEditorEdit(change)) {
+    if (!allowEditor || loadEngine === undefined || !withinLimits) {
         return fallback;
     }
     return (
-        <Suspense fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
-            <EditorEditDiff change={change} loadEngine={loadEngine} fallback={fallback} />
-        </Suspense>
+        <DiffFallbackBoundary fallback={fallback} resetKeys={[change.path, change.before, change.after, loadEngine]}>
+            <Suspense fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
+                <EditorEditDiff change={change} loadEngine={loadEngine} fallback={fallback} />
+            </Suspense>
+        </DiffFallbackBoundary>
     );
 }

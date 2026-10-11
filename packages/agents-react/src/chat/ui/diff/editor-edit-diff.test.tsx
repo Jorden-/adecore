@@ -1,11 +1,12 @@
 import { expect, test } from 'bun:test';
-import { act, createElement } from 'react';
+import { act, createElement, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { FakeEditorEngine } from '@adecore/editor/fake';
 import { createPage } from '@adecore/editor/testing';
 import type { EditorEngine } from '@adecore/editor';
 import type { FileChange } from '../../logic/tools';
 import EditorEditDiff from './EditorEditDiff';
+import { DiffFallbackBoundary } from './DiffFallbackBoundary';
 
 async function mounted(run: (page: ReturnType<typeof createPage>, root: ReturnType<typeof createRoot>) => Promise<void>): Promise<void> {
     const page = createPage();
@@ -14,7 +15,7 @@ async function mounted(run: (page: ReturnType<typeof createPage>, root: ReturnTy
     const globals = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
     const previousAct = globals.IS_REACT_ACT_ENVIRONMENT;
     globals.IS_REACT_ACT_ENVIRONMENT = true;
-    const root = createRoot(page.host);
+    const root = createRoot(page.host, { onCaughtError: () => {} });
     try {
         await run(page, root);
     } finally {
@@ -81,5 +82,66 @@ test('engine failures retain the supplied legacy renderer and a late engine does
         await act(async () => root.render(null));
         await act(async () => resolve(engine));
         expect(engine.editors).toHaveLength(0);
+    });
+});
+
+test('a virtualized edit remount uses the cached engine without a loading placeholder', async () => {
+    await mounted(async (page, root) => {
+        const engine = new FakeEditorEngine();
+        let loads = 0;
+        const loadEngine = async () => {
+            loads++;
+            return engine;
+        };
+        const render = () =>
+            root.render(createElement(EditorEditDiff, { change: { path: 'a.ts', before: 'old', after: 'new' }, loadEngine, fallback: 'Legacy' }));
+        await act(async () => render());
+        await act(async () => root.render(null));
+        act(() => render());
+        expect(page.host.textContent).not.toContain('Loading diff');
+        expect(loads).toBe(1);
+        expect(engine.editors).toHaveLength(2);
+        expect(engine.last.getText()).toBe('old\nnew');
+    });
+});
+
+test('a failed editor mount falls back locally and retries when the loader changes', async () => {
+    await mounted(async (page, root) => {
+        class BrokenEngine extends FakeEditorEngine {
+            override mount(): never {
+                throw new Error('Mount failed');
+            }
+        }
+        const change: FileChange = { path: 'a.ts', before: 'old', after: 'new' };
+        const render = (loadEngine: () => Promise<EditorEngine>) =>
+            root.render(
+                <DiffFallbackBoundary fallback="Legacy" resetKeys={[loadEngine]}>
+                    <EditorEditDiff change={change} loadEngine={loadEngine} fallback="Legacy" />
+                </DiffFallbackBoundary>
+            );
+        await act(async () => render(async () => new BrokenEngine()));
+        expect(page.host.textContent).toBe('Legacy');
+        const engine = new FakeEditorEngine();
+        await act(async () => render(async () => engine));
+        expect(engine.last.getText()).toBe('old\nnew');
+        expect(page.host.textContent).not.toContain('Legacy');
+    });
+});
+
+test('a rejected lazy diff chunk also retains the legacy review', async () => {
+    await mounted(async (page, root) => {
+        const FailedChunk = lazy(async () => {
+            throw new Error('Chunk unavailable');
+        });
+        await act(async () =>
+            root.render(
+                <DiffFallbackBoundary fallback="Legacy" resetKeys={[]}>
+                    <Suspense fallback="Loading">
+                        <FailedChunk />
+                    </Suspense>
+                </DiffFallbackBoundary>
+            )
+        );
+        expect(page.host.textContent).toBe('Legacy');
     });
 });

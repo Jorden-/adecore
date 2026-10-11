@@ -191,7 +191,7 @@ export function DiffView({ engine, document, theme, tokens, wrap = true, fill = 
             });
         };
         refresh();
-        const window = element.current?.ownerDocument.defaultView;
+        const ownerWindow = element.current?.ownerDocument.defaultView;
         let pending = false;
         let stopped = false;
         let frame: number | undefined;
@@ -206,8 +206,8 @@ export function DiffView({ engine, document, theme, tokens, wrap = true, fill = 
                     refresh();
                 }
             };
-            if (window?.requestAnimationFrame !== undefined) {
-                frame = window.requestAnimationFrame(paint);
+            if (ownerWindow?.requestAnimationFrame !== undefined) {
+                frame = ownerWindow.requestAnimationFrame(paint);
             } else {
                 queueMicrotask(paint);
             }
@@ -217,7 +217,7 @@ export function DiffView({ engine, document, theme, tokens, wrap = true, fill = 
             stopped = true;
             stop?.();
             if (frame !== undefined) {
-                window?.cancelAnimationFrame?.(frame);
+                ownerWindow?.cancelAnimationFrame?.(frame);
             }
         };
     }, [mounted, engine, tokens, display]);

@@ -26,7 +26,7 @@ A unified diff as a CLI that writes patches reports it, in a `ChatFileChange`. A
 
 ## EditDiff
 
-The text before and after one edit, for a CLI that reports edits that way: `change` is `{ path, before, after }`, a `FileChange`. Optional `chatHost().code.editor` loads an `EditorEngine` for this view. Edits up to 400 combined source lines and 100,000 combined UTF-16 code units use `DiffView` with a 480-pixel height cap, per-side Shiki tokens and selectable removed lines. The public Pierre filename helper supplies the language, retaining its existing extension and special-filename coverage. Larger edits, a host without an engine, or an engine load failure keep the Pierre renderer. The editor path loads only when needed. These initial rollout limits remain until native input and scroll measurements cover larger diffs.
+The text before and after one edit, for a CLI that reports edits that way: `change` is `{ path, before, after }`, a `FileChange`. Optional `chatHost().code.editor` loads an `EditorEngine` for this view. Edits up to 400 combined source lines, 100,000 combined UTF-16 code units and 10,000 code units per line use `DiffView` with a 480-pixel height cap, per-side Shiki tokens and selectable removed lines. The public Pierre filename helper supplies the language, retaining its existing extension and special-filename coverage. Larger edits, a host without an engine, or an engine or render failure keep the Pierre renderer. Set `allowEditor={false}` to retain Pierre in a container whose editor scrolling and keyboard behavior have not been validated; approval previews currently do this. The editor chunk participates in idle prefetching; engines and syntax grammars load on demand. A loaded engine is cached per host loader so remounting a virtualized row renders immediately. These initial rollout limits remain until native input and scroll measurements cover larger diffs.
 
 ## DiffPool
 
@@ -46,7 +46,7 @@ The demo above runs under such a pool. Without one the diffs highlight on the pa
 
 ## Editor source tokens
 
-The additive `@adecore/agents-react/chat/ui/diff-syntax` entrypoint connects a [`DiffView`](/editor-react/change-review#diffview) to the shared Shiki runtime. The existing Pierre components above keep their APIs and rendering.
+The additive `@adecore/agents-react/chat/ui/diff-syntax` entrypoint connects a [`DiffView`](/editor-react/change-review#diffview) to the shared Shiki runtime. Existing patch and split components keep their APIs and rendering. The optional editor path adds `@adecore/editor-react` and its LSP dependency to the installation even for hosts that do not opt in; the renderer remains in a lazy chunk.
 
 ```ts
 import { diffSourceTokens } from '@adecore/agents-react/chat/ui/diff-syntax';
@@ -62,6 +62,5 @@ const tokens = diffSourceTokens(document, mapping);
 `DiffSyntaxMapping` supplies the separate old and new `DiffSyntaxDocument` definitions and a `locate(side, index)` callback; `diffSyntaxDocument` builds that mapping. The syntax entrypoint imports no React renderer.
 
 `diffSyntaxRuntime()` lazily returns one runtime configured by `chatHost().code`. `createDiffSyntaxRuntime(options)` creates an independent `DiffSyntaxRuntime`; `DiffSyntaxRuntimeOptions` takes custom `themes`, an optional `workerFactory` and an optional borrowed `highlighter`. A runtime opens a `DiffSyntaxSession` per document, with `request(block)`, `cancel()` and `dispose()`. Dispose an independent runtime when its owner ends; the shared runtime belongs to the page. The service sends custom themes once and falls back from a failed worker to main-thread Shiki with yields between blocks.
-
 
 `useDiffSourceTokens(document, language, theme, runtime?)` from `@adecore/agents-react/chat/ui/use-diff-source-tokens` creates the mapping and token provider together in one memo. Pass its result directly to `DiffView`. It opens sessions on the first committed read, releases both sides on unmount or a definition change, and reopens after StrictMode effect replay. No runtime resource starts during an abandoned render. The optional runtime supports an independently owned service or tests.
