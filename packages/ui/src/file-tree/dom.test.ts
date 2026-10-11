@@ -2,7 +2,7 @@ import { test } from 'bun:test';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 const PRELOAD = new URL('./testing/preload.ts', import.meta.url).pathname;
-const files = ['file-tree/interaction.test.tsx', 'workspace/interaction.test.tsx', 'Slider.test.tsx'];
+const files = ['file-tree/interaction.test.tsx', 'workspace/interaction.test.tsx', 'Slider.test.tsx', 'Segmented.test.tsx'];
 
 // React and Base UI must first load with a DOM; isolate these from the server-rendered suite.
 test.each(files)(

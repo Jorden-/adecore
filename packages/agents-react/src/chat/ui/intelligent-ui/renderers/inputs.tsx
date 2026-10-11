@@ -106,6 +106,9 @@ export function SliderRenderer({ node, context }: UiRendererProps<UiProps<'Slide
     );
 }
 
+/* A label longer than this reads as a sentence, which wraps badly beside another; the options then stand in a column. */
+const SIDE_BY_SIDE_LABEL = 24;
+
 /* Left aligned, never the full width. Each Option is a segment by its place, since a value may be any scalar. */
 export function SegmentedRenderer({ node, context }: UiRendererProps<UiProps<'Segmented'>>) {
     const { t } = useTranslation('agent-chat');
@@ -119,6 +122,7 @@ export function SegmentedRenderer({ node, context }: UiRendererProps<UiProps<'Se
                 value={picked}
                 options={options}
                 label={t('blocks.options')}
+                orientation={options.some((option) => option.label.length > SIDE_BY_SIDE_LABEL) ? 'vertical' : 'horizontal'}
                 disabled={binding === null}
                 onValueChange={(id) => {
                     const option = options[Number(id)];

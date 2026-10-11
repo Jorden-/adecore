@@ -231,6 +231,16 @@ describe('local inputs', () => {
         expect(partial).toContain('pointer-events-none opacity-60');
     });
 
+    test('a segmented control with a sentence for a label stands in a column', () => {
+        const long = 'Missing information and decisions before work go through the question tool';
+        expect(markup(`$mode = "a"\n<Segmented value={$mode}><Option value="a">${long}</Option><Option value="b">Other</Option></Segmented>`)).toContain(
+            'aria-orientation="vertical"'
+        );
+        expect(markup('$mode = "a"\n<Segmented value={$mode}><Option value="a">One</Option><Option value="b">Two</Option></Segmented>')).not.toContain(
+            'aria-orientation'
+        );
+    });
+
     test('a button runs its action and closes once the block is answered', () => {
         const { nodes, state } = evaluate('$mode = "all"\n<Button action={@Set($mode, "failed")}>Failed only</Button>');
         const element = ButtonRenderer({ node: nodes[0] as never, children: 'Failed only', context: CONTEXT }) as ReactElement<{

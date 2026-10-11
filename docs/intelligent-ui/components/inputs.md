@@ -58,7 +58,7 @@ A local number in a range. Its children are the label.
 
 ## Segmented and Option
 
-Choose one value. `Segmented` holds only `Option`, and binds the chosen option's value. An `Option` stands only inside `Segmented`; its children are its label. Option draws nothing itself: Segmented reads its options.
+Choose one value. `Segmented` holds only `Option`, and binds the chosen option's value. An `Option` stands only inside `Segmented`; its children are its label. Option draws nothing itself: Segmented reads its options. Keep labels to a few words; an option longer than that makes the renderer of agents-react stand the options in a column.
 
 | Prop    | Type   | Required | Notes    |
 | ------- | ------ | -------- | -------- |
