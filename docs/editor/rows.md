@@ -51,7 +51,7 @@ A color here, and in `renderCode` and the [agent marks](/editor/agents), is the 
 
 `setLineNumbers(labels)` supplies a string or `null` for each zero-based document line. A null label hides its number; passing `null` as the provider restores normal numbering. The gutter and sticky headers use the same labels, and the gutter reserves room for the longest label. Labels are read again after a text edit or another call to the setter.
 
-`setLineTokens(provider)` supplies prepared `LineToken` arrays for the displayed lines. A null or undefined result draws plain text while tokens are unavailable. Local grammar tokenization pauses while a provider is installed, so a document containing lines from different files never mixes their syntax states. Call the setter again when results change; passing `null` restores local grammar coloring. The host must keep the provider aligned with the current document text.
+`setLineTokens(provider)` supplies prepared `LineToken` arrays for the displayed lines. A null or undefined result draws plain text while tokens are unavailable. Local grammar tokenization pauses while a provider is installed, so a document containing lines from different files never mixes their syntax states. Return the same array while a line is unchanged, so scrolling can reuse the painted spans. Call the setter again when results change; passing `null` restores local grammar coloring. The host must keep the provider aligned with the current document text.
 
 ## Line actions
 
@@ -62,3 +62,7 @@ A color here, and in `renderCode` and the [agent marks](/editor/agents), is the 
 `setCodeVision(rows)` puts a row above each declaration, such as the number of usages and the author. An `EditorCodeVision` has an `id`, the zero-based `line` of the declaration and `entries`; each `EditorCodeVisionEntry` has an `id`, its `text`, an optional `icon` of `user` or `users`, and `activate(anchor)`, which gets the entry's box in page pixels.
 
 The row is one code line high and stands at the declaration's indentation. It keeps its height with no entries, so the text does not jump when they arrive. Code vision rows are separate from widgets and never take each other's place. [`@adecore/editor-react`](/editor-react/code-vision) fills them from a language server and Git blame.
+
+## Content height
+
+`getContentHeight()` returns the height in pixels needed to show all rows without vertical scrolling, including wrapped lines, widget rows, bottom padding and the horizontal scrollbar when present. Read it after mounting and on `onViewChange` to size a host that grows with its contents. A fixed-height host can keep its existing height and let the editor scroll.

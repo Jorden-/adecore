@@ -556,6 +556,10 @@ export class EditorView {
         return this.document.activeElement === this.input;
     }
 
+    get contentHeight(): number {
+        return this.layout.height + Math.max(0, (this.viewport.offsetHeight ?? 0) - (this.viewport.clientHeight ?? 0));
+    }
+
     get viewportHeight(): number {
         return this.clientHeight || DEFAULT_HEIGHT;
     }

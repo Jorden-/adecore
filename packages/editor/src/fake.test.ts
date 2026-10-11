@@ -35,6 +35,12 @@ describe('FakeEditorEngine', () => {
         expect(editor.indentation).toEqual({ tabSize: 8, insertSpaces: true });
     });
 
+    test('returns the content height supplied by a test', () => {
+        const editor = new FakeEditorEngine().mount(element, { text: '', theme: 'light' });
+        editor.contentHeight = 280;
+        expect(editor.getContentHeight()).toBe(280);
+    });
+
     test('follows the wrap it is set to', () => {
         const editor = new FakeEditorEngine().mount(element, { text: '', theme: 'light', wrap: true });
         editor.setWrap(false);

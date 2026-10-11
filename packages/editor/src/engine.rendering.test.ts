@@ -518,3 +518,27 @@ describe('line actions', () => {
         expect(reached).toEqual([]);
     });
 });
+
+describe('content height', () => {
+    test('tracks wrap and widget rows and includes a native horizontal scrollbar', () => {
+        const { editor, viewport } = setup({ text: 'word '.repeat(80) });
+        const unwrapped = editor.getContentHeight();
+        Object.defineProperties(viewport, {
+            clientWidth: { value: 400 },
+            offsetHeight: { value: 500, configurable: true },
+            clientHeight: { value: 485, configurable: true }
+        });
+        expect(editor.getContentHeight()).toBe(unwrapped + 15);
+        Object.defineProperty(viewport, 'clientHeight', { value: 500 });
+        editor.setWrap(true);
+        const wrapped = editor.getContentHeight();
+        expect(wrapped).toBeGreaterThan(unwrapped);
+        editor.setWidgets([{ id: 'gap', line: 0, placement: 'above', height: 40, render: () => {} }]);
+        expect(editor.getContentHeight()).toBe(wrapped + 40);
+        editor.setWidgets([]);
+        expect(editor.getContentHeight()).toBe(wrapped);
+        editor.setWrap(false);
+        expect(editor.getContentHeight()).toBe(unwrapped);
+        editor.dispose();
+    });
+});

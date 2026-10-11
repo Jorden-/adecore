@@ -223,6 +223,10 @@ class SmartEditor implements Editor {
         return this.view.scrollPlace.y;
     }
 
+    getContentHeight(): number {
+        return this.view.contentHeight;
+    }
+
     getSelection(): EditorRange {
         return this.rangeOf(this.model.getPrimary());
     }

@@ -536,7 +536,7 @@ export interface Editor {
     setLineHighlights(highlights: readonly EditorLineHighlight[]): void;
     /* Source labels for zero-based document lines; a null label hides the number. Null restores document numbering. */
     setLineNumbers(labels: ((line: number) => string | null) | null): void;
-    /* Prepared colors for displayed lines. Unknown or null results stay plain; null restores grammar tokenization. Call again when results change. */
+    /* Prepared colors for displayed lines. Unknown or null results stay plain; null restores grammar tokenization. Keep the same array while a line is unchanged; call again when results change. */
     setLineTokens(tokens: ((line: number) => readonly LineToken[] | null | undefined) | null): void;
     /*
      * Fills a widget row's element with lines of code that are not in the document, such as the lines an
@@ -569,6 +569,8 @@ export interface Editor {
     getCaret(): EditorPosition;
     /* In pixels, what `scrollTop` on mounting takes back. */
     getScrollTop(): number;
+    /* All rows in pixels, including the horizontal scrollbar, for a host that grows with its contents. */
+    getContentHeight(): number;
     /* Which lines are folded, for `folds` on mounting. */
     getFolds(): EditorFolds;
     /* The primary selection, start before end; empty at the caret. */

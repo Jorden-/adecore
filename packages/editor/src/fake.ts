@@ -556,6 +556,13 @@ export class FakeEditor implements Editor {
     /* The selection a person made; without one the caret. */
     selection: EditorRange | null = null;
 
+    /* A test supplies the measured height; this fake has no layout. */
+    contentHeight = 0;
+
+    getContentHeight(): number {
+        return this.contentHeight;
+    }
+
     getSelection(): EditorRange {
         return this.selection ?? { start: this.caret, end: this.caret };
     }
