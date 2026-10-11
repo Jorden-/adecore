@@ -58,6 +58,10 @@
     font-size: var(--text-sm);
 }
 
+.adecore-editor-diff .se-viewport {
+    overscroll-behavior-y: auto;
+}
+
 .adecore-editor-diff[data-scroll='false'] .se-viewport {
     overflow-y: hidden;
 }

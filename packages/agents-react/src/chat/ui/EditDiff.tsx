@@ -8,7 +8,7 @@ import { useDiffTheme } from './diff-theme';
 
 import type { FileChange } from '../logic/tools';
 
-function LegacyEditDiff({ change }: { change: FileChange }) {
+function LegacyEditDiff({ change, maxHeight }: { change: FileChange; maxHeight?: number }) {
     const resolved = chatHost().code.useMode();
     const theme = useDiffTheme();
     const oldFile = useMemo(() => ({ name: change.path, contents: change.before }), [change.path, change.before]);
@@ -25,7 +25,7 @@ function LegacyEditDiff({ change }: { change: FileChange }) {
         [theme, resolved]
     );
     return (
-        <div className="chat-diff select-text">
+        <div className="chat-diff select-text" style={maxHeight === undefined ? undefined : { maxHeight, overflow: 'auto' }}>
             <MultiFileDiff oldFile={oldFile} newFile={newFile} options={options} />
         </div>
     );
@@ -33,17 +33,17 @@ function LegacyEditDiff({ change }: { change: FileChange }) {
 
 const EditorEditDiff = lazyNamed(() => import('./diff/EditorEditDiff'), 'default');
 
-export default function EditDiff({ change, allowEditor = true }: { change: FileChange; allowEditor?: boolean }) {
+export default function EditDiff({ change, allowEditor = true, maxHeight }: { change: FileChange; allowEditor?: boolean; maxHeight?: number }) {
     const { t } = useTranslation('agent-chat');
     const loadEngine = chatHost().code.editor;
-    const fallback = <LegacyEditDiff change={change} />;
+    const fallback = <LegacyEditDiff change={change} maxHeight={maxHeight} />;
     if (!allowEditor || loadEngine === undefined) {
         return fallback;
     }
     return (
         <DiffFallbackBoundary fallback={fallback} resetKeys={[change.path, change.before, change.after, loadEngine]}>
             <Suspense fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
-                <EditorEditDiff change={change} loadEngine={loadEngine} fallback={fallback} />
+                <EditorEditDiff change={change} loadEngine={loadEngine} fallback={fallback} maxHeight={maxHeight} />
             </Suspense>
         </DiffFallbackBoundary>
     );

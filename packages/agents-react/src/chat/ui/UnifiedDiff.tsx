@@ -46,6 +46,7 @@ function lineClass(line: string): string {
 
 interface UnifiedDiffProps {
     allowEditor?: boolean;
+    maxHeight?: number;
     ignoreWhitespace?: boolean;
     change: ChatFileChange;
     overflow?: 'wrap' | 'scroll';
@@ -57,7 +58,7 @@ interface UnifiedDiffProps {
     contents?: DiffContents;
 }
 
-function LegacyUnifiedDiff({ change, overflow = 'wrap', diffStyle = 'unified', fill = false, contents }: UnifiedDiffProps) {
+function LegacyUnifiedDiff({ change, overflow = 'wrap', diffStyle = 'unified', fill = false, contents, maxHeight }: UnifiedDiffProps) {
     const resolved = chatHost().code.useMode();
     const theme = useDiffTheme();
     const patch = useMemo(() => asPatch(change), [change]);
@@ -82,7 +83,7 @@ function LegacyUnifiedDiff({ change, overflow = 'wrap', diffStyle = 'unified', f
     );
     if (patch === null) {
         return (
-            <pre className="max-h-64 overflow-auto px-3 py-2 font-mono text-code select-text">
+            <pre className="max-h-64 overflow-auto px-3 py-2 font-mono text-code select-text" style={fill ? undefined : { maxHeight }}>
                 {change.diff
                     .replace(/\n$/, '')
                     .split('\n')
@@ -95,7 +96,10 @@ function LegacyUnifiedDiff({ change, overflow = 'wrap', diffStyle = 'unified', f
         );
     }
     return (
-        <div className={clsx('chat-diff select-text', fill && 'flex grow flex-col')}>
+        <div
+            className={clsx('chat-diff select-text', fill && 'flex grow flex-col')}
+            style={fill || maxHeight === undefined ? undefined : { maxHeight, overflow: 'auto' }}
+        >
             {full === null ? <PatchDiff patch={patch} options={options} /> : <FileDiff fileDiff={full} options={options} />}
         </div>
     );
@@ -105,7 +109,7 @@ const EditorPatchDiff = lazyNamed(() => import('./diff/EditorPatchDiff'), 'defau
 
 export default function UnifiedDiff(props: UnifiedDiffProps) {
     const { t } = useTranslation('agent-chat');
-    const { change, contents, allowEditor = true, ignoreWhitespace = false, overflow = 'wrap', diffStyle = 'unified', fill = false } = props;
+    const { change, contents, allowEditor = true, ignoreWhitespace = false, overflow = 'wrap', diffStyle = 'unified', fill = false, maxHeight } = props;
     const loadEngine = chatHost().code.editor;
     const oldText = contents?.old ?? '';
     const newText = contents?.new ?? change.diff;
@@ -122,6 +126,7 @@ export default function UnifiedDiff(props: UnifiedDiffProps) {
                     ignoreWhitespace={ignoreWhitespace}
                     wrap={overflow === 'wrap'}
                     fill={fill}
+                    maxHeight={maxHeight}
                     layout={diffStyle}
                     loadEngine={loadEngine}
                     fallback={fallback}

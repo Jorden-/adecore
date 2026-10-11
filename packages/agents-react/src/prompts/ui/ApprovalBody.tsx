@@ -27,6 +27,9 @@ function ApprovalDetails({ item }: { item: ChatApprovalItem }) {
     const [expanded, setExpanded] = useState(false);
     const patches = approvalChanges(item.input);
     const edits = patches.length ? [] : fileChanges(item.toolName, item.input);
+    const single = patches.length + edits.length === 1;
+    const editorPreview = single && chatHost().code.editor !== undefined;
+    const maxHeight = expanded ? 480 : 176;
     const input = typeof item.input === 'object' && item.input !== null ? (item.input as Record<string, unknown>) : {};
     return (
         <>
@@ -36,13 +39,13 @@ function ApprovalDetails({ item }: { item: ChatApprovalItem }) {
             )}
             {patches.length + edits.length > 0 ? (
                 <div className="overflow-hidden rounded-xl bg-surface-sunken">
-                    <div className={clsx('overflow-auto', !expanded && 'max-h-44')}>
+                    <div className={clsx(editorPreview ? 'overflow-hidden' : 'overflow-auto', !expanded && 'max-h-44')}>
                         <Suspense fallback={<p className="p-3 text-xs text-text-muted">{t('approval.loadingDiff')}</p>}>
                             {patches.map((change, i) => (
-                                <UnifiedDiff key={i} change={change} allowEditor={false} />
+                                <UnifiedDiff key={i} change={change} allowEditor={editorPreview} maxHeight={editorPreview ? maxHeight : undefined} />
                             ))}
                             {edits.map((change, i) => (
-                                <EditDiff key={i} change={change} allowEditor={false} />
+                                <EditDiff key={i} change={change} allowEditor={editorPreview} maxHeight={editorPreview ? maxHeight : undefined} />
                             ))}
                         </Suspense>
                     </div>

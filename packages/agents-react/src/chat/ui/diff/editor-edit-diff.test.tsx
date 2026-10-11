@@ -238,3 +238,37 @@ test('a small edit in a large snapshot mounts while a large displayed edit stays
         expect(engine.editors).toHaveLength(1);
     });
 });
+
+test('changing the preview cap preserves the mounted editor and its scroll position', async () => {
+    await mounted(async (page, root) => {
+        const fake = new FakeEditorEngine();
+        const engine: EditorEngine = {
+            mount(host, options) {
+                const editor = fake.mount(host, options);
+                editor.contentHeight = 1000;
+                return editor;
+            }
+        };
+        const loadEngine = async () => engine;
+        const change = { path: 'file.ts', before: 'old', after: 'new' };
+        const render = (maxHeight: number) =>
+            root.render(
+                createElement(EditorEditDiff, {
+                    change,
+                    loadEngine,
+                    maxHeight,
+                    fallback: createElement('p', null, 'Legacy')
+                })
+            );
+        await act(async () => render(176));
+        expect((page.host.querySelector('.adecore-editor-diff') as HTMLElement).style.height).toBe('176px');
+        const editor = fake.last;
+        await act(async () => editor.setScrollTop(220));
+        await act(async () => render(480));
+        expect((page.host.querySelector('.adecore-editor-diff') as HTMLElement).style.height).toBe('480px');
+        expect(fake.editors).toHaveLength(1);
+        expect(editor.getScrollTop()).toBe(220);
+        await act(async () => render(176));
+        expect(editor.getScrollTop()).toBe(220);
+    });
+});

@@ -20,7 +20,8 @@ function ReadyDiff({
     engine,
     wrap,
     fill,
-    layout
+    layout,
+    maxHeight
 }: {
     document: DiffDocument;
     path: string;
@@ -28,6 +29,7 @@ function ReadyDiff({
     wrap: boolean;
     fill: boolean;
     layout: 'unified' | 'split';
+    maxHeight: number;
 }) {
     const { t } = useTranslation('agent-chat');
     const mode = chatHost().code.useMode();
@@ -40,7 +42,7 @@ function ReadyDiff({
             document={document}
             tokens={tokens}
             theme={theme}
-            maxHeight={480}
+            maxHeight={maxHeight}
             unfoldLimits={EDITOR_DIFF_LIMITS}
             label={t('work.diffLabel', { path })}
             layout={layout}
@@ -58,7 +60,8 @@ export function EditorDocumentDiff({
     fallback,
     wrap = true,
     fill = false,
-    layout = 'unified'
+    layout = 'unified',
+    maxHeight = 480
 }: {
     document: DiffDocument;
     path: string;
@@ -67,6 +70,7 @@ export function EditorDocumentDiff({
     wrap?: boolean;
     fill?: boolean;
     layout?: 'unified' | 'split';
+    maxHeight?: number;
 }) {
     const { t } = useTranslation('agent-chat');
     const withinLimits = useMemo(() => canRenderEditorDiff(document), [document]);
@@ -103,13 +107,27 @@ export function EditorDocumentDiff({
     if (engine === undefined) {
         return <div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>;
     }
-    return engine === null ? fallback : <ReadyDiff document={document} path={path} engine={engine} wrap={wrap} fill={fill} layout={layout} />;
+    return engine === null ? (
+        fallback
+    ) : (
+        <ReadyDiff document={document} path={path} engine={engine} wrap={wrap} fill={fill} layout={layout} maxHeight={maxHeight} />
+    );
 }
 
-export default function EditorEditDiff({ change, loadEngine, fallback }: { change: FileChange; loadEngine: EngineLoader; fallback: ReactNode }) {
+export default function EditorEditDiff({
+    change,
+    loadEngine,
+    fallback,
+    maxHeight
+}: {
+    change: FileChange;
+    loadEngine: EngineLoader;
+    fallback: ReactNode;
+    maxHeight?: number;
+}) {
     const document = useMemo(
         () => diffDocument(patchOf(change.before, change.after), { old: change.before, new: change.after }),
         [change.before, change.after]
     );
-    return <EditorDocumentDiff document={document} path={change.path} loadEngine={loadEngine} fallback={fallback} />;
+    return <EditorDocumentDiff document={document} path={change.path} loadEngine={loadEngine} fallback={fallback} maxHeight={maxHeight} />;
 }
