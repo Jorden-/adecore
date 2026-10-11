@@ -10,6 +10,11 @@ interface TagRegion {
     readonly region: 'template' | 'script' | 'style' | 'mixed';
 }
 
+export function phpLiteralAt(source: EditSource, offset: number): boolean {
+    const mode = source.context(offset).mode;
+    return mode === 'heredoc' || mode === 'quote';
+}
+
 function firstContent(source: EditSource, line: number): number {
     const bounds = source.line(line);
     return bounds.start + bounds.text.length - bounds.text.trimStart().length;
@@ -183,7 +188,8 @@ export function editRegions(source: EditSource, language: string, through?: numb
     if (id === 'php') {
         let tags: TagRegion[] | null | undefined;
         return (line, offset) => {
-            if (offset === undefined && mixedPhpLine(source, line)) {
+            const bounds = source.line(line);
+            if (offset === undefined && (phpLiteralAt(source, bounds.start) || phpLiteralAt(source, bounds.end) || mixedPhpLine(source, line))) {
                 return 'mixed';
             }
             const at = offset ?? firstContent(source, line);

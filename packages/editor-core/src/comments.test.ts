@@ -238,7 +238,7 @@ describe('comments in embedded markup', () => {
             expect(commented(source, 'php').getText()).toBe(source.replace('¦<p>text</p>', '<!-- <p>text</p> -->'));
         }
         const heredoc = '<?php\n$value = <<<HTML\n¦<script>\nHTML;';
-        expect(commented(heredoc, 'php').getText()).toBe(heredoc.replace('¦', '// '));
+        expect(commented(heredoc, 'php').getText()).toBe(heredoc.replace('¦', ''));
     });
 
     it('leaves mixed PHP and HTML lines unchanged', () => {
@@ -447,4 +447,67 @@ test('PHP comment scanning falls back before repeated whole-line context queries
     model.setSelections([{ anchor: at, head: at }]);
     expect(model.execute('toggleLineComment', { language: 'php' })).toBe(false);
     expect(model.getText()).toBe(source);
+});
+
+describe('PHP literal values stay unchanged by comment commands', () => {
+    it('skips heredoc and nowdoc openers, bodies and indented closing labels', () => {
+        for (const label of ['HTML', "'HTML'"]) {
+            const source = `<?php\n$value = <<<${label}\n    <p>text</p>\n    HTML;\n$next = 1;`;
+            for (let line = 1; line <= 3; line++) {
+                const model = new DocumentModel(source);
+                const at = model.getLine(line).start;
+                model.setSelections([{ anchor: at, head: at }]);
+                expect(model.execute('toggleLineComment', { language: 'php' })).toBe(false);
+                expect(model.getText()).toBe(source);
+            }
+        }
+    });
+    it('skips multiline quoted-string openers, body and closing lines', () => {
+        for (const quote of ['"', "'"]) {
+            const source = `<?php\n$value = ${quote}first\nsecond\nlast${quote};\n$next = 1;`;
+            for (let line = 1; line <= 3; line++) {
+                const model = new DocumentModel(source);
+                const at = model.getLine(line).start;
+                model.setSelections([{ anchor: at, head: at }]);
+                expect(model.execute('toggleLineComment', { language: 'php' })).toBe(false);
+                expect(model.getText()).toBe(source);
+            }
+        }
+    });
+    it('comments neighboring code without changing a literal within a selection', () => {
+        const source = '<?php\n$before = 1;\n$value = <<<HTML\n<p>text</p>\nHTML;\n$after = 2;';
+        const model = new DocumentModel(source);
+        const select = () => model.setSelections([{ anchor: model.getLine(1).start, head: model.getLine(5).end }]);
+        select();
+        model.execute('toggleLineComment', { language: 'php' });
+        expect(model.getText()).toBe('<?php\n// $before = 1;\n$value = <<<HTML\n<p>text</p>\nHTML;\n// $after = 2;');
+        select();
+        model.execute('toggleLineComment', { language: 'php' });
+        expect(model.getText()).toBe(source);
+    });
+    it('refuses block-comment ranges whose endpoints are within a PHP literal', () => {
+        for (const source of ['<?php\n$value = <<<HTML\nbody\nHTML;', '<?php\n$value = "first\nbody\nlast";']) {
+            const model = new DocumentModel(source);
+            const body = model.getLine(2);
+            model.setSelections([{ anchor: body.start, head: body.end }]);
+            expect(model.execute('toggleBlockComment', { language: 'php' })).toBe(false);
+            expect(model.getText()).toBe(source);
+        }
+    });
+    it('refuses a block selection that ends inside a PHP literal', () => {
+        const source = '<?php\n$value = <<<HTML\nbody\nHTML;';
+        const model = new DocumentModel(source);
+        model.setSelections([{ anchor: model.getLine(1).start, head: model.getLine(2).end }]);
+        expect(model.execute('toggleBlockComment', { language: 'php' })).toBe(false);
+        expect(model.getText()).toBe(source);
+    });
+    it('still toggles a complete single-line string assignment', () => {
+        const source = '$value = "text";';
+        const model = new DocumentModel(source);
+        model.execute('toggleLineComment', { language: 'php' });
+        expect(model.getText()).toBe('// ' + source);
+        model.setSelections([{ anchor: 0, head: 0 }]);
+        model.execute('toggleLineComment', { language: 'php' });
+        expect(model.getText()).toBe(source);
+    });
 });
