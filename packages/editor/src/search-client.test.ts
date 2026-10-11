@@ -75,7 +75,7 @@ function setup() {
     const client = createSearchClient(options);
     const result = (worker = workers.at(-1)!): void => {
         const message = worker.messages.at(-1)!;
-        worker.reply({ type: 'matches', id: message.id, revision: message.revision, matches: [], limited: false });
+        worker.reply({ type: 'matches', id: message.id, revision: message.revision, ranges: new Uint32Array(), limited: false });
     };
     return { options, client, workers, timers, result };
 }
@@ -103,7 +103,7 @@ test('a search client starts lazily, coalesces bursts and reuses its snapshot', 
     expect(host.workers[0]!.messages).toHaveLength(1);
     expect(host.workers[0]!.messages[0]).toMatchObject({ query: { text: 'new' }, text: 'word' });
     host.result();
-    expect(await current).toEqual({ revision: 0, matches: [], limited: false });
+    expect(await current).toEqual({ revision: 0, ranges: new Uint32Array(), limited: false });
     const repeated = host.client.search(snapshot, query, { from: 1, to: 3 });
     await Promise.resolve();
     expect(host.workers[0]!.messages[1]).toMatchObject({ from: 1, to: 3 });
@@ -135,7 +135,7 @@ test('superseding a running regex terminates it and ignores replies from the old
     expect(active.messages[0]).toHaveProperty('text', 'next');
     const message = previous.messages[0]!;
     for (const listener of oldListeners) {
-        listener({ data: { type: 'matches', id: message.id, revision: message.revision, matches: [], limited: false } } as MessageEvent);
+        listener({ data: { type: 'matches', id: message.id, revision: message.revision, ranges: new Uint32Array(), limited: false } } as MessageEvent);
     }
     expect(host.timers[1]!.cancelled).toBe(false);
     host.result();
@@ -167,8 +167,8 @@ test('unknown ids and revisions cannot settle the current search', async () => {
     await Promise.resolve();
     const worker = host.workers[0]!;
     const message = worker.messages[0]!;
-    worker.reply({ type: 'matches', id: message.id + 1, revision: 0, matches: [], limited: false });
-    worker.reply({ type: 'matches', id: message.id, revision: 1, matches: [], limited: false });
+    worker.reply({ type: 'matches', id: message.id + 1, revision: 0, ranges: new Uint32Array(), limited: false });
+    worker.reply({ type: 'matches', id: message.id, revision: 1, ranges: new Uint32Array(), limited: false });
     expect(host.timers[0]!.cancelled).toBe(false);
     host.result();
     await pending;
@@ -318,5 +318,36 @@ test('deterministic worker range errors retain the loaded snapshot, but desync r
     expect(host.workers[1]!.messages[0]).toHaveProperty('text', 'word');
     host.result();
     await retry;
+    host.client.dispose();
+});
+
+test('the current match keeps captures in the worker and derives its text from the snapshot', async () => {
+    const host = setup();
+    const pending = host.client.match(snapshot, query, { from: 0, to: 4 });
+    await Promise.resolve();
+    const worker = host.workers[0]!;
+    const message = worker.messages[0]!;
+    expect(message).toMatchObject({ type: 'match', from: 0, to: 4, text: 'word' });
+    worker.reply({ type: 'match', id: message.id, revision: 0, match: { from: 0, to: 4, captures: ['word'], groups: { name: 'word' }, regex: true } });
+    expect(await pending).toEqual({ from: 0, to: 4, text: 'word', captures: ['word'], groups: { name: 'word' }, regex: true, revision: 0 });
+    const missing = host.client.match(snapshot, query, { from: 1, to: 3 });
+    await Promise.resolve();
+    const next = worker.messages[1]!;
+    expect(next).not.toHaveProperty('text');
+    worker.reply({ type: 'match', id: next.id, revision: 0, match: null });
+    expect(await missing).toBeNull();
+    host.client.dispose();
+});
+
+test('a stale or different match range cannot become a retained match', async () => {
+    const host = setup();
+    const failure = caught(host.client.match(snapshot, query, { from: 0, to: 4 }));
+    await Promise.resolve();
+    const worker = host.workers[0]!;
+    const message = worker.messages[0]!;
+    worker.reply({ type: 'match', id: message.id, revision: 1, match: { from: 0, to: 4, captures: [], regex: true } });
+    expect(host.timers[0]!.cancelled).toBe(false);
+    worker.reply({ type: 'match', id: message.id, revision: 0, match: { from: 0, to: 3, captures: [], regex: true } });
+    expect((await failure).kind).toBe('error');
     host.client.dispose();
 });

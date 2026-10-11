@@ -1,3 +1,4 @@
+import type { FindMatch } from '@adecore/editor-core';
 import type { EditorFindQuery } from './types.ts';
 import {
     SEARCH_LIMIT,
@@ -30,16 +31,16 @@ export interface EditorSearchClientOptions {
 export interface EditorSearchClient {
     /* One document per client; a revision must identify the same immutable text for its lifetime. */
     search(snapshot: EditorSearchSnapshot, query: EditorFindQuery, options?: EditorSearchOptions): Promise<EditorSearchResult>;
+    match(snapshot: EditorSearchSnapshot, query: EditorFindQuery, range: { readonly from: number; readonly to: number }): Promise<FindMatch | null>;
     cancel(): void;
     dispose(): void;
 }
 
+type SearchReply = Exclude<EditorSearchOutput, { type: 'ready' | 'error' }>;
+
 interface Request {
-    readonly id: number;
-    readonly snapshot: EditorSearchSnapshot;
-    readonly query: EditorFindQuery;
-    readonly options: EditorSearchOptions;
-    readonly resolve: (result: EditorSearchResult) => void;
+    readonly message: EditorSearchInput;
+    readonly resolve: (result: SearchReply) => void;
     readonly reject: (error: EditorSearchError) => void;
 }
 
@@ -140,7 +141,7 @@ export function createSearchClient(options: EditorSearchClientOptions): EditorSe
                 return;
             }
             const request = active;
-            if (worker !== created || request === undefined || request.id !== result.id || request.snapshot.revision !== result.revision) {
+            if (worker !== created || request === undefined || request.message.id !== result.id || request.message.revision !== result.revision) {
                 return;
             }
             if (result.type === 'error') {
@@ -150,7 +151,7 @@ export function createSearchClient(options: EditorSearchClientOptions): EditorSe
             active = undefined;
             cancelTimer?.();
             cancelTimer = undefined;
-            request.resolve({ revision: result.revision, matches: result.matches, limited: result.limited });
+            request.resolve(result);
         };
         const onError = (event: Event): void => {
             if (worker !== created) {
@@ -193,16 +194,9 @@ export function createSearchClient(options: EditorSearchClientOptions): EditorSe
         try {
             const target = startWorker();
             cancelTimer = schedule(() => fail(request, new EditorSearchError('timeout', 'The search exceeded its time limit.')), deadline);
-            const message: EditorSearchInput = {
-                type: 'search',
-                id: request.id,
-                revision: request.snapshot.revision,
-                ...(revision !== request.snapshot.revision ? { text: request.snapshot.text } : {}),
-                query: request.query,
-                ...request.options,
-                maxResults: request.options.maxResults ?? SEARCH_LIMIT
-            };
-            revision = request.snapshot.revision;
+            const { text, ...input } = request.message;
+            const message: EditorSearchInput = { ...input, ...(revision !== input.revision ? { text } : {}) };
+            revision = input.revision;
             target.postMessage(message);
         } catch (error) {
             fail(request, error instanceof EditorSearchError ? error : new EditorSearchError('error', error instanceof Error ? error.message : String(error)));
@@ -216,25 +210,88 @@ export function createSearchClient(options: EditorSearchClientOptions): EditorSe
             fail(active, error);
         }
     };
+    const run = <Result>(
+        snapshot: EditorSearchSnapshot,
+        query: EditorFindQuery,
+        bounds: EditorSearchOptions,
+        input: (id: number) => EditorSearchInput,
+        read: (reply: SearchReply) => Result
+    ): Promise<Result> => {
+        if (disposed) {
+            return Promise.reject(new EditorSearchError('disposed', 'The search client was disposed.'));
+        }
+        if (unavailable !== undefined) {
+            return Promise.reject(unavailable);
+        }
+        cancel('superseded');
+        try {
+            validateSearch(snapshot, query, bounds);
+        } catch (error) {
+            return Promise.reject(error);
+        }
+        return new Promise((resolve, reject) => {
+            pending = {
+                message: input(++nextId),
+                reject,
+                resolve(reply) {
+                    try {
+                        resolve(read(reply));
+                    } catch (error) {
+                        reject(
+                            error instanceof EditorSearchError ? error : new EditorSearchError('error', error instanceof Error ? error.message : String(error))
+                        );
+                    }
+                }
+            };
+            // A burst before the next microtask starts only its newest request.
+            queueMicrotask(pump);
+        });
+    };
     return {
         search(snapshot, query, bounds = {}) {
-            if (disposed) {
-                return Promise.reject(new EditorSearchError('disposed', 'The search client was disposed.'));
-            }
-            if (unavailable !== undefined) {
-                return Promise.reject(unavailable);
-            }
-            cancel('superseded');
-            try {
-                validateSearch(snapshot, query, bounds);
-            } catch (error) {
-                return Promise.reject(error);
-            }
-            return new Promise((resolve, reject) => {
-                pending = { id: ++nextId, snapshot: { ...snapshot }, query: { ...query }, options: { ...bounds }, resolve, reject };
-                // A burst before the next microtask starts only its newest request.
-                queueMicrotask(pump);
-            });
+            return run(
+                snapshot,
+                query,
+                bounds,
+                (id) => ({
+                    type: 'search',
+                    id,
+                    revision: snapshot.revision,
+                    text: snapshot.text,
+                    query: { ...query },
+                    ...bounds,
+                    maxResults: bounds.maxResults ?? SEARCH_LIMIT
+                }),
+                (reply) => {
+                    if (reply.type !== 'matches') {
+                        throw new EditorSearchError('error', 'The worker returned an unexpected search response.');
+                    }
+                    return { revision: reply.revision, ranges: reply.ranges, limited: reply.limited };
+                }
+            );
+        },
+        match(snapshot, query, range) {
+            const from = range.from,
+                to = range.to;
+            const text = snapshot.text;
+            return run(
+                snapshot,
+                query,
+                { from, to, maxResults: 1 },
+                (id) => ({ type: 'match', id, revision: snapshot.revision, text, query: { ...query }, from, to }),
+                (reply) => {
+                    if (reply.type !== 'match') {
+                        throw new EditorSearchError('error', 'The worker returned an unexpected match response.');
+                    }
+                    if (reply.match === null) {
+                        return null;
+                    }
+                    if (reply.match.from !== from || reply.match.to !== to) {
+                        throw new EditorSearchError('error', 'The worker returned a different match range.');
+                    }
+                    return { ...reply.match, text: text.slice(from, to), revision: reply.revision };
+                }
+            );
         },
         cancel() {
             cancel('superseded');
