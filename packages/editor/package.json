@@ -36,6 +36,11 @@
             "source": "./src/testing.ts",
             "types": "./dist/testing.d.ts",
             "default": "./dist/testing.js"
+        },
+        "./search-worker": {
+            "source": "./src/search-worker.ts",
+            "types": "./dist/search-worker.d.ts",
+            "default": "./dist/search-worker.js"
         }
     },
     "scripts": {

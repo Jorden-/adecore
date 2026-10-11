@@ -20,6 +20,32 @@ The editor has the matcher of a find bar but not the bar: the app draws its own,
 
 Matches never touch the selection until `endFind`. A regular expression expands `$1` and the like in the replacement, and `preserveCase: true` gives it the case of the text it replaces. An invalid regular expression finds nothing, and the editor marks at most 10,000 matches. Search results, captures and groups are cached by revision, query, flags and selection bounds. Repaint and replacement preview never rerun the search. Replacing the current match uses a fresh retained result; a complete replace-all uses the retained batch. An incomplete replace-all performs one full search, and an edit searches the new revision once. A search in an empty selection never replaces the whole document. A slow regular expression still has no time limit.
 
+## Search worker
+
+`@adecore/editor/search-worker` supplies `serveEditorSearch` for a worker entry and `createSearchClient` for its caller. Importing the entry starts nothing. The worker runs the same `findMatches` engine as editor-core, including captures, named groups, bounds, Unicode and zero-width matches.
+
+```ts
+// search.worker.ts
+import { serveEditorSearch } from '@adecore/editor/search-worker';
+serveEditorSearch(self);
+```
+
+```ts
+import { createSearchClient } from '@adecore/editor/search-worker';
+
+const search = createSearchClient({ workerFactory: () => new Worker(workerUrl, { type: 'module' }) });
+const result = await search.search({ revision: 1, text: 'Name: Ada' }, { text: 'Name: (\\w+)', regex: true, caseSensitive: false, wholeWord: false });
+search.dispose();
+```
+
+Keep one client per document. A revision identifies immutable text; the client sends that text only when the revision changes or a worker restarts. `search` accepts optional `from`, `to` and `maxResults` bounds. Selection bounds come from the caller, not the query's `inSelection` flag. Results contain the revision, matches and `limited`, which says another match exists beyond the returned prefix. The cap is 10,000 matches, and returned match text, captures and named groups together must fit within 4,000,000 UTF-16 code units. A response above that size fails instead of cloning a large payload.
+
+The default deadline is 1,500 ms from posting, including startup. A timeout or superseding request terminates the worker because a running regular expression cannot process a cancel message. A later request starts a fresh worker. Requests in the same microtask burst keep only the latest; replies from old workers, ids or revisions cannot settle a newer request. A completed worker stays available until `dispose`. `cancel` rejects pending work but keeps an idle worker available.
+
+Failures reject with `EditorSearchError.kind`: `timeout`, `superseded`, `unavailable`, `syntax`, `range`, `error` or `disposed`. There is no main-thread retry. `deadline` and the cancellable `schedule(callback, delay)` timer can be supplied for deterministic tests. `serveEditorSearch` returns a cleanup function that removes its message listener and releases the snapshot.
+
+This entry is the worker foundation. The editor's current find commands remain synchronous until the worker client is connected to them.
+
 ## Folding
 
 The editor reads the [folding ranges of the model](/editor-core/search-folding#folding-ranges) for its language, after a short pause once the text changes. Python and YAML also fold by indentation. A collapsed fold is one row for the line commands: delete, duplicate, comment, move and a copy without a selection take its hidden lines along.

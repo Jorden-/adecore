@@ -1,5 +1,6 @@
 import type { DocumentChange, DocumentModel, FindMatch } from '@adecore/editor-core';
 import { mapOffset } from './offsets.ts';
+import { SEARCH_LIMIT } from './search-protocol.ts';
 import type { EditorFindQuery, EditorFindState } from './types.ts';
 
 export interface FindMark {
@@ -7,8 +8,7 @@ export interface FindMark {
     to: number;
 }
 
-/* Past this a count means nothing to a reader, and marking every match would stall the editor. */
-export const FIND_LIMIT = 10000;
+export const FIND_LIMIT = SEARCH_LIMIT;
 
 /*
  * The find of the host's find bar: every match marked, one of them current. It searches the model on

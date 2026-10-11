@@ -6,6 +6,7 @@ import { createSmartEditorEngine } from '@adecore/editor';
 import { FakeEditorEngine } from '@adecore/editor/fake';
 import { resolveKeymap, chordOf } from '@adecore/editor/keymap';
 import { shikiTokenizers } from '@adecore/editor/shiki';
+import { createSearchClient, serveEditorSearch } from '@adecore/editor/search-worker';
 import { createPage } from '@adecore/editor/testing';
 import { applyTextEdits } from '@adecore/lsp';
 import { createMemoryTransportPair, FakeLanguageServer } from '@adecore/lsp/testing';
@@ -23,6 +24,36 @@ assert.equal(model.undo(), true);
 assert.equal(model.getText(), 'before');
 assert.equal(typeof createSmartEditorEngine, 'function');
 assert.equal(typeof shikiTokenizers, 'function');
+assert.equal(typeof createSearchClient, 'function');
+let searchListener;
+const searchReplies = [];
+const stopSearch = serveEditorSearch({
+    addEventListener(_type, listener) {
+        searchListener = listener;
+    },
+    removeEventListener(_type, listener) {
+        if (searchListener === listener) {
+            searchListener = undefined;
+        }
+    },
+    postMessage(message) {
+        searchReplies.push(message);
+    }
+});
+searchListener({
+    data: {
+        type: 'search',
+        id: 1,
+        revision: 0,
+        text: 'one two',
+        query: { text: '(two)', regex: true, caseSensitive: true, wholeWord: false },
+        maxResults: 10000
+    }
+});
+assert.equal(searchReplies[0].type, 'matches');
+assert.deepEqual(searchReplies[0].matches[0].captures, ['two']);
+stopSearch();
+assert.equal(searchListener, undefined);
 assert.ok(createPage().host);
 assert.equal(typeof FakeLanguageServer, 'function');
 assert.equal(createMemoryTransportPair().length, 2);
