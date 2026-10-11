@@ -49,6 +49,7 @@ export function SplitDiffView({
     const newElement = useRef<HTMLDivElement>(null);
     const labels = { old: `${label}: ${t('diff.oldSide')}`, new: `${label}: ${t('diff.newSide')}` };
     const current = useRef({ display, tokens, theme, wrap, label, labels });
+    const applied = useRef({ theme, wrap, labels });
     const [failure, setFailure] = useState<{ error: unknown } | null>(null);
     const [mounted, setMounted] = useState<MountedSplit | null>(null);
     const [height, setHeight] = useState(0);
@@ -61,6 +62,8 @@ export function SplitDiffView({
         if (oldHost === null || newHost === null) {
             return;
         }
+        const initial = current.current;
+        applied.current = { theme: initial.theme, wrap: initial.wrap, labels: initial.labels };
         const mount = (side: DiffSourceSide, host: HTMLElement): MountedDiff => {
             const initial = current.current;
             const editor = engine.mount(host, {
@@ -209,11 +212,20 @@ export function SplitDiffView({
         }
         mounted.update(() => {
             for (const side of SIDES) {
-                mounted[side].editor.setTheme(theme);
-                mounted[side].editor.setWrap(wrap);
-                mounted[side].editor.setLabel(`${label}: ${t(`diff.${side}Side`)}`);
+                const previous = applied.current;
+                if (previous.theme !== theme) {
+                    mounted[side].editor.setTheme(theme);
+                }
+                if (previous.wrap !== wrap) {
+                    mounted[side].editor.setWrap(wrap);
+                }
+                const nextLabel = `${label}: ${t(`diff.${side}Side`)}`;
+                if (previous.labels[side] !== nextLabel) {
+                    mounted[side].editor.setLabel(nextLabel);
+                }
             }
         });
+        applied.current = { theme, wrap, labels: { old: `${label}: ${t('diff.oldSide')}`, new: `${label}: ${t('diff.newSide')}` } };
     }, [mounted, engine, theme, wrap, label, t]);
     useLayoutEffect(() => {
         if (mounted === null || mounted.old.engine !== engine) {

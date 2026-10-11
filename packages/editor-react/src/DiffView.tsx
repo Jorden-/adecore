@@ -55,6 +55,7 @@ function UnifiedDiffView({
     const emphasis = useMemo(() => wordMarks(document), [document]);
     const element = useRef<HTMLDivElement>(null);
     const current = useRef({ display, tokens, theme, wrap, label });
+    const applied = useRef({ theme, wrap, label });
     const [mounted, setMounted] = useState<MountedDiff | null>(null);
     const [height, setHeight] = useState(0);
     useLayoutEffect(() => {
@@ -78,6 +79,7 @@ function UnifiedDiffView({
             // Prompt cards use this chord for their primary action; a read-only review has no split-line action.
             handBack: [parseChord('Mod+Enter')]
         });
+        applied.current = { theme: initial.theme, wrap: initial.wrap, label: initial.label };
         editor.setBlocks([]);
         editor.setLineTokens((line) => {
             const { display, tokens } = current.current;
@@ -135,9 +137,17 @@ function UnifiedDiffView({
         if (mounted === null || mounted.engine !== engine) {
             return;
         }
-        mounted.editor.setTheme(theme);
-        mounted.editor.setWrap(wrap);
-        mounted.editor.setLabel(label);
+        const previous = applied.current;
+        if (previous.theme !== theme) {
+            mounted.editor.setTheme(theme);
+        }
+        if (previous.wrap !== wrap) {
+            mounted.editor.setWrap(wrap);
+        }
+        if (previous.label !== label) {
+            mounted.editor.setLabel(label);
+        }
+        applied.current = { theme, wrap, label };
     }, [mounted, engine, theme, wrap, label]);
     useLayoutEffect(() => {
         if (mounted === null || mounted.engine !== engine) {
