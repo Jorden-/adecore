@@ -2,14 +2,14 @@ import { useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObjec
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import type { UiViewNode } from '@adecore/intelligent-ui';
-import { Lock, Radio, TriangleAlert, Wrench } from 'lucide-react';
+import { Info, Lock, Radio, TriangleAlert } from 'lucide-react';
 import { Icon, Skeleton, Spinner, Tooltip, useTickingText } from '@adecore/ui';
 import { formatAgo, formatMoment } from '@adecore/ui/format';
 import { uiBlockHead, uiReasonText } from './node-text';
 import { UiHeadContext, type UiLiveStatus } from './render-context';
 import { useLater } from './use-later';
 
-/* Something the compiler repaired, such as a prop it dropped; never an error to a person. */
+/* Something the compiler noted about a block: a prop it dropped, or a part it could only draw as text. */
 export interface UiBlockFix {
     code: string;
     message: string;
@@ -82,7 +82,7 @@ function LivePart({ live }: { live: UiLiveStatus }) {
 }
 
 /*
- * The line under a block, only when it has something to say: live, answered, repaired or drawn as
+ * The line under a block, only when it has something to say: live, answered, noted or drawn as
  * text, in that order. A hairline of the soft border runs the full width of the card over it.
  */
 function UiBlockFooter({ live = null, answered = null, fixes = NO_FIXES, shownAsText = null }: UiBlockFooterProps) {
@@ -111,8 +111,8 @@ function UiBlockFooter({ live = null, answered = null, fixes = NO_FIXES, shownAs
                         className="flex items-center gap-1.5 rounded-sm hover:text-text-muted"
                         onClick={() => setFixesOpen(!fixesOpen)}
                     >
-                        <Icon icon={Wrench} size={12} />
-                        {t('blocks.fixes', { count: fixes.length })}
+                        <Icon icon={Info} size={12} />
+                        {t('blocks.notes', { count: fixes.length })}
                     </button>
                 )}
                 {shownAsText !== null && (

@@ -50,7 +50,7 @@ Some components belong inside another: a `Stat` inside `Stats`, an `Item` inside
 <Choices><Choice primary={true} context='Run the "slow" suite'>Run it</Choice></Choices>
 ```
 
-A prop is `name="text"`, `name='text'` or `name={expression}`. Quote strings. Put numbers, booleans, arrays, records and expressions in braces. Inside quotes a backslash escapes as in JSON: `\"`, `\'`, `\\`, `\/`, `\n`, `\t`, `\r`, `\b`, `\f` and `\uXXXX`.
+A prop is `name="text"`, `name='text'` or `name={expression}`. A name on its own is `true`, as in JSX: `<Choice primary>` reads as `primary={true}`. Quote strings. Put numbers, booleans, arrays, records and expressions in braces. Inside quotes a backslash escapes as in JSON: `\"`, `\'`, `\\`, `\/`, `\n`, `\t`, `\r`, `\b`, `\f` and `\uXXXX`.
 
 A braced value that is a constant becomes a static prop. Anything that reads a variable stays an expression, evaluated against state when the block draws. The compiler checks every prop against the component's schema once it can: at once for constants, and for expressions with the defaults of the block.
 
@@ -83,7 +83,8 @@ The compiler runs on every preview of a reply, so it reads text that stops anywh
 - A tag that is still open is an incomplete node. Its renderer draws what it has. A control is not interactive until its tag closes.
 - A quoted prop that has not closed yet holds the text received so far.
 - A half-written prop, name or expression waits for more text without a diagnosis.
-- After malformed input the parser reports it and goes on at the next tag or line, so one mistake costs one line.
+- A prop that cannot be read is reported and skipped up to the next space or the end of its tag. The tag still opens and closes, and its children and neighbors still draw; the node itself draws as its text fallback. A tag that lost a prop and is never closed ends at its own `>`.
+- After other malformed input the parser reports it and goes on at the next tag or line, so one mistake costs one line.
 - An unknown component keeps its own text fallback, and its neighbors still draw.
 
 Once the reply is final, anything still open is reported: `unclosed_tag` for a tag, `incomplete_expression` for an expression.

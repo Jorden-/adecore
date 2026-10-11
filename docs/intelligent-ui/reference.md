@@ -9,7 +9,7 @@ Every public name, by the entry point you import it from: `@adecore/intelligent-
 | [`stream`](https://github.com/basmilius/adecore/blob/main/packages/intelligent-ui/src/stream.ts) | `UI_STREAM_INTERVAL_MS`, `UiStreamClock`, `UiStreamPreview`, `UiStreamOptions`, `UiStream` |
 | [`syntax`](https://github.com/basmilius/adecore/blob/main/packages/intelligent-ui/src/syntax.ts) | `UiDiagnostic`, `UiSyntaxNode`, `UiSyntax`, `uiDiagnostic`, `parseUiSyntax` |
 | [`expression`](https://github.com/basmilius/adecore/blob/main/packages/intelligent-ui/src/expression.ts) | `UiValue`, `UiExpression`, `parseUiExpression`, `sameUiValue`, `copyUiValue`, `evaluateUiExpression` |
-| [`runtime`](https://github.com/basmilius/adecore/blob/main/packages/intelligent-ui/src/runtime.ts) | `UiBinding`, `UiViewNode`, `UiEvaluation`, `UiState`, `evaluateUiBlock`, `UiChoiceSelection`, `uiInputValues`, `resolveUiChoice` |
+| [`runtime`](https://github.com/basmilius/adecore/blob/main/packages/intelligent-ui/src/runtime.ts) | `UiBinding`, `UiViewNode`, `UiEvaluation`, `UiState`, `evaluateUiBlock`, `UiChoiceSelection`, `uiInputValues`, `resolveUiChoice`, `uiChoiceLabel` |
 | [`query`](https://github.com/basmilius/adecore/blob/main/packages/intelligent-ui/src/query.ts) | `uiValidatedState`, `uiQueryArguments`, `uiQueryFallback` |
 | [`links`](https://github.com/basmilius/adecore/blob/main/packages/intelligent-ui/src/links.ts) | `UiLinkTargetSchema`, `UiLinkTarget`, `UiLinkResolutionSchema`, `UiLinkResolution`, `uiLinkTargets` |
 | [`protocol`](https://github.com/basmilius/adecore/blob/main/packages/intelligent-ui/src/protocol.ts) | `UiNodeSchema`, `UiDiagnosticSchema`, `UiBlockSchema`, `UiBlocksSchema` |
@@ -25,5 +25,5 @@ Every public name, by the entry point you import it from: `@adecore/intelligent-
 | Expressions and the value helpers | [Expressions](/intelligent-ui/language/expressions#from-code) |
 | `UiState`, `evaluateUiBlock`, bindings and actions | [State and inputs](/intelligent-ui/language/state#uistate) |
 | `@Query`, `uiQueryArguments`, `uiQueryFallback` | [Live queries](/intelligent-ui/host/queries) |
-| `resolveUiChoice`, `uiInputValues`, `uiValidatedState` | [Choices](/intelligent-ui/host/choices) |
+| `resolveUiChoice`, `uiChoiceLabel`, `uiInputValues`, `uiValidatedState` | [Choices](/intelligent-ui/host/choices) |
 | `uiLinkTargets` and the link schemas | [Links](/intelligent-ui/host/links) |

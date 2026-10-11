@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../../../../../../', import.meta.url));
 const PRELOAD = './packages/ui/src/file-tree/testing/preload.ts';
-const files = ['SubagentTimeline.test.ts', 'intelligent-ui/UiReply.queries.test.ts'];
+const files = ['SubagentTimeline.test.ts', 'intelligent-ui/UiReply.queries.test.ts', 'intelligent-ui/UiReply.choices.test.ts'];
 
 // React and Base UI must first load with a DOM; isolate these from the server-rendered suite.
 test.each(files)(

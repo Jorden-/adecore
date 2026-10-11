@@ -2,9 +2,10 @@ import { useId, useState } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, Check } from 'lucide-react';
-import type { UiProps } from '@adecore/intelligent-ui';
+import { uiChoiceLabel, type UiProps } from '@adecore/intelligent-ui';
 import { DisabledReason, Icon, Spinner, Tooltip } from '@adecore/ui';
 import type { UiRendererProps } from '../render-context';
+import { UiFallbackPart } from '../UiFallbackPart';
 import { useLater } from '../use-later';
 
 /* A context this long may run past its two lines, so the row offers all of it in a tooltip. */
@@ -28,7 +29,8 @@ export function ChoicesRenderer({ children, context }: UiRendererProps<UiProps<'
 /*
  * A row that shows what it sends: the label, and under it the context the agent receives. It stays
  * closed while the reply streams, once the block is answered and without a host to send it, and
- * remains focusable then so a screen reader hears why.
+ * remains focusable then so a screen reader hears why. A finished Choice the host would refuse for
+ * its label is no row at all, but its text.
  */
 export function ChoiceRenderer({ node, children, context }: UiRendererProps<UiProps<'Choice'>>) {
     const { t } = useTranslation('agent-chat');
@@ -41,6 +43,9 @@ export function ChoiceRenderer({ node, children, context }: UiRendererProps<UiPr
     const failed = answer === null && context.failedChoiceId === node.id;
     const closed = waiting || unavailable || answer !== null;
     const slow = useLater(chosen && answer.state === 'sending', SPINNER_AFTER_MS);
+    if (!waiting && uiChoiceLabel(node) === null) {
+        return <UiFallbackPart fallback={node.fallback} problem={{ kind: 'failed' }} />;
+    }
     const reason = waiting
         ? t('blocks.choice.waiting')
         : answer === null && unavailable

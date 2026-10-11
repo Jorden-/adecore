@@ -100,7 +100,7 @@ The agents host turns the diagnostics of a final reply into one note in front of
 
 ## Fallbacks
 
-Every node and block carries text a client can show instead: a Stat as `label: value unit`, a Source as `title: url`, a link as its target and description, a Table and a Chart as their data in JSON. A failed part shows its own fallback and its neighbors still draw.
+Every node and block carries text a client can show instead, and another agent reads a reply through it, so it keeps every prop that says something: a Summary with its badge, a Step as `title (state): detail`, a Progress as `label: value of max`, a Stat as `label: value unit (was previous unit)`, a Source as `title: url`, a File as `path:line`, a link as its target and description, a Table as its columns and its rows in JSON, and a Chart as its data in JSON with its unit. Props that only style a node or drive local state (a tone, `primary`, a control's value) are left out. A failed part shows its own fallback, with the text written inside it, and its neighbors still draw. A block keeps the fallback it was compiled with: a reply stored before a change here reads as it did then.
 
 `uiFallbackText(text, blocks)` replaces every fence of a reply with its block's fallback and keeps the prose around it, for a notification, a search index or a client without a renderer. With [`@adecore/agents`](/agents/chats#live-ui-sources), `readableAssistantText(item)` does this for a stored reply. `uiQueryFallback(block, values)` gives the fallback evaluated with query readings; see [Live queries](/intelligent-ui/host/queries#freshness).
 

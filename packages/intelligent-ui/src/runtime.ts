@@ -299,6 +299,25 @@ export function uiInputValues(block: UiBlock, state: UiState): Record<string, Ui
 }
 
 /* The host supplies its stored block; client data can change only declared inputs and Button targets. */
+function hasError(nodes: readonly UiViewNode[]): boolean {
+    return nodes.some((node) => node.error !== undefined || hasError(node.children));
+}
+
+function labelText(nodes: readonly UiViewNode[]): string {
+    return nodes.map((node) => (node.type === '$text' ? String(node.props.text ?? '') : labelText(node.children))).join('');
+}
+
+/*
+ * The label an evaluated Choice sends, on one line, or null when it can never send: it failed, never
+ * closed, part of its label could not be read, or the label is empty. A page draws no open row for null.
+ */
+export function uiChoiceLabel(choice: UiViewNode): string | null {
+    if (choice.error !== undefined || !choice.complete || hasError(choice.children)) {
+        return null;
+    }
+    return labelText(choice.children).replace(/\s+/g, ' ').trim() || null;
+}
+
 export function resolveUiChoice(
     block: UiBlock,
     choiceId: string,
@@ -354,15 +373,9 @@ export function resolveUiChoice(
     if (!choice) {
         throw new UiFailure('refused_choice', 'This choice is not available in the current block.');
     }
-    const text = (nodes: readonly UiViewNode[]): string =>
-        nodes.map((node) => (node.type === '$text' ? String(node.props.text ?? '') : text(node.children))).join('');
-    const hasError = (nodes: readonly UiViewNode[]): boolean => nodes.some((node) => node.error !== undefined || hasError(node.children));
-    if (hasError(choice.children)) {
-        throw new UiFailure('refused_choice', 'The choice label could not be fully read.');
-    }
-    const label = text(choice.children).replace(/\s+/g, ' ').trim();
-    if (!label) {
-        throw new UiFailure('refused_choice', 'A choice needs a visible label.');
+    const label = uiChoiceLabel(choice);
+    if (label === null) {
+        throw new UiFailure('refused_choice', hasError(choice.children) ? 'The choice label could not be fully read.' : 'A choice needs a visible label.');
     }
     return {
         label,

@@ -114,7 +114,7 @@ describe('the frame of a block', () => {
                 shownAsText: 'The block is too large to draw'
             })
         );
-        const order = ['Live', 'Not read', 'Answered with “Fix 2”', '2 fixes', 'Shown as text', 'The block is too large to draw'];
+        const order = ['Live', 'Not read', 'Answered with “Fix 2”', '2 notes', 'Shown as text', 'The block is too large to draw'];
         expect(order.map((words) => html.indexOf(words))).toEqual([...order.map((words) => html.indexOf(words))].sort((a, b) => a - b));
         expect(order.every((words) => html.includes(words))).toBe(true);
         expect(html).toContain('unknown_prop');
@@ -193,6 +193,22 @@ describe('choices', () => {
         const failed = markup(REVIEW, { onChoose: () => undefined, failedChoiceId: choiceId });
         expect(failed).toContain('role="alert"');
         expect(failed).toContain('Could not send. Try again.');
+    });
+});
+
+describe('a choice the host would refuse', () => {
+    test('is drawn as its text with no row to press, once the reply is done', () => {
+        for (const source of [
+            '<Choices><Choice context="Run checks"></Choice></Choices>',
+            '<Choices><Choice context="Run checks">Run checks',
+            '<Choices><Choice context="Run checks">Run {$missing}</Choice></Choices>'
+        ]) {
+            const html = markup(source, { onChoose: () => undefined });
+            expect(html).not.toContain('<button');
+            expect(html).toContain('Could not draw this part');
+            expect(html).toContain('Run checks');
+        }
+        expect(markup('<Choices><Choice context="Run checks">Run checks</Choice></Choices>', { onChoose: () => undefined })).toContain('<button');
     });
 });
 

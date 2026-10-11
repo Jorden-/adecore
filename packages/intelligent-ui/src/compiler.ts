@@ -138,6 +138,11 @@ function isConstant(expression: UiExpression): boolean {
     }
 }
 
+/* Whether a child can give a Choice words: a component, an expression, or text that is more than whitespace. */
+function isLabelSource(child: UiSyntaxNode): boolean {
+    return child.type !== '$text' || child.expression !== undefined || (child.text ?? '').trim() !== '';
+}
+
 export function compileUiBlock(source: string, options: UiCompileOptions): UiBlock {
     const budget = new UiBudget(options.limits, options.now);
     const block: UiBlock = {
@@ -261,14 +266,30 @@ export function compileUiBlock(source: string, options: UiCompileOptions): UiBlo
                     throw new UiFailure('invalid_props', parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; '));
                 }
             }
+            // A Choice sends its label, so one without a label can never send; whether it closed is only known once final.
+            if (syntax.type === 'Choice' && syntax.complete && !syntax.children.some(isLabelSource)) {
+                throw new UiFailure('invalid_props', 'A choice needs a visible label.');
+            }
         } catch (error) {
             rethrowBudget(error);
             node.error = error instanceof UiFailure ? error.code : 'invalid_props';
             diagnose(error, syntax.start, syntax.end, syntax.id);
         }
+        // The parser already diagnosed both, so they only decide how the node draws.
+        if (node.error === undefined && syntax.invalid) {
+            node.error = 'invalid_syntax';
+        }
+        if (node.error === undefined && syntax.type === 'Choice' && options.final && !syntax.complete) {
+            node.error = 'unclosed_tag';
+        }
         const effectiveParent = syntax.type === 'Show' || syntax.type === 'Each' ? parent : syntax.type;
         node.children = syntax.children.map((child) => compile(child, depth + 1, effectiveParent));
-        node.fallback = uiNodeFallback(syntax.type, fallbackProps, node.children.map((child) => child.fallback).join(''));
+        const childText = node.children.map((child) => child.fallback).join('');
+        node.fallback = uiNodeFallback(syntax.type, fallbackProps, childText);
+        // A part drawn as its text keeps the words written inside it, also where its kind reads only props.
+        if (node.error !== undefined && childText.trim() !== '' && !node.fallback.includes(childText.trim())) {
+            node.fallback += childText;
+        }
         if (!node.fallback.trim()) {
             node.fallback = source.slice(syntax.start, Math.min(syntax.end, syntax.start + 1024));
         }

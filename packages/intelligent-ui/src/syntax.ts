@@ -17,6 +17,8 @@ export interface UiSyntaxNode {
     text?: string;
     expression?: UiExpression;
     complete: boolean;
+    /* Set when a prop could not be read, so the node draws as its text even though its tag closed. */
+    invalid?: boolean;
     start: number;
     end: number;
 }
@@ -230,78 +232,138 @@ class UiParser {
                     node.end = this.position;
                     return;
                 }
-                this.stack.push(node);
-                return;
-            }
-            const prop = /^[A-Za-z_][A-Za-z_\d]*/.exec(this.source.slice(this.position));
-            if (!prop) {
-                if (this.position === this.source.length && !this.final) {
-                    return;
-                }
-                throw new UiFailure('invalid_prop', 'Expected a named prop.');
-            }
-            const name = safeKey(prop[0]);
-            this.position += name.length;
-            this.whitespace();
-            if (!this.finish('=')) {
-                return;
-            }
-            this.whitespace();
-            let value: string;
-            if (this.source[this.position] === '{') {
-                const body = this.balanced();
-                if (!body.complete) {
-                    return;
-                }
-                value = body.value;
-            } else {
-                const quote = this.source[this.position];
-                if (quote !== '"' && quote !== "'") {
-                    if (!this.final && this.position === this.source.length) {
-                        return;
-                    }
-                    throw new UiFailure('invalid_prop', 'Use a quoted string or a braced expression.');
-                }
-                const valueStart = this.position++;
-                let escaped = false;
-                let closed = false;
-                while (this.position < this.source.length) {
-                    this.budget.step();
-                    const character = this.source[this.position++];
-                    if (escaped) {
-                        escaped = false;
-                    } else if (character === '\\') {
-                        escaped = true;
-                    } else if (character === quote) {
-                        closed = true;
-                        break;
-                    }
-                }
-                if (!closed && !this.final) {
-                    value = this.source.slice(valueStart, this.position);
-                    if (escaped) {
-                        value = value.slice(0, -1);
-                    }
-                    try {
-                        node.props[name] = parseUiExpression(`${value}${quote}`, this.budget);
-                    } catch (error) {
-                        if (error instanceof UiFailure && error.code === 'budget_exceeded') {
-                            throw error;
-                        }
-                    }
+                // A tag that lost a prop and has no closing tag anywhere after it was meant to close itself.
+                if (node.invalid && this.final && !this.source.includes(`</${node.type}>`, this.position)) {
+                    node.complete = true;
                     node.end = this.position;
                     return;
                 }
-                value = this.source.slice(valueStart, this.position);
+                this.stack.push(node);
+                return;
             }
-            if (Object.hasOwn(node.props, name)) {
-                throw new UiFailure('duplicate_prop', `Duplicate prop ${name}.`);
+            const propStart = this.position;
+            try {
+                if (!this.prop(node)) {
+                    return;
+                }
+            } catch (error) {
+                if (error instanceof UiFailure && error.code === 'budget_exceeded') {
+                    throw error;
+                }
+                this.diagnose(error, propStart, node.id);
+                node.invalid = true;
+                this.skipToken();
             }
-            node.props[name] = parseUiExpression(value, this.budget);
         }
         node.end = this.position;
         if (this.final) {
             this.diagnose(new UiFailure('unclosed_tag', `The ${node.type} tag is incomplete.`), start, node.id);
+        }
+    }
+
+    /* Reads one prop into the node; false while a streaming prop waits for more text. */
+    private prop(node: UiSyntaxNode): boolean {
+        // At the end of the text the tag waits while it streams, and is reported incomplete once final.
+        if (this.position === this.source.length) {
+            return false;
+        }
+        const prop = /^[A-Za-z_][A-Za-z_\d]*/.exec(this.source.slice(this.position));
+        if (!prop) {
+            throw new UiFailure('invalid_prop', 'Expected a named prop.');
+        }
+        const name = safeKey(prop[0]);
+        this.position += name.length;
+        this.whitespace();
+        if (this.position === this.source.length && !this.final) {
+            return false;
+        }
+        if (this.source[this.position] !== '=') {
+            // A bare name is true, as in JSX.
+            if (Object.hasOwn(node.props, name)) {
+                throw new UiFailure('duplicate_prop', `Duplicate prop ${name}.`);
+            }
+            node.props[name] = parseUiExpression('true', this.budget);
+            return true;
+        }
+        this.position += 1;
+        this.whitespace();
+        let value: string;
+        if (this.source[this.position] === '{') {
+            const body = this.balanced();
+            if (!body.complete) {
+                return false;
+            }
+            value = body.value;
+        } else {
+            const quote = this.source[this.position];
+            if (quote !== '"' && quote !== "'") {
+                if (!this.final && this.position === this.source.length) {
+                    return false;
+                }
+                throw new UiFailure('invalid_prop', 'Use a quoted string or a braced expression.');
+            }
+            const valueStart = this.position++;
+            let escaped = false;
+            let closed = false;
+            while (this.position < this.source.length) {
+                this.budget.step();
+                const character = this.source[this.position++];
+                if (escaped) {
+                    escaped = false;
+                } else if (character === '\\') {
+                    escaped = true;
+                } else if (character === quote) {
+                    closed = true;
+                    break;
+                }
+            }
+            if (!closed && !this.final) {
+                value = this.source.slice(valueStart, this.position);
+                if (escaped) {
+                    value = value.slice(0, -1);
+                }
+                try {
+                    node.props[name] = parseUiExpression(`${value}${quote}`, this.budget);
+                } catch (error) {
+                    if (error instanceof UiFailure && error.code === 'budget_exceeded') {
+                        throw error;
+                    }
+                }
+                node.end = this.position;
+                return false;
+            }
+            value = this.source.slice(valueStart, this.position);
+        }
+        if (Object.hasOwn(node.props, name)) {
+            throw new UiFailure('duplicate_prop', `Duplicate prop ${name}.`);
+        }
+        node.props[name] = parseUiExpression(value, this.budget);
+        return true;
+    }
+
+    /* Skips a prop that could not be read, up to the next space or the end of its tag, so only that prop is lost. */
+    private skipToken(): void {
+        let quote = '';
+        let depth = 0;
+        while (this.position < this.source.length) {
+            this.budget.step();
+            const character = this.source[this.position];
+            if (quote) {
+                if (character === '\\') {
+                    this.position += 1;
+                } else if (character === quote) {
+                    quote = '';
+                }
+            } else if (character === '"' || character === "'") {
+                quote = character;
+            } else if (character === '{') {
+                depth += 1;
+            } else if (character === '}') {
+                depth = Math.max(0, depth - 1);
+            } else if (depth === 0 && (/\s/.test(character) || character === '>' || this.source.startsWith('/>', this.position))) {
+                break;
+            }
+            this.position += 1;
         }
     }
 

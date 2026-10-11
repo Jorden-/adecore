@@ -37,6 +37,8 @@ It throws a `UiFailure` with one of these codes:
 | `invalid_value`    | A value no visible control could have produced, or of another type      |
 | `budget_exceeded`  | Evaluating the block ran out of budget                                  |
 
+`uiChoiceLabel(node)` gives the label an evaluated Choice would send, or `null` when the host would refuse it for its label: the node failed or never closed, part of its label could not be read, or the label is empty. A page draws a Choice with `null` as its text and never as a row a person can press, so it offers nothing the host refuses. The compiler already marks a final Choice that never closed (`unclosed_tag`) or has no label (`invalid_props`), so a client without this check draws those as their fallback too.
+
 The fourth argument holds query values. The caller supplies them from its own readings; the client's input map can never set a query.
 
 ## What a person could have set

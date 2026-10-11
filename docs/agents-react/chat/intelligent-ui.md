@@ -50,7 +50,7 @@ const element = renderer === null ? null : createElement(renderer, { node, conte
 
 A renderer gets `UiRendererProps`: the evaluated `UiViewNode`, its rendered `children` and the `UiRenderContext` of the block. The context names the block, its `phase` (`streaming` or `final`) and its `answer`, and passes on the host callbacks as `link`, `openLink`, `openUrl` and `onChoose`. An input changes state only through `node.bindings.value.onValueChange`, and a Button only through `node.onAction()`.
 
-`UiBlockFrame` is the card around a block, with its footer for live status, the answer and repairs. `UiFallbackPart` draws a part this version cannot draw as the Markdown it stands for. The [reference](/agents-react/reference#intelligent-ui) lists every module and its exports.
+`UiBlockFrame` is the card around a block, with its footer for live status, the answer and the notes of the compiler. `UiFallbackPart` draws a part this version cannot draw as the Markdown it stands for, and so does a Choice the host would refuse for its label. The [reference](/agents-react/reference#intelligent-ui) lists every module and its exports.
 
 ## Words and accessibility
 

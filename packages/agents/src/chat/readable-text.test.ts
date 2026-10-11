@@ -23,6 +23,17 @@ describe('the readable text of an assistant', () => {
         expect(text.endsWith('After.')).toBe(true);
     });
 
+    test('keeps what a block says beyond its titles: a step state and detail, a badge, a unit', () => {
+        const text = readableAssistantText(
+            reply(
+                '```ui\n<Summary badge="2 blocking">Review</Summary><Steps><Step state="pending" detail="Make a backup first; otherwise changes are lost.">Migration</Step></Steps><Stats><Stat label="Build" value={42} unit="s"/></Stats>\n```'
+            )
+        );
+        expect(text).toContain('Review (2 blocking)');
+        expect(text).toContain('Migration (pending): Make a backup first; otherwise changes are lost.');
+        expect(text).toContain('Build: 42 s');
+    });
+
     test('takes the frozen fallback of a block only at the revision it was frozen for', () => {
         const item = reply('```ui\n<Summary>Overview</Summary>\n```');
         const block = item.ui![0]!;

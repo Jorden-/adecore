@@ -33,6 +33,7 @@ export {
     UiState,
     uiInputValues,
     resolveUiChoice,
+    uiChoiceLabel,
     type UiChoiceSelection,
     type UiBinding,
     type UiEvaluation,
