@@ -1,6 +1,7 @@
 import type { Highlighter, ThemeRegistration, ThemedToken } from 'shiki';
 import { shikiDocumentTokens } from './shiki-document.ts';
 import { documentLanguageOf } from './shiki.ts';
+import type { LineToken } from './types.ts';
 
 export interface DiffSyntaxDocument {
     readonly language: string;
@@ -103,6 +104,23 @@ function packedTokens(
     }
     lines[tokens.length] = cursor / 3;
     return { type: 'tokens', generation, index, colors, ...appearance, lines, tokens: packed };
+}
+
+/* The packet omits text and token lengths; its source line supplies the final token's end. */
+export function lineTokensOf(packet: DiffSyntaxTokens, line: number, text: string): LineToken[] {
+    if (!Number.isInteger(line) || line < 0 || line + 1 >= packet.lines.length) {
+        throw new RangeError('Unknown syntax line');
+    }
+    const result: LineToken[] = [];
+    const end = packet.lines[line + 1]!;
+    for (let index = packet.lines[line]!; index < end; index++) {
+        const from = packet.tokens[index * 3]!;
+        const to = index + 1 < end ? packet.tokens[(index + 1) * 3]! : text.length;
+        if (to > from) {
+            result.push({ length: to - from, color: packet.colors[packet.tokens[index * 3 + 1]!] ?? '', fontStyle: packet.tokens[index * 3 + 2]! });
+        }
+    }
+    return result;
 }
 
 export function createSyntaxService(options: DiffSyntaxServiceOptions): DiffSyntaxService {

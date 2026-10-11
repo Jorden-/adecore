@@ -2,6 +2,7 @@ import { describe, expect, spyOn, test } from 'bun:test';
 import { createHighlighter, type Highlighter, type ThemeRegistration } from 'shiki';
 import {
     createSyntaxService,
+    lineTokensOf,
     serveDiffSyntax,
     type DiffSyntaxDocument,
     type DiffSyntaxInput,
@@ -90,6 +91,34 @@ describe('diff syntax service', () => {
         expect(slices(tokens()[0]!, block)).toEqual(
             expected.map((line) => line.map((token) => ({ content: token.content, color: token.color ?? '', fontStyle: token.fontStyle ?? 0 })))
         );
+        service.dispose();
+    });
+
+    test('decodes transferred tokens with exact UTF-16 lengths, styles and default colors', async () => {
+        using highlighter = await createHighlighter({ themes: [THEME], langs: ['typescript'] });
+        const { service, tokens } = harness(highlighter);
+        const block = 'const cat = "😺";\r\n\r\n/* comment */';
+        await service.handle({ type: 'request', generation: 1, index: 0, document: { ...DOCUMENT, blocks: [block] } });
+        const packet = tokens()[0]!;
+        const expected = highlighter.codeToTokensBase(block, { lang: 'typescript', theme: THEME, tokenizeTimeLimit: 0 });
+        for (const [index, text] of block.split(/\r\n|\n/).entries()) {
+            const decoded = lineTokensOf(packet, index, text);
+            expect(decoded).toEqual(
+                expected[index]!.filter((token) => token.content.length > 0).map((token) => ({
+                    length: token.content.length,
+                    color: token.color ?? '',
+                    fontStyle: token.fontStyle ?? 0
+                }))
+            );
+            expect(decoded.reduce((length, token) => length + token.length, 0)).toBe(text.length);
+        }
+        expect(() => lineTokensOf(packet, -1, '')).toThrow(RangeError);
+        expect(() => lineTokensOf(packet, 3, '')).toThrow(RangeError);
+        const plain = { ...packet, lines: new Uint32Array([0, 2]), tokens: new Uint32Array([0, 0, 1, 2, 0, 6]) };
+        expect(lineTokensOf(plain, 0, 'abcd')).toEqual([
+            { length: 2, color: '', fontStyle: 1 },
+            { length: 2, color: '', fontStyle: 6 }
+        ]);
         service.dispose();
     });
 
