@@ -260,7 +260,11 @@ export function createSyntaxService(options: DiffSyntaxServiceOptions): DiffSynt
                 entries.clear();
                 count = 0;
                 ready = options.highlighter().then(async (loaded) => {
-                    await loaded.loadTheme(...message.themes);
+                    const known = new Set(loaded.getLoadedThemes());
+                    const missing = message.themes.filter((theme) => theme.name === undefined || !known.has(theme.name));
+                    if (missing.length > 0) {
+                        await loaded.loadTheme(...missing);
+                    }
                     return loaded;
                 });
                 return ready.then(

@@ -11,6 +11,9 @@ import type { DiffSourceSide, DiffSourceTokens } from './diff-syntax.ts';
 async function pageTest(run: (page: ReturnType<typeof createPage>, root: ReturnType<typeof createRoot>) => Promise<void>): Promise<void> {
     const page = createPage();
     const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    // LinkeDOM writes window frame functions into the process globals.
+    const frameNames = ['requestAnimationFrame', 'cancelAnimationFrame'] as const;
+    const previousFrames = frameNames.map((name) => Object.getOwnPropertyDescriptor(globalThis, name));
     Object.defineProperty(globalThis, 'window', { value: page.window, configurable: true });
     const globals = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
     const previousAct = globals.IS_REACT_ACT_ENVIRONMENT;
@@ -21,6 +24,14 @@ async function pageTest(run: (page: ReturnType<typeof createPage>, root: ReturnT
     } finally {
         await act(async () => root.unmount());
         globals.IS_REACT_ACT_ENVIRONMENT = previousAct;
+        for (const [index, name] of frameNames.entries()) {
+            const previous = previousFrames[index];
+            if (previous === undefined) {
+                Reflect.deleteProperty(globalThis, name);
+            } else {
+                Object.defineProperty(globalThis, name, previous);
+            }
+        }
         if (previousWindow === undefined) {
             Reflect.deleteProperty(globalThis, 'window');
         } else {
@@ -149,5 +160,85 @@ test('partial patches keep original numbers and deletion-only or empty displays 
         expect(editor!.getText()).toBe('');
         expect(page.host.querySelector('.se-line-number > span:first-child')!.textContent).toBe('');
         expect((page.host.querySelector('.adecore-editor-diff') as HTMLElement).style.height).toBe('100%');
+    });
+});
+
+test('a capped diff only paints and requests tokens for its own visible rows', async () => {
+    await pageTest(async (page, root) => {
+        const fresh = Array.from({ length: 2000 }, (_, index) => `added ${index}`).join('\n');
+        const document = snapshots('', fresh);
+        const core = createSmartEditorEngine({ tokenizer: async () => null });
+        let editor: Editor | undefined;
+        const engine: EditorEngine = {
+            mount(host, options) {
+                editor = core.mount(host, options);
+                Object.defineProperty(host.querySelector('.se-viewport')!, 'clientHeight', { value: 200 });
+                return editor;
+            }
+        };
+        const requested = new Set<number>();
+        const tokens: DiffSourceTokens = {
+            get: (_side, index) => {
+                requested.add(index);
+                return undefined;
+            },
+            subscribe: () => () => {}
+        };
+        await act(async () => root.render(createElement(DiffView, { engine, document, tokens, maxHeight: 200, theme: 'github-dark', label: 'Review' })));
+        expect(editor!.getContentHeight()).toBeGreaterThan(200);
+        expect((page.host.querySelector('.adecore-editor-diff') as HTMLElement).style.height).toBe('200px');
+        expect(page.host.querySelector('.adecore-editor-diff')!.getAttribute('data-scroll')).toBe('true');
+        expect(page.host.querySelectorAll('.se-line').length).toBeLessThan(100);
+        expect(Math.max(...requested)).toBeLessThan(100);
+    });
+});
+
+test('token arrivals coalesce per frame and cancel a scheduled repaint on unmount', async () => {
+    await pageTest(async (page, root) => {
+        const frames = new Map<number, FrameRequestCallback>();
+        let next = 0;
+        Object.assign(page.window, {
+            requestAnimationFrame: (callback: FrameRequestCallback) => {
+                frames.set(++next, callback);
+                return next;
+            },
+            cancelAnimationFrame: (id: number) => {
+                frames.delete(id);
+            }
+        });
+        const colors = syntax();
+        const core = createSmartEditorEngine({ tokenizer: async () => null });
+        let paints = 0;
+        const engine: EditorEngine = {
+            mount(host, options) {
+                const editor = core.mount(host, options);
+                const original = editor.setLineTokens.bind(editor);
+                editor.setLineTokens = (provider) => {
+                    paints++;
+                    original(provider);
+                };
+                return editor;
+            }
+        };
+        const document = snapshots('old', 'new');
+        await act(async () => root.render(createElement(DiffView, { engine, document, tokens: colors.source, theme: 'github-dark', label: 'Review' })));
+        const before = paints;
+        await act(async () => {
+            colors.set('old', 0, [{ length: 3, color: '#336699', fontStyle: 0 }]);
+            colors.set('new', 0, [{ length: 3, color: '#336699', fontStyle: 0 }]);
+        });
+        expect(paints).toBe(before);
+        expect(frames.size).toBe(1);
+        await act(async () => {
+            const [id, callback] = frames.entries().next().value!;
+            frames.delete(id);
+            callback(0);
+        });
+        expect(paints).toBe(before + 1);
+        await act(async () => colors.set('old', 0, null));
+        expect(frames.size).toBe(1);
+        await act(async () => root.render(null));
+        expect(frames.size).toBe(0);
+        expect(colors.listeners.size).toBe(0);
     });
 });

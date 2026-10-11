@@ -140,6 +140,19 @@ describe('diff syntax service', () => {
         service.dispose();
     });
 
+    test('starting on a borrowed highlighter preserves already loaded theme identities', async () => {
+        const custom: ThemeRegistration = { name: 'borrowed', type: 'dark', settings: [{ settings: { foreground: '#FFFFFF', background: '#000000' } }] };
+        using highlighter = await createHighlighter({ themes: [custom], langs: [] });
+        const original = highlighter.getTheme('borrowed');
+        const load = spyOn(highlighter, 'loadTheme');
+        const { service } = harness(highlighter);
+        await service.handle({ type: 'start', themes: [custom], maxLines: 100 });
+        expect(load).not.toHaveBeenCalled();
+        expect(highlighter.getTheme('borrowed')).toBe(original);
+        service.dispose();
+        load.mockRestore();
+    });
+
     test('loads custom themes before serving requests', async () => {
         using highlighter = await createHighlighter({ themes: [], langs: [] });
         const { service, tokens } = harness(highlighter);

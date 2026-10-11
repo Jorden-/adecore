@@ -85,7 +85,7 @@ A `DiffSyntaxWorkerEndpoint` supplies message listeners and `postMessage(message
 
 | Type | Payload | Behavior |
 | --- | --- | --- |
-| `start` | `themes`, `maxLines` | Load JSON custom themes before requests, clear earlier documents, and set a positive line-count cache budget. |
+| `start` | `themes`, `maxLines` | Load missing JSON custom themes before requests, retain already loaded theme objects, clear earlier documents, and set a positive line-count cache budget. |
 | `request` | `generation`, `index`, optional `document` | Return tokens for a block. Send the document on its first request and after a cache miss. |
 | `cancel` | `generation` | Drop queued requests and suppress late responses, retaining computed tokens. |
 | `dispose` | `generation` | Cancel requests and remove that document from the cache. |

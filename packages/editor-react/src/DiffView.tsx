@@ -16,6 +16,8 @@ export interface DiffViewProps {
     wrap?: boolean;
     /* A fixed-height host supplies the height; otherwise the view grows with its rows. */
     fill?: boolean;
+    /* Positive pixels; taller content scrolls inside the editor. Ignored with fill. */
+    maxHeight?: number;
     label: string;
     className?: string;
     ref?: Ref<HTMLDivElement>;
@@ -91,7 +93,7 @@ function DiffOverlays({ mounted, display, unfold }: { mounted: MountedDiff; disp
     );
 }
 
-export function DiffView({ engine, document, theme, tokens, wrap = true, fill = false, label, className, ref, onMount }: DiffViewProps) {
+export function DiffView({ engine, document, theme, tokens, wrap = true, fill = false, maxHeight, label, className, ref, onMount }: DiffViewProps) {
     const [expanded, setExpanded] = useState<{ document: DiffDocument; gaps: ReadonlyMap<number, number> }>(() => ({ document, gaps: new Map() }));
     const display = useMemo(() => diffDisplay(document, expanded.document === document ? expanded.gaps : undefined), [document, expanded]);
     const emphasis = useMemo(() => wordMarks(document), [document]);
@@ -189,15 +191,49 @@ export function DiffView({ engine, document, theme, tokens, wrap = true, fill = 
             });
         };
         refresh();
-        return tokens?.subscribe(refresh);
+        const window = element.current?.ownerDocument.defaultView;
+        let pending = false;
+        let stopped = false;
+        let frame: number | undefined;
+        const schedule = (): void => {
+            if (pending) {
+                return;
+            }
+            pending = true;
+            const paint = (): void => {
+                pending = false;
+                if (!stopped) {
+                    refresh();
+                }
+            };
+            if (window?.requestAnimationFrame !== undefined) {
+                frame = window.requestAnimationFrame(paint);
+            } else {
+                queueMicrotask(paint);
+            }
+        };
+        const stop = tokens?.subscribe(schedule);
+        return () => {
+            stopped = true;
+            stop?.();
+            if (frame !== undefined) {
+                window?.cancelAnimationFrame?.(frame);
+            }
+        };
     }, [mounted, engine, tokens, display]);
     useLayoutEffect(() => {
         if (mounted !== null && mounted.engine === engine) {
             return onMount?.(mounted.editor);
         }
     }, [mounted, engine, onMount]);
+    const limit = maxHeight !== undefined && Number.isFinite(maxHeight) && maxHeight > 0 ? maxHeight : Infinity;
     return (
-        <div className={`adecore-editor-diff ${className ?? ''}`} ref={ref} style={{ position: 'relative', minHeight: 0, height: fill ? '100%' : height }}>
+        <div
+            className={`adecore-editor-diff ${className ?? ''}`}
+            ref={ref}
+            data-scroll={fill || height > limit}
+            style={{ position: 'relative', minHeight: 0, height: fill ? '100%' : Math.min(height, limit) }}
+        >
             <div ref={element} style={{ position: 'absolute', inset: 0 }} />
             {mounted !== null && mounted.engine === engine && (
                 <DiffOverlays

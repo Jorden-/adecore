@@ -57,3 +57,7 @@
     font-family: var(--font-sans);
     font-size: var(--text-sm);
 }
+
+.adecore-editor-diff[data-scroll='false'] .se-viewport {
+    overflow-y: hidden;
+}

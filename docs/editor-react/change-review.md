@@ -4,7 +4,7 @@ The editor draws what an agent proposed or wrote; these parts give that a React 
 
 ## DiffView
 
-`DiffView` (`DiffViewProps`) is a read-only unified diff in the editor engine, supplied through `engine`. Pass a `DiffDocument` from [`@adecore/merge`](/merge/lines), a syntax `theme` and an accessible `label`. Optional `wrap` defaults to true. With `fill`, the parent supplies its height; otherwise the component grows to the editor's content height. `className` and `ref` belong to the outer element. `onMount(editor)` can attach a find bar or editor commands and return a cleanup function.
+`DiffView` (`DiffViewProps`) is a read-only unified diff in the editor engine, supplied through `engine`. Pass a `DiffDocument` from [`@adecore/merge`](/merge/lines), a syntax `theme` and an accessible `label`. Optional `wrap` defaults to true. With `fill`, the parent supplies its height; otherwise the component grows to the editor's content height. Set a positive `maxHeight` in pixels to bound that growth: taller diffs scroll internally and keep editor virtualization. It is ignored with `fill`; invalid or nonpositive limits leave the height unbounded. Token arrivals coalesce into one repaint per animation frame. `className` and `ref` belong to the outer element. `onMount(editor)` can attach a find bar or editor commands and return a cleanup function.
 
 ```tsx
 import { DiffView } from '@adecore/editor-react';
