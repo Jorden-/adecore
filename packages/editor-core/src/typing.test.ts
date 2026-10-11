@@ -350,3 +350,89 @@ describe('backspace in the indentation of a bracketed language', () => {
         expect(backspace('/*\n        ¦x\n*/')).toBe('/*\n    ¦x\n*/');
     });
 });
+
+describe('PHP markup attribute quotes', () => {
+    it('pairs quotes after an attribute equals sign, including across lines', () => {
+        for (const quote of ['"', "'"]) {
+            for (const source of [
+                '<div title=¦>',
+                '<div title= ¦/>',
+                '<div\n title=\n ¦>',
+                '<a href="<?= $url ?>" title=¦>',
+                '<div title=<?= $value ?> other=¦>'
+            ]) {
+                type(source, quote, source.replace('¦', quote + '¦' + quote), { language: 'php' });
+            }
+        }
+    });
+
+    it('steps over attribute closers after PHP returns and on multiline values', () => {
+        type('<a title="<?= $title ?>¦">', '"', '<a title="<?= $title ?>"¦>', { language: 'php' });
+        type('<div title="first\nsecond¦">', '"', '<div title="first\nsecond"¦>', { language: 'php' });
+        type("<div title='¦'>", "'", "<div title=''¦>", { language: 'php' });
+    });
+
+    it('removes an empty attribute pair with backspace', () => {
+        for (const quote of ['"', "'"]) {
+            const source = '<div\n title= ' + quote + quote + '>';
+            const model = new DocumentModel(source);
+            const at = source.indexOf(quote) + 1;
+            model.setSelections([{ anchor: at, head: at }]);
+            model.execute('smartBackspace', { language: 'php' });
+            expect(model.getText()).toBe('<div\n title= >');
+            expect(model.getSelections()[0]!.head).toBe(at - 1);
+        }
+    });
+
+    it('keeps pairing, step-over and backspace correct after undo and redo', () => {
+        const source = '<div title=>';
+        for (const action of ['type', 'backspace']) {
+            const model = new DocumentModel(source);
+            const at = source.indexOf('>');
+            model.setSelections([{ anchor: at, head: at }]);
+            model.typeText('"', { language: 'php' });
+            expect(model.getText()).toBe('<div title="">');
+            expect(model.undo()).toBe(true);
+            expect(model.getText()).toBe(source);
+            expect(model.redo()).toBe(true);
+            if (action === 'type') {
+                model.typeText('"', { language: 'php' });
+                expect(model.getText()).toBe('<div title="">');
+                expect(model.getSelections()[0]!.head).toBe(at + 2);
+            } else {
+                model.execute('smartBackspace', { language: 'php' });
+                expect(model.getText()).toBe(source);
+            }
+        }
+    });
+
+    it('respects pairing preferences and leaves text, comments, raw content and unquoted values alone', () => {
+        for (const source of [
+            '<p>don¦t</p>',
+            '<!-- title=¦ -->',
+            '<script>title=¦</script>',
+            '<style>title=¦</style>',
+            '<div title=value¦>',
+            '<div title=¦word>'
+        ]) {
+            type(source, "'", source.replace('¦', "'¦"), { language: 'php' });
+        }
+        type('<div title=¦>', '"', '<div title="¦>', { language: 'php', autoClosingQuotes: false });
+        type('<div title=¦>', '`', '<div title=`¦>', { language: 'php' });
+        type('<div title=¦>', '(', '<div title=(¦>', { language: 'php' });
+        type('<script>¦</script>', '(', '<script>(¦</script>', { language: 'php' });
+    });
+
+    it('pairs independently at several attribute carets', () => {
+        const source = '<div title=>\n<a href=>';
+        const model = new DocumentModel(source);
+        model.setSelections([
+            { anchor: 11, head: 11 },
+            { anchor: source.length - 1, head: source.length - 1 }
+        ]);
+        model.typeText('"', { language: 'php' });
+        expect(model.getText()).toBe('<div title="">\n<a href="">');
+        model.execute('smartBackspace', { language: 'php' });
+        expect(model.getText()).toBe(source);
+    });
+});

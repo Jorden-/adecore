@@ -858,7 +858,10 @@ export class DocumentModel {
         if (arrow && context?.mode === 'code' && context.word !== 'control-close' && this.endsOperand(from)) {
             return { from, to, text, anchor: 1, head: 1, arrow: true };
         }
-        const insideQuote = context && (context.mode === 'quote' || context.mode === 'template') && context.quote === text && !context.escaped;
+        const insideQuote =
+            context &&
+            (((context.mode === 'quote' || context.mode === 'template') && context.quote === text && !context.escaped) ||
+                (context.mode === 'html' && context.markup === 'value' && context.markupQuote === text));
         if (pairing && from === to && after === text && (quote ? insideQuote : context?.mode === 'code' && context.bracket?.close === text)) {
             return { from, to, text: '', anchor: 1, head: 1, skip: true };
         }
@@ -937,6 +940,9 @@ export class DocumentModel {
     }
 
     private shouldClosePair(offset: number, opener: string, after: string, context: TypingContext | undefined, input: TypingInput): boolean {
+        if (context?.mode === 'html') {
+            return context.markup === 'equals' && (opener === '"' || opener === "'") && (!after || /[\s>/]/u.test(after));
+        }
         const interpolation = this.isInterpolation(offset, opener, context);
         const quote = isQuote(opener);
         const followedByTerminator = quote ? !identifier.test(after) && after !== opener : !after || /[\s)\]}>,;:]/u.test(after);
@@ -1692,6 +1698,10 @@ export class DocumentModel {
             return false;
         }
         const context = this.typingContext(offset - 1, language);
+        if (context.mode === 'html' && context.markup === 'equals' && (opener === '"' || opener === "'")) {
+            const inside = this.typingContext(offset, language);
+            return inside.mode === 'html' && inside.markup === 'value' && inside.markupQuote === opener;
+        }
         return context.mode === 'code' || this.isInterpolation(offset - 1, opener, context);
     }
 
