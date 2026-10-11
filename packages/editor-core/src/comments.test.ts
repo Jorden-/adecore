@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, test } from 'bun:test';
 import { DocumentModel } from './document.ts';
 import type { CommandOptions, EditorCommand } from './types.ts';
 
@@ -384,4 +384,67 @@ describe('embedded selections keep their region boundaries', () => {
         model.execute('toggleLineComment', { language: 'vue' });
         expect(model.getText()).toBe(source);
     });
+});
+
+describe('PHP tag scans preserve comments and malformed input', () => {
+    it('finds a script after many malformed tag starts', () => {
+        const source = '<a'.repeat(1000) + '<script>\nrun();\n</script>';
+        const model = new DocumentModel(source);
+        const at = model.getLine(1).start;
+        model.setSelections([{ anchor: at, head: at }]);
+        model.execute('toggleLineComment', { language: 'php' });
+        expect(model.getLine(1).text).toBe('// run();');
+    });
+    it('keeps PHP expressions inside script attributes within the opening tag', () => {
+        for (const expression of ['$nonce', '"?>"']) {
+            const source = `<script <?= ${expression} ?>>\nrun();\n</script>`;
+            const model = new DocumentModel(source);
+            const at = model.getLine(1).start;
+            model.setSelections([{ anchor: at, head: at }]);
+            model.execute('toggleLineComment', { language: 'php' });
+            expect(model.getLine(1).text).toBe('// run();');
+        }
+    });
+    it('skips every line of a multiline HTML comment without closing it early', () => {
+        const source = '<!--\n<p>protected</p>\n-->\n<p>outside</p>';
+        for (let line = 0; line < 3; line++) {
+            const model = new DocumentModel(source);
+            const at = model.getLine(line).start;
+            model.setSelections([{ anchor: at, head: at }]);
+            expect(model.execute('toggleLineComment', { language: 'php' })).toBe(false);
+            expect(model.getText()).toBe(source);
+        }
+    });
+    it('still unwraps a complete one-line HTML comment', () => {
+        const model = new DocumentModel('<!-- <p>text</p> -->');
+        model.execute('toggleLineComment', { language: 'php' });
+        expect(model.getText()).toBe('<p>text</p>');
+    });
+    it('does not close an HTML comment at a marker in a PHP string', () => {
+        const source = '<!--\n<?php echo "-->"; ?>\n<p>protected</p>\n-->\n<p>outside</p>';
+        const model = new DocumentModel(source);
+        let at = model.getLine(2).start;
+        model.setSelections([{ anchor: at, head: at }]);
+        expect(model.execute('toggleLineComment', { language: 'php' })).toBe(false);
+        at = model.getLine(4).start;
+        model.setSelections([{ anchor: at, head: at }]);
+        model.execute('toggleLineComment', { language: 'php' });
+        expect(model.getLine(4).text).toBe('<!-- <p>outside</p> -->');
+    });
+    it('does not close a raw script at a namespaced tag', () => {
+        const model = new DocumentModel('<script>\n</script:other>\nrun();\n</script>');
+        const at = model.getLine(2).start;
+        model.setSelections([{ anchor: at, head: at }]);
+        model.execute('toggleLineComment', { language: 'php' });
+        expect(model.getLine(2).text).toBe('// run();');
+    });
+});
+
+test('PHP comment scanning falls back before repeated whole-line context queries exceed its budget', () => {
+    const source = '<div></div>'.repeat(1000) + '<script>\nrun();\n</script>';
+    const model = new DocumentModel(source);
+    const at = model.getLine(1).start;
+    model.setSelections([{ anchor: at, head: at }]);
+    expect(model.execute('toggleLineComment', { language: 'php' })).toBe(false);
+    expect(model.getText()).toBe(source);
 });

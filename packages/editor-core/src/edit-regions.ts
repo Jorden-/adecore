@@ -19,7 +19,7 @@ function mixedPhpLine(source: EditSource, line: number): boolean {
     const bounds = source.line(line);
     let work = SCAN_LIMIT;
     for (const match of bounds.text.matchAll(/<\?(?:php\b|=)|\?>/g)) {
-        work -= match.index + 1;
+        work -= bounds.text.length + 1;
         if (work < 0) {
             return true;
         }
@@ -39,11 +39,60 @@ function mixedPhpLine(source: EditSource, line: number): boolean {
 function phpTags(source: EditSource, end: number): TagRegion[] | null {
     const regions: TagRegion[] = [];
     const text = source.slice(0, end);
-    const tags = /<!--[\s\S]*?(?:-->|$)|<(\/?)([a-z][\w:-]*)\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi;
-    const closing = { script: /<\/script\b[^>]*>/gi, style: /<\/style\b[^>]*>/gi };
+    const tags = /<!--|<(\/?)([a-z][\w:-]*)(?=[\s/>])/gi;
+    const closing = { script: /<\/script(?=[\s/>])[^<>]*>/gi, style: /<\/style(?=[\s/>])[^<>]*>/gi };
+    let work = SCAN_LIMIT;
+    let exhausted = false;
+    const modeAt = (offset: number) => {
+        const line = source.line(source.lineAt(offset));
+        // PHP markup lookup searches the whole line for its next opening tag.
+        work -= line.text.length + 1;
+        if (work < 0) {
+            exhausted = true;
+            return null;
+        }
+        return source.context(offset).mode;
+    };
+    const phpEnd = (from: number): number => {
+        let close = text.indexOf('?>', from);
+        while (close >= 0 && close < end) {
+            const mode = modeAt(close);
+            if (exhausted) {
+                return end;
+            }
+            if (mode === 'code' || mode === 'line-comment') {
+                return close + 2;
+            }
+            close = text.indexOf('?>', close + 2);
+        }
+        return end;
+    };
+    const tagEnd = (from: number): { at: number; closed: boolean } => {
+        let quote: string | null = null;
+        let at = from;
+        while (at < end) {
+            const char = text[at]!;
+            if (char === '<' && text[at + 1] === '?' && /^<\?(?:php\b|=)/.test(text.slice(at, at + 8))) {
+                at = phpEnd(at + 3);
+                continue;
+            }
+            if (quote !== null) {
+                if (char === quote) {
+                    quote = null;
+                }
+            } else if (char === '"' || char === "'") {
+                quote = char;
+            } else if (char === '>') {
+                return { at: at + 1, closed: true };
+            } else if (char === '<') {
+                return { at, closed: false };
+            }
+            at++;
+        }
+        return { at, closed: false };
+    };
     let active: 'script' | 'style' | null = null;
     let at = 0;
-    let work = SCAN_LIMIT;
     while (at < end) {
         // Raw script and style bodies only end at their own closing tag.
         const matcher: RegExp = active === null ? tags : closing[active];
@@ -53,32 +102,49 @@ function phpTags(source: EditSource, end: number): TagRegion[] | null {
             break;
         }
         at = match.index + match[0].length;
-        const name: string | undefined = active ?? match[2]?.toLowerCase();
-        const comment = active === null && match[0].startsWith('<!--');
-        if (!comment && name !== 'script' && name !== 'style') {
-            continue;
-        }
-        const line = source.line(source.lineAt(match.index));
-        work -= match.index - line.start + 1;
-        if (work < 0) {
+        const mode = modeAt(match.index);
+        if (exhausted) {
             return null;
         }
-        if (source.context(match.index).mode !== 'html') {
+        if (mode !== 'html') {
             continue;
         }
-        if (comment) {
-            regions.push({ at: match.index + 4, region: 'mixed' });
-            if (match[0].endsWith('-->')) {
-                regions.push({ at, region: 'template' });
+        if (active === null && match[0] === '<!--') {
+            regions.push({ at, region: 'mixed' });
+            let close = text.indexOf('-->', at);
+            while (close >= 0 && close < end && modeAt(close) !== 'html') {
+                if (exhausted) {
+                    return null;
+                }
+                close = text.indexOf('-->', close + 3);
             }
+            if (exhausted) {
+                return null;
+            }
+            if (close < 0 || close >= end) {
+                break;
+            }
+            at = close + 3;
+            regions.push({ at, region: 'template' });
             continue;
+        }
+        const name: string | undefined = active ?? match[2]?.toLowerCase();
+        const closes: boolean = active !== null || match[1] === '/';
+        if (active === null) {
+            const finish = tagEnd(at);
+            if (exhausted) {
+                return null;
+            }
+            at = finish.at;
+            if (!finish.closed) {
+                continue;
+            }
         }
         if (name !== 'script' && name !== 'style') {
             continue;
         }
-        const closes: boolean = active !== null || match[1] === '/';
         active = closes ? null : name;
-        regions.push({ at: match.index + (closes ? 0 : match[0].length), region: active ?? 'template' });
+        regions.push({ at: closes ? match.index : at, region: active ?? 'template' });
     }
     return regions;
 }
@@ -130,7 +196,10 @@ export function editRegions(source: EditSource, language: string, through?: numb
             if (tags === undefined) {
                 tags = phpTags(source, Math.min(end, through ?? end));
             }
-            return tags === null ? 'mixed' : tagRegionAt(tags, at);
+            if (tags === null || (offset === undefined && tagRegionAt(tags, source.line(line).end) === 'mixed')) {
+                return 'mixed';
+            }
+            return tagRegionAt(tags, at);
         };
     }
     return () => null;
