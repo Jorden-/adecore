@@ -71,6 +71,37 @@ const secondBlock = await tokens(1);
 
 Whole-file snapshots can share a tokenizer across their blocks. A patch without snapshots sets `options.reset` to the indexes of blocks that start a hunk, because grammar state cannot continue through unknown omitted lines. All blocks share one preparation step, so lazy embedded grammars load together before tokenization. Old and new sides need separate tokenizers. `ShikiDocumentTokenOptions` also accepts Shiki's `tokenizeMaxLineLength` and `tokenizeTimeLimit`; omitted values keep Shiki's defaults (unlimited line length and 500 milliseconds per line). A diff service should set both limits before processing untrusted or minified text. Lines at or above a positive length limit retain their literal text without syntax colors. Multiple tokenizers can share one highlighter.
 
+## Diff syntax in a worker
+
+`@adecore/editor/shiki-worker` exports `serveDiffSyntax(endpoint)`, an explicit listener factory. A bundler-owned worker entry calls it with its global `self`; importing the module alone registers nothing. The returned function removes the listener, stops the service and disposes its highlighter. Full Shiki loads lazily, retaining bundled grammars, aliases, themes and the document PHP grammar.
+
+```ts
+// syntax.worker.ts
+import { serveDiffSyntax } from '@adecore/editor/shiki-worker';
+serveDiffSyntax(self);
+```
+
+A `DiffSyntaxWorkerEndpoint` supplies message listeners and `postMessage(message, { transfer })`. `DiffSyntaxInput` messages are:
+
+| Type | Payload | Behavior |
+| --- | --- | --- |
+| `start` | `themes`, `maxLines` | Load JSON custom themes before requests, clear earlier documents, and set a positive line-count cache budget. |
+| `request` | `generation`, `index`, optional `document` | Return tokens for a block. Send the document on its first request and after a cache miss. |
+| `cancel` | `generation` | Drop queued requests and suppress late responses, retaining computed tokens. |
+| `dispose` | `generation` | Cancel requests and remove that document from the cache. |
+
+A `DiffSyntaxDocument` contains `language`, `theme`, `blocks` and `resets`. Generations are positive integers allocated by the host; assign a new one whenever the text, language, theme or block layout changes. `resets` identifies blocks that start independent hunks. A zero-line side has no blocks and needs no request. An actual blank source line is a valid empty-string block.
+
+The service prioritizes the newest request. It advances at most one block before yielding through `MessageChannel`, so cancellation can interrupt a jump deep into a document. Divide files into blocks of about 200 lines. Tokenization retains default text above 10,000 UTF-16 code units per line and passes a 20-millisecond time limit to Shiki. TextMate checks that time limit during tokenization; it is not a hard deadline for the whole block.
+
+The cache counts all source lines of each generation and evicts the least recently requested idle generations over `maxLines`. The active document survives until its request completes, even if it exceeds the budget. A request whose definition was evicted receives a `failed` response with `reason: 'missing'`; resend its definition. The renderer should retain only mounted generations and ignore responses for disposed ones.
+
+`DiffSyntaxOutput` reports `ready`, `error`, `failed` or `tokens`. A `DiffSyntaxTokens` packet holds the normalized theme foreground and background, a color dictionary and two transferable `Uint32Array` buffers. `lines` has one token index per line plus the exclusive end. `tokens` stores triples `[lineRelativeUtf16Offset, colorIndex, fontStyle]`. Color zero is the default color. The next token offset or the source line length gives each token's end. Build text nodes from the source text; the worker does not send HTML or duplicate token content.
+
+`createSyntaxService(options)` provides the same queue and cache for a main-thread fallback. `DiffSyntaxServiceOptions` injects the shared highlighter, a `send` callback and an optional asynchronous `yield` function. The resulting `DiffSyntaxService` has `handle(message): Promise<void>` and `dispose()`. A request promise settles when its response is sent or it is canceled. The caller owns an injected highlighter; service disposal does not dispose that borrowed highlighter.
+
+The host should fall back to this service if worker construction or execution fails. `failed` messages carry a generation and block index; `reason: 'highlight'` reports a grammar or theme failure. `error` reports initialization or invalid protocol input. Initialization can be retried by sending another `start`.
+
 ## A tokenizer of your own
 
 A `TokenizerSource` is `(language, theme, text?) => Promise<LineTokenizer | null>`. A `LineTokenizer` colors one line at a time, from the state the line before it ended in:

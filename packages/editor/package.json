@@ -22,6 +22,11 @@
             "types": "./dist/shiki.d.ts",
             "default": "./dist/shiki.js"
         },
+        "./shiki-worker": {
+            "source": "./src/shiki-worker.ts",
+            "types": "./dist/shiki-worker.d.ts",
+            "default": "./dist/shiki-worker.js"
+        },
         "./keymap": {
             "source": "./src/keymap-table.ts",
             "types": "./dist/keymap-table.d.ts",
