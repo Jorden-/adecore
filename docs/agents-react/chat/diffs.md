@@ -1,6 +1,6 @@
 # Diffs
 
-The file changes a chat reports, highlighted with Shiki. Existing split views use `@pierre/diffs`; a host can opt in to the editor for bounded edit reviews. The thread draws them under a tool call, in the changed files of a turn and in an approval; they are exported for a review pane of your own. They draw what the host reported and write nothing.
+The file changes a chat reports, highlighted with Shiki. A host can opt in to its editor for bounded edit and patch reviews, including split with wrapping. Legacy hosts use `@pierre/diffs`. The thread draws them under a tool call, in the changed files of a turn and in an approval; they are exported for a review pane of your own. They draw what the host reported and write nothing.
 
 ```tsx
 import UnifiedDiff from '@adecore/agents-react/chat/ui/UnifiedDiff';
@@ -24,7 +24,7 @@ A unified diff as a CLI that writes patches reports it, in a `ChatFileChange`. A
 | `fill`      | `boolean`                | Grow to the height of a flex column around it.                                      |
 | `contents`  | `{ old, new }`           | Both whole texts. With them a person can unfold the lines between hunks (`fullFileDiff`). |
 
-The optional host editor also renders bounded unified patches through the shared parser and validated snapshots. `ignoreWhitespace` accepts patches made with whitespace filtering; every displayed context line and its tokens come from the same source side. `allowEditor={false}` retains the legacy renderer. Raw text without hunks, larger inputs, split, and a host without an engine stay on the existing path. Editor patch rendering uses the same height cap, lazy worker, engine cache and local failure fallback as edits.
+The optional host editor also renders bounded unified and split patches through the shared parser and validated snapshots. `ignoreWhitespace` accepts patches made with whitespace filtering; every displayed context line and its tokens come from the same source side. `allowEditor={false}` retains the legacy renderer. Raw text without hunks, larger inputs, and a host without an engine stay on the existing path. Editor patch rendering uses the same height cap, lazy worker, engine cache and local failure fallback as edits.
 
 ## EditDiff
 
@@ -48,7 +48,7 @@ The demo above runs under such a pool. Without one the diffs highlight on the pa
 
 ## Editor source tokens
 
-The additive `@adecore/agents-react/chat/ui/diff-syntax` entrypoint connects a [`DiffView`](/editor-react/change-review#diffview) to the shared Shiki runtime. Existing patch and split components keep their APIs and rendering. The optional editor path adds `@adecore/editor-react` and its LSP dependency to the installation even for hosts that do not opt in; the renderer remains in a lazy chunk.
+The additive `@adecore/agents-react/chat/ui/diff-syntax` entrypoint connects a [`DiffView`](/editor-react/change-review#diffview) to the shared Shiki runtime. Existing patch and split components keep their APIs; hosts without the optional editor keep their rendering. The optional editor path adds `@adecore/editor-react` and its LSP dependency to the installation even for hosts that do not opt in; the renderer remains in a lazy chunk.
 
 ```ts
 import { diffSourceTokens } from '@adecore/agents-react/chat/ui/diff-syntax';

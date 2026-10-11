@@ -13,7 +13,21 @@ type EngineLoader = () => Promise<EditorEngine>;
 // Virtualized rows remount; retain the engine so their height does not return to the loading placeholder.
 const engines = new WeakMap<EngineLoader, EditorEngine | null>();
 
-function ReadyDiff({ document, path, engine, wrap, fill }: { document: DiffDocument; path: string; engine: EditorEngine; wrap: boolean; fill: boolean }) {
+function ReadyDiff({
+    document,
+    path,
+    engine,
+    wrap,
+    fill,
+    layout
+}: {
+    document: DiffDocument;
+    path: string;
+    engine: EditorEngine;
+    wrap: boolean;
+    fill: boolean;
+    layout: 'unified' | 'split';
+}) {
     const { t } = useTranslation('agent-chat');
     const mode = chatHost().code.useMode();
     const theme = chatHost().code.useThemes()[mode];
@@ -27,6 +41,7 @@ function ReadyDiff({ document, path, engine, wrap, fill }: { document: DiffDocum
             theme={theme}
             maxHeight={480}
             label={t('work.diffLabel', { path })}
+            layout={layout}
             wrap={wrap}
             fill={fill}
             className="chat-diff select-text"
@@ -40,7 +55,8 @@ export function EditorDocumentDiff({
     loadEngine,
     fallback,
     wrap = true,
-    fill = false
+    fill = false,
+    layout = 'unified'
 }: {
     document: DiffDocument;
     path: string;
@@ -48,6 +64,7 @@ export function EditorDocumentDiff({
     fallback: ReactNode;
     wrap?: boolean;
     fill?: boolean;
+    layout?: 'unified' | 'split';
 }) {
     const { t } = useTranslation('agent-chat');
     const [loaded, setLoaded] = useState<{ load: EngineLoader; engine: EditorEngine | null }>();
@@ -80,7 +97,7 @@ export function EditorDocumentDiff({
     if (engine === undefined) {
         return <div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>;
     }
-    return engine === null ? fallback : <ReadyDiff document={document} path={path} engine={engine} wrap={wrap} fill={fill} />;
+    return engine === null ? fallback : <ReadyDiff document={document} path={path} engine={engine} wrap={wrap} fill={fill} layout={layout} />;
 }
 
 export default function EditorEditDiff({ change, loadEngine, fallback }: { change: FileChange; loadEngine: EngineLoader; fallback: ReactNode }) {

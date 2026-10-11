@@ -11,6 +11,7 @@ export default function EditorPatchDiff({
     ignoreWhitespace,
     wrap,
     fill,
+    layout = 'unified',
     loadEngine,
     fallback
 }: {
@@ -19,6 +20,7 @@ export default function EditorPatchDiff({
     ignoreWhitespace: boolean;
     wrap: boolean;
     fill: boolean;
+    layout?: 'unified' | 'split';
     loadEngine: () => Promise<EditorEngine>;
     fallback: ReactNode;
 }) {
@@ -33,5 +35,5 @@ export default function EditorPatchDiff({
             ),
         [change.diff, oldText, newText, ignoreWhitespace]
     );
-    return <EditorDocumentDiff document={document} path={change.path} loadEngine={loadEngine} fallback={fallback} wrap={wrap} fill={fill} />;
+    return <EditorDocumentDiff document={document} path={change.path} loadEngine={loadEngine} fallback={fallback} wrap={wrap} fill={fill} layout={layout} />;
 }

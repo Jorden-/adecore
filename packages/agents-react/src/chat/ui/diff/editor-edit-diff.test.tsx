@@ -189,3 +189,29 @@ test('a partial deletion patch has real selectable old text and original gutter 
         expect(engine.last.readOnly).toBe(true);
     });
 });
+
+test('split patch reviews use two real side documents and preserve the shared loader', async () => {
+    await mounted(async (page, root) => {
+        const engine = new FakeEditorEngine();
+        const loadEngine = async () => engine;
+        await act(async () =>
+            root.render(
+                createElement(EditorPatchDiff, {
+                    change: { path: 'a.ts', kind: 'update', diff: '@@ -10,2 +20,3 @@\n context\n-old\n+new\n+extra\n' },
+                    loadEngine,
+                    fallback: 'Legacy',
+                    ignoreWhitespace: false,
+                    wrap: true,
+                    fill: true,
+                    layout: 'split'
+                })
+            )
+        );
+        expect(engine.editors.length).toBe(2);
+        expect(engine.editors.map((editor) => editor.getText())).toEqual(['context\nold', 'context\nnew\nextra']);
+        expect(engine.editors[0]!.lineNumbers!(1)).toBe('11');
+        expect(engine.editors[1]!.lineNumbers!(2)).toBe('22');
+        expect(page.host.querySelector('.adecore-editor-diff-split')).not.toBeNull();
+        expect(page.host.textContent).not.toContain('Legacy');
+    });
+});

@@ -112,11 +112,11 @@ export default function UnifiedDiff(props: UnifiedDiffProps) {
     const newText = contents?.new ?? change.diff;
     const withinLimits = useMemo(() => canRenderEditorEdit({ before: oldText, after: newText }) && /^@@/m.test(change.diff), [oldText, newText, change.diff]);
     const fallback = <LegacyUnifiedDiff {...props} />;
-    if (!allowEditor || loadEngine === undefined || diffStyle === 'split' || !withinLimits) {
+    if (!allowEditor || loadEngine === undefined || !withinLimits) {
         return fallback;
     }
     return (
-        <DiffFallbackBoundary fallback={fallback} resetKeys={[change.path, change.diff, oldText, newText, ignoreWhitespace, loadEngine]}>
+        <DiffFallbackBoundary fallback={fallback} resetKeys={[change.path, change.diff, oldText, newText, ignoreWhitespace, diffStyle, loadEngine]}>
             <Suspense fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
                 <EditorPatchDiff
                     change={change}
@@ -124,6 +124,7 @@ export default function UnifiedDiff(props: UnifiedDiffProps) {
                     ignoreWhitespace={ignoreWhitespace}
                     wrap={overflow === 'wrap'}
                     fill={fill}
+                    layout={diffStyle}
                     loadEngine={loadEngine}
                     fallback={fallback}
                 />
