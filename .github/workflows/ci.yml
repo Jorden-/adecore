@@ -129,14 +129,14 @@ jobs:
           cargo fmt --check
           cargo clippy --locked --all-targets -- -D warnings
 
-      # The MySQL tests run once against each server, since MariaDB and MySQL differ in what information_schema answers.
+      # Run the full suite once; only MySQL and its SSH tunnel need both server implementations.
       - name: 🧪 Test against MariaDB
         run: cargo test --locked
         env:
           ADECORE_TEST_MYSQL_URL: mysql://root:test@127.0.0.1:33061
 
       - name: 🧪 Test against MySQL
-        run: cargo test --locked
+        run: cargo test --locked --test mysql --test tunnel_ssh
         env:
           ADECORE_TEST_MYSQL_URL: mysql://root:test@127.0.0.1:33062
 

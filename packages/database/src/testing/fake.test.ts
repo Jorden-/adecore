@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, jest, test } from 'bun:test';
 import { createDatabaseClient } from '../client/index.ts';
 import type { ColumnInfo, Value } from '../protocol/index.ts';
 import { fakeDatabaseTransport, type FakeDatabase } from './index.ts';
@@ -370,27 +370,56 @@ describe('the session', () => {
 });
 
 describe('latency', () => {
-    test('delays the answers', async () => {
-        const { session } = setup({ latencyMs: 20 });
-        const started = performance.now();
-        await session.schemas();
-        expect(performance.now() - started).toBeGreaterThanOrEqual(35);
+    beforeEach(() => {
+        jest.useFakeTimers();
     });
 
-    test('cancels a request that is still waiting', async () => {
-        const { session } = setup({ latencyMs: 200 });
-        await session.server();
+    afterEach(() => {
+        jest.useRealTimers();
+    });
+
+    test('holds an answer until its delay has passed', async () => {
+        const transport = fakeDatabaseTransport({ databases: { db: database() }, latencyMs: 20 });
+        let answered = false;
+        const pending = transport({ id: 'r1', method: 'open', params: { connection: { engine: 'mysql', host: 'db', user: 'u' } } }).then((response) => {
+            answered = true;
+            return response;
+        });
+
+        jest.advanceTimersByTime(19);
+        await Promise.resolve();
+        expect(answered).toBe(false);
+        jest.advanceTimersByTime(1);
+        expect(await pending).toMatchObject({ id: 'r1', ok: true });
+    });
+
+    test('a client abort cancels a request before its delayed answer', async () => {
+        const transport = fakeDatabaseTransport({ databases: { db: database() }, latencyMs: 200 });
+        const started = Promise.withResolvers<void>();
+        const client = createDatabaseClient((request) => {
+            const response = transport(request);
+            if (request.method === 'rows') {
+                started.resolve();
+            }
+            return response;
+        });
+        const session = client.session({ id: 'c', name: 'Shop', config: { engine: 'mysql', host: 'db', user: 'u' } });
+        const opening = session.server();
+        jest.advanceTimersByTime(200);
+        await opening;
+
         const controller = new AbortController();
         const pending = session.rows('main', 'users', { offset: 0, limit: 1 }, { signal: controller.signal });
-        const started = performance.now();
-        setTimeout(() => controller.abort(), 10);
+        await started.promise;
+        controller.abort();
         await expect(pending).rejects.toMatchObject({ code: 'cancelled' });
-        expect(performance.now() - started).toBeLessThan(150);
     });
 
     test('answers a cancel with cancelled true for the request it stopped', async () => {
         const transport = fakeDatabaseTransport({ databases: { db: database() }, latencyMs: 100 });
-        const opened = await transport({ id: 'r1', method: 'open', params: { connection: { engine: 'mysql', host: 'db', user: 'u' } } });
+        const opening = transport({ id: 'r1', method: 'open', params: { connection: { engine: 'mysql', host: 'db', user: 'u' } } });
+        jest.advanceTimersByTime(100);
+        const opened = await opening;
         const session = (opened as { result: { session: string } }).result.session;
         const waiting = transport({ id: 'r2', method: 'schemas', params: { session } });
         const cancel = await transport({ id: 'r3', method: 'cancel', params: { request: 'r2' } });
