@@ -514,6 +514,11 @@
             "types": "./dist/chat/ui/composer/menu-aria.d.ts",
             "default": "./dist/chat/ui/composer/menu-aria.js"
         },
+        "./chat/ui/diff-syntax": {
+            "source": "./src/chat/ui/diff-syntax.ts",
+            "types": "./dist/chat/ui/diff-syntax.d.ts",
+            "default": "./dist/chat/ui/diff-syntax.js"
+        },
         "./chat/ui/diff-theme": {
             "source": "./src/chat/ui/diff-theme.ts",
             "types": "./dist/chat/ui/diff-theme.d.ts",

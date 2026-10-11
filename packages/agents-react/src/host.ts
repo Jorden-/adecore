@@ -1,7 +1,7 @@
 import type { ComponentProps, ComponentType, ReactNode, RefObject } from 'react';
 import type { Extension } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
-import type { ThemeRegistration } from 'shiki';
+import type { Highlighter, ThemeRegistration } from 'shiki';
 import type {
     AgentKind,
     ChatCheckpointDiff,
@@ -246,6 +246,8 @@ export interface ChatHost {
         custom: ReadonlyArray<ThemeRegistration & { name: string }>;
         /* One syntax worker shared by chat diffs and standalone review panes; omitted, tokenize on the page. */
         syntaxWorker?: () => Worker;
+        /* Borrow the page highlighter for fallback; the host retains ownership. */
+        highlighter?: () => Promise<Highlighter>;
     };
     /* How a reply appears while it streams: a word, a block or the whole of it at a time. */
     useStreaming(): 'words' | 'blocks' | 'whole';

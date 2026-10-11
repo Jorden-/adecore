@@ -32,7 +32,7 @@ export interface DiffSyntaxRuntime {
     dispose(): void;
 }
 
-interface RuntimeOptions {
+export interface DiffSyntaxRuntimeOptions {
     workerFactory?: () => Worker;
     themes: readonly ThemeRegistration[];
     highlighter?: () => Promise<Highlighter>;
@@ -43,10 +43,10 @@ let shared: DiffSyntaxRuntime | undefined;
 
 export function diffSyntaxRuntime(): DiffSyntaxRuntime {
     const code = chatHost().code;
-    return (shared ??= createDiffSyntaxRuntime({ workerFactory: code.syntaxWorker, themes: code.custom }));
+    return (shared ??= createDiffSyntaxRuntime({ workerFactory: code.syntaxWorker, themes: code.custom, highlighter: code.highlighter }));
 }
 
-export function createDiffSyntaxRuntime(options: RuntimeOptions): DiffSyntaxRuntime {
+export function createDiffSyntaxRuntime(options: DiffSyntaxRuntimeOptions): DiffSyntaxRuntime {
     const sessions = new Map<number, Session>();
     let worker: Worker | undefined;
     let fallback: DiffSyntaxService | undefined;
