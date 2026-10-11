@@ -102,7 +102,7 @@ export function editRegions(source: EditSource, language: string, through?: numb
     const id = language.toLowerCase();
     const end = source.line(source.lineCount - 1).end;
     if (id === 'vue') {
-        return (line) => vueRegionAt((index) => source.line(index).text, line);
+        return (line) => (/^<\/?(?:template|script|style)\b/.test(source.line(line).text) ? 'mixed' : vueRegionAt((index) => source.line(index).text, line));
     }
     if (hasJsx(id)) {
         let children: ((offset: number) => boolean) | undefined;

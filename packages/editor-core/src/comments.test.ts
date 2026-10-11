@@ -343,3 +343,45 @@ describe('JSX attribute comments retain child context', () => {
         expect(model.getText()).toBe(source);
     });
 });
+
+describe('embedded selections keep their region boundaries', () => {
+    it('leaves a PHP selection spanning markup and script or style unchanged', () => {
+        for (const tag of ['script', 'style']) {
+            const source = `<${tag}>\nrun();\n</${tag}>`;
+            const model = new DocumentModel(source);
+            model.setSelections([{ anchor: 0, head: source.length }]);
+            expect(model.execute('toggleLineComment', { language: 'php' })).toBe(false);
+            expect(model.getText()).toBe(source);
+            expect(model.getSnapshot().canUndo).toBe(false);
+        }
+    });
+    it('keeps a homogeneous PHP script-body selection reversible', () => {
+        const source = '<script>\nrun();\nnext();\n</script>';
+        const model = new DocumentModel(source);
+        const select = () => model.setSelections([{ anchor: model.getLine(1).start, head: model.getLine(2).end }]);
+        select();
+        expect(model.execute('toggleLineComment', { language: 'php' })).toBe(true);
+        expect(model.getText()).toBe('<script>\n// run();\n// next();\n</script>');
+        select();
+        model.execute('toggleLineComment', { language: 'php' });
+        expect(model.getText()).toBe(source);
+    });
+    it('leaves a Vue selection spanning template and script unchanged', () => {
+        const source = '<template>\n<div />\n</template>\n<script>\nrun();\n</script>';
+        const model = new DocumentModel(source);
+        model.setSelections([{ anchor: 0, head: source.length }]);
+        expect(model.execute('toggleLineComment', { language: 'vue' })).toBe(false);
+        expect(model.getText()).toBe(source);
+    });
+    it('retains Vue block delimiters while toggling their body', () => {
+        const source = '<script>\nrun();\n</script>';
+        const model = new DocumentModel(source);
+        const select = () => model.setSelections([{ anchor: 0, head: model.getText().length }]);
+        select();
+        model.execute('toggleLineComment', { language: 'vue' });
+        expect(model.getText()).toBe('<script>\n// run();\n</script>');
+        select();
+        model.execute('toggleLineComment', { language: 'vue' });
+        expect(model.getText()).toBe(source);
+    });
+});

@@ -95,10 +95,25 @@ export function planLineComments(source: EditSource, selections: readonly Select
     const blocks = blocksOf(source, selections, options.lineSpan);
     const lineBased = new Map<number, CommentSyntax>();
     for (const block of blocks) {
+        let marker: CommentSyntax | undefined;
+        let mixed = false;
         const firstSyntax = hasJsx(options.language) && block.first !== block.last ? syntaxOf(regions, options, block.first) : undefined;
         for (let line = block.first; line <= block.last; line++) {
             const syntax = firstSyntax ?? syntaxOf(regions, options, line);
-            lineBased.set(line, syntax.line === null ? syntax : { ...syntax, block: null });
+            const effective = syntax.line === null ? syntax : { ...syntax, block: null };
+            lineBased.set(line, effective);
+            if (effective.line !== null || effective.block !== null) {
+                mixed ||=
+                    marker !== undefined &&
+                    (marker.line !== effective.line || marker.block?.open !== effective.block?.open || marker.block?.close !== effective.block?.close);
+                marker ??= effective;
+            }
+        }
+        // Commenting a region opener would change the markers needed for the next toggle.
+        if (mixed && /^(php|vue)$/i.test(options.language)) {
+            for (let line = block.first; line <= block.last; line++) {
+                lineBased.set(line, { line: null, block: null });
+            }
         }
     }
     let allCommented = true;
