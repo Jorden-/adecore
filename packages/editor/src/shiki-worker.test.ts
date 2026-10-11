@@ -238,7 +238,7 @@ describe('diff syntax service', () => {
     test('bounds minified lines and rejects out-of-range requests before advancing', async () => {
         using highlighter = await createHighlighter({ themes: [THEME], langs: [] });
         const { service, tokens, messages } = harness(highlighter);
-        const text = 'x'.repeat(10000);
+        const text = 'x'.repeat(10001);
         await service.handle({ type: 'request', generation: 1, index: 0, document: { ...DOCUMENT, blocks: [text] } });
         expect(tokens()[0]!.tokens).toEqual(new Uint32Array([0, 0, 0]));
         await service.handle({ type: 'request', generation: 2, index: 100, document: DOCUMENT });

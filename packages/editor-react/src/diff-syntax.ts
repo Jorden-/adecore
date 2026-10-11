@@ -15,10 +15,28 @@ export interface DiffSyntaxSources {
     locate(side: DiffSourceSide, index: number): { readonly block: number; readonly line: number } | undefined;
 }
 
+function canTokenize(source: readonly string[]): boolean {
+    if (source.length > 20000) {
+        return false;
+    }
+    let characters = Math.max(0, source.length - 1);
+    for (const line of source) {
+        characters += line.length;
+        if (line.length > 10000 || characters > 2000000) {
+            return false;
+        }
+    }
+    return true;
+}
+
 export function diffSyntaxDocument(document: DiffDocument, language: string, theme: string): DiffSyntaxSources {
     const locations: Record<DiffSourceSide, Array<{ block: number; line: number }>> = { old: [], new: [] };
     const build = (side: DiffSourceSide): DiffSyntaxDocument => {
         const source = document.sides[side];
+        // Skipping a long hidden line loses grammar state; keep the entire side plain instead.
+        if (!canTokenize(source)) {
+            return { language, theme, blocks: [], resets: [] };
+        }
         const blocks: string[] = [];
         const resets: number[] = [];
         const ranges = document.snapshots

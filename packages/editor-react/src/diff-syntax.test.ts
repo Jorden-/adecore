@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { diffDocument, parsePatch, patchOf } from '@adecore/merge';
+import { diffDocument, parsePatch, patchOf, type DiffDocument } from '@adecore/merge';
 import { diffSyntaxDocument } from './diff-syntax.ts';
 
 test('snapshot syntax blocks keep both sides independent and bound work to 200 lines', () => {
@@ -45,4 +45,30 @@ test('zero-line hunks do not create empty blocks or spill state into later hunks
     expect(source.documents.new.blocks).toEqual(['added']);
     expect(source.documents.new.resets).toEqual([0]);
     expect(source.locate('new', 0)).toEqual({ block: 0, line: 0 });
+});
+
+function sources(old: readonly string[], fresh: readonly string[]): DiffDocument {
+    return { sides: { old, new: fresh }, hunks: [], offsets: [], snapshots: true, ignoreWhitespace: false, partial: false };
+}
+
+test('oversize sides remain plain without joining snapshots or allocating per-line locations', () => {
+    const huge = Array.from({ length: 20001 }, () => 'context');
+    const mapping = diffSyntaxDocument(sources(huge, ['const fresh = 1;']), 'typescript', 'github-dark');
+    expect(mapping.documents.old.blocks).toEqual([]);
+    expect(mapping.locate('old', 15000)).toBeUndefined();
+    expect(mapping.documents.new.blocks).toEqual(['const fresh = 1;']);
+    const atLimit = diffSyntaxDocument(sources(huge.slice(0, 20000), []), 'typescript', 'github-dark');
+    expect(atLimit.locate('old', 19999)).toEqual({ block: 99, line: 199 });
+    const textLimit = Array.from({ length: 200 }, () => 'x'.repeat(10000));
+    expect(diffSyntaxDocument(sources(textLimit, []), 'typescript', 'github-dark').documents.old.blocks).toEqual([]);
+});
+
+test('a hidden long line disables syntax for its entire side rather than carrying stale grammar state', () => {
+    const old = ['/*' + 'x'.repeat(9999), 'hidden */', 'const value = 1;'];
+    const fresh = ['/*' + 'x'.repeat(9998), 'hidden */', 'const value = 2;'];
+    const mapping = diffSyntaxDocument(sources(old, fresh), 'typescript', 'github-dark');
+    expect(mapping.documents.old.blocks).toEqual([]);
+    expect(mapping.locate('old', 2)).toBeUndefined();
+    expect(mapping.locate('new', 2)).toEqual({ block: 0, line: 2 });
+    expect(mapping.documents.new.blocks.join('\n')).toBe(fresh.join('\n'));
 });

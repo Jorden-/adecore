@@ -20,7 +20,7 @@ function createSourceBinding(document: DiffDocument, language: string, theme: st
     };
     return {
         tokens: {
-            get: (side, index) => current().get(side, index),
+            get: (side, index) => (mapping.locate(side, index) === undefined ? null : current().get(side, index)),
             subscribe(listener) {
                 listeners.add(listener);
                 return () => {

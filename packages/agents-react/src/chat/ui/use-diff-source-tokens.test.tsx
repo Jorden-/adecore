@@ -75,6 +75,18 @@ test('source hook opens only on committed reads, survives StrictMode replay and 
     const render = (document: DiffDocument, theme: string, read = true) =>
         root.render(createElement(StrictMode, null, createElement(Reader, { document, theme, read })));
     try {
+        const plain: DiffDocument = {
+            sides: { old: Array.from({ length: 20001 }, () => 'hidden'), new: ['x'.repeat(10001), 'visible'] },
+            hunks: [],
+            offsets: [],
+            snapshots: true,
+            ignoreWhitespace: false,
+            partial: false
+        };
+        await act(async () => render(plain, 'github-dark'));
+        expect(current.get('old', 15000)).toBeNull();
+        expect(current.get('new', 1)).toBeNull();
+        expect(sessions).toHaveLength(0);
         await act(async () => render(document, 'github-dark', false));
         expect(sessions).toHaveLength(0);
         await act(async () => render(document, 'github-dark'));

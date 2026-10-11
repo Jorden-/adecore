@@ -292,7 +292,8 @@ export function createSyntaxService(options: DiffSyntaxServiceOptions): DiffSynt
                     document,
                     tokens: shikiDocumentTokens(() => (ready ??= options.highlighter()), document.blocks, document.language, document.theme, {
                         reset: new Set(document.resets),
-                        tokenizeMaxLineLength: 10000,
+                        // Shiki skips at the cutoff; include source lines of exactly 10,000 code units.
+                        tokenizeMaxLineLength: 10001,
                         tokenizeTimeLimit: 20
                     }),
                     count: document.blocks.reduce((count, block) => count + block.split(/\r\n|\n/).length, 0),

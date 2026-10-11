@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import { createHighlighter, type Highlighter } from 'shiki';
 import { diffDocument, patchOf, type DiffDocument } from '@adecore/merge';
 import type { DiffSyntaxDocument, DiffSyntaxTokens } from '@adecore/editor/shiki-worker';
+import { diffSyntaxDocument } from '@adecore/editor-react';
 import { createDiffSyntaxRuntime, diffSourceTokens, type DiffSyntaxMapping, type DiffSyntaxRuntime } from './diff-syntax';
 
 function mapping(document: DiffDocument): DiffSyntaxMapping {
@@ -134,4 +135,20 @@ test('an empty side never starts a syntax request', () => {
     expect(source.get('new', 0)).toBeUndefined();
     expect(requests).toBe(1);
     source.dispose();
+});
+
+test('syntax at the source limits preserves comment state from the first through the last block', async () => {
+    using highlighter = await createHighlighter({ langs: [], themes: [] });
+    const lines = ['/*' + 'x'.repeat(9998), ...Array.from({ length: 19998 }, () => 'still comment'), 'closing */ const value = 1;'];
+    const document: DiffDocument = { sides: { old: lines, new: [] }, hunks: [], offsets: [], snapshots: true, ignoreWhitespace: false, partial: false };
+    const runtime = createDiffSyntaxRuntime({ themes: [], highlighter: fixture(highlighter) });
+    const source = diffSourceTokens(document, diffSyntaxDocument(document, 'typescript', 'github-dark'), runtime);
+    const ready = new Promise<void>((resolve) => source.subscribe(resolve));
+    expect(source.get('old', 19999)).toBeUndefined();
+    await ready;
+    const tokens = source.get('old', 19999)!;
+    expect(tokens[0]!.color).toBe('#6A737D');
+    expect(tokens.some((token) => token.color !== '#6A737D')).toBe(true);
+    source.dispose();
+    runtime.dispose();
 });
