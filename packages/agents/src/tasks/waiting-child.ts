@@ -1,4 +1,4 @@
-import { clipText, type ChatApprovalItem, type ChatItem, type ChatQuestionItem, type Task } from '@adecore/agent-contracts';
+import { clipText, WAITING_NOTE_PREFIX, type ChatApprovalItem, type ChatItem, type ChatQuestionItem, type Task } from '@adecore/agent-contracts';
 import type { ChatCore } from '../chat/chat-core.ts';
 import { errorText } from '../error-text.ts';
 import type { AgentEvent } from '../events.ts';
@@ -45,7 +45,7 @@ export function chatRequests(chats: Pick<ChatCore, 'get' | 'answer'>): ChatReque
 
 /* The id of the note one request of one child leaves in its parent, so delivering it twice leaves one. */
 export function waitingNoteId(childId: string, requestId: string): string {
-    return `waiting-${childId}-${requestId}`;
+    return `${WAITING_NOTE_PREFIX}${childId}-${requestId}`;
 }
 
 /*
@@ -185,7 +185,7 @@ export function waitingTexts(child: { id: string; title: string }, item: Waiting
 export interface DeliverWaitingDeps {
     request: ChatRequests['request'];
     titleFor(nodeId: string): string | null;
-    deliver(chatId: string, delivery: { noteId: string; note: string; preamble: string }): Promise<boolean>;
+    deliver(chatId: string, delivery: { noteId: string; note: string; from?: string; preamble: string }): Promise<boolean>;
     words: WaitingWords;
 }
 
@@ -201,6 +201,6 @@ export function deliverWaitingHandler(deps: DeliverWaitingDeps) {
             return;
         }
         const texts = waitingTexts({ id: childId, title: deps.titleFor(childId) ?? childId }, item, deps.words);
-        await deps.deliver(entry.target, { noteId: waitingNoteId(childId, requestId), ...texts });
+        await deps.deliver(entry.target, { noteId: waitingNoteId(childId, requestId), from: childId, ...texts });
     };
 }

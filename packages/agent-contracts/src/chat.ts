@@ -600,6 +600,9 @@ export function abortedByMachine(
     );
 }
 
+/* The id prefix of the note a host leaves in a parent about a child that waits on a request. */
+export const WAITING_NOTE_PREFIX = 'waiting-';
+
 export const ChatNoteItemSchema = z.object({
     ...base,
     kind: z.literal('note'),
