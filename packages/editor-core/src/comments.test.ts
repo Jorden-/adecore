@@ -575,3 +575,29 @@ test('PHP block selections still refuse mismatched comment contexts', () => {
         expect(model.getText()).toBe(initial.text);
     }
 });
+
+test('PHP script comments preserve their script region and PHP islands', () => {
+    line('<script>\ncall();¦\n</script>', '<script>\n// call();\n</script>¦', { language: 'php' });
+    const source = '<script>\nvar value = <?php\n$value = 1;\n?>;\n</script>';
+    const model = new DocumentModel(source);
+    const at = model.getLine(1).start;
+    model.setSelections([{ anchor: at, head: at }]);
+    expect(model.execute('toggleLineComment', { language: 'php' })).toBe(false);
+    expect(model.getText()).toBe(source);
+    block('<script>\n[call(); // note]\n</script>', '<script>\n[/* call(); // note */]\n</script>', { language: 'php' });
+});
+
+test('comment commands leave multiline script templates unchanged', () => {
+    const source = '<script>\nconst value = `first\nsecond\nlast`;\n</script>';
+    const model = new DocumentModel(source);
+    model.setSelections([{ anchor: model.getLine(1).start, head: model.getLine(3).end }]);
+    expect(model.execute('toggleLineComment', { language: 'php' })).toBe(false);
+    expect(model.getText()).toBe(source);
+    model.setSelections([{ anchor: model.getLine(2).start, head: model.getLine(2).end }]);
+    expect(model.execute('toggleBlockComment', { language: 'php' })).toBe(false);
+    expect(model.getText()).toBe(source);
+});
+
+test('a PHP closing-tag string in JavaScript does not disable script comments', () => {
+    line('<script>\nconst value = "?>";¦\n</script>', '<script>\n// const value = "?>";\n</script>¦', { language: 'php' });
+});

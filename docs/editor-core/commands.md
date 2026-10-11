@@ -7,7 +7,7 @@ Three methods turn what a person does into edits on every caret at once. Each re
 `typeText(text, options?)` is one keystroke. With a single character it does what a code editor does on that key:
 
 - An opening bracket brings its closer when nothing after the caret already closes it. A quote pairs only when no identifier character follows.
-- In PHP markup, attribute quotes pair after `=`, including in multiline tags. PHP inside an attribute returns to the same quote context. Typing the closing quote steps over it and Backspace removes an empty pair, including after undo and redo. Text, HTML comments and raw script or style content do not pair.
+- In PHP markup, attribute quotes pair after `=`, including in multiline tags. PHP inside an attribute returns to the same quote context. Typing the closing quote steps over it and Backspace removes an empty pair, including after undo and redo. Text, HTML comments and raw style content do not pair. Inline script content uses JavaScript bracket and quote rules; PHP islands use PHP rules and then resume the script state, including within script strings and templates.
 - Typing a closer the editor added steps over it. That counts as a change, so `typeText` returns `true` with the text unchanged.
 - A bracket, quote or `<` typed over a selection wraps it. A quote typed over one quote of a string swaps both.
 - A closing bracket typed alone on its line moves back to the indentation of its opener.
@@ -21,6 +21,8 @@ document.setSelections([{ anchor: 6, head: 6 }]);
 document.typeText(';', { language: 'typescript' });
 document.getText(); // 'call(x);'
 ```
+
+PHP script bodies use JavaScript comments, regexes, template literals and bracket stacks. PHP-only arrows, hash comments, heredocs and concatenation stay within PHP islands. Enter within a script string uses `+`; Enter within a PHP string uses `.`. A literal `</script>` ends the script even within a script string or comment, following HTML. The lexical editor treats `<script ... />` as self-closing and does not inspect its `type` attribute: all non-self-closing script bodies use JavaScript rules.
 
 Nothing pairs in plain text (`text`, `plaintext`, `txt` or `log`), inside a comment, or inside a string. Longer text is inserted as it is. Consecutive calls join one undo step, the `typing` group.
 

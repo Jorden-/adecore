@@ -855,7 +855,7 @@ export class DocumentModel {
         const arrow = text === '-' && input.smartArrow && from === to;
         const needsContext = text.length === 1 && (/[()[\]{}'"`<]/.test(text) || (text === ';' && smartSemicolon) || arrow);
         const context = needsContext ? this.typingContext(from, language) : undefined;
-        if (arrow && context?.mode === 'code' && context.word !== 'control-close' && this.endsOperand(from)) {
+        if (arrow && context?.mode === 'code' && context.embedded === undefined && context.word !== 'control-close' && this.endsOperand(from)) {
             return { from, to, text, anchor: 1, head: 1, arrow: true };
         }
         const insideQuote =
@@ -945,7 +945,8 @@ export class DocumentModel {
         }
         const interpolation = this.isInterpolation(offset, opener, context);
         const quote = isQuote(opener);
-        const followedByTerminator = quote ? !identifier.test(after) && after !== opener : !after || /[\s)\]}>,;:]/u.test(after);
+        const scriptEnd = context?.embedded !== undefined && /^<\/script(?=[\s/>]|$)/i.test(this.slice(offset, offset + 9));
+        const followedByTerminator = quote ? !identifier.test(after) && after !== opener : !after || scriptEnd || /[\s)\]}>,;:]/u.test(after);
         if (context?.mode !== 'code' && !interpolation) {
             return false;
         }
@@ -960,7 +961,7 @@ export class DocumentModel {
                 !this.completesTripleQuote(offset, opener, input.language)
             );
         }
-        return !this.hasMatch(offset, opener, input.language);
+        return !this.hasMatch(offset, opener, context?.embedded ?? input.language);
     }
 
     /* The third quote of a Python docstring opener is typed as it is, since the pair that came before it is the empty string. */
@@ -1592,7 +1593,7 @@ export class DocumentModel {
             newline: (index) => this.newlineAt(index),
             context: (offset) => this.typingContext(offset, language),
             region: (line) => (/^vue$/i.test(language) ? vueRegionAt((index) => this.getLine(index).text, line) : null),
-            unclosedBrace: (offset) => this.isUnclosedBrace(offset, language)
+            unclosedBrace: (offset) => this.isUnclosedBrace(offset, this.typingContext(offset, language).embedded ?? language)
         };
     }
 

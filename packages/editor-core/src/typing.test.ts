@@ -406,21 +406,14 @@ describe('PHP markup attribute quotes', () => {
         }
     });
 
-    it('respects pairing preferences and leaves text, comments, raw content and unquoted values alone', () => {
-        for (const source of [
-            '<p>don¦t</p>',
-            '<!-- title=¦ -->',
-            '<script>title=¦</script>',
-            '<style>title=¦</style>',
-            '<div title=value¦>',
-            '<div title=¦word>'
-        ]) {
+    it('respects pairing preferences and leaves text, comments, style content and unquoted values alone', () => {
+        for (const source of ['<p>don¦t</p>', '<!-- title=¦ -->', '<style>title=¦</style>', '<div title=value¦>', '<div title=¦word>']) {
             type(source, "'", source.replace('¦', "'¦"), { language: 'php' });
         }
         type('<div title=¦>', '"', '<div title="¦>', { language: 'php', autoClosingQuotes: false });
         type('<div title=¦>', '`', '<div title=`¦>', { language: 'php' });
         type('<div title=¦>', '(', '<div title=(¦>', { language: 'php' });
-        type('<script>¦</script>', '(', '<script>(¦</script>', { language: 'php' });
+        type('<script>¦</script>', '(', '<script>(¦)</script>', { language: 'php' });
     });
 
     it('pairs independently at several attribute carets', () => {
@@ -435,4 +428,78 @@ describe('PHP markup attribute quotes', () => {
         model.execute('smartBackspace', { language: 'php' });
         expect(model.getText()).toBe(source);
     });
+});
+
+describe('JavaScript typing within PHP script elements', () => {
+    it('pairs JavaScript brackets and quotes and steps over returned script strings', () => {
+        for (const source of [
+            '<script>#x; f¦</script>',
+            '<script>\ny = z <<<EOT\nf¦\n</script>',
+            "<script>s = '<?= $x ?>' + f¦</script>",
+            '<script>// x\nf¦</script>'
+        ]) {
+            type(source, '(', source.replace('¦', '(¦)'), { language: 'php' });
+        }
+        type("<script>s = '<?= $x ?>¦';</script>", "'", "<script>s = '<?= $x ?>'¦;</script>", { language: 'php' });
+        type('<script>t = `<?= $a ?>¦`</script>', '`', '<script>t = `<?= $a ?>`¦</script>', { language: 'php' });
+        type('<script>f¦)</script>', '(', '<script>f(¦)</script>', { language: 'php' });
+        type('<script>f¦x)</script>', '(', '<script>f(¦x)</script>', { language: 'php' });
+    });
+
+    it('applies PHP arrows only within a PHP island', () => {
+        type('<script>a¦</script>', '-', '<script>a-¦</script>', { language: 'php' });
+        type('<script>x = <?php $a¦ ?>;</script>', '-', '<script>x = <?php $a->¦ ?>;</script>', { language: 'php' });
+        type('<script>a¦</script>', '#', '<script>a#¦</script>', { language: 'php' });
+    });
+
+    it('does not apply JavaScript rules to style content or self-closing script tags', () => {
+        type('<style>a { #x¦', '(', '<style>a { #x(¦', { language: 'php' });
+        type('<script src="a.js" /><a href=¦>', '"', '<script src="a.js" /><a href="¦">', { language: 'php' });
+    });
+
+    it('removes an empty script pair after undo and redo', () => {
+        const model = new DocumentModel('<script>call</script>');
+        model.setSelections([{ anchor: 12, head: 12 }]);
+        model.typeText('(', { language: 'php' });
+        expect(model.getText()).toBe('<script>call()</script>');
+        model.undo();
+        model.redo();
+        model.execute('smartBackspace', { language: 'php' });
+        expect(model.getText()).toBe('<script>call</script>');
+    });
+
+    it('invalidates script context when openers and closers change and history restores them', () => {
+        const model = new DocumentModel('<div>\ncall\n</div>');
+        model.applyEdits([
+            { from: 0, to: 5, text: '<script>' },
+            { from: 11, to: 17, text: '</script>' }
+        ]);
+        const at = model.getLine(1).end;
+        model.setSelections([{ anchor: at, head: at }]);
+        model.typeText('(', { language: 'php' });
+        expect(model.getLine(1).text).toBe('call()');
+        model.undo();
+        model.undo();
+        const oldAt = model.getLine(1).end;
+        model.setSelections([{ anchor: oldAt, head: oldAt }]);
+        model.typeText('(', { language: 'php' });
+        expect(model.getLine(1).text).toBe('call(');
+    });
+});
+
+it('restores script context when a closing tag is removed, undone and redone', () => {
+    const model = new DocumentModel('<script>\ncall();\n</script>\naction');
+    const closing = model.getLine(2);
+    model.applyEdits([{ from: closing.start, to: closing.end, text: '' }]);
+    let at = model.getLine(3).end;
+    model.setSelections([{ anchor: at, head: at }]);
+    model.typeText('(', { language: 'php' });
+    expect(model.getLine(3).text).toBe('action()');
+    model.undo();
+    model.undo();
+    model.redo();
+    at = model.getLine(3).end;
+    model.setSelections([{ anchor: at, head: at }]);
+    model.typeText('(', { language: 'php' });
+    expect(model.getLine(3).text).toBe('action()');
 });

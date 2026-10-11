@@ -45,9 +45,11 @@ export interface TypingContext {
     /* Where the comment the lexer is in began, in the document. */
     commentStart?: number;
     /* PHP preserves these fields while code inside an attribute or raw block runs. */
-    markup?: 'text' | 'tag' | 'equals' | 'value' | 'comment' | 'raw';
+    markup?: 'tag' | 'equals' | 'value' | 'comment' | 'raw';
     markupQuote?: '"' | "'";
     element?: 'script' | 'style';
+    embed?: TypingContext;
+    embedded?: 'javascript';
 }
 
 interface Rules {
@@ -225,9 +227,34 @@ function closeBracket(state: TypingContext, char: string): void {
     state.word = bracket.control ? 'control-close' : '';
 }
 
+let scriptRules: Rules | undefined;
+
+function stepScript(state: TypingContext, text: string, at: number, end: number, offset: number): number {
+    if (state.mode === 'line-comment') {
+        return at;
+    }
+    if (state.mode === 'block-comment') {
+        return scanComment(state, text, at, end);
+    }
+    return state.mode === 'code' ? scanCode(state, (scriptRules ??= rulesOf('javascript')), text, at, end, offset) : scanLiteral(state, text, at, end, offset);
+}
+
+const scriptLexer = { initial, step: stepScript };
+
+function normalizeLine(state: TypingContext, multilineQuotes: boolean): void {
+    if (state.mode === 'line-comment' || state.mode === 'regex' || (state.mode === 'quote' && !multilineQuotes && !state.escaped)) {
+        state.mode = 'code';
+        state.quote = undefined;
+        state.commentStart = undefined;
+        state.expression = true;
+    }
+    state.escaped = false;
+}
+
 /* Lexes `text` up to `end`, from the state the line started in. `offset` is where the line starts in the document. */
 function scan(text: string, end: number, start: TypingContext, rules: Rules, offset: number): TypingContext {
-    const state = { ...start };
+    // An embedded lexer must not mutate the script state cached at the line start.
+    const state = { ...start, embed: start.embed === undefined ? undefined : { ...start.embed } };
     for (let at = 0; at < end; at++) {
         if (state.mode === 'line-comment') {
             // A PHP line comment ends at its line break and at a closing tag.
@@ -239,7 +266,7 @@ function scan(text: string, end: number, start: TypingContext, rules: Rules, off
             state.commentStart = undefined;
             at = tag + 1;
         } else if (state.mode === 'html') {
-            at = scanPhpMarkup(state, text, at, end);
+            at = scanPhpMarkup(state, text, at, end, offset, scriptLexer);
         } else if (state.mode === 'heredoc') {
             const closing = new RegExp(`^[\\t ]*${state.quote}(?![\\w])`).exec(text);
             if (closing === null) {
@@ -272,7 +299,8 @@ function sameState(left: TypingContext, right: TypingContext): boolean {
         left.commentStart === right.commentStart &&
         left.markup === right.markup &&
         left.markupQuote === right.markupQuote &&
-        left.element === right.element
+        left.element === right.element &&
+        (left.embed === right.embed || (left.embed !== undefined && right.embed !== undefined && sameState(left.embed, right.embed)))
     );
 }
 
@@ -332,20 +360,18 @@ export class TypingContexts {
             const previous = this.states.at(-1)!;
             const source = this.line(this.states.length - 1);
             const next = scan(source.text, source.text.length, previous, rules, source.start);
-            // Only PHP and Rust strings run past a line break without a trailing backslash.
-            if (next.mode === 'line-comment' || next.mode === 'regex' || (next.mode === 'quote' && !/^(php|rust|rs)$/i.test(id) && !next.escaped)) {
-                next.mode = 'code';
-                next.quote = undefined;
-                next.commentStart = undefined;
-                next.expression = true;
+            // A PHP island's source newlines are not newlines in the emitted script.
+            if (next.mode === 'html' && next.embed !== undefined) {
+                normalizeLine(next.embed, false);
             }
+            normalizeLine(next, /^(php|rust|rs)$/i.test(id));
             if (next.mode === 'html' && next.markup === 'value' && next.markupQuote === undefined) {
                 next.markup = 'tag';
             }
-            next.escaped = false;
             this.states.push(sameState(next, previous) ? previous : next);
         }
         const source = this.line(line);
-        return scan(source.text, column, this.states[line], rules, source.start);
+        const state = scan(source.text, column, this.states[line], rules, source.start);
+        return state.mode === 'html' && state.embed !== undefined ? { ...state.embed, markup: 'raw', element: 'script', embedded: 'javascript' } : state;
     }
 }

@@ -3,15 +3,21 @@ import type { TypingContext } from './typing-context.ts';
 const TAG = /<(\/?)([a-z][\w:-]*)(?=[\s/>]|$)/iy;
 const PHP = /<\?(?:php\b|=)/y;
 
-function finishTag(state: TypingContext, selfClosing: boolean): void {
+interface ScriptLexer {
+    initial(): TypingContext;
+    step(state: TypingContext, text: string, at: number, end: number, offset: number): number;
+}
+
+function finishTag(state: TypingContext, selfClosing: boolean, script: ScriptLexer): void {
     state.markup = !selfClosing && state.element !== undefined ? 'raw' : undefined;
     state.markupQuote = undefined;
+    state.embed = state.markup === 'raw' && state.element === 'script' ? script.initial() : undefined;
     if (selfClosing) {
         state.element = undefined;
     }
 }
 
-export function scanPhpMarkup(state: TypingContext, text: string, from: number, end: number): number {
+export function scanPhpMarkup(state: TypingContext, text: string, from: number, end: number, offset: number, script: ScriptLexer): number {
     for (let at = from; at < end; at++) {
         const char = text[at]!;
         if (char === '<' && text[at + 1] === '?') {
@@ -54,8 +60,12 @@ export function scanPhpMarkup(state: TypingContext, text: string, from: number, 
             const tag = TAG.exec(text);
             const name = tag?.[2]?.toLowerCase();
             if (state.markup === 'raw' && (tag?.[1] !== '/' || name !== state.element)) {
+                if (state.embed !== undefined) {
+                    at = script.step(state.embed, text, at, end, offset);
+                }
                 continue;
             }
+            state.embed = undefined;
             state.element = tag?.[1] !== '/' && (name === 'script' || name === 'style') ? name : undefined;
             state.markup = tag === null ? undefined : 'tag';
             state.markupQuote = undefined;
@@ -64,13 +74,17 @@ export function scanPhpMarkup(state: TypingContext, text: string, from: number, 
             }
             continue;
         }
-        if (state.markup === undefined || state.markup === 'text' || state.markup === 'raw') {
+        if (state.embed !== undefined) {
+            at = script.step(state.embed, text, at, end, offset);
+            continue;
+        }
+        if (state.markup === undefined || state.markup === 'raw') {
             continue;
         }
         if (char === '>') {
-            finishTag(state, false);
+            finishTag(state, false, script);
         } else if (char === '/' && text[at + 1] === '>' && at + 2 <= end) {
-            finishTag(state, true);
+            finishTag(state, true, script);
             at++;
         } else if (/\s/u.test(char)) {
             if (state.markup === 'value') {

@@ -393,3 +393,15 @@ describe('Enter in PHP markup', () => {
         expect(model.getSelections()[0]!.head).toBe(10);
     });
 });
+
+describe('Enter within PHP script elements', () => {
+    it('uses JavaScript continuation and string concatenation rules', () => {
+        enter('<script>\n    x = y.¦\n</script>', '<script>\n    x = y.\n    ¦\n</script>', { language: 'php' });
+        enter('<script>\nlet value = "ab¦cd";\n</script>', '<script>\nlet value = "ab" +\n    "¦cd";\n</script>', { language: 'php' });
+        enter('<script>\n    call(¦)\n</script>', '<script>\n    call(\n        ¦\n    )\n</script>', { language: 'php' });
+    });
+    it('continues script comments and keeps PHP concatenation within PHP islands', () => {
+        enter('<script>\n// note¦ more\n</script>', '<script>\n// note\n// ¦more\n</script>', { language: 'php' });
+        enter('<script>\n<?php $value = "ab¦cd"; ?>\n</script>', '<script>\n<?php $value = "ab" .\n    "¦cd"; ?>\n</script>', { language: 'php' });
+    });
+});

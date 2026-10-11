@@ -6,8 +6,8 @@ export type EditRegions = (line: number, offset?: number) => EditRegion | null;
 
 const SCAN_LIMIT = 2_000_000;
 export function phpLiteralAt(source: EditSource, offset: number): boolean {
-    const mode = source.context(offset).mode;
-    return mode === 'heredoc' || mode === 'quote';
+    const context = source.context(offset);
+    return context.mode === 'heredoc' || context.mode === 'quote' || (context.embedded !== undefined && context.mode === 'template');
 }
 
 function firstContent(source: EditSource, line: number): number {
@@ -24,12 +24,13 @@ function mixedPhpLine(source: EditSource, line: number): boolean {
             return true;
         }
         const at = bounds.start + match.index;
-        const mode = source.context(at).mode;
+        const context = source.context(at);
+        const { mode, embedded } = context;
         if (match[0] === '?>') {
-            if (mode !== 'html') {
+            if (mode !== 'html' && embedded === undefined) {
                 return true;
             }
-        } else if (mode === 'html' || (mode === 'code' && at === firstContent(source, line))) {
+        } else if (mode === 'html' || embedded !== undefined || (mode === 'code' && at === firstContent(source, line))) {
             return true;
         }
     }
@@ -60,7 +61,7 @@ export function editRegions(source: EditSource, language: string): EditRegions {
             }
             const at = offset ?? firstContent(source, line);
             const context = source.context(at);
-            if (context.mode !== 'html') {
+            if (context.mode !== 'html' && context.embedded === undefined) {
                 return null;
             }
             if (context.markup === 'comment' || (offset === undefined && source.context(bounds.end).markup === 'comment')) {

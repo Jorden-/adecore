@@ -55,13 +55,14 @@ function escapeForPattern(text: string): string {
  * `if` or `for`, after `else`, `=>` or a binary operator. Languages with braces only.
  */
 export function continues(text: string, context: TypingContext, language: string): boolean {
-    if (!isBraced(language) || context.mode !== 'code') {
+    const effectiveLanguage = context.embedded ?? language;
+    if (!isBraced(effectiveLanguage) || context.mode !== 'code') {
         return false;
     }
     if (context.word === 'control-close' || context.word === 'else' || context.word === 'do') {
         return true;
     }
-    if (isPhp(language) && /(?<!\.)\.$/.test(text)) {
+    if (isPhp(effectiveLanguage) && /(?<!\.)\.$/.test(text)) {
         return true;
     }
     return trailingOperator.test(text);
@@ -299,7 +300,7 @@ class Enter {
 
     private inString(from: number, context: TypingContext, index: number): EnterPlan | null {
         const { source, options } = this;
-        const operator = concatenation.get(options.language.toLowerCase());
+        const operator = concatenation.get(context.embedded ?? options.language.toLowerCase());
         const quote = context.quote;
         if (operator === undefined || (quote !== '"' && quote !== "'")) {
             return null;

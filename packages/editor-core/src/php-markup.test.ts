@@ -28,7 +28,7 @@ test('PHP markup keeps assignment and value states across line breaks', () => {
     expect(context('<div\n class=\n ¦>')).toMatchObject({ mode: 'html', markup: 'equals' });
     expect(context('<div class=x\n¦title="y">')).toMatchObject({ mode: 'html', markup: 'tag' });
     expect(context('<div class="a\n¦b">')).toMatchObject({ mode: 'html', markup: 'value', markupQuote: '"' });
-    expect(context('<script\n type="text/javascript"\n>¦')).toMatchObject({ mode: 'html', markup: 'raw', element: 'script' });
+    expect(context('<script\n type="text/javascript"\n>¦')).toMatchObject({ markup: 'raw', element: 'script', embedded: 'javascript' });
 });
 
 test('PHP returns to the attribute state it entered from', () => {
@@ -42,7 +42,7 @@ test('PHP returns to the attribute state it entered from', () => {
 
 test('raw PHP markup only ends at its own closing tag', () => {
     for (const source of ['<script> <div>¦', '<script> </style>¦', '<script> </script:other>¦', '<script> <?= $x ?>¦']) {
-        expect(context(source)).toMatchObject({ mode: 'html', markup: 'raw', element: 'script' });
+        expect(context(source)).toMatchObject({ markup: 'raw', element: 'script', embedded: 'javascript' });
     }
     expect(context('<script> </script>¦')).toMatchObject({ mode: 'html', markup: undefined, element: undefined });
     expect(context('<style> <script>¦')).toMatchObject({ mode: 'html', markup: 'raw', element: 'style' });
@@ -73,4 +73,50 @@ test('edits invalidate cached markup assignments and quoted values', () => {
     model.applyEdits([{ from: 12, to: 12, text: "'" }]);
     contexts.invalidate(1);
     expect(contexts.at(2, 1, 'php').markupQuote).toBe("'");
+});
+
+test('PHP script content uses script comments, regexes, templates and bracket stacks', () => {
+    expect(context('<script>#x; call(¦</script>')).toMatchObject({ mode: 'code', embedded: 'javascript', bracket: { close: ')' } });
+    expect(context('<script>let regex = /[a¦]/;</script>')).toMatchObject({ mode: 'regex', inClass: true, embedded: 'javascript' });
+    expect(context('<script>// note¦</script>')).toMatchObject({ mode: 'line-comment', embedded: 'javascript' });
+    expect(context('<script>/* note¦</script>')).toMatchObject({ mode: 'block-comment', embedded: 'javascript' });
+    expect(context('<script>let value = `first\nsecond¦`;</script>')).toMatchObject({ mode: 'template', embedded: 'javascript' });
+    expect(context('<script>let value = `${call(¦)}`;</script>')).toMatchObject({ mode: 'code', embedded: 'javascript', bracket: { close: ')' } });
+    expect(context('<script>value <<<EOT\ncall¦\n</script>')).toMatchObject({ mode: 'code', embedded: 'javascript' });
+});
+
+test('PHP islands suspend the script state including across PHP source line breaks', () => {
+    expect(context("<script>let value = '<?= $value ?>¦';</script>")).toMatchObject({ mode: 'quote', quote: "'", embedded: 'javascript' });
+    expect(context("<script>let value = '<?=\n$value\n?>¦';</script>")).toMatchObject({ mode: 'quote', quote: "'", embedded: 'javascript' });
+    expect(context('<script>let value = `<?=\n$value\n?>¦`;</script>')).toMatchObject({ mode: 'template', quote: '`', embedded: 'javascript' });
+    expect(context('<script>// <?=\n$value\n?>¦')).toMatchObject({ mode: 'line-comment', embedded: 'javascript' });
+    expect(context('<script>call(<?= $value ?>¦);</script>')).toMatchObject({ mode: 'code', embedded: 'javascript', bracket: { close: ')' } });
+    expect(context('<script>call(<?= $value¦ ?>);</script>').embedded).toBeUndefined();
+    expect(context('<script>call(<?= $value¦ ?>);</script>').mode).toBe('code');
+});
+
+test('HTML closes a script even inside a script string, comment, template or regex', () => {
+    for (const prelude of ["let value = '", '// ', '/* ', 'let value = `', 'let regex = /']) {
+        const result = context('<script>' + prelude + '</script><a href=¦>');
+        expect(result).toMatchObject({ mode: 'html', markup: 'equals' });
+        expect(result.embedded).toBeUndefined();
+    }
+    expect(context('<script>let value = "<\\/script>¦";</script>')).toMatchObject({ mode: 'quote', embedded: 'javascript' });
+});
+
+test('script line comments, regexes and ordinary quotes reset at emitted line breaks', () => {
+    for (const prelude of ['// note', 'let value = "unfinished', 'let regex = /unfinished']) {
+        expect(context('<script>\n' + prelude + '\n¦call();\n</script>')).toMatchObject({ mode: 'code', embedded: 'javascript' });
+    }
+    expect(context('<script>let value = "escaped\\\n¦continuation";</script>')).toMatchObject({ mode: 'quote', embedded: 'javascript' });
+});
+
+test('script queries do not mutate the state cached at the start of a line', () => {
+    const model = new DocumentModel('<script>\nconst value = "unfinished\ncall();\n</script>');
+    const contexts = new TypingContexts((line) => model.getLine(line));
+    expect(contexts.at(1, 0, 'php').mode).toBe('code');
+    expect(contexts.at(1, model.getLine(1).text.length, 'php').mode).toBe('quote');
+    expect(contexts.at(1, 0, 'php').mode).toBe('code');
+    expect(contexts.at(2, 0, 'php').mode).toBe('code');
+    expect(contexts.at(1, 0, 'php').mode).toBe('code');
 });
