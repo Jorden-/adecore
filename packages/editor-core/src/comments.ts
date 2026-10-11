@@ -366,8 +366,19 @@ export function planBlockComment(source: EditSource, selections: readonly Select
     let offsetDelta = 0;
     for (const selection of selections) {
         const { from, to } = rangeOf(selection);
-        if (/^php$/i.test(options.language) && (phpLiteralAt(source, from) || phpLiteralAt(source, to))) {
-            return null;
+        if (/^php$/i.test(options.language)) {
+            const mode = source.context(from).mode;
+            const text = source.slice(from, to);
+            // Wrapping a PHP tag can move a closing marker into a different language.
+            if (
+                phpLiteralAt(source, from) ||
+                phpLiteralAt(source, to) ||
+                mode !== source.context(to).mode ||
+                /<\?(?:php\b|=)/.test(text) ||
+                (mode !== 'html' && text.includes('?>'))
+            ) {
+                return null;
+            }
         }
         const block = syntaxOf(regions, options, source.lineAt(from), from).block;
         if (!block) {

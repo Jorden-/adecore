@@ -31,7 +31,7 @@ function mixedPhpLine(source: EditSource, line: number): boolean {
         const at = bounds.start + match.index;
         const mode = source.context(at).mode;
         if (match[0] === '?>') {
-            if (mode === 'code' || mode === 'line-comment') {
+            if (mode !== 'html') {
                 return true;
             }
         } else if (mode === 'html' || (mode === 'code' && at === firstContent(source, line))) {

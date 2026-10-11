@@ -511,3 +511,28 @@ describe('PHP literal values stay unchanged by comment commands', () => {
         expect(model.getText()).toBe(source);
     });
 });
+
+describe('PHP comment boundary safety', () => {
+    test('line comments leave closing tags in PHP strings and block comments unchanged', () => {
+        for (const text of ["echo '?>';", '$value = "?>";', '/* ?> */ run();']) {
+            const model = new DocumentModel(text);
+            expect(model.execute('toggleLineComment', { language: 'php' })).toBe(false);
+            expect(model.getText()).toBe(text);
+        }
+    });
+
+    test('block comments cannot cross PHP opening or closing tags', () => {
+        for (const text of ['<div><?php run();', '<?php run(); ?><div>', '<div><?= $value ?></div>', '<?php run(); ?><div><?php next();']) {
+            const model = new DocumentModel(text);
+            model.setSelections([{ anchor: 0, head: text.length }]);
+            expect(model.execute('toggleBlockComment', { language: 'php' })).toBe(false);
+            expect(model.getText()).toBe(text);
+        }
+    });
+
+    test('closing-tag text in HTML can still be commented and toggled back', () => {
+        line('<div>?>¦</div>', '<!-- <div>?></div> -->¦', { language: 'php' });
+        block('[<div>?> text</div>]', '[<!--\n<div>?> text</div>\n-->]', { language: 'php' });
+        block('[run();]', '[/*\nrun();\n*/]', { language: 'php' });
+    });
+});
