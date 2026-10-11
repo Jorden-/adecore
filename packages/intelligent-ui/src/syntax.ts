@@ -233,7 +233,7 @@ class UiParser {
                     return;
                 }
                 // A tag that lost a prop and has no closing tag anywhere after it was meant to close itself.
-                if (node.invalid && this.final && !this.source.includes(`</${node.type}>`, this.position)) {
+                if (node.invalid && this.final && !this.closesLater(node.type)) {
                     node.complete = true;
                     node.end = this.position;
                     return;
@@ -396,6 +396,13 @@ class UiParser {
             throw new UiFailure('incomplete_expression', 'The expression is not closed.');
         }
         return { value: this.source.slice(start), complete: false };
+    }
+
+    /* Whether a closing tag for this type follows, written the way `tag` accepts one: whitespace may stand before its `>`. */
+    private closesLater(type: string): boolean {
+        const closing = new RegExp(`</${type}\\s*>`, 'g');
+        closing.lastIndex = this.position;
+        return closing.test(this.source);
     }
 
     private whitespace(): void {

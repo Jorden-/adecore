@@ -34,6 +34,18 @@ describe('a malformed prop', () => {
         expect(compiled.fallback).not.toContain('<Choice');
     });
 
+    test('finds its closing tag however the tag closes it, keeping its children and siblings', () => {
+        for (const close of ['</Choice >', '</Choice\n>', '</Choice\t \n>']) {
+            const compiled = block(`<Choices><Choice context=bad>Run${close}<Choice>Keep</Choice></Choices>`);
+            expect(compiled.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(['invalid_prop']);
+            const [first, second] = compiled.nodes[0]!.children;
+            expect(first!.error).toBe('invalid_syntax');
+            expect(first!.children.map((child) => child.props.text)).toEqual(['Run']);
+            expect(second!.children.map((child) => child.props.text)).toEqual(['Keep']);
+            expect(compiled.fallback.trim()).toBe('Run\nKeep');
+        }
+    });
+
     test('a tag that lost a prop and is never closed ends at its own bracket', () => {
         const compiled = block('<Summary>One</Summary>\n<Stat value=>\n<Summary>Two</Summary>');
         expect(compiled.nodes.map((node) => node.type)).toEqual(['Summary', 'Stat', 'Summary']);
