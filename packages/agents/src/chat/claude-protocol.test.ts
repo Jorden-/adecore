@@ -717,6 +717,20 @@ describe('ClaudeProtocol', () => {
         expect(protocol.stopTaskRequest('b2')).toMatchObject({ type: 'control_request', request: { subtype: 'stop_task', task_id: 'b2' } });
     });
 
+    test('an error answer to stop_task is reported once, and a success or a stranger is not', () => {
+        const protocol = new ClaudeProtocol();
+        const request = protocol.stopTaskRequest('b2') as { request_id: string };
+        const other = protocol.stopTaskRequest('b3') as { request_id: string };
+        expect(protocol.handle({ type: 'control_response', response: { subtype: 'success', request_id: other.request_id, response: {} } })).toEqual([]);
+        expect(protocol.handle({ type: 'control_response', response: { subtype: 'error', request_id: 'elsewhere', error: 'x' } })).toEqual([]);
+        expect(protocol.handle({ type: 'control_response', response: { subtype: 'error', request_id: request.request_id, error: 'no such task' } })).toEqual([
+            { type: 'stop.refused', taskId: 'b2', message: 'no such task' }
+        ]);
+        expect(protocol.handle({ type: 'control_response', response: { subtype: 'error', request_id: request.request_id, error: 'no such task' } })).toEqual(
+            []
+        );
+    });
+
     // The launch text is what Claude Code 2.1.273 and 2.1.274 wrote to their transcripts; 2.1.282 still carries it and ends the task this way.
     test('a workflow ends on whichever says so first, its task status or its notification', () => {
         const launch = (protocol: ClaudeProtocol) =>

@@ -1275,6 +1275,34 @@ export class ChatSession {
         }
     }
 
+    /* The CLI would not stop it: with no turn running the row is only marked, and while one runs a note says it still goes on. */
+    private refuseStop(agentId: string, message: string): void {
+        const toolUseId = this.stopping.get(agentId);
+        if (toolUseId === undefined) {
+            return;
+        }
+        this.stopping.delete(agentId);
+        const row = this.thread.find('subagent', (item) => item.toolUseId === toolUseId);
+        if (row?.status !== 'running') {
+            return;
+        }
+        if (this.thread.info.activeTurnId === null) {
+            this.markSubagentStopped(toolUseId);
+            return;
+        }
+        this.emit([
+            this.thread.upsert({
+                id: `stop-refused-${toolUseId}-${Date.now()}`,
+                kind: 'note',
+                createdAt: Date.now(),
+                turnId: null,
+                level: 'warning',
+                text: `"${row.description || row.subagentType || 'Sub-agent'}" could not be stopped: ${message}`
+            })
+        ]);
+        this.options.persist();
+    }
+
     /* The line under a subagent that `stop_task` ended, once the CLI reported it settled. */
     private noteStopped(event: Extract<BackendEvent, { type: 'task.done' }>): void {
         const stopped = [...this.stopping].find(([agentId, toolUseId]) => agentId === event.taskId || toolUseId === event.ref);
@@ -1282,6 +1310,10 @@ export class ChatSession {
             return;
         }
         this.stopping.delete(stopped[0]);
+        // It finished on its own just before the stop arrived; the row already says so.
+        if (event.ok) {
+            return;
+        }
         const row = this.thread.find('subagent', (item) => item.toolUseId === stopped[1]);
         if (!row) {
             return;
@@ -1727,6 +1759,10 @@ export class ChatSession {
         }
         if (event.type === 'title') {
             this.applyTitle(event.title);
+            return;
+        }
+        if (event.type === 'stop.refused') {
+            this.refuseStop(event.taskId, event.message);
             return;
         }
         /*

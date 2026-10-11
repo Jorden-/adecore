@@ -1774,6 +1774,40 @@ describe('stopping one subagent of the CLI', () => {
         await run.session.dispose();
     });
 
+    test('a sub-agent that finished by itself before the stop arrived gets no stopped note', async () => {
+        const run = rig();
+        run.backend.stopTask = () => undefined;
+        run.session.send('go');
+        await flush();
+        run.event(started('t1', 'a-one'));
+        run.session.stopSubagent('t1');
+        run.event({ type: 'task.done', ref: 't1', taskId: 'a-one', summary: 'Done', ok: true });
+        expect(run.session.thread.get('stopped-t1')).toBeUndefined();
+        await run.session.dispose();
+    });
+
+    test('a stop the CLI refuses leaves a note while a turn runs and marks the row once none does', async () => {
+        const run = rig();
+        run.backend.stopTask = () => undefined;
+        run.session.send('go');
+        await flush();
+        run.event(started('t1', 'a-one'));
+        run.session.stopSubagent('t1');
+        run.event({ type: 'stop.refused', taskId: 'a-one', message: 'no such task' });
+        expect(row(run.session, 't1')).toMatchObject({ status: 'running' });
+        expect(run.session.thread.list().some((item) => item.kind === 'note' && item.text.includes('could not be stopped: no such task'))).toBe(true);
+        // The entry is gone, so a later settle writes no stopped note.
+        run.event({ type: 'task.done', ref: 't1', taskId: 'a-one', summary: null, ok: false });
+        expect(run.session.thread.get('stopped-t1')).toBeUndefined();
+
+        run.event(started('t2', 'a-two'));
+        run.event({ type: 'turn.done', state: 'done', costUsd: 0 });
+        run.session.stopSubagent('t2');
+        run.event({ type: 'stop.refused', taskId: 'a-two', message: 'no such task' });
+        expect(row(run.session, 't2')).toMatchObject({ status: 'failed' });
+        await run.session.dispose();
+    });
+
     test('a process that did not start it refuses while a turn runs and marks it otherwise', async () => {
         const run = rig();
         const stopped: string[] = [];

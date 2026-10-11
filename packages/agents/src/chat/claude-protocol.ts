@@ -147,6 +147,9 @@ export class ClaudeProtocol {
     private apiError: string | null = null;
     private readonly refusedWindows = new Map<string, number | null>();
 
+    // The task each `stop_task` request named, so an error answer finds it again.
+    private readonly stopRequests = new Map<string, string>();
+
     private readonly steerIds = new Set<string>();
 
     beginSteer(promptId: string): void {
@@ -184,6 +187,9 @@ export class ClaudeProtocol {
                 break;
             case 'control_request':
                 this.handleControlRequest(frame, events);
+                break;
+            case 'control_response':
+                this.handleControlResponse(frame, events);
                 break;
             case 'control_cancel_request': {
                 const requestId = str(frame.request_id);
@@ -445,7 +451,23 @@ export class ClaudeProtocol {
 
     /* The control request that ends one task the CLI runs beside its turns. */
     stopTaskRequest(taskId: string): unknown {
-        return { type: 'control_request', request_id: `stop-task-${taskId}-${Date.now()}`, request: { subtype: 'stop_task', task_id: taskId } };
+        const requestId = `stop-task-${taskId}-${Date.now()}`;
+        this.stopRequests.set(requestId, taskId);
+        return { type: 'control_request', request_id: requestId, request: { subtype: 'stop_task', task_id: taskId } };
+    }
+
+    /* Only a refused `stop_task` matters; every other answer is the CLI saying it took the request. */
+    private handleControlResponse(frame: Frame, events: BackendEvent[]): void {
+        const response = isRecord(frame.response) ? frame.response : null;
+        const requestId = str(response?.request_id);
+        const taskId = requestId === null ? undefined : this.stopRequests.get(requestId);
+        if (response === null || requestId === null || taskId === undefined) {
+            return;
+        }
+        this.stopRequests.delete(requestId);
+        if (response.subtype === 'error') {
+            events.push({ type: 'stop.refused', taskId, message: str(response.error) ?? 'The CLI refused to stop it' });
+        }
     }
 
     private handleStreamEvent(frame: Frame, events: BackendEvent[]): void {

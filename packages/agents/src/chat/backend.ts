@@ -160,6 +160,8 @@ export type BackendEvent =
     | { type: 'compaction'; preTokens: number | null }
     | { type: 'model'; model: string }
     | { type: 'note'; level: 'info' | 'warning' | 'error'; text: string }
+    // The CLI answered a `stopTask` with an error, so the task still runs.
+    | { type: 'stop.refused'; taskId: string; message: string }
     // `native` is the CLI's own name for where the turn ended, which a fork of the chat is cut at.
     | {
           type: 'turn.done';
