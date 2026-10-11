@@ -195,10 +195,10 @@ describe('comments in embedded markup', () => {
         expect(commented(ordinary, 'typescript').getText()).toBe('// const value = 1;');
     });
 
-    it('recognizes an element nested in an expression inside another element', () => {
+    it('keeps an element inside an expression in JavaScript comment syntax', () => {
         const source = 'const view = <div>{items.map(item => (\n    <span>\n        ¦{item.name}\n    </span>\n))}</div>;';
         const element = source.replace('¦{item.name}', '{item.name}').replace('<span>', '¦<span>');
-        expect(commented(element, 'tsx').getText()).toBe(element.replace('¦<span>', '{/* <span> */}'));
+        expect(commented(element, 'tsx').getText()).toBe(element.replace('¦', '// '));
     });
 
     it('uses JSX block comments for child text and JavaScript blocks within an expression', () => {
@@ -265,5 +265,49 @@ describe('comments in embedded markup', () => {
         model.setSelections([{ anchor: 0, head: model.getText().length }]);
         model.execute('toggleLineComment', { language: 'php' });
         expect(model.getText()).toBe(source);
+    });
+});
+
+describe('JSX line comment context remains stable across toggles', () => {
+    it('uses JSX comments for an expression container at the start of a child line', () => {
+        const source = 'const view = <div>\n    {items.map(item => item.name)}\n</div>;';
+        const model = new DocumentModel(source);
+        const at = model.getLine(1).start + 4;
+        model.setSelections([{ anchor: at, head: at }]);
+        model.execute('toggleLineComment', { language: 'tsx' });
+        expect(model.getText()).toBe('const view = <div>\n    {/* {items.map(item => item.name)} */}\n</div>;');
+        model.setSelections([{ anchor: at, head: at }]);
+        model.execute('toggleLineComment', { language: 'tsx' });
+        expect(model.getText()).toBe(source);
+    });
+    it('toggles all lines of a nested multiline opening tag with the first line marker', () => {
+        const source = 'const view = <div>\n    <Foo\n        bar="x"\n    />\n</div>;';
+        const model = new DocumentModel(source);
+        model.setSelections([{ anchor: model.getLine(1).start, head: model.getLine(3).end }]);
+        model.execute('toggleLineComment', { language: 'tsx' });
+        expect(model.getText()).toBe('const view = <div>\n    {/* <Foo */}\n    {/*     bar="x" */}\n    {/* /> */}\n</div>;');
+        model.setSelections([{ anchor: model.getLine(1).start, head: model.getLine(3).end }]);
+        model.execute('toggleLineComment', { language: 'tsx' });
+        expect(model.getText()).toBe(source);
+    });
+    it('preserves JavaScript markers across a complete return block', () => {
+        const source = 'function view() {\n    return (\n        <div>\n            text\n        </div>\n    );\n}';
+        const model = new DocumentModel(source);
+        model.setSelections([{ anchor: model.getLine(1).start, head: model.getLine(5).end }]);
+        model.execute('toggleLineComment', { language: 'tsx' });
+        for (let line = 1; line <= 5; line++) {
+            expect(model.getLine(line).text.trimStart().startsWith('//')).toBe(true);
+        }
+        model.setSelections([{ anchor: model.getLine(1).start, head: model.getLine(5).end }]);
+        model.execute('toggleLineComment', { language: 'tsx' });
+        expect(model.getText()).toBe(source);
+    });
+    it('keeps a self-closing element within JavaScript parentheses in script syntax', () => {
+        const source = 'const view = <div>{items.map(item => (\n    <li />\n))}</div>;';
+        const model = new DocumentModel(source);
+        const at = model.getLine(1).start;
+        model.setSelections([{ anchor: at, head: at }]);
+        model.execute('toggleLineComment', { language: 'tsx' });
+        expect(model.getLine(1).text).toBe('    // <li />');
     });
 });

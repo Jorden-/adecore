@@ -2,6 +2,8 @@ import type { EditSource } from './edit-source.ts';
 import { type EditRegion, vueRegionAt } from './languages.ts';
 import { hasJsx, jsxChildren } from './markup-regions.ts';
 
+export type EditRegions = (line: number, offset?: number) => EditRegion | null;
+
 const SCAN_LIMIT = 2_000_000;
 interface TagRegion {
     readonly at: number;
@@ -85,7 +87,7 @@ function tagRegionAt(tags: readonly TagRegion[], offset: number): EditRegion {
 }
 
 /* Scans once for one command, without retaining offsets after its edits. */
-export function editRegions(source: EditSource, language: string): EditSource['region'] {
+export function editRegions(source: EditSource, language: string): EditRegions {
     const id = language.toLowerCase();
     const end = source.line(source.lineCount - 1).end;
     if (id === 'vue') {

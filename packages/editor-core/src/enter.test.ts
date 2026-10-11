@@ -339,3 +339,15 @@ describe('Enter in general', () => {
         expect(model.getText()).toBe('if (x) {\r\n    \r\n}');
     });
 });
+
+describe('Enter continues code comments inside embedded markup', () => {
+    it('continues the comment in a JSX callback', () => {
+        enter('const view = <Foo onClick={() => { // note¦ more\n}} />;', 'const view = <Foo onClick={() => { // note\n//¦more\n}} />;', { language: 'tsx' });
+    });
+    it('continues the star prefix within a JSX child comment', () => {
+        enter('const view = <div>{/*\n * foo¦\n */}</div>;', 'const view = <div>{/*\n * foo\n * ¦\n */}</div>;', { language: 'tsx' });
+    });
+    it('continues a PHP comment on the opening-tag line', () => {
+        enter('<?php // header¦ text\n$value = 1;', '<?php // header\n//¦text\n$value = 1;', { language: 'php' });
+    });
+});

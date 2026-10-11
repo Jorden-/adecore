@@ -183,9 +183,6 @@ class JsxScanner {
     private element(from: number, outermost: boolean): number {
         const children = this.children.length;
         const previousEnd = this.children.at(-1)?.to;
-        if (this.depth > 0) {
-            this.child(from, from + 1);
-        }
         this.depth++;
         const end = this.parseElement(from);
         this.depth--;
@@ -288,6 +285,7 @@ class JsxScanner {
                 return -1;
             }
             if (text[at] === '{') {
+                this.child(at, at + 1);
                 const from = at;
                 at = this.code(at + 1, '}');
                 if (at >= 0 && /^\{\s*\/\*/.test(text.slice(from, from + 20))) {

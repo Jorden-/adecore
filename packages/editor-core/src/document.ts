@@ -6,8 +6,7 @@ import { mapOffset } from './offsets.ts';
 import { planPaste } from './paste.ts';
 import type { EnterOptions, EnterPlan } from './enter.ts';
 import type { EditPlan, EditSource } from './edit-source.ts';
-import { isPlainText } from './languages.ts';
-import { editRegions } from './edit-regions.ts';
+import { isPlainText, vueRegionAt } from './languages.ts';
 import { blockFolds } from './block-folds.ts';
 import { applyFoldHints, markFileHeader } from './fold-roles.ts';
 import { lexicalFolds } from './lexical-folds.ts';
@@ -1578,7 +1577,7 @@ export class DocumentModel {
     }
 
     private editSource(language: string): EditSource {
-        const source: EditSource = {
+        return {
             lineCount: this.getLineCount(),
             slice: (from, to) => this.slice(from, to),
             charAt: (offset) => this.rope.charAt(offset),
@@ -1586,11 +1585,9 @@ export class DocumentModel {
             line: (index) => this.getLine(index),
             newline: (index) => this.newlineAt(index),
             context: (offset) => this.typingContext(offset, language),
-            region: () => null,
+            region: (line) => (/^vue$/i.test(language) ? vueRegionAt((index) => this.getLine(index).text, line) : null),
             unclosedBrace: (offset) => this.isUnclosedBrace(offset, language)
         };
-        source.region = editRegions(source, language);
-        return source;
     }
 
     /*

@@ -159,3 +159,14 @@ describe('auto-indent lines', () => {
         expect(python.execute('autoIndentLines', { language: 'python' })).toBe(false);
     });
 });
+
+describe('joining code below comments in embedded markup', () => {
+    it('converts the PHP opening-tag line comment before joining executable code', () => {
+        run('joinLines', '<?php // note¦\n$value = 2;', '<?php /* note */¦ $value = 2;', { language: 'php' });
+    });
+    it('converts a JSX callback line comment before joining executable code', () => {
+        run('joinLines', 'const view = <Foo onClick={() => { // note¦\nwork();\n}} />;', 'const view = <Foo onClick={() => { /* note */¦ work();\n}} />;', {
+            language: 'tsx'
+        });
+    });
+});

@@ -1,4 +1,4 @@
-import type { EditRegion } from './languages.ts';
+import type { VueRegion } from './languages.ts';
 import type { DocumentLine } from './rope.ts';
 import type { TypingContext } from './typing-context.ts';
 import type { Selection, TextEdit } from './types.ts';
@@ -13,7 +13,7 @@ export interface EditSource {
     /* The line break of a line. */
     newline(index: number): string;
     context(offset: number): TypingContext;
-    region(line: number, offset?: number): EditRegion | null;
+    region(line: number): VueRegion | null;
     /* Whether a `{` at this offset has no closer of its own, so Enter after it adds one. */
     unclosedBrace(offset: number): boolean;
 }

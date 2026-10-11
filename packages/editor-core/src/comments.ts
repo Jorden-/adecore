@@ -1,4 +1,6 @@
 import type { EditPlan, EditSource } from './edit-source.ts';
+import { editRegions, type EditRegions } from './edit-regions.ts';
+import { hasJsx } from './markup-regions.ts';
 import { type BlockComment, type CommentSyntax, commentSyntax } from './languages.ts';
 import { indentText, isBlank, rangeOf, whitespaceOf } from './line-text.ts';
 import { mapOffset } from './offsets.ts';
@@ -27,8 +29,8 @@ interface Geometry {
     length: number;
 }
 
-function syntaxOf(source: EditSource, options: CommentOptions, line: number, offset?: number): CommentSyntax {
-    const syntax = commentSyntax(options.language, source.region(line, offset));
+function syntaxOf(regions: EditRegions, options: CommentOptions, line: number, offset?: number): CommentSyntax {
+    const syntax = commentSyntax(options.language, regions(line, offset));
     return options.lineToken === undefined ? syntax : { ...syntax, line: options.lineToken };
 }
 
@@ -89,11 +91,13 @@ function geometryOf(source: EditSource, edits: readonly TextEdit[], index: numbe
  * The markers go in at the smallest indentation of the lines, and a lone caret moves to the next line.
  */
 export function planLineComments(source: EditSource, selections: readonly Selection[], options: CommentOptions): EditPlan | null {
+    const regions = editRegions(source, options.language);
     const blocks = blocksOf(source, selections, options.lineSpan);
     const lineBased = new Map<number, CommentSyntax>();
     for (const block of blocks) {
+        const firstSyntax = hasJsx(options.language) && block.first !== block.last ? syntaxOf(regions, options, block.first) : undefined;
         for (let line = block.first; line <= block.last; line++) {
-            const syntax = syntaxOf(source, options, line);
+            const syntax = firstSyntax ?? syntaxOf(regions, options, line);
             lineBased.set(line, syntax.line === null ? syntax : { ...syntax, block: null });
         }
     }
@@ -341,12 +345,13 @@ function commentOf(source: EditSource, from: number, to: number, block: BlockCom
  * With nothing selected it opens an empty comment around the caret.
  */
 export function planBlockComment(source: EditSource, selections: readonly Selection[], options: CommentOptions): EditPlan | null {
+    const regions = editRegions(source, options.language);
     const edits: TextEdit[] = [];
     const result: Selection[] = [];
     let offsetDelta = 0;
     for (const selection of selections) {
         const { from, to } = rangeOf(selection);
-        const block = syntaxOf(source, options, source.lineAt(from), from).block;
+        const block = syntaxOf(regions, options, source.lineAt(from), from).block;
         if (!block) {
             return null;
         }
