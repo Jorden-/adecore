@@ -1,6 +1,6 @@
 # Lines and diffs
 
-Every function in the package works on arrays of lines. A line holds no line ending; the endings and whether the file ends on one are kept apart in a `TextShape`, and put back when the lines are joined.
+The line diff and merge functions work on arrays of lines. A line holds no line ending; the endings and whether the file ends on one are kept apart in a `TextShape`, and put back when the lines are joined.
 
 ```ts
 import { diffLines, joinLines, shapeOf, splitLines } from '@adecore/merge';
@@ -37,6 +37,24 @@ rebuilt.push(...base.slice(cursor));
 ```
 
 Here `diffLines` returns one change, `{ baseStart: 1, baseEnd: 2, otherStart: 1, otherEnd: 3 }`. Edits that follow each other with no equal line between them come back as one change.
+
+## Patch snapshots
+
+`missingSides(patch)` reads a single file patch's header and returns `{ old, new }`, marking a side missing when its filename is `/dev/null`. Headers are read only before the first hunk, so deleted content that resembles a header cannot change the result. A patch with no file headers has neither side marked missing.
+
+`patchFits(patch, oldText, newText, ignoreWhitespace)` checks that every displayed context, removed and added line occurs at its hunk coordinates in the corresponding snapshot. It returns `false` without a hunk or when any displayed line differs. Set `ignoreWhitespace` for a patch made with Git's `--ignore-all-space`: a context line can carry either side's spacing even though the snapshots keep their own text.
+
+```ts
+import { missingSides, patchFits } from '@adecore/merge';
+
+const patch = '--- a/code.ts\n+++ b/code.ts\n@@ -1 +1 @@\n-old\n+new\n';
+missingSides(patch); // { old: false, new: false }
+patchFits(patch, 'old\n', 'new\n', false); // true
+```
+
+These helpers preserve patch text rather than normalizing its line endings. Git shows a CRLF file's carriage returns in the hunk body. The `\ No newline at end of file` marker carries no source line and does not advance either snapshot position. Changes outside the displayed hunks are not checked.
+
+`patchFits` is a snapshot alignment check for ordinary single-file unified hunks, not a complete patch validator. It does not validate hunk counts, the final newline markers or combined/multi-file patch syntax. Do not use it to authorize applying an untrusted patch.
 
 ## Limits
 
