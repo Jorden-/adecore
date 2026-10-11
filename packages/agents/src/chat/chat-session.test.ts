@@ -1807,3 +1807,54 @@ describe('stopping one subagent of the CLI', () => {
         await run.session.dispose();
     });
 });
+
+describe('the HEAD a turn checkpoint is taken on', () => {
+    const diff = { files: [], truncated: false };
+    const hosts = (heads: string[] | undefined) => {
+        const asked: string[] = [];
+        const checkpoints = {
+            take: () => Promise.resolve('tree-before'),
+            diff: () => Promise.resolve(diff),
+            settle: () => Promise.resolve({ diff, after: 'tree-after' }),
+            ...(heads === undefined
+                ? {}
+                : {
+                      head: () => {
+                          asked.push('head');
+                          return Promise.resolve(heads.shift() ?? null);
+                      }
+                  })
+        };
+        return { checkpoints, asked };
+    };
+    const turnOf = (session: ChatSession) => session.thread.list().find((item) => item.kind === 'turn');
+
+    test('is recorded when the turn starts and when it settles', async () => {
+        const { checkpoints } = hosts(['head-1', 'head-2']);
+        const run = rig({ checkpoints });
+        run.session.send('go');
+        await flush();
+        expect(turnOf(run.session)).toMatchObject({ checkpoint: 'tree-before', checkpointHead: 'head-1' });
+        run.event({ type: 'turn.done', state: 'done', costUsd: 0 });
+        await flush();
+        expect(turnOf(run.session)).toMatchObject({ checkpointAfter: 'tree-after', checkpointHeadAfter: 'head-2' });
+        await run.session.dispose();
+    });
+
+    test('stays absent for a host that cannot read it, and for an unborn branch', async () => {
+        const without = rig({ checkpoints: hosts(undefined).checkpoints });
+        without.session.send('go');
+        await flush();
+        without.event({ type: 'turn.done', state: 'done', costUsd: 0 });
+        await flush();
+        expect(turnOf(without.session)).toMatchObject({ checkpoint: 'tree-before' });
+        expect(turnOf(without.session)).not.toHaveProperty('checkpointHead');
+        expect(turnOf(without.session)).not.toHaveProperty('checkpointHeadAfter');
+        const unborn = rig({ checkpoints: hosts([]).checkpoints });
+        unborn.session.send('go');
+        await flush();
+        expect(turnOf(unborn.session)).not.toHaveProperty('checkpointHead');
+        await without.session.dispose();
+        await unborn.session.dispose();
+    });
+});

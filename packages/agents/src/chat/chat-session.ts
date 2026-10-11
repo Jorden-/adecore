@@ -43,6 +43,8 @@ export interface TurnCheckpoints {
     diff(cwd: string, tree: string): Promise<ChatCheckpointDiff | null>;
     /* The diff of a turn that ended, with the tree of the folder it was taken against: where that turn left the files. */
     settle(cwd: string, tree: string): Promise<{ diff: ChatCheckpointDiff; after: string } | null>;
+    /* The commit HEAD points at, or null when unborn or outside a repository. A host without it records no heads. */
+    head?(cwd: string): Promise<string | null>;
 }
 
 /* What a host says in front of the next real prompt, beside the preambles a chat keeps itself. */
@@ -1450,14 +1452,14 @@ export class ChatSession {
         if (!checkpoints) {
             return Promise.resolve();
         }
-        return checkpoints
-            .take(this.thread.info.cwd)
-            .then((tree) => {
+        const cwd = this.thread.info.cwd;
+        return Promise.all([checkpoints.take(cwd), checkpoints.head?.(cwd) ?? null])
+            .then(([tree, head]) => {
                 const turn = this.thread.get(turnId);
                 if (tree === null || turn?.kind !== 'turn' || turn.state !== 'running' || this.info.activeTurnId !== turnId) {
                     return;
                 }
-                this.emit([this.thread.upsert({ ...turn, checkpoint: tree })]);
+                this.emit([this.thread.upsert({ ...turn, checkpoint: tree, ...(head === null ? {} : { checkpointHead: head }) })]);
             })
             .catch(() => undefined);
     }
@@ -1468,14 +1470,22 @@ export class ChatSession {
         if (turn?.kind !== 'turn' || turn.checkpoint === undefined || turn.checkpointDiff || !this.options.checkpoints) {
             return;
         }
-        void this.options.checkpoints
-            .settle(this.thread.info.cwd, turn.checkpoint)
-            .then((answer) => {
+        const { checkpoints } = this.options;
+        const cwd = this.thread.info.cwd;
+        void Promise.all([checkpoints.settle(cwd, turn.checkpoint), checkpoints.head?.(cwd) ?? null])
+            .then(([answer, head]) => {
                 const settled = this.thread.get(turnId);
                 if (answer === null || settled?.kind !== 'turn') {
                     return;
                 }
-                this.emit([this.thread.upsert({ ...settled, checkpointDiff: answer.diff, checkpointAfter: answer.after })]);
+                this.emit([
+                    this.thread.upsert({
+                        ...settled,
+                        checkpointDiff: answer.diff,
+                        checkpointAfter: answer.after,
+                        ...(head === null ? {} : { checkpointHeadAfter: head })
+                    })
+                ]);
                 this.options.persist();
             })
             .catch(() => undefined);

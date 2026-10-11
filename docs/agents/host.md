@@ -103,7 +103,7 @@ const host = await AgentHost.open({ dataDir, core: (options) => new ProjectChats
 | `clearing`, `cleared`, `forgotten`, `removed`, `broadcasted`   | What goes along with a clear or a removal, and a look at every event.                     |
 | `endedAt`, `unownedReason`, `resumeWords`                      | Taking up a turn the host went down in; see [Restarts](/agents/chats#restarts).           |
 
-None of them knows the client; a check of who asks belongs on the wire. `ChatCoreOptions` also takes `checkpoints` (a `TurnCheckpoints` with `take`, `diff` and `settle`, for a tree per turn), `skills`, `onInterruptedRun` and `limitResume`. Without `checkpoints` a turn has no checkpoint; the package runs no git of its own.
+None of them knows the client; a check of who asks belongs on the wire. `ChatCoreOptions` also takes `checkpoints` (a `TurnCheckpoints` with `take`, `diff` and `settle`, for a tree per turn, and optionally `head`, which records the commit HEAD pointed at when the turn started and settled so a card can say the branch moved during it), `skills`, `onInterruptedRun` and `limitResume`. Without `checkpoints` a turn has no checkpoint; the package runs no git of its own.
 
 ## Electron
 
