@@ -559,3 +559,19 @@ test('immediately closed HTML comments do not swallow later PHP markup', () => {
         expect(model.getLine(1).text).toBe('<!-- <p>text</p> -->');
     }
 });
+
+test('PHP block selections can end in a line comment', () => {
+    for (const token of ['//', '#']) {
+        block('<?php\n[$a = 1; ' + token + ' note]', '<?php\n[/*\n$a = 1; ' + token + ' note\n*/]', { language: 'php' });
+    }
+});
+
+test('PHP block selections still refuse mismatched comment contexts', () => {
+    for (const source of ['<?php\n$a = 1; /* x [y */ z]', '<?php\n[$a = 1; /* x]', '<?php\n$a = 1; // [note\nnext();]']) {
+        const initial = parse(source);
+        const model = new DocumentModel(initial.text);
+        model.setSelections(initial.selections);
+        expect(model.execute('toggleBlockComment', { language: 'php' })).toBe(false);
+        expect(model.getText()).toBe(initial.text);
+    }
+});

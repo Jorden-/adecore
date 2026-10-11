@@ -368,12 +368,13 @@ export function planBlockComment(source: EditSource, selections: readonly Select
         const { from, to } = rangeOf(selection);
         if (/^php$/i.test(options.language)) {
             const mode = source.context(from).mode;
+            const endMode = source.context(to).mode;
             const text = source.slice(from, to);
             // Wrapping a PHP tag can move a closing marker into a different language.
             if (
                 phpLiteralAt(source, from) ||
                 phpLiteralAt(source, to) ||
-                mode !== source.context(to).mode ||
+                (mode !== endMode && !(mode === 'code' && endMode === 'line-comment')) ||
                 /<\?(?:php\b|=)/.test(text) ||
                 (mode !== 'html' && text.includes('?>'))
             ) {
