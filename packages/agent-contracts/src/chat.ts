@@ -567,6 +567,10 @@ export const ChatTurnItemSchema = z.object({
     costUsd: z.number().nonnegative(),
     // The git tree of the chat's folder when the turn started; absent outside a repository.
     checkpoint: z.string().optional(),
+    // The commit HEAD pointed at when the turn started, and when it settled; absent when unborn or outside git.
+    // Two that differ mean the branch moved during the turn, so the checkpoint diff holds more than the agent's work.
+    checkpointHead: z.string().optional(),
+    checkpointHeadAfter: z.string().optional(),
     // What the working tree holds against that checkpoint, taken when the turn settled.
     checkpointDiff: ChatCheckpointDiffSchema.optional(),
     // How many CLI processes worked on this turn; absent is one, which is every turn before this field.
