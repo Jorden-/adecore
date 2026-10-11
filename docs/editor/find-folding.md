@@ -6,7 +6,7 @@ The editor has the matcher of a find bar but not the bar: the app draws its own,
 
 <Demo src="editor/find" />
 
-`find(query)` marks every match and moves to the first one from the caret; `null` removes the marks. An `EditorFindQuery` has `text`, `caseSensitive`, `wholeWord` and `regex`, and `inSelection: true` searches only what was selected when it turned on. `onFind(listener)` reports an `EditorFindState`: the `count`, the zero-based `current` match or `null`, and `noSelection` when a search in the selection has nothing selected. It reports again whenever an edit changes the count.
+`find(query)` marks every match and moves to the first one from the caret; `null` removes the marks. An `EditorFindQuery` has `text`, `caseSensitive`, `wholeWord` and `regex`, and `inSelection: true` searches only what was selected when it turned on. `onFind(listener)` reports an `EditorFindState`: the `count`, the zero-based `current` match or `null`, and `noSelection` when a search in the selection has nothing selected. `limited: true` means more matches exist than the marked count; exactly 10,000 matches remain a complete result. It reports again whenever an edit changes the count.
 
 | Method                              | What it does                                                                       |
 | ----------------------------------- | ---------------------------------------------------------------------------------- |
@@ -18,7 +18,7 @@ The editor has the matcher of a find bar but not the bar: the app draws its own,
 | `endFind()`                         | Removes the marks and selects the current match                                    |
 | `findFromCursor(query, direction)`  | Selects the next match from the caret without a find bar                           |
 
-Matches never touch the selection until `endFind`. A regular expression expands `$1` and the like in the replacement, and `preserveCase: true` gives it the case of the text it replaces. An invalid regular expression finds nothing, and the editor marks at most 10,000 matches. A slow regular expression has no time limit.
+Matches never touch the selection until `endFind`. A regular expression expands `$1` and the like in the replacement, and `preserveCase: true` gives it the case of the text it replaces. An invalid regular expression finds nothing, and the editor marks at most 10,000 matches. Search results, captures and groups are cached by revision, query, flags and selection bounds. Repaint and replacement preview never rerun the search. Replacing the current match uses a fresh retained result; a complete replace-all uses the retained batch. An incomplete replace-all performs one full search, and an edit searches the new revision once. A search in an empty selection never replaces the whole document. A slow regular expression still has no time limit.
 
 ## Folding
 

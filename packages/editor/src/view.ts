@@ -1697,32 +1697,23 @@ export class EditorView {
 
     /* Shown only when it says something the replacement text does not, as a regular expression's does. */
     private paintPreview(): void {
-        const mark = this.find.currentMark;
-        const query = this.find.activeQuery;
+        const match = this.find.currentMatch;
         const wanted = this.replacePreview;
         let shown: string | null = null;
-        if (wanted !== null && mark !== null && query?.regex === true) {
+        if (wanted !== null && match?.regex === true) {
             try {
-                const match = this.model.find(query.text, {
-                    caseSensitive: query.caseSensitive,
-                    wholeWord: query.wholeWord,
-                    regex: true,
-                    from: mark.from,
-                    to: mark.to,
-                    maxResults: 1
-                })[0];
-                const text = match === undefined ? wanted.text : replacementText(this.model.getText(), match, wanted.text, false, wanted.preserveCase);
+                const text = replacementText(this.model.getText(), match, wanted.text, false, wanted.preserveCase);
                 shown = text === wanted.text ? null : text;
             } catch {
                 shown = null;
             }
         }
         this.preview.hidden = shown === null;
-        if (shown === null || mark === null) {
+        if (shown === null || match === null) {
             return;
         }
-        const start = this.layout.caret(mark.from);
-        const end = this.layout.caret(mark.to);
+        const start = this.layout.caret(match.from);
+        const end = this.layout.caret(match.to);
         this.preview.textContent = shown;
         this.preview.style.left = `${(start.x + end.x) / 2}px`;
         this.preview.style.top = `${end.y + end.height}px`;
@@ -1960,8 +1951,8 @@ export class EditorView {
         const textRows = rows.filter((candidate) => candidate.kind === 'text');
         const visibleFrom = textRows.length > 0 ? this.model.getLine(textRows[0]!.line).start : 0;
         const visibleTo = textRows.length > 0 ? this.model.getLine(textRows.at(-1)!.line).next : 0;
-        for (const mark of this.find.matches) {
-            if (mark.to > mark.from && mark.to >= visibleFrom && mark.from <= visibleTo) {
+        for (const mark of this.find.matchesBetween(visibleFrom, visibleTo)) {
+            if (mark.to > mark.from) {
                 marks.push({ className: mark === current ? 'se-find-current' : 'se-find-match', rects: this.layout.rectangles(mark.from, mark.to, rows) });
             }
         }

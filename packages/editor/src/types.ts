@@ -451,6 +451,8 @@ export interface EditorFindState {
     readonly current: number | null;
     /* The search is in the selection and nothing was selected. */
     readonly noSelection?: boolean;
+    /* More results exist than the marked count. */
+    readonly limited?: boolean;
 }
 
 export interface EditorReplaceOptions {

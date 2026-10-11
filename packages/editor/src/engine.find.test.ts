@@ -1,4 +1,5 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test, spyOn } from 'bun:test';
+import { DocumentModel } from '@adecore/editor-core';
 import type { EditorFindQuery, EditorFindState } from './types.ts';
 import { setup } from './engine.fixture.test.ts';
 
@@ -224,4 +225,61 @@ describe('find in the selection and the rest of the find', () => {
         expect(editor.getSelection().start.character).toBe(8);
         expect(editor.findFromCursor(query('zzz'), 1)).toBe(false);
     });
+});
+
+test('preview and repaint reuse captures and replacement searches only the new revision', () => {
+    const pattern = '([a-z]+)(\\d+)';
+    const original = DocumentModel.prototype.find;
+    const revisions: number[] = [];
+    const search = spyOn(DocumentModel.prototype, 'find').mockImplementation(function (this: DocumentModel, text, options) {
+        if (text === pattern) {
+            revisions.push(this.getRevision());
+        }
+        return original.call(this, text, options);
+    });
+    const { editor, host } = setup({ text: 'cat12 cat34' });
+    try {
+        editor.find({ text: pattern, caseSensitive: false, wholeWord: false, regex: true });
+        editor.setReplacePreview('$1:$2');
+        editor.setWrap(true);
+        editor.setWrap(false);
+        editor.findStep(1);
+        expect(revisions).toEqual([0]);
+        expect(host.querySelector('.se-preview')?.textContent).toBe('cat:34');
+        expect(editor.replace('$2')).toBe(true);
+        expect(editor.getText()).toBe('cat12 34');
+        expect(revisions).toEqual([0, 1]);
+        expect(editor.replaceAll('$2')).toBe(1);
+        expect(editor.getText()).toBe('12 34');
+        expect(revisions).toEqual([0, 1, 2]);
+    } finally {
+        editor.dispose();
+        search.mockRestore();
+    }
+});
+
+test('limited replace-all performs one full run while an empty selection replaces nothing', () => {
+    const original = DocumentModel.prototype.find;
+    const revisions: number[] = [];
+    const search = spyOn(DocumentModel.prototype, 'find').mockImplementation(function (this: DocumentModel, text, options) {
+        if (text === 'a') {
+            revisions.push(this.getRevision());
+        }
+        return original.call(this, text, options);
+    });
+    const { editor } = setup({ text: 'a '.repeat(10001) });
+    try {
+        editor.find({ text: 'a', caseSensitive: false, wholeWord: false, regex: false });
+        expect(editor.replaceAll('b')).toBe(10001);
+        expect(editor.getText()).toBe('b '.repeat(10001));
+        expect(revisions).toEqual([0, 0, 1]);
+        editor.setText('a a');
+        editor.setCaret({ line: 0, character: 0 });
+        editor.find({ text: 'a', caseSensitive: false, wholeWord: false, regex: false, inSelection: true });
+        expect(editor.replaceAll('b')).toBe(0);
+        expect(editor.getText()).toBe('a a');
+    } finally {
+        editor.dispose();
+        search.mockRestore();
+    }
 });

@@ -1,4 +1,4 @@
-import type { DocumentChange, DocumentModel } from '@adecore/editor-core';
+import type { DocumentChange, DocumentModel, FindMatch } from '@adecore/editor-core';
 import { mapOffset } from './offsets.ts';
 import type { EditorFindQuery, EditorFindState } from './types.ts';
 
@@ -16,7 +16,8 @@ export const FIND_LIMIT = 10000;
  */
 export class FindController {
     private query: EditorFindQuery | null = null;
-    private marks: FindMark[] = [];
+    private marks: readonly FindMark[] = [];
+    private cache?: { revision: number; key: string; matches: FindMatch[]; complete: boolean };
     private index: number | null = null;
     /* The text a search in the selection is held to, which follows the text through edits; null when nothing was selected. */
     private bounds: { from: number; to: number } | null = null;
@@ -46,7 +47,12 @@ export class FindController {
     }
 
     get state(): EditorFindState {
-        return { count: this.marks.length, current: this.index, ...(this.query?.inSelection === true && this.bounds === null ? { noSelection: true } : {}) };
+        return {
+            count: this.marks.length,
+            current: this.index,
+            ...(this.cache?.complete === false ? { limited: true } : {}),
+            ...(this.query?.inSelection === true && this.bounds === null ? { noSelection: true } : {})
+        };
     }
 
     /* The range a search in the selection is held to. */
@@ -58,10 +64,61 @@ export class FindController {
         return this.index === null ? null : (this.marks[this.index] ?? null);
     }
 
+    matchesBetween(from: number, to: number): readonly FindMark[] {
+        let low = 0;
+        let high = this.marks.length;
+        while (low < high) {
+            const middle = (low + high) >>> 1;
+            if (this.marks[middle]!.to < from) {
+                low = middle + 1;
+            } else {
+                high = middle;
+            }
+        }
+        const first = low;
+        high = this.marks.length;
+        while (low < high) {
+            const middle = (low + high) >>> 1;
+            if (this.marks[middle]!.from <= to) {
+                low = middle + 1;
+            } else {
+                high = middle;
+            }
+        }
+        return this.marks.slice(first, low);
+    }
+
+    get currentMatch(): FindMatch | null {
+        const matches = this.cachedMatches;
+        return this.index === null || matches === null ? null : (matches[this.index] ?? null);
+    }
+
+    get completeMatches(): readonly FindMatch[] | null {
+        return this.cache?.complete === true ? this.cachedMatches : null;
+    }
+
+    private get cachedMatches(): readonly FindMatch[] | null {
+        return this.query !== null && this.cache?.revision === this.model.getRevision() && this.cache.key === this.cacheKey() ? this.cache.matches : null;
+    }
+
+    private cacheKey(): string {
+        const query = this.query;
+        const scope = this.scope;
+        return JSON.stringify([
+            query?.text,
+            query?.caseSensitive === true,
+            query?.wholeWord === true,
+            query?.regex === true,
+            query?.inSelection === true,
+            scope?.from,
+            scope?.to
+        ]);
+    }
+
     /* A new query, or null to end the find. */
     set(query: EditorFindQuery | null): void {
         const wasInSelection = this.query?.inSelection === true;
-        this.query = query === null || query.text === '' ? null : query;
+        this.query = query === null || query.text === '' ? null : { ...query };
         if (this.query?.inSelection !== true) {
             this.bounds = null;
         } else if (!wasInSelection) {
@@ -90,26 +147,31 @@ export class FindController {
         const query = this.query;
         if (query === null) {
             this.marks = [];
+            this.cache = undefined;
             this.index = null;
             return;
         }
-        let found: FindMark[] = [];
-        try {
-            const inSelection = query.inSelection === true;
-            if (!inSelection || this.bounds !== null) {
-                found = this.model
-                    .find(query.text, {
+        const revision = this.model.getRevision();
+        const key = this.cacheKey();
+        if (this.cache?.revision !== revision || this.cache.key !== key) {
+            let found: FindMatch[] = [];
+            try {
+                const inSelection = query.inSelection === true;
+                if (!inSelection || this.bounds !== null) {
+                    found = this.model.find(query.text, {
                         caseSensitive: query.caseSensitive,
                         wholeWord: query.wholeWord,
                         regex: query.regex,
-                        maxResults: FIND_LIMIT,
+                        maxResults: FIND_LIMIT + 1,
                         ...(inSelection ? this.bounds : {})
-                    })
-                    .map((match) => ({ from: match.from, to: match.to }));
+                    });
+                }
+            } catch {
+                // A pattern that does not parse finds nothing; the find bar says it is invalid.
             }
-        } catch {
-            // A pattern that does not parse finds nothing; the find bar says it is invalid.
+            this.cache = { revision, key, matches: found.slice(0, FIND_LIMIT), complete: found.length <= FIND_LIMIT };
         }
+        const found = this.cache.matches;
         this.marks = found;
         const selection = this.model.getPrimary();
         const anchor = this.pendingAnchor ?? previous?.from ?? Math.min(selection.anchor, selection.head);

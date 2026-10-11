@@ -417,19 +417,13 @@ class SmartEditor implements Editor {
 
     replace(replacement: string, replaceOptions: EditorReplaceOptions = {}): boolean {
         const { find } = this.view;
-        const mark = find.currentMark;
-        const query = find.activeQuery;
-        if (mark === null || query === null || this.blockedByReadOnly()) {
+        const match = find.currentMatch;
+        if (match === null || this.blockedByReadOnly()) {
             return false;
         }
         try {
-            const options = { caseSensitive: query.caseSensitive, wholeWord: query.wholeWord, regex: query.regex, from: mark.from, to: mark.to, maxResults: 1 };
-            const match = this.model.find(query.text, options)[0];
-            if (match === undefined) {
-                return false;
-            }
             // The next match is looked for after what was written, or a replacement that holds the query would find itself again.
-            find.pendingAnchor = mark.from + replacementText(this.model.getText(), match, replacement, false, replaceOptions.preserveCase).length;
+            find.pendingAnchor = match.from + replacementText(this.model.getText(), match, replacement, false, replaceOptions.preserveCase).length;
             if (!this.model.replace(match, replacement, { preserveCase: replaceOptions.preserveCase })) {
                 find.pendingAnchor = undefined;
                 return false;
@@ -444,11 +438,16 @@ class SmartEditor implements Editor {
     }
 
     replaceAll(replacement: string, options: EditorReplaceOptions = {}): number {
-        const query = this.view.find.activeQuery;
-        if (query === null || this.blockedByReadOnly()) {
+        const { find } = this.view;
+        const query = find.activeQuery;
+        if (query === null || find.state.noSelection === true || this.blockedByReadOnly()) {
             return 0;
         }
         try {
+            const matches = find.completeMatches;
+            if (matches !== null) {
+                return this.model.replaceMatches(matches, replacement, { preserveCase: options.preserveCase });
+            }
             return this.model.replaceAll(query.text, replacement, {
                 caseSensitive: query.caseSensitive,
                 wholeWord: query.wholeWord,
