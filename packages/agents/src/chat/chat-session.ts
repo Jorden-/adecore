@@ -7,6 +7,7 @@ import type {
     ChatInfo,
     ChatItem,
     ChatQueuedMessage,
+    ChatQuoteSource,
     ChatSkill,
     ChatSubagentItem,
     ChatTurnItem,
@@ -123,6 +124,7 @@ export interface ChatSendExtras {
     mentions?: string[];
     skills?: string[];
     chats?: string[];
+    quoteSource?: ChatQuoteSource;
     attachments?: ChatAttachment[];
 }
 
@@ -302,7 +304,8 @@ export class ChatSession {
     /*
      * Internal follow-ups wait for a new turn. User input goes through `sendInput`, which can steer native work.
      */
-    send(text: string, extras: ChatSendExtras = {}): { queued: boolean; turnId: string } {
+    send(text: string, sent: ChatSendExtras = {}): { queued: boolean; turnId: string } {
+        const extras = this.vetted(sent);
         const turnId = newId('turn');
         // Behind whatever still waits (a CLI that crashed leaves its queue), so everything goes out in the order it was sent.
         if (this.busy || this.queue.length > 0 || this.replacementWaits()) {
@@ -318,6 +321,7 @@ export class ChatSession {
                 ...(extras.mentions?.length ? { mentions: extras.mentions } : {}),
                 ...(extras.skills?.length ? { skills: extras.skills } : {}),
                 ...(extras.chats?.length ? { chats: extras.chats } : {}),
+                ...(extras.quoteSource ? { quoteSource: extras.quoteSource } : {}),
                 ...(extras.attachments?.length ? { attachments: extras.attachments } : {})
             };
             this.setQueue([...this.queue, message]);
@@ -424,11 +428,22 @@ export class ChatSession {
         this.options.persist();
     }
 
+    /* A quote whose source is no reply of this thread is sent as the plain text it is; the message itself is never refused for it. */
+    private vetted(extras: ChatSendExtras): ChatSendExtras {
+        if (extras.quoteSource === undefined || this.thread.get(extras.quoteSource.itemId)?.kind === 'assistant') {
+            return extras;
+        }
+        const plain = { ...extras };
+        delete plain.quoteSource;
+        return plain;
+    }
+
     sendInput(text: string, extras: ChatSendExtras = {}): Promise<{ queued: boolean; turnId: string }> {
         return this.submitInput(text, extras);
     }
 
-    private async submitInput(text: string, extras: ChatSendExtras): Promise<{ queued: boolean; turnId: string }> {
+    private async submitInput(text: string, sent: ChatSendExtras): Promise<{ queued: boolean; turnId: string }> {
+        const extras = this.vetted(sent);
         const backend = this.backend;
         const turnId = this.info.activeTurnId;
         if (
@@ -472,7 +487,8 @@ export class ChatSession {
                     mentions: extras.mentions,
                     skills: extras.skills,
                     chats: references.ids,
-                    attachments: extras.attachments
+                    attachments: extras.attachments,
+                    ...(extras.quoteSource ? { quoteSource: extras.quoteSource } : {})
                 }),
                 this.thread.patchInfo({ queue: this.queue.filter((entry) => entry.id !== message.id) })
             ]);
@@ -562,7 +578,14 @@ export class ChatSession {
         this.setQueue(rest);
         this.dispatch(
             next.text,
-            { mentions: next.mentions, skills: next.skills, chats: next.chats, attachments: next.attachments, uiChoice: next.uiChoice },
+            {
+                mentions: next.mentions,
+                skills: next.skills,
+                chats: next.chats,
+                attachments: next.attachments,
+                uiChoice: next.uiChoice,
+                quoteSource: next.quoteSource
+            },
             next.turnId
         );
     }
@@ -1325,7 +1348,8 @@ export class ChatSession {
                     skills,
                     chats,
                     attachments,
-                    ...(extras.uiChoice ? { uiChoice: extras.uiChoice } : {})
+                    ...(extras.uiChoice ? { uiChoice: extras.uiChoice } : {}),
+                    ...(extras.quoteSource ? { quoteSource: extras.quoteSource } : {})
                 })
             );
         }

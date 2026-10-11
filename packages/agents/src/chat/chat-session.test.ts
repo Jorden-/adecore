@@ -1693,3 +1693,51 @@ describe('choices from saved UI blocks', () => {
         await restored.session.dispose();
     });
 });
+
+describe('the source of a quote', () => {
+    const reply: ChatItem = { id: 'answer', kind: 'assistant', createdAt: 5, turnId: null, streaming: false, text: 'An earlier reply' };
+    const quoted = '> An earlier\n\nWhy?';
+
+    function userItems(run: ReturnType<typeof rig>) {
+        return run.session.thread.list().filter((item) => item.kind === 'user');
+    }
+
+    test('is written on the user item', async () => {
+        const run = rig({ items: [reply] });
+        run.session.send(quoted, { quoteSource: { itemId: 'answer' } });
+        await flush();
+        expect(userItems(run)[0]).toMatchObject({ text: quoted, quoteSource: { itemId: 'answer' } });
+        await run.session.dispose();
+    });
+
+    test('survives the queue', async () => {
+        const run = rig({ items: [reply] });
+        run.session.send('original');
+        await flush();
+        run.session.send(quoted, { quoteSource: { itemId: 'answer' } });
+        expect(run.session.info.queue?.[0]?.quoteSource).toEqual({ itemId: 'answer' });
+        run.event({ type: 'turn.done', state: 'done', costUsd: 0 });
+        await flush();
+        expect(userItems(run).find((item) => item.text === quoted)).toMatchObject({ quoteSource: { itemId: 'answer' } });
+        await run.session.dispose();
+    });
+
+    test('is kept when the message steers a running turn', async () => {
+        const run = rig({ items: [reply] });
+        run.backend.steerTurn = async () => true;
+        run.session.send('original');
+        await flush();
+        await run.session.sendInput(quoted, { delivery: 'steer', quoteSource: { itemId: 'answer' } });
+        expect(userItems(run).find((item) => item.text === quoted)).toMatchObject({ quoteSource: { itemId: 'answer' } });
+        await run.session.dispose();
+    });
+
+    test('is dropped for an item that is no reply, and the message still goes out', async () => {
+        const run = rig({ items: [reply] });
+        run.session.send(quoted, { quoteSource: { itemId: 'nowhere' } });
+        await flush();
+        expect(run.sent.map((input) => input.text)).toEqual([quoted]);
+        expect(userItems(run)[0]).not.toHaveProperty('quoteSource');
+        await run.session.dispose();
+    });
+});

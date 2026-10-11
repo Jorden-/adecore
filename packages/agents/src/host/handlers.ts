@@ -63,7 +63,7 @@ export function chatHandlers(chats: ChatCore, providers: ProviderRegistry): { [T
             chats.send(
                 payload.chatId,
                 payload.text,
-                { delivery: payload.delivery, mentions: payload.mentions, skills: payload.skills, chats: payload.chats },
+                { delivery: payload.delivery, mentions: payload.mentions, skills: payload.skills, chats: payload.chats, quoteSource: payload.quoteSource },
                 payload.attachments
             ),
         'chat.uiChoice': (payload, clientId) => chats.choose(payload, clientId),

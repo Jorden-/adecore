@@ -126,6 +126,10 @@ export const ChatUiAnswerSchema = ChatUiChoiceOriginSchema.extend({
 export type ChatUiAnswer = z.infer<typeof ChatUiAnswerSchema>;
 
 // A message typed while a turn was running; the daemon sends it when that turn settles.
+/* The reply a quoted passage was taken from, so a client can lead the reader back to it. */
+export const ChatQuoteSourceSchema = z.object({ itemId: z.string().min(1).max(256) });
+export type ChatQuoteSource = z.infer<typeof ChatQuoteSourceSchema>;
+
 export const ChatQueuedMessageSchema = z.object({
     id: z.string().min(1),
     // Older saved queues have no reserved turn yet; draining them still mints one.
@@ -136,7 +140,8 @@ export const ChatQueuedMessageSchema = z.object({
     chats: z.array(z.string()).optional(),
     attachments: z.array(ChatAttachmentSchema).optional(),
     createdAt: z.number(),
-    uiChoice: ChatUiChoiceOriginSchema.optional()
+    uiChoice: ChatUiChoiceOriginSchema.optional(),
+    quoteSource: ChatQuoteSourceSchema.optional()
 });
 export type ChatQueuedMessage = z.infer<typeof ChatQueuedMessageSchema>;
 
@@ -307,7 +312,9 @@ export const ChatUserItemSchema = z.object({
     // Chats of the same project the person picked with `@`. Only their ids travel; the agent reads them itself.
     chats: z.array(z.string()).optional(),
     attachments: z.array(ChatAttachmentSchema).optional(),
-    uiChoice: ChatUiChoiceOriginSchema.optional()
+    uiChoice: ChatUiChoiceOriginSchema.optional(),
+    // The reply the quote at the head of the text was taken from; absent when it names none or the reply is gone.
+    quoteSource: ChatQuoteSourceSchema.optional()
 });
 
 // `state` is a frozen set: native clients validate these payloads whole, so a new state would fail them.
@@ -875,6 +882,7 @@ export const ChatSendPayloadSchema = z
         mentions: z.array(z.string().min(1)).max(64).optional(),
         skills: z.array(z.string().min(1)).max(16).optional(),
         chats: z.array(ChatIdSchema).max(16).optional(),
+        quoteSource: ChatQuoteSourceSchema.optional(),
         attachments: ChatAttachmentUploadsSchema.optional()
     })
     .refine((payload) => payload.text.trim() !== '' || (payload.attachments?.length ?? 0) > 0, { message: 'A message needs text or an attachment' });
