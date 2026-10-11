@@ -11,7 +11,7 @@ import { ChatScopeContext } from '../../scope';
 import { useReportedModels } from '../../state/chats';
 import { pickerEntriesOf, type PickerEntry } from '../logic/picker-entries';
 import { forgetStashed, STASH_SHORTCUT, useStash, type StashedPrompt } from '../stash';
-import { Button, Icon, IconButton, Menu, Popover, Tooltip } from '@adecore/ui';
+import { Icon, IconButton, Menu, Popover, Tooltip } from '@adecore/ui';
 
 const triggerClass =
     'flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 text-xs text-text-muted hover:bg-surface-hover hover:text-text data-[popup-open]:bg-surface-active data-[popup-open]:text-text';
@@ -76,6 +76,8 @@ export function ModelPicker({
     const machine = chatHost().useMachineLabel(scope?.id ?? '');
     const reported = useReportedModels(provider);
     const requirementOf = (entry: PickerEntry & { kind: 'model' }) => modelRequirementOf(entry.model, entry.provider, reported);
+    // A CLI that is too old blocks all its models; one way to its settings under the group says it once.
+    const blockedKinds = new Set(entries.flatMap((entry) => (entry.kind === 'model' && requirementOf(entry) !== null ? [entry.provider.kind] : [])));
 
     /* Closing forgets the search, so the next open (a click or `/model`) starts on the whole list. */
     const setOpen = (next: boolean): void => {
@@ -179,6 +181,8 @@ export function ModelPicker({
                         const previous = entries[i - 1];
                         const first = grouped && (previous === undefined || previous.kind !== 'model' || previous.provider.kind !== entry.provider.kind);
                         const requirement = requirementOf(entry);
+                        const next = entries[i + 1];
+                        const lastOfGroup = next === undefined || next.kind !== 'model' || next.provider.kind !== entry.provider.kind;
                         const chosen = entry.provider.kind === provider && entry.model.slug === selection.model;
                         return (
                             <div key={`${entry.provider.kind}/${entry.model.slug}`}>
@@ -216,12 +220,17 @@ export function ModelPicker({
                                         </span>
                                     )}
                                 </button>
-                                {requirement !== null && (
-                                    <div className="pb-1 pl-8">
-                                        <Button size="sm" variant="ghost" onClick={() => chatHost().openSettings('providers')}>
-                                            {t('pickers.model.providerSettings')}
-                                        </Button>
-                                    </div>
+                                {lastOfGroup && blockedKinds.has(entry.provider.kind) && (
+                                    <button
+                                        type="button"
+                                        className="cursor-row flex w-full items-center rounded-md px-2.5 py-1.5 text-left text-xs text-text-muted"
+                                        onClick={() => {
+                                            setOpen(false);
+                                            chatHost().openSettings('providers');
+                                        }}
+                                    >
+                                        {t('pickers.model.providerSettings')}
+                                    </button>
                                 )}
                             </div>
                         );
