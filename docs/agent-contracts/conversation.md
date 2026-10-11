@@ -113,6 +113,12 @@ An assistant item may carry `ui`, an array of UI block envelopes from `@adecore/
 While a reply streams, a preview of its blocks rides on a `delta` event with an empty `text`, an optional `ui` and `textLength`. It has no `seq`, stays out of the chat log and goes only to clients attached to the chat. A client applies it only while the assistant item still streams and has that length. An older client ignores the optional fields. The final assistant item carries the tree that counts, once, and replays with the rest of the thread.
 
 
+## Quoted replies and waiting notes
+
+`ChatQuoteSourceSchema` and `ChatQuoteSource` name the assistant item a quote was taken from, as an optional `quoteSource` on a send, a queued message and a user item. The host keeps it only when that item is an assistant item of the chat, and a fork keeps it. An older decoder drops the field.
+
+`WAITING_NOTE_PREFIX` starts the note a parent receives when a child it delegated to waits on a question or an approval. A client that draws such a note recognizes it by this prefix.
+
 ## Choices in UI replies
 
 `ChatUiChoicePayloadSchema` and `ChatUiChoicePayload` are the `chat.uiChoice` request: the IDs of the chat, the assistant item, the block, the revision and the choice, and optional local input `values`. Its result is a `ChatSendResult`. The client never sends a label or the context of the message. The host reads both from the stored block: the visible context becomes the message, and the label goes before it in the prompt to the provider. The host also sets the revision of the finished block and checks the choice against it.

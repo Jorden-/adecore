@@ -63,6 +63,18 @@ The stash is a shelf of prompts shared by every chat: Mod+S puts the draft there
 
 A normal send during a turn queues the message until the current turn finishes. Hold Option or Alt when clicking Send or pressing Enter to steer Claude or Codex at its next input boundary. The host can reverse these behaviors with `useSendDelivery`. The composer passes `delivery: "steer"` or `delivery: "queue"` in `ChatSendExtras`. A backend without steering keeps the message queued. Queued messages can be sent at once, or taken back into the draft to edit, which merges with what was typed since.
 
+## Holding a prompt card
+
+While a person types, a prompt card (an approval or a question) stays out of the way, so a key meant for the text never answers it. `holdsPrompt(input)` decides from the typing state, and `holdLiftsIn(input)` says how long the hold has left; `PROMPT_HOLD_PAUSE_MS` is the pause in typing that lifts it, and `HoldInput` and `HoldRelease` are the shapes it reads and reports (`send` and `blur` release at once). `PromptComposer` takes a `PromptHold` and draws a bar with a Show now button while it holds.
+
+## Menus for screen readers
+
+`composerMenuAria(input)` builds the combobox and listbox attributes of the mention, skill and command menus, and `optionIdOf` gives each option the id the input points at (`ComposerMenuAriaInput` is the input of the first).
+
+## Quoting
+
+`splitQuote` separates a quoted block from the text under it. The quote chip and the quote in a sent message lead back to the reply with `jumpToTimelineItem`, which takes `ItemJumpOptions` (`flash`, `onMissing`) and waits for a thread that is not drawn yet. `StashedQuote` is the quote a stashed prompt brings back.
+
 ## Props
 
 | Prop                     | Type                                                      |                                                                       |

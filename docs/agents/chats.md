@@ -24,6 +24,12 @@ Stopping a turn settles the requests it left open, so no approval stays pending 
 
 `chat.subagent` reads the conversation of an agent the chat delegated to, from the CLI's own transcript, a page at a time, and with `watch: true` sends `chat.subagentChanged` while it grows. `chat.stopSubagent` stops a subagent a task of your app opened; a subagent of the CLI's own can only be marked stopped. `chat.stopTask` stops one background shell or monitor, on a CLI that can.
 
+## Searching and resuming
+
+`searchThreadItems(items, query, { limit })` from `@adecore/agents/chat/thread-search` returns `ThreadHit` records for the user and assistant messages of a thread that contain the query, with a snippet around the match (`ThreadSearchOptions` holds the limit). `spokenText` from `@adecore/agents/chat/claude-transcript` is the text of a Claude transcript line as the person saw it.
+
+`listClaudeSessions` and `listCodexSessions` from `@adecore/agents/chat/external-sessions` list the CLI sessions that were started outside your app, newest first, as `ExternalSession` records with the provider, account, session id, title and folder. They read through a `SessionFs`, and `nodeSessionFs()` is the one over the real disk. Codex sessions that are forks or subagents of another (`isForkOrSubagent`) are left out.
+
 ## Visuals
 
 A [visual](/agent-contracts/visuals) is a page an agent publishes in a chat. Agents publish through a command of your app, which calls `host.chats.publishVisual(chatId, { title, html, maxHeight?, layout?, heights?, turnId? })` and gets the `ChatVisual` back. The chat may be one nobody loaded; a visual published while a turn runs belongs to that turn unless the input names another. `listVisuals(chatId)` answers a chat's visuals in the order they were published, and `chat.removeVisual` takes one away.

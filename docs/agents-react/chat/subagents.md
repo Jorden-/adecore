@@ -21,6 +21,10 @@ Which conversation a chat shows is its trail: the steps down from the main agent
 
 `SubagentBreadcrumb({ chatId, title?, className? })` is the way back up, a crumb per step and a close that goes back to the main agent; it draws nothing on the main agent. Pass `title` when your header does not draw the chat's title itself. `SubagentTitleCrumb({ chatId, children })` makes your own title the first crumb while a subagent is on screen.
 
+## Progress
+
+`progressOf(states)` counts the delegated work that is done out of all of it, and the activity chip shows the count; a child that waits on a person shows a question mark and a note that opens it. `SubagentActions` is the row of stop and close buttons in the info header.
+
 ## Stopping
 
 `SubagentStopButton({ chatId, item })` stops a running subagent, or draws nothing when stopping it is not on offer. A subagent the CLI opened can only be marked stopped once the turn ended (`stop` `mark`); one your app opened with a task of its own is stopped through `stopTask`, after the host's `confirm.stopTask`. Shift with the composer's Stop also ends every agent the chat opened, after `confirm.stopSubagents`.
