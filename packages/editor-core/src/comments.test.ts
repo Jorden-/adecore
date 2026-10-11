@@ -633,3 +633,28 @@ test('PHP title and textarea contents stay literal under comment commands', () =
         expect(model.getLine(3).text).toBe('<!-- <p>markup</p> -->');
     }
 });
+
+test('PHP and script block selections leave a partial line comment intact', () => {
+    for (const sample of ['<?php\n[$a = 1; // fo]o', '<?php\n[$a = 1; # fo]o', '<script>\n[a = 1; // fo]o\n</script>', '<?php\n[$a; // foo ]?>']) {
+        const initial = parse(sample);
+        const model = new DocumentModel(initial.text);
+        model.setSelections(initial.selections);
+        expect(model.execute('toggleBlockComment', { language: 'php' })).toBe(false);
+        expect(model.getText()).toBe(initial.text);
+    }
+    block('<?php\n[$a; // note]  ', '<?php\n[/* $a; // note */]  ', { language: 'php' });
+});
+
+test('block selections cannot cross PHP script-element boundaries', () => {
+    for (const sample of [
+        '<script>[a();</script><script>b();]</script>',
+        '<script>[a();</SCRIPT ><script>b();]</script>',
+        '<script>[a();</script><?php $b = 1;]'
+    ]) {
+        const initial = parse(sample);
+        const model = new DocumentModel(initial.text);
+        model.setSelections(initial.selections);
+        expect(model.execute('toggleBlockComment', { language: 'php' })).toBe(false);
+        expect(model.getText()).toBe(initial.text);
+    }
+});

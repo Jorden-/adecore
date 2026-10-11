@@ -369,7 +369,9 @@ export function planBlockComment(source: EditSource, selections: readonly Select
         if (/^php$/i.test(options.language)) {
             const context = source.context(from);
             const { mode } = context;
-            const endMode = source.context(to).mode;
+            const endContext = source.context(to);
+            const endMode = endContext.mode;
+            const endsLineComment = mode === 'code' && endMode === 'line-comment' && source.slice(to, source.line(source.lineAt(to)).end).trim() === '';
             const text = source.slice(from, to);
             // Wrapping a PHP tag can move a closing marker into a different language.
             if (
@@ -377,7 +379,9 @@ export function planBlockComment(source: EditSource, selections: readonly Select
                 phpLiteralAt(source, to) ||
                 phpTagAt(source, from) ||
                 phpTagAt(source, to) ||
-                (mode !== endMode && !(mode === 'code' && endMode === 'line-comment')) ||
+                (mode !== endMode && !endsLineComment) ||
+                context.embedded !== endContext.embedded ||
+                (context.embedded !== undefined && /<\/script(?=[\s/>]|$)/i.test(text)) ||
                 /<\?(?:php\b|=)/.test(text) ||
                 (mode !== 'html' && context.embedded === undefined && text.includes('?>'))
             ) {
