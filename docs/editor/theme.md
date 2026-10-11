@@ -58,7 +58,7 @@ The full document chooses the embedded languages to load, including languages na
 
 ## Tokens for a document
 
-`shikiDocumentTokens(getHighlighter, blocks, language, theme)` from `@adecore/editor/shiki` returns `(index) => Promise<ThemedToken[][]>`. It uses the same block preparation, state propagation, cache invalidation and host yields as `shikiDocumentHighlighter`, then calls Shiki's `codeToTokensBase` instead of rendering HTML.
+`shikiDocumentTokens(getHighlighter, blocks, language, theme, options?)` from `@adecore/editor/shiki` returns `(index) => Promise<ThemedToken[][]>`. It uses the same block preparation, state propagation, cache invalidation and host yields as `shikiDocumentHighlighter`, then calls Shiki's `codeToTokensBase` instead of rendering HTML.
 
 Each result contains one token array per line. Tokens retain Shiki's `content`, optional `color`, `fontStyle` flags and UTF-16 `offset` relative to the requested block. Treat cached results as immutable. Text is literal; a renderer must use text nodes or escape it before writing HTML.
 
@@ -69,7 +69,7 @@ const tokens = shikiDocumentTokens(getHighlighter, ['/* opening', 'still a comme
 const secondBlock = await tokens(1);
 ```
 
-Whole-file snapshots can share a tokenizer across their blocks. A patch without snapshots needs a separate tokenizer for each hunk, because grammar state cannot continue through unknown omitted lines. Old and new sides also need separate tokenizers. Multiple tokenizers can share one highlighter.
+Whole-file snapshots can share a tokenizer across their blocks. A patch without snapshots sets `options.reset` to the indexes of blocks that start a hunk, because grammar state cannot continue through unknown omitted lines. All blocks share one preparation step, so lazy embedded grammars load together before tokenization. Old and new sides need separate tokenizers. `ShikiDocumentTokenOptions` also accepts Shiki's `tokenizeMaxLineLength` and `tokenizeTimeLimit`; omitted values keep Shiki's defaults (unlimited line length and 500 milliseconds per line). A diff service should set both limits before processing untrusted or minified text. Lines at or above a positive length limit retain their literal text without syntax colors. Multiple tokenizers can share one highlighter.
 
 ## A tokenizer of your own
 

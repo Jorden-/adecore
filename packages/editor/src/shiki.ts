@@ -126,4 +126,4 @@ export function shikiScopeColors(highlighter: () => Promise<Highlighter>): Scope
     };
 }
 
-export { shikiDocumentHighlighter, shikiDocumentTokens } from './shiki-document.ts';
+export { shikiDocumentHighlighter, shikiDocumentTokens, type ShikiDocumentTokenOptions } from './shiki-document.ts';

@@ -28,6 +28,27 @@ async function expectWholeDocument(language: string, blocks: readonly string[]):
 }
 
 describe('Shiki document tokens', () => {
+    test('resets state at partial-hunk boundaries and prepares all lazy embeds together', async () => {
+        using highlighter = await createHighlighter({ themes: [THEME], langs: [] });
+        const blocks = ['/* opening', 'const answer = 42;'];
+        const tokens = shikiDocumentTokens(async () => highlighter, blocks, 'typescript', THEME, { reset: new Set([1]) });
+        expect(await tokens(1)).toEqual(highlighter.codeToTokensBase(blocks[1]!, { lang: 'typescript', theme: THEME }));
+        const markdown = shikiDocumentTokens(async () => highlighter, ['```scss', 'plain text'], 'markdown', THEME, { reset: new Set([1]) });
+        expect(await markdown(1)).toEqual(highlighter.codeToTokensBase('plain text', { lang: 'markdown', theme: THEME }));
+        expect(highlighter.getLoadedLanguages()).toContain('scss');
+    });
+
+    test('passes line-length and time limits to Shiki', async () => {
+        using highlighter = await createHighlighter({ themes: [THEME], langs: ['typescript'] });
+        const render = spyOn(highlighter, 'codeToTokensBase');
+        const text = 'const longIdentifier = 42;';
+        const tokens = shikiDocumentTokens(async () => highlighter, [text], 'typescript', THEME, { tokenizeMaxLineLength: 10, tokenizeTimeLimit: 20 });
+        const result = await tokens(0);
+        expect(result).toEqual([[{ content: text, offset: 0, color: '', fontStyle: 0 }]]);
+        expect(render.mock.calls[0]![1]).toMatchObject({ tokenizeMaxLineLength: 10, tokenizeTimeLimit: 20 });
+        render.mockRestore();
+    });
+
     test.each([
         ['typescript', ['const one = 1;\n/* <tag>', 'comment\n*/\nconst text = `opening', '😺 closing`;\nconst last = "<&>";']],
         ['markdown', ['# Title\n\n```scss', '.outer { .inner { margin: 4px; } }', '```\n\n```ts', 'const answer = 42;', '```']],
