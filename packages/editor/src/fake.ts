@@ -371,7 +371,7 @@ export class FakeEditor implements Editor {
         const before = this.drawnWidgets.get(owner) ?? new Set<string>();
         for (const widget of widgets) {
             if (!before.has(widget.id)) {
-                widget.render({} as HTMLElement);
+                widget.render(this.element.ownerDocument?.createElement('div') ?? ({} as HTMLElement));
             }
         }
         this.drawnWidgets.set(owner, new Set(widgets.map((widget) => widget.id)));

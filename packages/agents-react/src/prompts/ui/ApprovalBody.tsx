@@ -39,7 +39,7 @@ function ApprovalDetails({ item }: { item: ChatApprovalItem }) {
                     <div className={clsx('overflow-auto', !expanded && 'max-h-44')}>
                         <Suspense fallback={<p className="p-3 text-xs text-text-muted">{t('approval.loadingDiff')}</p>}>
                             {patches.map((change, i) => (
-                                <UnifiedDiff key={i} change={change} />
+                                <UnifiedDiff key={i} change={change} allowEditor={false} />
                             ))}
                             {edits.map((change, i) => (
                                 <EditDiff key={i} change={change} allowEditor={false} />

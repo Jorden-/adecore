@@ -88,3 +88,5 @@ return container === undefined ? null : createPortal(<ChangeReview editor={edito
 `LineActionHost(editor, owner)` does the same for [line actions](/editor/rows#line-actions): `set` takes `{ id, line }`s, and an element lives as long as its action, so React state in it survives.
 
 The editor has one set of line highlights, and a review and a conflict may both want some. `highlightLayers(editor)` returns the `HighlightLayers` of an editor: `set(owner, provider)` takes a function that returns the owner's highlights as they stand now, and `set(owner, null)` removes them. Every change reads all owners again, so one owner never brings back the old lines of another.
+
+DiffView hands Mod+Enter back to its container so a read-only review does not swallow a prompt card's primary action. Other engine-level host shortcuts still pass through.

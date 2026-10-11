@@ -1,5 +1,9 @@
-import { useMemo } from 'react';
+import { Suspense, useMemo } from 'react';
 import clsx from 'clsx';
+import { useTranslation } from 'react-i18next';
+import { lazyNamed } from '../../lazy';
+import { DiffFallbackBoundary } from './diff/DiffFallbackBoundary';
+import { canRenderEditorEdit } from './diff/editor-edit-model';
 import { FileDiff, PatchDiff } from '@pierre/diffs/react';
 import type { ChatFileChange } from '@adecore/agent-contracts';
 import { chatHost } from '../../host';
@@ -42,6 +46,8 @@ function lineClass(line: string): string {
 }
 
 interface UnifiedDiffProps {
+    allowEditor?: boolean;
+    ignoreWhitespace?: boolean;
     change: ChatFileChange;
     overflow?: 'wrap' | 'scroll';
     /* `split` puts the old and the new side by side; the chat always stacks. */
@@ -52,7 +58,7 @@ interface UnifiedDiffProps {
     contents?: DiffContents;
 }
 
-export default function UnifiedDiff({ change, overflow = 'wrap', diffStyle = 'unified', fill = false, contents }: UnifiedDiffProps) {
+function LegacyUnifiedDiff({ change, overflow = 'wrap', diffStyle = 'unified', fill = false, contents }: UnifiedDiffProps) {
     const resolved = chatHost().code.useMode();
     const theme = useDiffTheme();
     const patch = useMemo(() => asPatch(change), [change]);
@@ -93,5 +99,35 @@ export default function UnifiedDiff({ change, overflow = 'wrap', diffStyle = 'un
         <div className={clsx('chat-diff select-text', fill && 'flex grow flex-col')}>
             {full === null ? <PatchDiff patch={patch} options={options} /> : <FileDiff fileDiff={full} options={options} />}
         </div>
+    );
+}
+
+const EditorPatchDiff = lazyNamed(() => import('./diff/EditorPatchDiff'), 'default');
+
+export default function UnifiedDiff(props: UnifiedDiffProps) {
+    const { t } = useTranslation('agent-chat');
+    const { change, contents, allowEditor = true, ignoreWhitespace = false, overflow = 'wrap', diffStyle = 'unified', fill = false } = props;
+    const loadEngine = chatHost().code.editor;
+    const oldText = contents?.old ?? '';
+    const newText = contents?.new ?? change.diff;
+    const withinLimits = useMemo(() => canRenderEditorEdit({ before: oldText, after: newText }) && /^@@/m.test(change.diff), [oldText, newText, change.diff]);
+    const fallback = <LegacyUnifiedDiff {...props} />;
+    if (!allowEditor || loadEngine === undefined || diffStyle === 'split' || !withinLimits) {
+        return fallback;
+    }
+    return (
+        <DiffFallbackBoundary fallback={fallback} resetKeys={[change.path, change.diff, oldText, newText, ignoreWhitespace, loadEngine]}>
+            <Suspense fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
+                <EditorPatchDiff
+                    change={change}
+                    contents={contents}
+                    ignoreWhitespace={ignoreWhitespace}
+                    wrap={overflow === 'wrap'}
+                    fill={fill}
+                    loadEngine={loadEngine}
+                    fallback={fallback}
+                />
+            </Suspense>
+        </DiffFallbackBoundary>
     );
 }

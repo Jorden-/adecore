@@ -44,6 +44,8 @@ export interface EditorFolds {
 export type EditorTheme = string;
 
 export interface EditorOptions {
+    /* Additional host shortcuts for this mount, preserving the engine's handBack chords. */
+    readonly handBack?: readonly KeyChord[];
     readonly text: string;
     /* A Shiki language id. Without one, or with one Shiki does not know, it is plain text. */
     readonly language?: string;

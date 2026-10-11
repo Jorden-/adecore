@@ -6,6 +6,7 @@ import { createPage } from '@adecore/editor/testing';
 import type { EditorEngine } from '@adecore/editor';
 import type { FileChange } from '../../logic/tools';
 import EditorEditDiff from './EditorEditDiff';
+import EditorPatchDiff from './EditorPatchDiff';
 import { DiffFallbackBoundary } from './DiffFallbackBoundary';
 
 async function mounted(run: (page: ReturnType<typeof createPage>, root: ReturnType<typeof createRoot>) => Promise<void>): Promise<void> {
@@ -143,5 +144,48 @@ test('a rejected lazy diff chunk also retains the legacy review', async () => {
             )
         );
         expect(page.host.textContent).toBe('Legacy');
+    });
+});
+
+test('patch reviews validate snapshots and read whitespace-filtered context from the new side', async () => {
+    await mounted(async (_page, root) => {
+        const engine = new FakeEditorEngine();
+        const loadEngine = async () => engine;
+        const change = { path: 'a.ts', kind: 'update' as const, diff: '@@ -2,2 +2,2 @@\n \tkeep\n-old\n+new\n' };
+        const contents = { old: 'prefix\n\tkeep\nold\ntail\n', new: 'prefix\n  keep\nnew\ntail\n' };
+        await act(async () =>
+            root.render(<EditorPatchDiff change={change} contents={contents} ignoreWhitespace wrap fill={false} loadEngine={loadEngine} fallback="Legacy" />)
+        );
+        expect(engine.last.getText()).toBe('  keep\nold\nnew');
+        expect([0, 1, 2].map((line) => engine.last.lineNumbers!(line))).toEqual(['2', '3', '3']);
+        expect(engine.last.lineHighlights.map((line) => line.sign)).toEqual(['-', '+']);
+        await act(async () =>
+            root.render(
+                <EditorPatchDiff
+                    change={change}
+                    contents={{ old: 'stale\n', new: 'wrong\n' }}
+                    ignoreWhitespace
+                    wrap
+                    fill={false}
+                    loadEngine={loadEngine}
+                    fallback="Legacy"
+                />
+            )
+        );
+        expect(engine.editors).toHaveLength(1);
+        expect(engine.last.getText()).toBe('\tkeep\nold\nnew');
+    });
+});
+
+test('a partial deletion patch has real selectable old text and original gutter numbers', async () => {
+    await mounted(async (_page, root) => {
+        const engine = new FakeEditorEngine();
+        const change = { path: 'a.ts', kind: 'delete' as const, diff: '@@ -20,2 +19,0 @@\n-one\n-two\n' };
+        await act(async () =>
+            root.render(<EditorPatchDiff change={change} ignoreWhitespace={false} wrap fill={false} loadEngine={async () => engine} fallback="Legacy" />)
+        );
+        expect(engine.last.getText()).toBe('one\ntwo');
+        expect([0, 1].map((line) => engine.last.lineNumbers!(line))).toEqual(['20', '21']);
+        expect(engine.last.readOnly).toBe(true);
     });
 });

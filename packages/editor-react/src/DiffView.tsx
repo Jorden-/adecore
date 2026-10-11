@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@adecore/ui';
 import { formatNumber } from '@adecore/ui/format';
 import type { Editor, EditorEngine, EditorLineHighlight, EditorTheme } from '@adecore/editor';
+import { parseChord } from '@adecore/editor/keymap';
 import { diffDisplay, diffRows, wordChanges, type DiffDocument, type DiffWordRange } from '@adecore/merge';
 import type { DiffSourceTokens } from './diff-syntax.ts';
 import { LineActionHost, RowHost } from './row-host.ts';
@@ -117,7 +118,9 @@ export function DiffView({ engine, document, theme, tokens, wrap = true, fill = 
             label: initial.label,
             readOnly: true,
             guides: false,
-            foldOutline: 'off'
+            foldOutline: 'off',
+            // Prompt cards use this chord for their primary action; a read-only review has no split-line action.
+            handBack: [parseChord('Mod+Enter')]
         });
         editor.setBlocks([]);
         editor.setLineTokens((line) => {

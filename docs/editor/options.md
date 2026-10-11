@@ -12,6 +12,7 @@
 | `theme`          | required                | `setTheme`        | The syntax theme id, handed to the tokenizer                                 |
 | `language`       | plain text              |                   | The language id, for the tokenizer and the editing commands                  |
 | `path`           |                         |                   | The file's path or name, for a language service to read a dialect off        |
+| `handBack`       | `[]`                    |                   | Extra host chords for this mount, combined with the engine shortcuts         |
 | `readOnly`       | `false`                 | `setReadOnly`     | With `readOnlyReason`, what a person is told when typing into it             |
 | `wrap`           | `false`                 | `setWrap`         | Wrap long lines                                                              |
 | `indentation`    | 4, spaces               | `setIndentation`  | `{ tabSize, insertSpaces }`                                                  |

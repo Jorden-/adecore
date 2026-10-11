@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { parseChord } from './keymap-table.ts';
 import type { KeyChord } from './types.ts';
 import { setup } from './engine.fixture.test.ts';
 
@@ -68,6 +69,18 @@ describe('saving, blur and shortcuts', () => {
         const own = setup({ text: 'a' });
         expect(own.press('d', { ctrlKey: true })).toBe(true);
         expect(own.editor.getText()).toBe('a\na');
+    });
+
+    test('per-mount shortcuts preserve the engine shortcuts and leave read-only primary actions intact', () => {
+        const handed = setup({ text: 'a', readOnly: true, handBack: [parseChord('Mod+Enter')] }, { handBack: [parseChord('Mod+D')] });
+        expect(handed.press('Enter', { ctrlKey: true })).toBe(false);
+        expect(handed.press('d', { ctrlKey: true })).toBe(false);
+        expect(handed.editor.getText()).toBe('a');
+        handed.editor.dispose();
+        const own = setup({ text: 'a' });
+        expect(own.press('Enter', { ctrlKey: true })).toBe(true);
+        expect(own.editor.getText()).not.toBe('a');
+        own.editor.dispose();
     });
 
     test('stops reporting once a listener unsubscribes', () => {

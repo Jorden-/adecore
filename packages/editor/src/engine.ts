@@ -100,7 +100,7 @@ class SmartEditor implements Editor {
         };
         this.view = new EditorView(element, this.model, this.settings);
         this.controller = new InputController(this.view, {
-            handBack: engine.handBack ?? [],
+            handBack: [...(engine.handBack ?? []), ...(options.handBack ?? [])],
             keymap: engine.keymap,
             apple: engine.apple ?? false,
             save: () => emit(this.saves),
