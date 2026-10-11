@@ -11,18 +11,19 @@ export function useReviewStack(entries: readonly ReviewEntry[]): ReviewStack {
     const [promoted, setPromoted] = useState<string | null>(null);
     const slots = useMemo(() => planReview(entries, promoted), [entries, promoted]);
     const selected = [...slots].filter(([, slot]) => slot === 'editor').map(([key]) => key);
-    const signature = JSON.stringify(selected);
-    const [mounted, setMounted] = useState({ signature, count: 1 });
-    const count = mounted.signature === signature ? Math.min(mounted.count, selected.length) : Math.min(1, selected.length);
-    if (mounted.signature !== signature) {
-        setMounted({ signature, count: Math.min(1, selected.length) });
+    const [admitted, setAdmitted] = useState<string[]>(() => selected.slice(0, 1));
+    const retained = admitted.filter((key) => selected.includes(key));
+    const live = retained.length === 0 ? selected.slice(0, 1) : retained;
+    if (live.length !== admitted.length || live.some((key, index) => key !== admitted[index])) {
+        setAdmitted(live);
     }
+    const next = selected.find((key) => !live.includes(key));
     useEffect(() => {
-        if (count >= selected.length) {
+        if (next === undefined) {
             return;
         }
-        const frame = window.requestAnimationFrame(() => setMounted({ signature, count: count + 1 }));
+        const frame = window.requestAnimationFrame(() => setAdmitted((previous) => [...previous, next]));
         return () => window.cancelAnimationFrame(frame);
-    }, [signature, count, selected.length]);
-    return { slots, ready: new Set(selected.slice(0, count)), promote: setPromoted };
+    }, [next]);
+    return { slots, ready: new Set(live), promote: setPromoted };
 }

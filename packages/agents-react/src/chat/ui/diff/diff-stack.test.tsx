@@ -78,10 +78,13 @@ test('stacked reviews admit one editor per frame, retain stable entries and prom
         expect(engine.editors).toHaveLength(3);
         const deferred = page.host.querySelectorAll<HTMLButtonElement>('[data-review-show]')[1]!;
         await act(async () => deferred.click());
+        expect(engine.editors).toHaveLength(3);
+        expect(engine.editors[0]!.disposed).toBe(false);
+        expect(engine.editors[1]!.disposed).toBe(false);
+        expect(engine.editors[2]!.disposed).toBe(true);
+        await nextFrame();
         expect(engine.editors).toHaveLength(4);
         expect(engine.last.getText()).toBe('old 4\nnew 4');
-        expect(engine.editors.slice(0, 3).every((editor) => editor.disposed)).toBe(true);
-        await nextFrame();
         await nextFrame();
         expect(engine.editors.filter((editor) => !editor.disposed)).toHaveLength(3);
     });
