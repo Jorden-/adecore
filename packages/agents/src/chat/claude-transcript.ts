@@ -19,7 +19,7 @@ function str(value: unknown): string | null {
 }
 
 /* The words of a user line that somebody said, or null for a line that carries tool results. */
-function spokenText(content: unknown): string | null {
+export function spokenText(content: unknown): string | null {
     if (typeof content === 'string') {
         return content;
     }

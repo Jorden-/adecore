@@ -79,7 +79,7 @@ function deltaOf(total: CodexCounts, previous: CodexCounts | null): CodexCounts 
 }
 
 /* A thread that was forked or spawned repeats its parent's events before its own work starts. */
-function isForkOrSubagent(payload: Record<string, unknown>): boolean {
+export function isForkOrSubagent(payload: Record<string, unknown>): boolean {
     if (typeof payload.forked_from_id === 'string' || typeof payload.parent_thread_id === 'string') {
         return true;
     }
