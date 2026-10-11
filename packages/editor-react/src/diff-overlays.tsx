@@ -14,7 +14,17 @@ export interface MountedDiff {
     actions: LineActionHost;
 }
 
-export function DiffOverlays({ mounted, display, unfold }: { mounted: MountedDiff; display: DiffDisplay; unfold(id: number): void }) {
+export function DiffOverlays({
+    mounted,
+    display,
+    unfold,
+    blocked
+}: {
+    mounted: MountedDiff;
+    display: DiffDisplay;
+    unfold(id: number): void;
+    blocked?: ReadonlySet<number>;
+}) {
     const { t } = useTranslation('editor');
     useSyncExternalStore(mounted.rows.subscribe, mounted.rows.getVersion, mounted.rows.getVersion);
     useSyncExternalStore(mounted.actions.subscribe, mounted.actions.getVersion, mounted.actions.getVersion);
@@ -29,7 +39,12 @@ export function DiffOverlays({ mounted, display, unfold }: { mounted: MountedDif
                 return createPortal(
                     <div className="adecore-editor-diff-gap">
                         {row.unfoldable ? (
-                            <Button size="xs" onClick={() => unfold(row.id)}>
+                            <Button
+                                size="xs"
+                                disabled={blocked?.has(row.id)}
+                                title={blocked?.has(row.id) ? t('diff.contextLimit') : undefined}
+                                onClick={() => unfold(row.id)}
+                            >
                                 {text}
                             </Button>
                         ) : (

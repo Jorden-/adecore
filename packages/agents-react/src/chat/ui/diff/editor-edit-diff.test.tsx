@@ -215,3 +215,26 @@ test('split patch reviews use two real side documents and preserve the shared lo
         expect(page.host.textContent).not.toContain('Legacy');
     });
 });
+
+test('a small edit in a large snapshot mounts while a large displayed edit stays on the fallback', async () => {
+    await mounted(async (page, root) => {
+        const engine = new FakeEditorEngine();
+        const loadEngine = async () => engine;
+        const before = Array.from({ length: 5000 }, (_, index) => `line ${index}`).join('\n');
+        const after = before.replace('line 2500\n', 'changed\n');
+        const render = (before: string, after: string) =>
+            root.render(
+                createElement(EditorEditDiff, {
+                    change: { path: 'file.txt', before, after },
+                    loadEngine,
+                    fallback: createElement('p', null, 'Legacy')
+                })
+            );
+        await act(async () => render(before, after));
+        expect(engine.last.getText().split('\n').length).toBeLessThan(20);
+        expect(engine.last.getText()).toContain('changed');
+        await act(async () => render('', 'added\n'.repeat(401)));
+        expect(page.host.textContent).toBe('Legacy');
+        expect(engine.editors).toHaveLength(1);
+    });
+});

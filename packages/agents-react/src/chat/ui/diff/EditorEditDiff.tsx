@@ -7,6 +7,7 @@ import { diffDocument, patchOf, type DiffDocument } from '@adecore/merge';
 import { chatHost } from '../../../host';
 import type { FileChange } from '../../logic/tools';
 import { useDiffSourceTokens } from '../use-diff-source-tokens';
+import { canRenderEditorDiff, EDITOR_DIFF_LIMITS } from './editor-edit-model';
 
 type EngineLoader = () => Promise<EditorEngine>;
 
@@ -40,6 +41,7 @@ function ReadyDiff({
             tokens={tokens}
             theme={theme}
             maxHeight={480}
+            unfoldLimits={EDITOR_DIFF_LIMITS}
             label={t('work.diffLabel', { path })}
             layout={layout}
             wrap={wrap}
@@ -67,9 +69,10 @@ export function EditorDocumentDiff({
     layout?: 'unified' | 'split';
 }) {
     const { t } = useTranslation('agent-chat');
+    const withinLimits = useMemo(() => canRenderEditorDiff(document), [document]);
     const [loaded, setLoaded] = useState<{ load: EngineLoader; engine: EditorEngine | null }>();
     useEffect(() => {
-        if (engines.has(loadEngine)) {
+        if (!withinLimits || engines.has(loadEngine)) {
             return;
         }
         let active = true;
@@ -92,8 +95,11 @@ export function EditorDocumentDiff({
         return () => {
             active = false;
         };
-    }, [loadEngine]);
+    }, [loadEngine, withinLimits]);
     const engine = loaded?.load === loadEngine ? loaded.engine : engines.get(loadEngine);
+    if (!withinLimits) {
+        return fallback;
+    }
     if (engine === undefined) {
         return <div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>;
     }

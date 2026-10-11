@@ -3,7 +3,6 @@ import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { lazyNamed } from '../../lazy';
 import { DiffFallbackBoundary } from './diff/DiffFallbackBoundary';
-import { canRenderEditorEdit } from './diff/editor-edit-model';
 import { FileDiff, PatchDiff } from '@pierre/diffs/react';
 import type { ChatFileChange } from '@adecore/agent-contracts';
 import { chatHost } from '../../host';
@@ -110,9 +109,8 @@ export default function UnifiedDiff(props: UnifiedDiffProps) {
     const loadEngine = chatHost().code.editor;
     const oldText = contents?.old ?? '';
     const newText = contents?.new ?? change.diff;
-    const withinLimits = useMemo(() => canRenderEditorEdit({ before: oldText, after: newText }) && /^@@/m.test(change.diff), [oldText, newText, change.diff]);
     const fallback = <LegacyUnifiedDiff {...props} />;
-    if (!allowEditor || loadEngine === undefined || !withinLimits) {
+    if (!allowEditor || loadEngine === undefined || !/^@@/m.test(change.diff)) {
         return fallback;
     }
     return (

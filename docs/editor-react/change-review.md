@@ -16,7 +16,7 @@ const document = diffDocument(patchOf(before, after), { old: before, new: after 
 
 Removed and added lines are both document text: keyboard selection, copy, find, horizontal scrolling and wrapping use the editor itself. Source numbers, change signs and no-final-newline labels stay outside copied text. Copy joins displayed lines with LF, including lines separated by a collapsed gap. A literal CR in source text remains in the display; when it ends a displayed line, joining that line with LF forms CRLF. Fully unfolding a gap restores its context. Partial patches keep their original numbers but cannot unfold omitted text. Unified context reads the new snapshot, including when a patch ignores whitespace. Split layout is not supported yet.
 
-The view keeps the same editor when its document, tokens, theme or wrap setting changes. Fold arrows, sticky blocks and indentation guides are disabled because combined source lines do not form one program. Keyboard folding commands still belong to the editor. Replaced words use stronger tints when the bounded word comparison succeeds; coarse differences skip word marks. Whitespace-only ranges are omitted when the document ignores whitespace.
+The view keeps the same editor when its document, tokens, theme or wrap setting changes. Fold arrows, sticky blocks and indentation guides are disabled because combined source lines do not form one program. Ordinary folding commands are disabled. Replaced words use stronger tints when the bounded word comparison succeeds; coarse differences skip word marks. Whitespace-only ranges are omitted when the document ignores whitespace.
 
 ### Source tokens
 
@@ -91,6 +91,11 @@ The editor has one set of line highlights, and a review and a conflict may both 
 
 DiffView hands Mod+Enter back to its container so a read-only review does not swallow a prompt card's primary action. Other engine-level host shortcuts still pass through.
 
-Pass `layout="split"` to `DiffView` for two read-only editors. Each side contains only its real text, with its own source labels, tokens, word emphasis, copy and Find. Vertical scrolling and wrapped row heights are synchronized; horizontal scrolling remains independent. Fixed filler rows take up space without entering the text. Hidden context unfolds on both sides. A wholly absent side uses unified view. Ordinary folding is disabled in both layouts. `onMount(editor, side)` runs for each split editor, with `side` equal to `old` or `new`; unified passes no side.
+Pass `layout="split"` to `DiffView` for two read-only editors. Each side contains only its real text, with its own source labels, tokens, word emphasis, copy and Find. Vertical scrolling and wrapped row heights are synchronized; horizontal scrolling remains independent. Fixed filler rows take up space without entering the text. Hidden context unfolds on both sides, adding at most 500 source rows per click. A wholly absent side uses unified view. Ordinary folding is disabled in both layouts. `onMount(editor, side)` runs for each split editor, with `side` equal to `old` or `new`; unified passes no side.
 
 `HostedRow.fixed` supplies an exact height and `HostedRow.filler` draws a noninteractive hatched spacer without a portal. Changing height or either flag updates the row.
+
+
+Context expansion is bounded by `unfoldLimits: { rows, characters, lineLength }`. The limits count unified source rows, UTF-16 characters including separators, and the longest visible line. Defaults are 20,000 rows, 2,000,000 characters and 10,000 characters per line. These limits control additional context; callers must separately bound the initial changes. When a gap cannot reveal more text within the limits, its button is disabled. Initial changed rows remain visible. Expansion keeps the current editor, selection and scroll anchor.
+
+Split scrolling follows the side last driven by wheel, pointer, focus or keyboard input. A programmatic reveal can also change the leading side. A delayed scroll event from a clamped follower does not move the leader backward. Asynchronous alignment failures are thrown during React rendering so a surrounding error boundary can replace the view.

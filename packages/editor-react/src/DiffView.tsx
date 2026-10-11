@@ -1,12 +1,13 @@
 import { useLayoutEffect, useMemo, useRef, useState, type Ref } from 'react';
 import type { Editor, EditorEngine, EditorLineHighlight, EditorTheme } from '@adecore/editor';
 import { parseChord } from '@adecore/editor/keymap';
-import { diffDisplay, diffSplit, type DiffDocument } from '@adecore/merge';
+import { diffDisplay, diffSplit, type DiffDocument, type DiffDisplay } from '@adecore/merge';
 import { wordMarks } from './diff-wordmarks.ts';
 import { DiffOverlays, type MountedDiff } from './diff-overlays.tsx';
 import { SplitDiffView } from './SplitDiffView.tsx';
 import type { DiffSourceTokens } from './diff-syntax.ts';
 import { LineActionHost, RowHost } from './row-host.ts';
+import { DEFAULT_UNFOLD_LIMITS, expandDiff, type DiffLimits } from './diff-expansion.ts';
 
 export interface DiffViewProps {
     engine: EditorEngine;
@@ -19,15 +20,36 @@ export interface DiffViewProps {
     fill?: boolean;
     /* Positive pixels; taller content scrolls inside the editor. Ignored with fill. */
     maxHeight?: number;
+    /* Total visible source-text budgets after unfolding; changed rows are always retained. */
+    unfoldLimits?: DiffLimits;
     label: string;
     className?: string;
     ref?: Ref<HTMLDivElement>;
     onMount?(editor: Editor, side?: 'old' | 'new'): void | (() => void);
 }
 
-function UnifiedDiffView({ engine, document, theme, tokens, wrap = true, fill = false, maxHeight, label, className, ref, onMount }: DiffViewProps) {
-    const [expanded, setExpanded] = useState<{ document: DiffDocument; gaps: ReadonlyMap<number, number> }>(() => ({ document, gaps: new Map() }));
-    const display = useMemo(() => diffDisplay(document, expanded.document === document ? expanded.gaps : undefined), [document, expanded]);
+interface UnifiedViewProps extends DiffViewProps {
+    display: DiffDisplay;
+    unfold(id: number): void;
+    blocked: ReadonlySet<number>;
+}
+
+function UnifiedDiffView({
+    engine,
+    document,
+    display,
+    unfold,
+    blocked,
+    theme,
+    tokens,
+    wrap = true,
+    fill = false,
+    maxHeight,
+    label,
+    className,
+    ref,
+    onMount
+}: UnifiedViewProps) {
     const emphasis = useMemo(() => wordMarks(document), [document]);
     const element = useRef<HTMLDivElement>(null);
     const current = useRef({ display, tokens, theme, wrap, label });
@@ -170,21 +192,35 @@ function UnifiedDiffView({ engine, document, theme, tokens, wrap = true, fill = 
             style={{ position: 'relative', minHeight: 0, height: fill ? '100%' : Math.min(height, limit) }}
         >
             <div ref={element} style={{ position: 'absolute', inset: 0 }} />
-            {mounted !== null && mounted.engine === engine && (
-                <DiffOverlays
-                    mounted={mounted}
-                    display={display}
-                    unfold={(id) =>
-                        setExpanded((previous) => ({ document, gaps: new Map([...(previous.document === document ? previous.gaps : []), [id, Infinity]]) }))
-                    }
-                />
-            )}
+            {mounted !== null && mounted.engine === engine && <DiffOverlays mounted={mounted} display={display} unfold={unfold} blocked={blocked} />}
         </div>
     );
 }
 
 export function DiffView(props: DiffViewProps) {
-    const split = useMemo(() => (props.layout === 'split' ? diffSplit(props.document) : undefined), [props.layout, props.document]);
+    const { document, unfoldLimits = DEFAULT_UNFOLD_LIMITS } = props;
+    const [expanded, setExpanded] = useState<{ document: DiffDocument; gaps: ReadonlyMap<number, number>; blocked: ReadonlySet<number> }>(() => ({
+        document,
+        gaps: new Map(),
+        blocked: new Set()
+    }));
+    const gaps = expanded.document === document ? expanded.gaps : undefined;
+    const blocked = expanded.document === document ? expanded.blocked : new Set<number>();
+    const projection = useMemo(() => (props.layout === 'split' ? diffSplit(document, gaps) : diffDisplay(document, gaps)), [props.layout, document, gaps]);
+    const unfold = (id: number): void =>
+        setExpanded((previous) => {
+            const gaps = previous.document === document ? previous.gaps : new Map<number, number>();
+            const next = expandDiff(document, gaps, id, unfoldLimits);
+            return {
+                document,
+                gaps: next,
+                blocked: next === gaps ? new Set([...(previous.document === document ? previous.blocked : []), id]) : new Set()
+            };
+        });
+    if ('aligned' in projection && projection.old.lines.length > 0 && projection.new.lines.length > 0) {
+        return <SplitDiffView {...props} display={projection} unfold={unfold} blocked={blocked} />;
+    }
     // An absent side has no selectable text; keep additions and deletions in the unified editor.
-    return split !== undefined && split.old.lines.length > 0 && split.new.lines.length > 0 ? <SplitDiffView {...props} /> : <UnifiedDiffView {...props} />;
+    const display = 'aligned' in projection ? (projection.old.lines.length > 0 ? projection.old : projection.new) : projection;
+    return <UnifiedDiffView {...props} display={display} unfold={unfold} blocked={blocked} />;
 }

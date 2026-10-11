@@ -171,6 +171,7 @@
     },
     "diff": {
         "hidden": "Show {{count}} hidden lines",
+        "contextLimit": "Context limit reached",
         "oldSide": "Old version",
         "newSide": "New version",
         "noNewline": "No final newline"

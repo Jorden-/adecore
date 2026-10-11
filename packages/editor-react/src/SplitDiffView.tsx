@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { parseChord } from '@adecore/editor/keymap';
 import type { EditorLineHighlight } from '@adecore/editor';
-import { diffSplit, type DiffDocument } from '@adecore/merge';
+import type { DiffSplit } from '@adecore/merge';
 import type { DiffViewProps } from './DiffView.tsx';
 import type { DiffSourceSide } from './diff-syntax.ts';
 import { DiffOverlays, type MountedDiff } from './diff-overlays.tsx';
@@ -21,10 +21,29 @@ interface MountedSplit {
     update(run: () => void): void;
 }
 
-export function SplitDiffView({ engine, document, theme, tokens, wrap = true, fill = false, maxHeight, label, className, ref, onMount }: DiffViewProps) {
+interface SplitViewProps extends DiffViewProps {
+    display: DiffSplit;
+    unfold(id: number): void;
+    blocked: ReadonlySet<number>;
+}
+
+export function SplitDiffView({
+    engine,
+    document,
+    display,
+    unfold,
+    blocked,
+    theme,
+    tokens,
+    wrap = true,
+    fill = false,
+    maxHeight,
+    label,
+    className,
+    ref,
+    onMount
+}: SplitViewProps) {
     const { t } = useTranslation('editor');
-    const [expanded, setExpanded] = useState<{ document: DiffDocument; gaps: ReadonlyMap<number, number> }>(() => ({ document, gaps: new Map() }));
-    const display = useMemo(() => diffSplit(document, expanded.document === document ? expanded.gaps : undefined), [document, expanded]);
     const emphasis = useMemo(() => wordMarks(document), [document]);
     const oldElement = useRef<HTMLDivElement>(null);
     const newElement = useRef<HTMLDivElement>(null);
@@ -250,8 +269,6 @@ export function SplitDiffView({ engine, document, theme, tokens, wrap = true, fi
         };
     }, [mounted, engine, onMount]);
     const limit = maxHeight !== undefined && Number.isFinite(maxHeight) && maxHeight > 0 ? maxHeight : Infinity;
-    const unfold = (id: number): void =>
-        setExpanded((previous) => ({ document, gaps: new Map([...(previous.document === document ? previous.gaps : []), [id, Infinity]]) }));
     if (failure !== null) {
         throw failure.error;
     }
@@ -281,7 +298,9 @@ export function SplitDiffView({ engine, document, theme, tokens, wrap = true, fi
                     }}
                 >
                     <div ref={side === 'old' ? oldElement : newElement} className="adecore-editor-diff-surface" />
-                    {mounted !== null && mounted[side].engine === engine && <DiffOverlays mounted={mounted[side]} display={display[side]} unfold={unfold} />}
+                    {mounted !== null && mounted[side].engine === engine && (
+                        <DiffOverlays mounted={mounted[side]} display={display[side]} unfold={unfold} blocked={blocked} />
+                    )}
                 </div>
             ))}
         </div>

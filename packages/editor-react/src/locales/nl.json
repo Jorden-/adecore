@@ -171,6 +171,7 @@
     },
     "diff": {
         "hidden": "Toon {{count}} verborgen regels",
+        "contextLimit": "Limiet voor context bereikt",
         "oldSide": "Oude versie",
         "newSide": "Nieuwe versie",
         "noNewline": "Geen afsluitende nieuwe regel"
