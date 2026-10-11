@@ -21,7 +21,7 @@ The demos on these pages run over [`FakeLanguageService`](/editor-react/testing)
 - [EditorView](/editor-react/editor-view): the component, `EditorLanguage` for an editor mounted by hand, `LanguagePopups` and `AnchoredPopup`.
 - [Completion and signatures](/editor-react/completion), [Hover and problems](/editor-react/hover), [Navigation](/editor-react/navigation) and [Rename and code actions](/editor-react/rename): the features and their cards.
 - [FindReplace](/editor-react/find-replace): a find and replace bar.
-- [Reviews and agents](/editor-react/change-review): `ChangeReview`, `AttributionCard` and React in editor rows.
+- [Reviews and agents](/editor-react/change-review): `DiffView`, `ChangeReview`, `AttributionCard` and React in editor rows.
 - [Code vision](/editor-react/code-vision): usages and authors above declarations.
 - [Models](/editor-react/models): the pure functions behind the features.
 - [View state](/editor-react/view-state): where a file was scrolled, folded and left.

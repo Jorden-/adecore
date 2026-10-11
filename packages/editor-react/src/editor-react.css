@@ -41,3 +41,19 @@
 .adecore-editor-find output {
     font-variant-numeric: tabular-nums;
 }
+
+.adecore-editor-diff-gap {
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 4px 8px;
+    font-family: var(--font-sans);
+    color: var(--text-muted);
+    background: var(--surface-raised);
+}
+.adecore-editor-diff-no-newline {
+    padding-inline: 8px;
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+}

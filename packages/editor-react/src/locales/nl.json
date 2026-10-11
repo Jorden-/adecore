@@ -168,5 +168,9 @@
             "toggle": "Vervangen tonen",
             "hide": "Vervangen verbergen"
         }
+    },
+    "diff": {
+        "hidden": "Toon {{count}} verborgen regels",
+        "noNewline": "Geen afsluitende nieuwe regel"
     }
 }

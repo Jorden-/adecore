@@ -2,6 +2,28 @@
 
 The editor draws what an agent proposed or wrote; these parts give that a React face. Asking the agent, keeping its proposals and deciding who may accept them stay with the app.
 
+## DiffView
+
+`DiffView` (`DiffViewProps`) is a read-only unified diff in the editor engine, supplied through `engine`. Pass a `DiffDocument` from [`@adecore/merge`](/merge/lines), a syntax `theme` and an accessible `label`. Optional `wrap` defaults to true. With `fill`, the parent supplies its height; otherwise the component grows to the editor's content height. `className` and `ref` belong to the outer element. `onMount(editor)` can attach a find bar or editor commands and return a cleanup function.
+
+```tsx
+import { DiffView } from '@adecore/editor-react';
+import { diffDocument, patchOf } from '@adecore/merge';
+
+const document = diffDocument(patchOf(before, after), { old: before, new: after });
+<DiffView engine={engine} document={document} theme="github-dark" label="Proposed changes" />;
+```
+
+Removed and added lines are both document text: keyboard selection, copy, find, horizontal scrolling and wrapping use the editor itself. Source numbers, change signs and no-final-newline labels stay outside copied text. Copy joins displayed lines with LF, including lines separated by a collapsed gap. A literal CR in source text remains in the display; when it ends a displayed line, joining that line with LF forms CRLF. Fully unfolding a gap restores its context. Partial patches keep their original numbers but cannot unfold omitted text. Unified context reads the new snapshot, including when a patch ignores whitespace. Split layout is not supported yet.
+
+The view keeps the same editor when its document, tokens, theme or wrap setting changes. Fold arrows, sticky blocks and indentation guides are disabled because combined source lines do not form one program. Keyboard folding commands still belong to the editor. Replaced words use stronger tints when the bounded word comparison succeeds; coarse differences skip word marks. Whitespace-only ranges are omitted when the document ignores whitespace.
+
+### Source tokens
+
+Optional `tokens` implements `DiffSourceTokens`: `get(side, index)` returns the immutable `LineToken` array for that zero-based source line, `undefined` while pending, or `null` for plain text. `DiffSourceSide` is `old` or `new`. `subscribe(listener)` reports token changes and returns an unsubscribe function. Keep the same array while that source line is unchanged. The view pauses local grammar tokenization so interleaved old and new lines never share syntax state.
+
+`diffSyntaxDocument(document, language, theme)` returns `DiffSyntaxSources`: `documents.old` and `documents.new` are independent worker `DiffSyntaxDocument` definitions, and `locate(side, index)` returns that source line's `{ block, line }` or undefined outside the source. Blocks contain at most 200 lines. Snapshot blocks continue grammar state; partial blocks reset at each nonempty hunk. A missing side has no blocks, while a real blank line is one empty-string block. A host opens a session per side, requests the mapped block and decodes its line with [`lineTokensOf`](/editor/theme#diff-syntax-in-a-worker).
+
 ## ChangeReview
 
 <Demo src="editor/change-review" />

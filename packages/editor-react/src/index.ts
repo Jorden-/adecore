@@ -61,3 +61,7 @@ export { AttributionCard } from './AttributionCard.tsx';
 export type { AttributionCardProps } from './AttributionCard.tsx';
 export { ReviewGroup, joinReviewGroup } from './review-group.ts';
 export type { ReviewMember } from './review-group.ts';
+export { DiffView } from './DiffView.tsx';
+export type { DiffViewProps } from './DiffView.tsx';
+export { diffSyntaxDocument } from './diff-syntax.ts';
+export type { DiffSourceSide, DiffSourceTokens, DiffSyntaxSources } from './diff-syntax.ts';

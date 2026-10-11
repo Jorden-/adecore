@@ -168,5 +168,9 @@
             "toggle": "Show replace",
             "hide": "Hide replace"
         }
+    },
+    "diff": {
+        "hidden": "Show {{count}} hidden lines",
+        "noNewline": "No final newline"
     }
 }
