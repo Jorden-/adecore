@@ -11,7 +11,7 @@ Everything comes from the package root, `@adecore/editor-core`.
 | Edits       | `applyEdits`, `setText`, `undo`, `redo`, `getRevision`                                                              |
 | State       | `getSnapshot`, `subscribe`                                                                                          |
 | Commands    | `typeText`, `paste`, `execute`, `wordSelectionAt`, `wordStartBefore`, `wordEndAfter`                                |
-| Search      | `find`, `findNext`, `replace`, `replaceAll`                                                                         |
+| Search      | `find`, `findNext`, `replace`, `replaceAll`, `replaceMatches`                                                                         |
 | Folding     | `getFoldingRanges`                                                                                                  |
 
 See [Documents and edits](/editor-core/documents), [Typing and commands](/editor-core/commands) and [Search and folding](/editor-core/search-folding).

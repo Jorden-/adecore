@@ -606,14 +606,25 @@ export class DocumentModel {
         if (options.expectedRevision !== undefined && options.expectedRevision !== this.revision) {
             return 0;
         }
-        const matches = this.find(query, options);
+        return this.replaceMatches(this.find(query, options), replacement, options);
+    }
+
+    /* Commits retained search results as one undo step; one stale result refuses the entire batch. */
+    replaceMatches(matches: readonly FindMatch[], replacement: string, options: ReplaceOptions = {}): number {
+        const revision = this.revision;
+        if (
+            (options.expectedRevision !== undefined && options.expectedRevision !== revision) ||
+            matches.some((match) => match.revision !== revision || this.slice(match.from, match.to) !== match.text)
+        ) {
+            return 0;
+        }
         const text = this.getText();
         const edits = matches.map((match) => ({
             from: match.from,
             to: match.to,
             text: replacementText(text, match, replacement, options.literal, options.preserveCase)
         }));
-        return this.applyEdits(edits, { source: 'command', ...options }) ? matches.length : 0;
+        return this.applyEdits(edits, { source: 'command', ...options, expectedRevision: revision }) ? matches.length : 0;
     }
 
     getFoldingRanges(options: FoldingOptions = {}): FoldingRange[] {

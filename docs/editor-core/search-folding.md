@@ -25,6 +25,8 @@ document.replaceAll('item', 'entry', { preserveCase: true });
 document.getText(); // 'Entry one, entry two, ENTRY three'
 ```
 
+`replaceMatches(matches, replacement, options?)` applies retained, unique, nonoverlapping results from one search without running its expression again. It accepts `ReplaceOptions`, replaces the batch in one undo step and returns the number replaced, or `0` for an empty or unchanged batch. If any result has a stale revision or different text, the whole batch is refused. Invalid edit bounds or overlapping results throw before any change, as in `applyEdits`. This lets an asynchronous search provide results while the document still checks the revision at commit time. `replaceAll` uses the same batch path after its synchronous search.
+
 With a regular expression the replacement expands `$1`, `$<name>`, `$&` and the other JavaScript patterns; `literal: true` turns that off. `preserveCase: true` gives the replacement the case of the text it replaces. `findMatches` and `replacementText` are the same search and expansion without a model.
 
 ## Folding ranges

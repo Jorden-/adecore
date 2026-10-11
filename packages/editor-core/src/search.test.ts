@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 import { DocumentModel } from './document.ts';
 
 describe('find and replace', () => {
@@ -80,6 +80,66 @@ describe('find and replace', () => {
         expect(model.replace(match, 'x')).toBe(false);
         expect(model.replaceAll('a', 'a')).toBe(0);
         expect(model.getSnapshot().canRedo).toBe(true);
+    });
+});
+
+describe('replacing a searched batch without running its query again', () => {
+    it('uses regex captures, groups and the original replacement context in one undo step', () => {
+        const source = 'first=12\nsecond=3';
+        const model = new DocumentModel(source);
+        const matches = structuredClone(model.find('(?<key>\\w+)=(\\d+)', { regex: true }));
+        const search = spyOn(model, 'find');
+        expect(model.replaceMatches(matches, '$<key>:$2 $$ $&')).toBe(2);
+        expect(search).not.toHaveBeenCalled();
+        expect(model.getText()).toBe('first:12 $ first=12\nsecond:3 $ second=3');
+        model.undo();
+        expect(model.getText()).toBe(source);
+        model.redo();
+        expect(model.getText()).toBe('first:12 $ first=12\nsecond:3 $ second=3');
+        search.mockRestore();
+        const context = new DocumentModel('aba');
+        const replacement = "$`|$&|$'";
+        expect(context.replaceMatches(context.find('a', { regex: true }), replacement)).toBe(2);
+        expect(context.getText()).toBe('aba'.replace(/a/g, replacement));
+    });
+
+    it('rejects the entire batch when one result is stale or has different text', () => {
+        const model = new DocumentModel('cat cat');
+        const matches = model.find('cat');
+        for (const invalid of [
+            { ...matches[1]!, revision: 1 },
+            { ...matches[1]!, text: 'dog' }
+        ]) {
+            expect(model.replaceMatches([matches[0]!, invalid], 'entry')).toBe(0);
+            expect(model.getText()).toBe('cat cat');
+            expect(model.getSnapshot().canUndo).toBe(false);
+        }
+        expect(model.replaceMatches(matches, 'entry', { expectedRevision: 1 })).toBe(0);
+        model.typeText('!');
+        expect(model.replaceMatches(matches, 'entry')).toBe(0);
+        model.undo();
+        expect(model.replaceMatches(matches, 'entry')).toBe(0);
+    });
+
+    it('respects literal replacements and preserve-case and does not change history for a no-op', () => {
+        const model = new DocumentModel('Item item ITEM');
+        expect(model.replaceMatches(model.find('item'), 'entry', { preserveCase: true })).toBe(3);
+        expect(model.getText()).toBe('Entry entry ENTRY');
+        model.undo();
+        expect(model.replaceMatches([], 'entry')).toBe(0);
+        expect(model.replaceMatches(model.find('Item', { caseSensitive: true }), 'Item')).toBe(0);
+        expect(model.getSnapshot().canRedo).toBe(true);
+        expect(model.replaceMatches(model.find('item', { regex: true }), '$&', { literal: true })).toBe(3);
+        expect(model.getText()).toBe('$& $& $&');
+    });
+
+    it('validates overlapping batches before committing any edit', () => {
+        const model = new DocumentModel('aaa');
+        const first = model.find('aa')[0]!;
+        const second = { ...first, from: 1, to: 3 };
+        expect(() => model.replaceMatches([first, second], 'x')).toThrow(RangeError);
+        expect(model.getText()).toBe('aaa');
+        expect(model.getSnapshot().canUndo).toBe(false);
     });
 });
 
