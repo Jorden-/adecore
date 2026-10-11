@@ -83,3 +83,7 @@ Syntax budgets apply independently to the old and new snapshots. A hidden line o
 The public diff views load their Pierre renderers only when the legacy fallback is rendered. Those chunks opt out of idle prefetch and have their own suspense and error boundary; a failed fallback chunk shows the omission status. `DiffPool` and `useDiffTheme` retain their legacy Pierre dependencies for existing consumers.
 
 The work budget preserves exact hunks for displayable reformatting fixtures of 800 to 1,300 lines with every second or third line changed. In particular, the 1,100-line alternating fixture displays 1,650 rows rather than being omitted after a coarse replacement.
+
+## Reviewing several changes
+
+Permission cards show one change at a time. The file toolbar selects the active review; repeated edits to the same file include their position. Arrow keys, Home and End move between its buttons. Mod+Enter in the read-only editor still invokes the card's primary action. Allow applies to the entire request. The collapsed preview is capped at 176 px and the expanded preview at 480 px.

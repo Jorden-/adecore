@@ -18,6 +18,7 @@
     "allChanges_one": "Toestaan geldt voor de {{count}} wijziging in dit verzoek.",
     "allChanges_other": "Toestaan geldt voor alle {{count}} wijzigingen in dit verzoek.",
     "loadingDiff": "Diff laden…",
+    "reviewChanges": "Wijzigingen beoordelen",
     "viewDiff": "Volledige diff tonen",
     "collapseDiff": "Diff inklappen",
     "details": "Details",

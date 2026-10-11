@@ -1,16 +1,14 @@
-import { Suspense, useState } from 'react';
+import { useState } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import type { ChatApprovalItem } from '@adecore/agent-contracts';
 import { approvalChanges, fileChanges } from '../../chat/logic/tools';
 import { chatHost } from '../../host';
-import { lazyNamed } from '../../lazy';
+import { ApprovalReview } from '../../chat/ui/diff/ApprovalReview';
+import { reviewEntries } from '../../chat/ui/diff/review-plan';
 import { isPrimaryKey } from '../logic/keys';
 import type { PromptDraft } from '../logic/prompts';
 import { Button, TextMenu } from '@adecore/ui';
-
-const EditDiff = lazyNamed(() => import('../../chat/ui/EditDiff'), 'default');
-const UnifiedDiff = lazyNamed(() => import('../../chat/ui/UnifiedDiff'), 'default');
 
 /* A command in the sunken box a person reads before allowing it, with the folder it runs in when that is known. */
 export function CommandBox({ command, cwd }: { command: string; cwd?: string }) {
@@ -27,8 +25,8 @@ function ApprovalDetails({ item }: { item: ChatApprovalItem }) {
     const [expanded, setExpanded] = useState(false);
     const patches = approvalChanges(item.input);
     const edits = patches.length ? [] : fileChanges(item.toolName, item.input);
-    const single = patches.length + edits.length === 1;
-    const editorPreview = single && chatHost().code.editor !== undefined;
+    const entries = reviewEntries(patches, edits);
+    const editorPreview = chatHost().code.editor !== undefined;
     const maxHeight = expanded ? 480 : 176;
     const input = typeof item.input === 'object' && item.input !== null ? (item.input as Record<string, unknown>) : {};
     return (
@@ -39,15 +37,8 @@ function ApprovalDetails({ item }: { item: ChatApprovalItem }) {
             )}
             {patches.length + edits.length > 0 ? (
                 <div className="overflow-hidden rounded-xl bg-surface-sunken">
-                    <div className={clsx(editorPreview ? 'overflow-hidden' : 'overflow-auto', !expanded && 'max-h-44')}>
-                        <Suspense fallback={<p className="p-3 text-xs text-text-muted">{t('approval.loadingDiff')}</p>}>
-                            {patches.map((change, i) => (
-                                <UnifiedDiff key={i} change={change} allowEditor={editorPreview} maxHeight={editorPreview ? maxHeight : undefined} />
-                            ))}
-                            {edits.map((change, i) => (
-                                <EditDiff key={i} change={change} allowEditor={editorPreview} maxHeight={editorPreview ? maxHeight : undefined} />
-                            ))}
-                        </Suspense>
+                    <div className={clsx(editorPreview ? 'overflow-hidden' : 'overflow-auto', !editorPreview && !expanded && 'max-h-44')}>
+                        <ApprovalReview key={item.requestId} entries={entries} maxHeight={maxHeight} />
                     </div>
                     <div className="flex items-center border-t border-border p-1">
                         <Button size="sm" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>

@@ -18,6 +18,7 @@
     "allChanges_one": "Allow applies to the {{count}} change in this request.",
     "allChanges_other": "Allow applies to all {{count}} changes in this request.",
     "loadingDiff": "Loading diff…",
+    "reviewChanges": "Changes to review",
     "viewDiff": "View full diff",
     "collapseDiff": "Collapse diff",
     "details": "Details",
