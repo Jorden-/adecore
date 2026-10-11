@@ -1,3 +1,4 @@
+import { LegacyDiffPool } from './LegacyDiffPool';
 import { useReviewSettled } from './review-settle';
 import { useMemo } from 'react';
 import clsx from 'clsx';
@@ -86,7 +87,7 @@ export default function LegacyUnifiedDiff({ change, overflow = 'wrap', diffStyle
             className={clsx('chat-diff select-text', fill && 'flex grow flex-col')}
             style={fill || maxHeight === undefined ? undefined : { maxHeight, overflow: 'auto' }}
         >
-            {full === null ? <PatchDiff patch={patch} options={options} /> : <FileDiff fileDiff={full} options={options} />}
+            <LegacyDiffPool>{full === null ? <PatchDiff patch={patch} options={options} /> : <FileDiff fileDiff={full} options={options} />}</LegacyDiffPool>
         </div>
     );
 }

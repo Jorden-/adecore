@@ -247,6 +247,8 @@ export interface ChatHost {
         custom: ReadonlyArray<ThemeRegistration & { name: string }>;
         /* One syntax worker shared by chat diffs and standalone review panes; omitted, tokenize on the page. */
         syntaxWorker?: () => Worker;
+        /* Starts legacy highlighting with its first diff; an enclosing DiffPool takes precedence. */
+        legacyDiffWorker?: () => Worker;
         /* Borrow the page highlighter for fallback; the host retains ownership. */
         highlighter?: () => Promise<Highlighter>;
         /* Opt in to editor-rendered, bounded edit reviews; omitted, keep the legacy diff renderer. */

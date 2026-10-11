@@ -1,3 +1,4 @@
+import { LegacyDiffPool } from './LegacyDiffPool';
 import { useReviewSettled } from './review-settle';
 import { useMemo } from 'react';
 import { MultiFileDiff } from '@pierre/diffs/react';
@@ -24,7 +25,9 @@ export default function LegacyEditDiff({ change, maxHeight }: { change: FileChan
     );
     return (
         <div className="chat-diff select-text" style={maxHeight === undefined ? undefined : { maxHeight, overflow: 'auto' }}>
-            <MultiFileDiff oldFile={oldFile} newFile={newFile} options={options} />
+            <LegacyDiffPool>
+                <MultiFileDiff oldFile={oldFile} newFile={newFile} options={options} />
+            </LegacyDiffPool>
         </div>
     );
 }
