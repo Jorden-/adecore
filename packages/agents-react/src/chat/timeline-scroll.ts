@@ -1,6 +1,9 @@
 // A page is a screen minus a little, so the line you were reading is still on it after the jump.
 const PAGE_OVERLAP = 0.9;
 
+// How long a jump asked before its thread registered stays up for that thread.
+const PENDING_JUMP_TTL_MS = 10_000;
+
 type Scroller = {
     element: HTMLElement;
     follow: (enabled: boolean) => void;
@@ -103,14 +106,17 @@ export function stepTimelineMessage(key: string, direction: -1 | 1): boolean {
  */
 function waitingJumps<T>(): { register(key: string, jump: (target: T) => void): () => void; jump(key: string, target: T): boolean } {
     const jumpers = new Map<string, (target: T) => void>();
-    const waiting = new Map<string, T>();
+    const waiting = new Map<string, { target: T; at: number }>();
     return {
         register(key, jump) {
             jumpers.set(key, jump);
-            if (waiting.has(key)) {
-                const target = waiting.get(key)!;
+            const pending = waiting.get(key);
+            if (pending !== undefined) {
                 waiting.delete(key);
-                jump(target);
+                // A jump nobody picked up for long is not what the person wants any more.
+                if (Date.now() - pending.at <= PENDING_JUMP_TTL_MS) {
+                    jump(pending.target);
+                }
             }
             return () => {
                 if (jumpers.get(key) === jump) {
@@ -121,7 +127,7 @@ function waitingJumps<T>(): { register(key: string, jump: (target: T) => void): 
         jump(key, target) {
             const jump = jumpers.get(key);
             if (jump === undefined) {
-                waiting.set(key, target);
+                waiting.set(key, { target, at: Date.now() });
                 return false;
             }
             jump(target);

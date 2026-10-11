@@ -67,6 +67,8 @@ import { useModelName } from '../../agents/model-name';
 import { ContextMenu, EmptyState, ErrorBoundary, Icon, SectionLabel } from '@adecore/ui';
 
 const ESTIMATED_ROW_PX = 56;
+// How long a jump waits for a thread that is still loading before it calls the item missing.
+const JUMP_THREAD_WAIT_MS = 8000;
 
 /* A jump puts its row at the top and stops following the end, so the reader stays where they landed. */
 function showRowAtTop(virtualizer: Virtualizer<HTMLDivElement, Element>, followRef: RefObject<boolean>, index: number): void {
@@ -457,7 +459,11 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
             }
             return;
         }
-        const item = items?.[seeking.itemId];
+        // The thread has not loaded yet, so nothing says the item is missing; the effect below bounds the wait.
+        if (items === undefined) {
+            return;
+        }
+        const item = items[seeking.itemId];
         if (item === undefined && cursor !== null) {
             loadEarlier();
             return;
@@ -470,6 +476,17 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
         setSeeking(null);
         seeking.options?.onMissing?.();
     }, [seeking, rows, items, turns, virtualizer, cursor, loadEarlier, keyOf, chatId]);
+    const waitingForThread = seeking !== null && items === undefined;
+    useEffect(() => {
+        if (!waitingForThread) {
+            return;
+        }
+        const timer = window.setTimeout(() => {
+            setSeeking(null);
+            seeking?.options?.onMissing?.();
+        }, JUMP_THREAD_WAIT_MS);
+        return () => window.clearTimeout(timer);
+    }, [waitingForThread, seeking]);
     useEffect(
         () =>
             registerItemJumper(keyOf(chatId), (itemId, options) => {
