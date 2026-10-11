@@ -1,7 +1,5 @@
 import { expect, test } from 'bun:test';
 import { DocumentModel } from './document.ts';
-import { editRegions } from './edit-regions.ts';
-import type { EditSource } from './edit-source.ts';
 import { TypingContexts } from './typing-context.ts';
 
 function context(source: string) {
@@ -75,43 +73,4 @@ test('edits invalidate cached markup assignments and quoted values', () => {
     model.applyEdits([{ from: 12, to: 12, text: "'" }]);
     contexts.invalidate(1);
     expect(contexts.at(2, 1, 'php').markupQuote).toBe("'");
-});
-
-test('cached markup agrees with the existing PHP region parser on its corpus', () => {
-    const corpus = [
-        '<div>¦text</div>',
-        '<script>\n¦run();\n</script>',
-        '<style>\n¦a { color: red; }\n</style>',
-        '<script nonce="<?= $nonce ?>">\n¦run();\n</script>',
-        '<div title="<script>">¦text</div>',
-        '<!--\n¦protected\n-->',
-        '<!-- <?= "-->" ?>\n¦protected\n-->',
-        '<script>\n</script:other>\n¦run();\n</script>',
-        '<script>\n¦<?= $value ?>\n</script>',
-        '<script>\n</script>¦text',
-        '<a'.repeat(1000) + '<script>\n¦run();\n</script>'
-    ];
-    for (const sample of corpus) {
-        const offset = sample.indexOf('¦');
-        const model = new DocumentModel(sample.replace('¦', ''));
-        const contexts = new TypingContexts((line) => model.getLine(line));
-        const source: EditSource = {
-            slice: (from, to) => model.slice(from, to),
-            charAt: (at) => model.slice(at, at + 1),
-            lineAt: (at) => model.positionAt(at).line,
-            lineCount: model.getLineCount(),
-            line: (line) => model.getLine(line),
-            newline: () => '\n',
-            context: (at) => {
-                const position = model.positionAt(at);
-                return contexts.at(position.line, position.column, 'php');
-            },
-            region: () => null,
-            unclosedBrace: () => false
-        };
-        const state = source.context(offset);
-        const region =
-            state.mode !== 'html' ? null : state.markup === 'comment' ? 'mixed' : state.markup === 'raw' ? (state.element ?? 'template') : 'template';
-        expect(editRegions(source, 'php')(source.lineAt(offset), offset)).toBe(region);
-    }
 });

@@ -382,13 +382,14 @@ describe('Enter in PHP markup', () => {
             enter('<div>¦</div>', '<div>\n    ¦\n</div>', { language });
         }
     });
-    it('does not scan a PHP document beyond its region budget', () => {
+    it('reads only the needed PHP markup context with a large unrelated suffix', () => {
         const initial = marked('<div>¦</div>\n' + 'x'.repeat(2_000_001));
         const model = new DocumentModel(initial.text);
         model.setSelections([{ anchor: initial.offset, head: initial.offset }]);
         model.execute('insertNewline', { language: 'php' });
         expect(model.getLine(0).text).toBe('<div>');
-        expect(model.getLine(1).text).toBe('</div>');
-        expect(model.getSelections()[0]!.head).toBe(6);
+        expect(model.getLine(1).text).toBe('    ');
+        expect(model.getLine(2).text).toBe('</div>');
+        expect(model.getSelections()[0]!.head).toBe(10);
     });
 });

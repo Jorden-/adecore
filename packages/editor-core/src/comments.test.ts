@@ -249,11 +249,12 @@ describe('comments in embedded markup', () => {
         }
     });
 
-    it('leaves markup beyond the scan budget unchanged', () => {
+    it('comments markup without scanning a large unrelated document suffix', () => {
         const source = '<p>text</p>\n' + 'x'.repeat(2_000_001);
         const model = new DocumentModel(source);
-        expect(model.execute('toggleLineComment', { language: 'php' })).toBe(false);
-        expect(model.getText()).toBe(source);
+        expect(model.execute('toggleLineComment', { language: 'php' })).toBe(true);
+        expect(model.getLine(0).text).toBe('<!-- <p>text</p> -->');
+        expect(model.getLine(1).text).toBe('x'.repeat(2_000_001));
     });
 
     it('skips mixed PHP lines within a selection and comments its markup neighbors', () => {
@@ -440,13 +441,13 @@ describe('PHP tag scans preserve comments and malformed input', () => {
     });
 });
 
-test('PHP comment scanning falls back before repeated whole-line context queries exceed its budget', () => {
+test('PHP comment lookup handles many tags without repeatedly scanning their whole line', () => {
     const source = '<div></div>'.repeat(1000) + '<script>\nrun();\n</script>';
     const model = new DocumentModel(source);
     const at = model.getLine(1).start;
     model.setSelections([{ anchor: at, head: at }]);
-    expect(model.execute('toggleLineComment', { language: 'php' })).toBe(false);
-    expect(model.getText()).toBe(source);
+    expect(model.execute('toggleLineComment', { language: 'php' })).toBe(true);
+    expect(model.getLine(1).text).toBe('// run();');
 });
 
 describe('PHP literal values stay unchanged by comment commands', () => {
@@ -535,4 +536,26 @@ describe('PHP comment boundary safety', () => {
         block('[<div>?> text</div>]', '[<!--\n<div>?> text</div>\n-->]', { language: 'php' });
         block('[run();]', '[/*\nrun();\n*/]', { language: 'php' });
     });
+});
+
+test('PHP comment lookup does not charge every tag for the whole template', () => {
+    const row = '<div class="' + 'x'.repeat(100) + '"><span>text</span></div>\n';
+    const source = row.repeat(6000) + '<p>last</p>';
+    const model = new DocumentModel(source);
+    expect(model.execute('toggleLineComment', { language: 'php' })).toBe(true);
+    expect(model.getLine(0).text).toBe('<!-- ' + row.trimEnd() + ' -->');
+    const end = model.getLine(6000).start;
+    model.setSelections([{ anchor: end, head: end }]);
+    model.execute('toggleLineComment', { language: 'php' });
+    expect(model.getLine(6000).text).toBe('<!-- <p>last</p> -->');
+});
+
+test('immediately closed HTML comments do not swallow later PHP markup', () => {
+    for (const empty of ['<!-->', '<!--->']) {
+        const model = new DocumentModel(empty + '\n<p>text</p>');
+        const at = model.getLine(1).start;
+        model.setSelections([{ anchor: at, head: at }]);
+        expect(model.execute('toggleLineComment', { language: 'php' })).toBe(true);
+        expect(model.getLine(1).text).toBe('<!-- <p>text</p> -->');
+    }
 });

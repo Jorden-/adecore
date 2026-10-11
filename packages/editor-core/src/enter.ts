@@ -226,7 +226,7 @@ class Enter {
         if (isPhp(language)) {
             const offset = this.source.line(index).start + trimmed.indexOf('<', match.index);
             // Only earlier tags establish this opener's region; its content can be script or style.
-            const regions = editRegions(this.source, language, offset);
+            const regions = editRegions(this.source, language);
             if (regions(index, offset) !== 'template') {
                 return null;
             }
