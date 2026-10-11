@@ -28,7 +28,7 @@ A trigger with the CLI's mark and the model's short name, and a popup with a sea
 
 ### A model the CLI is too old for
 
-A model whose catalog entry carries `minCliVersion` is a row that cannot be picked while the CLI's version is lower. Its second line reads "Requires Claude Code 2.1 or later on <machine>", with a button to the provider settings. `modelRequirementOf(model, provider, reported)` answers the requirement, or `null` when none applies: no minimum, a version that is not a readable x.y.z, a new enough CLI, or a model a chat of that CLI reported running. `useReportedModels(provider)` collects those reported names from the chats of the scope in context, and the host names the machine with `useMachineLabel`. `pickerEntriesOf(providers, query, legacyOpen)` builds the rows and keeps a blocked model in them, so a search for it still finds the explanation; `PickerEntry` is a row.
+A model whose catalog entry carries `minCliVersion` is a row that cannot be picked while the CLI's version is lower. Its second line reads "Requires Claude Code 2.1 or later on &lt;machine&gt;", with a button to the provider settings. `modelRequirementOf(model, provider, reported)` answers the requirement, or `null` when none applies: no minimum, a version that is not a readable x.y.z, a new enough CLI, or a model a chat of that CLI reported running. `useReportedModels(provider)` collects those reported names from the chats of the scope in context, and the host names the machine with `useMachineLabel`. `pickerEntriesOf(providers, query, legacyOpen)` builds the rows and keeps a blocked model in them, so a search for it still finds the explanation; `PickerEntry` is a row.
 
 ## ModelOptionControl
 

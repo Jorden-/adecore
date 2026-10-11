@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { crumbOf, openFromMain, useSubagentItem, useSubagentTrail } from '@adecore/agents-react/chat/subagent-view';
-import { SubagentBreadcrumb } from '@adecore/agents-react/chat/ui/SubagentControls';
+import { SubagentTitleCrumb } from '@adecore/agents-react/chat/ui/SubagentControls';
 import { SubagentInfo } from '@adecore/agents-react/chat/ui/SubagentInfo';
 import { SubagentTimeline } from '@adecore/agents-react/chat/ui/SubagentTimeline';
 import { AgentDemo } from '../shared/agents.tsx';
@@ -24,7 +24,9 @@ function Conversation() {
     return (
         <div className="flex h-[420px] w-full flex-col overflow-hidden rounded-lg border border-border bg-surface">
             <header className="flex h-10 shrink-0 items-center px-3">
-                <SubagentBreadcrumb chatId={DEMO_CHAT} title="Retry for fetchJson" />
+                <SubagentTitleCrumb chatId={DEMO_CHAT} className="text-text-muted hover:text-text">
+                    Retry for fetchJson
+                </SubagentTitleCrumb>
             </header>
             <SubagentInfo chatId={DEMO_CHAT} toolUseId={CALL} />
             <div className="flex min-h-0 grow flex-col">

@@ -30,7 +30,7 @@ A patch replaces top-level fields only: to change one function of `code`, `promp
 | `openLogin(scopeId, kind, accountId, name)` | No log in button                          | Runs a CLI's own login somewhere a command can run, such as a terminal.                                |
 | `useLoginBlocked(scopeId)`         | Login is always possible                           | Why a login cannot start right now, or `null`.                                                         |
 | `useProjectLook(scopeId, projectId)` | The folder's own name                            | A project's name and mark on the usage page.                                                           |
-| `useMachineLabel(scopeId)`         | A version requirement names no machine             | What a person calls the machine the scope's chats run on, for "Requires Claude Code 2.1 or later on <machine>". `null` says it without a machine. |
+| `useMachineLabel(scopeId)`         | A version requirement names no machine             | What a person calls the machine the scope's chats run on, for "Requires Claude Code 2.1 or later on &lt;machine&gt;". `null` says it without a machine. |
 | `useChatPlace(chatId)`             | Links to other chats lead nowhere                  | Where another chat is (`title`, `go()`), for a fork's way back. A `null` title is a chat that is gone. |
 | `useContextSources(chatId)`        | Nothing                                            | What a chat may read besides its folder, named under an empty thread.                                  |
 | `useHidesFolder(chatId)`           | `false`                                            | Hide the working folder under an empty thread.                                                         |
