@@ -1,4 +1,4 @@
-import { diffLines, type Change } from './diff.ts';
+import { diffChanges, type Change } from './diff.ts';
 import type { Hunk, ParsedPatch, PatchLine } from './patch-parser.ts';
 import { shapeOf } from './text.ts';
 
@@ -45,9 +45,13 @@ function rangeText(start: number, count: number): string {
     return `${start + (count === 0 ? 0 : 1)},${count}`;
 }
 
-export function patchOf(oldText: string, newText: string, context = 3): ParsedPatch {
+export function patchOf(oldText: string, newText: string, context = 3, options?: { readonly maxWork?: number }): ParsedPatch {
     if (!Number.isSafeInteger(context) || context < 0) {
         throw new RangeError('Patch context must be a nonnegative safe integer.');
+    }
+    const maxWork = options?.maxWork;
+    if (maxWork !== undefined && (!Number.isSafeInteger(maxWork) || maxWork < 0)) {
+        throw new RangeError('Patch work budget must be a nonnegative safe integer.');
     }
     const old = fileLines(oldText);
     const fresh = fileLines(newText);
@@ -55,7 +59,7 @@ export function patchOf(oldText: string, newText: string, context = 3): ParsedPa
     const newShape = shapeOf(newText);
     const oldKeys = keysOf(old, oldShape.finalNewline);
     const newKeys = keysOf(fresh, newShape.finalNewline);
-    const changes = diffLines(oldKeys, newKeys);
+    const { changes, limited } = diffChanges(oldKeys, newKeys, maxWork);
     alignChanges(changes, oldKeys, newKeys);
     const hunks: Hunk[] = [];
     let group: Change[] = [];
@@ -90,7 +94,7 @@ export function patchOf(oldText: string, newText: string, context = 3): ParsedPa
         for (; oldAt < last.baseEnd + after; oldAt++) {
             line('context', oldAt);
         }
-        const coarse = group.some((change) => change.baseEnd - change.baseStart + change.otherEnd - change.otherStart > 4000);
+        const coarse = limited || group.some((change) => change.baseEnd - change.baseStart + change.otherEnd - change.otherStart > 4000);
         hunks.push({
             oldStart,
             newStart,

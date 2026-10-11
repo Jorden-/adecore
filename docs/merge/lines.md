@@ -84,7 +84,7 @@ The document and rows describe a view; they do not authorize applying a patch. K
 
 ## Computed patches and word changes
 
-`patchOf(oldText, newText, context = 3)` returns a `ParsedPatch` for two complete texts. It uses `diffLines`, merges changes whose context overlaps or touches, and retains raw CRLF data and final newline markers in the serialized `text`. It moves a repeated blank from the end of a pure insertion or deletion to its beginning, so an added or removed function includes its leading separator. This alignment applies only to computed patches; `parsePatch` keeps a supplied patch's hunk boundaries.
+`patchOf(oldText, newText, context = 3, options?)` returns a `ParsedPatch` for two complete texts. It uses `diffLines`, merges changes whose context overlaps or touches, and retains raw CRLF data and final newline markers in the serialized `text`. It moves a repeated blank from the end of a pure insertion or deletion to its beginning, so an added or removed function includes its leading separator. This alignment applies only to computed patches; `parsePatch` keeps a supplied patch's hunk boundaries.
 
 ```ts
 import { diffDocument, diffRows, patchOf, wordChanges } from '@adecore/merge';
@@ -97,6 +97,8 @@ const words = wordChanges(document.sides.old[0]!, document.sides.new[0]!);
 ```
 
 An unchanged pair yields no hunks and empty patch text. An empty text is a file with zero lines; it does not imply a missing filename, so both `missing` fields stay false. Context must be a nonnegative safe integer; invalid values throw `RangeError`. A computed hunk containing a changed block larger than 4000 lines has `coarse: true`, allowing a renderer to skip word pairing for that block.
+
+Pass `{ maxWork: 2_000_000 }` as the fourth argument to bound Myers work. `maxWork` must be a nonnegative safe integer. Each diagonal visit and line comparison in the walk counts as one unit; half the limit is reserved for the replay used to reconstruct the path. Once exhausted, the unmatched middle becomes one replacement hunk with `coarse: true`, including small replacements. Prefix and suffix scans, text splitting and patch serialization are linear work outside this counter; bound source size separately. Pure additions, deletions and identical texts do not need a walk. Omitting the option preserves the existing output. The two-argument `diffLines` keeps its existing behavior.
 
 `wordChanges(oldLine, newLine)` returns `{ old, new }` arrays of `DiffWordRange` entries. `from` and `to` are UTF-16 offsets with an exclusive end. Word segmentation retains combining characters and emoji sequences. Whitespace changes are included. Unchanged sides have no ranges. The function returns `null` above 20,000 combined UTF-16 code units or 2000 combined segments, bounding the work for long or minified lines.
 

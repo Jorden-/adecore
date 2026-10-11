@@ -16,6 +16,10 @@ const MAX_DISTANCE = 4000;
    state per round came to over a hundred megabytes at MAX_DISTANCE. */
 const STRIDE = 64;
 
+interface WorkBudget {
+    remaining: number;
+}
+
 /* One edit and the run of equal lines behind it, as the walk found them. */
 interface Move {
     prevX: number;
@@ -30,12 +34,21 @@ function cameDown(reach: Int32Array, offset: number, diagonal: number, distance:
 }
 
 /* One round of the walk: every diagonal of this distance taken as far as its lines match. True once the far corner is reached. */
-function extend(left: readonly string[], right: readonly string[], reach: Int32Array, offset: number, distance: number): boolean {
+function extend(left: readonly string[], right: readonly string[], reach: Int32Array, offset: number, distance: number, work?: WorkBudget): boolean | null {
     for (let diagonal = -distance; diagonal <= distance; diagonal += 2) {
+        if (work !== undefined && work.remaining-- <= 0) {
+            return null;
+        }
         const down = cameDown(reach, offset, diagonal, distance);
         let x = down ? reach[offset + diagonal + 1]! : reach[offset + diagonal - 1]! + 1;
         let y = x - diagonal;
-        while (x < left.length && y < right.length && left[x] === right[y]) {
+        while (x < left.length && y < right.length) {
+            if (work !== undefined && work.remaining-- <= 0) {
+                return null;
+            }
+            if (left[x] !== right[y]) {
+                break;
+            }
             x += 1;
             y += 1;
         }
@@ -82,20 +95,26 @@ function backtrack(left: readonly string[], right: readonly string[], saved: rea
  * STRIDE-th state a round started in, which is what the path is read back from once the far corner
  * is reached. Null once the distance passes what is worth walking.
  */
-function walk(left: readonly string[], right: readonly string[]): Move[] | null {
+function walk(left: readonly string[], right: readonly string[], maxWork?: number): { moves: Move[] | null; limited: boolean } {
     const limit = Math.min(left.length + right.length, MAX_DISTANCE);
     const offset = limit;
     const reach = new Int32Array(2 * limit + 1);
     const saved: Int32Array[] = [];
+    // Replay visits each earlier round once; reserve half the budget for backtracking.
+    const work = maxWork === undefined ? undefined : { remaining: Math.floor(maxWork / 2) };
     for (let distance = 0; distance <= limit; distance += 1) {
         if (distance % STRIDE === 0) {
             saved.push(reach.slice());
         }
-        if (extend(left, right, reach, offset, distance)) {
-            return backtrack(left, right, saved, distance, offset);
+        const complete = extend(left, right, reach, offset, distance, work);
+        if (complete === null) {
+            return { moves: null, limited: true };
+        }
+        if (complete) {
+            return { moves: backtrack(left, right, saved, distance, offset), limited: false };
         }
     }
-    return null;
+    return { moves: null, limited: false };
 }
 
 /* The stretches the moves cover, with edits that follow each other straight away folded into one. */
@@ -130,6 +149,10 @@ function changesOf(moves: readonly Move[]): Change[] {
 
 /* Where `other` differs from `base`, in line stretches, in the order they appear. */
 export function diffLines(base: readonly string[], other: readonly string[]): Change[] {
+    return diffChanges(base, other).changes;
+}
+
+export function diffChanges(base: readonly string[], other: readonly string[], maxWork?: number): { changes: Change[]; limited: boolean } {
     let prefix = 0;
     while (prefix < base.length && prefix < other.length && base[prefix] === other[prefix]) {
         prefix += 1;
@@ -141,14 +164,17 @@ export function diffLines(base: readonly string[], other: readonly string[]): Ch
     const left = base.slice(prefix, base.length - suffix);
     const right = other.slice(prefix, other.length - suffix);
     if (left.length === 0 && right.length === 0) {
-        return [];
+        return { changes: [], limited: false };
     }
-    const moves = left.length === 0 || right.length === 0 ? null : walk(left, right);
+    const { moves, limited } = left.length === 0 || right.length === 0 ? { moves: null, limited: false } : walk(left, right, maxWork);
     const changes = moves === null ? [{ baseStart: 0, baseEnd: left.length, otherStart: 0, otherEnd: right.length }] : changesOf(moves);
-    return changes.map((change) => ({
-        baseStart: change.baseStart + prefix,
-        baseEnd: change.baseEnd + prefix,
-        otherStart: change.otherStart + prefix,
-        otherEnd: change.otherEnd + prefix
-    }));
+    return {
+        changes: changes.map((change) => ({
+            baseStart: change.baseStart + prefix,
+            baseEnd: change.baseEnd + prefix,
+            otherStart: change.otherStart + prefix,
+            otherEnd: change.otherEnd + prefix
+        })),
+        limited
+    };
 }
