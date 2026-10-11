@@ -31,20 +31,27 @@ function isLive(context: UiRenderContext): boolean {
     return context.phase === 'streaming' || (context.live !== undefined && context.live !== null && context.live.state !== 'refused');
 }
 
+/* A badge longer than this is a sentence, which a tag cannot wrap; it stands under the title as text instead. */
+const BADGE_AS_TAG = 32;
+
 /* The head of the block when it is the first node, a subheading without an icon further down. */
 export function SummaryRenderer({ node, children }: UiRendererProps<UiProps<'Summary'>>) {
     const headId = useContext(UiHeadContext);
     const head = headId === undefined || headId === node.id;
     const { tone, badge } = node.props;
+    const tag = badge !== undefined && badge !== '' && badge.length <= BADGE_AS_TAG;
     return (
         <div className="flex items-start gap-2 px-2">
             {head && tone !== undefined && <Icon icon={UI_TONE_ICONS[tone]} size={16} className={clsx('mt-0.75 shrink-0', UI_TONE_TEXT[tone])} />}
-            <div className="min-w-0 grow text-sm font-semibold text-balance text-text">{children}</div>
-            {badge !== undefined && badge !== '' && (
-                <Pill shape="tag" tone={tone === undefined ? 'muted' : UI_TONE_PILL[tone]} className="shrink-0">
-                    {badge}
-                </Pill>
-            )}
+            <div className="flex min-w-0 grow flex-wrap items-start gap-x-2 gap-y-1">
+                <div className="max-w-full min-w-0 grow basis-48 text-sm font-semibold text-balance wrap-break-word text-text">{children}</div>
+                {tag && (
+                    <Pill shape="tag" tone={tone === undefined ? 'muted' : UI_TONE_PILL[tone]}>
+                        {badge}
+                    </Pill>
+                )}
+                {!tag && badge !== undefined && badge !== '' && <p className="w-full text-xs wrap-anywhere text-text-muted">{badge}</p>}
+            </div>
         </div>
     );
 }
@@ -117,8 +124,11 @@ export function StepRenderer({ node, children, context }: UiRendererProps<UiProp
                 )}
             </span>
             <span className="sr-only">{t(`blocks.step.${state}`)}</span>
-            <span className={clsx('min-w-0 grow', quiet ? 'text-text-faint' : 'text-text')}>{children}</span>
-            {detail !== undefined && detail !== '' && <span className="shrink-0 text-xs text-text-faint tabular-nums">{detail}</span>}
+            {/* A short detail stays beside the title; one that does not fit beside it takes the line under it. */}
+            <span className="flex min-w-0 grow flex-wrap items-baseline justify-between gap-x-2">
+                <span className={clsx('max-w-full min-w-0 grow basis-48 wrap-break-word', quiet ? 'text-text-faint' : 'text-text')}>{children}</span>
+                {detail !== undefined && detail !== '' && <span className="max-w-full text-xs wrap-anywhere text-text-faint tabular-nums">{detail}</span>}
+            </span>
         </li>
     );
 }

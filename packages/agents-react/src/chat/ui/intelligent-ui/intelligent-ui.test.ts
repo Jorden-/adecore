@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { compileUiBlock, evaluateUiBlock, UI_CATALOG, UiState, type UiComponentName, type UiViewNode } from '@adecore/intelligent-ui';
 import { chatHost, setChatHost } from '../../../host';
 import { UiPageMemory } from './block-local';
-import { uiChartData, uiChartRange, niceCeiling, UI_CHART_SERIES } from './chart-data';
+import { uiChartAxis, uiChartCharacter, uiChartData, uiChartRange, uiChartText, uiChartTextWidth, niceCeiling, UI_CHART_SERIES } from './chart-data';
 import i18next from 'i18next';
 import { uiBlockHead, uiLiveChoiceReason, uiNodeLabel, uiNodeText, uiReasonText, uiUrlDomain, uiWithUnit } from './node-text';
 import { UI_RENDERERS } from './registry';
@@ -196,6 +196,18 @@ describe('choices', () => {
     });
 });
 
+describe('long text', () => {
+    test('a long step detail and a long badge take a line of their own instead of squeezing the title', () => {
+        const long = 'Missing information and decisions before work go through the built-in question tool.';
+        const step = markup(`<Steps><Step state="pending" detail="${long}">Give the question tool priority</Step></Steps>`);
+        expect(step).toContain('flex-wrap');
+        expect(step).toContain(long);
+        const summary = markup(`<Summary badge="${long}">Result of the research</Summary>`);
+        expect(summary).toContain(`<p class="w-full text-xs wrap-anywhere text-text-muted">${long}</p>`);
+        expect(markup('<Summary badge="Draft">Release overview</Summary>')).not.toContain('<p class');
+    });
+});
+
 describe('a choice the host would refuse', () => {
     test('is drawn as its text with no row to press, once the reply is done', () => {
         for (const source of [
@@ -244,9 +256,9 @@ describe('local inputs', () => {
     test('a button runs its action and closes once the block is answered', () => {
         const { nodes, state } = evaluate('$mode = "all"\n<Button action={@Set($mode, "failed")}>Failed only</Button>');
         const element = ButtonRenderer({ node: nodes[0] as never, children: 'Failed only', context: CONTEXT }) as ReactElement<{
-            children: ReactElement<{ onClick(): void }>;
+            children: ReactElement<{ children: ReactElement<{ onClick(): void }> }>;
         }>;
-        element.props.children.props.onClick();
+        element.props.children.props.children.props.onClick();
         expect(state.scope().$mode).toBe('failed');
         const html = markup('$mode = "all"\n<Button action={@Reset()}>Reset</Button>', { answer: { choiceId: 'other', state: 'sent' } });
         expect(html).toContain('Reset');
@@ -440,6 +452,33 @@ describe('charts', () => {
         expect(seven).toContain('<th scope="col">g</th>');
         expect(compiled(wide).diagnostics.map((diagnostic) => diagnostic.code)).toEqual(['too_many_series']);
         expect(markup('<Chart kind="bar" data={[{label: "Core", count: 2}]}/>')).not.toContain('Show all values');
+    });
+
+    test('an axis is as wide as its longest label, and a label never runs past its room', () => {
+        expect(uiChartAxis(['0', '1', '2'], 326).axisWidth).toBe(44);
+        const wide = uiChartAxis(['0', '500,000', '1,000,000'], 326);
+        expect(wide.axisWidth).toBe(uiChartTextWidth('1,000,000') + 8);
+        const narrow = uiChartAxis(['0', '1,000,000,000,000,000,000,000'], 326);
+        expect(narrow.axisWidth).toBeLessThanOrEqual(130);
+        expect(uiChartTextWidth(narrow.tickTexts[1]!) + 8).toBeLessThanOrEqual(130);
+        expect(uiChartText('Zeer lange categorie zonder een compacte naam', 120)).toBe('Zeer lange cate…');
+        expect(uiChartText('Core', 120)).toBe('Core');
+    });
+
+    test('text that grows with the root font size gets as much more room', () => {
+        expect(uiChartCharacter(16)).toBe(7.5);
+        expect(uiChartCharacter(32)).toBe(15);
+        expect(uiChartCharacter(Number.NaN)).toBe(7.5);
+        const large = uiChartAxis(['0', '500,000', '1,000,000'], 326, uiChartCharacter(32));
+        expect(large.axisWidth).toBeGreaterThan(88);
+        expect(large.axisWidth).toBeLessThanOrEqual(Math.floor(326 * 0.4));
+        for (const text of large.tickTexts) {
+            expect(uiChartTextWidth(text, uiChartCharacter(32)) + 8).toBeLessThanOrEqual(large.axisWidth);
+        }
+    });
+
+    test('values a screen reader hears never widen the block they sit in', () => {
+        expect(markup('<Chart kind="bar" data={[{label: "Big", count: 9e307}]}/>')).toMatch(/<div class="sr-only"><table>/);
     });
 
     test('numbers too large to scale draw as text, never as a coordinate that is not a number', () => {

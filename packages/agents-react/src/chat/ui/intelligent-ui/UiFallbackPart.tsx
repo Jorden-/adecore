@@ -15,7 +15,12 @@ export function UiFallbackPart({ fallback, problem }: { fallback: string; proble
             <span className="text-xs text-text-faint">
                 {problem.kind === 'unknown' ? t('blocks.unknownComponent', { component: problem.component }) : t('blocks.renderFailed')}
             </span>
-            {fallback !== '' && <Markdown text={fallback} fileLinks={false} />}
+            {fallback !== '' && (
+                // A fallback is often data without a space in it, such as the JSON of a chart.
+                <div className="min-w-0 wrap-anywhere">
+                    <Markdown text={fallback} fileLinks={false} />
+                </div>
+            )}
         </div>
     );
 }

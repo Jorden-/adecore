@@ -6,7 +6,19 @@ import type { UiProps } from '@adecore/intelligent-ui';
 import { Button, SegmentBar, useMeasuredWidth } from '@adecore/ui';
 import { formatNumber, formatRounded } from '@adecore/ui/format';
 import { useBlockLocal } from '../block-local';
-import { UI_CHART_ROWS, uiChartData, uiChartRange, uiChartValues, type UiChartData, type UiChartValues } from '../chart-data';
+import {
+    UI_CHART_CHARACTER,
+    UI_CHART_ROWS,
+    uiChartCharacter,
+    uiChartAxis,
+    uiChartData,
+    uiChartRange,
+    uiChartText,
+    uiChartTextWidth,
+    uiChartValues,
+    type UiChartData,
+    type UiChartValues
+} from '../chart-data';
 import { uiWithUnit } from '../node-text';
 import type { UiRenderContext, UiRendererProps } from '../render-context';
 import { UiFallbackPart } from '../UiFallbackPart';
@@ -16,9 +28,10 @@ type ChartKind = UiProps<'Chart'>['kind'];
 const HEIGHT = 160;
 const HBAR_ROW = 24;
 const STACKED_ROW = 28;
-const AXIS_WIDTH = 44;
 const PLOT_TOP = 8;
 const LABEL_ROOM = 20;
+/* A unit longer than this stands once above the plot instead of beside every tick. */
+const UNIT_ON_TICKS = 5;
 /* The narrowest band a category label is written under; narrower bands skip labels. */
 const LABEL_BAND = 56;
 /* Points get a dot up to this many categories; more would crowd the line. */
@@ -31,6 +44,47 @@ function seriesColor(index: number): string {
 
 function valueText(value: number | null, unit: string | undefined): string {
     return value === null ? '' : uiWithUnit(formatRounded(value, 2), unit);
+}
+
+function unitApart(unit: string | undefined): boolean {
+    return unit !== undefined && unit.length > UNIT_ON_TICKS;
+}
+
+/* Where a value axis stands and how much room its category labels get, from the labels it writes. */
+function verticalLayout(chart: UiChartData, unit: string | undefined, width: number, character: number) {
+    // uiChartData only hands over data whose range is finite.
+    const { low, high } = uiChartRange(chart.min, chart.max)!;
+    const ticks = low === 0 ? [0, high / 2, high] : [low, 0, high];
+    const tickUnit = unitApart(unit) ? undefined : unit;
+    const { axisWidth, tickTexts } = uiChartAxis(
+        ticks.map((tick) => valueText(tick, tickUnit)),
+        width,
+        character
+    );
+    const band = Math.max(0, width - axisWidth) / chart.labels.length;
+    const labelEvery = Math.max(1, Math.ceil(LABEL_BAND / Math.max(1, band)));
+    return { low, high, ticks, tickTexts, axisWidth, band, labelEvery, labelRoom: Math.min(band * labelEvery, Math.max(0, width - axisWidth)) };
+}
+
+/* Whether a drawing at this width cuts a category label short, which then offers the values to read it whole. */
+function labelsCut(chart: UiChartData, unit: string | undefined, width: number, character: number): boolean {
+    if (width <= 0) {
+        return false;
+    }
+    if (chart.kind === 'hbar' || chart.kind === 'stacked') {
+        const room = Math.min(width * 0.4, (144 * character) / UI_CHART_CHARACTER);
+        return chart.labels.some((label) => uiChartTextWidth(label, character) > room);
+    }
+    const { labelRoom } = verticalLayout(chart, unit, width, character);
+    return chart.labels.some((label) => uiChartTextWidth(label, character) > labelRoom);
+}
+
+/* The character width of chart type, which follows the root font size; a drawing depends on a measured width, so only a page reads it. */
+function useChartCharacter(): number {
+    const [character] = useState(() =>
+        typeof document === 'undefined' ? UI_CHART_CHARACTER : uiChartCharacter(Number.parseFloat(getComputedStyle(document.documentElement).fontSize))
+    );
+    return character;
 }
 
 /* The height a chart will take, which its place holds while the node streams. */
@@ -75,7 +129,7 @@ function Legend({ chart }: { chart: UiChartData }) {
 function ValuesTable({ values, unit, shown }: { values: UiChartValues; unit: string | undefined; shown: boolean }) {
     const { t } = useTranslation('agent-chat');
     const table = (
-        <table className={shown ? 'w-full border-collapse text-xs tabular-nums' : 'sr-only'}>
+        <table className={shown ? 'w-full border-collapse text-xs tabular-nums' : undefined}>
             <caption className={shown ? 'sr-only' : undefined}>{t('blocks.chart.values')}</caption>
             <thead className={shown ? 'sticky top-0 z-1 bg-surface-hover' : undefined}>
                 <tr>
@@ -103,7 +157,8 @@ function ValuesTable({ values, unit, shown }: { values: UiChartValues; unit: str
             </tbody>
         </table>
     );
-    return shown ? <div className="max-h-80 w-full overflow-auto rounded-md border border-border-soft">{table}</div> : table;
+    // A table grows to its widest cell whatever width it is given, so it is hidden inside a block that clips.
+    return <div className={shown ? 'max-h-80 w-full overflow-auto rounded-md border border-border-soft' : 'sr-only'}>{table}</div>;
 }
 
 /* The values of one category beside the pointer. */
@@ -111,10 +166,10 @@ function Readout({ chart, index, left, unit }: { chart: UiChartData; index: numb
     return (
         <div
             aria-hidden
-            className="pointer-events-none absolute top-0 z-1 flex -translate-x-1/2 flex-col gap-0.5 rounded-md bg-surface-raised px-2 py-1 text-xs whitespace-nowrap shadow-raised"
+            className="pointer-events-none absolute top-0 z-1 flex w-max max-w-56 -translate-x-1/2 flex-col gap-0.5 rounded-md bg-surface-raised px-2 py-1 text-xs shadow-raised"
             style={{ left }}
         >
-            <span className="font-medium text-text">{chart.labels[index]}</span>
+            <span className="font-medium wrap-anywhere text-text">{chart.labels[index]}</span>
             {chart.series.map((series, at) => (
                 <span key={series.key} className="flex items-center gap-1.5 text-text-muted tabular-nums">
                     <span className="size-2 rounded-sm" style={{ backgroundColor: seriesColor(at) }} />
@@ -127,20 +182,31 @@ function Readout({ chart, index, left, unit }: { chart: UiChartData; index: numb
 }
 
 /* Bars and lines over a value axis, in SVG at the measured width. */
-function VerticalChart({ chart, kind, unit, width }: { chart: UiChartData; kind: 'bar' | 'line'; unit: string | undefined; width: number }) {
+function VerticalChart({
+    chart,
+    kind,
+    unit,
+    width,
+    character
+}: {
+    chart: UiChartData;
+    kind: 'bar' | 'line';
+    unit: string | undefined;
+    width: number;
+    character: number;
+}) {
     const [hover, setHover] = useState<number | null>(null);
-    // uiChartData only hands over data whose range is finite.
-    const { low, high } = uiChartRange(chart.min, chart.max)!;
-    const plotWidth = Math.max(0, width - AXIS_WIDTH);
-    const plotHeight = HEIGHT - PLOT_TOP - LABEL_ROOM;
-    const band = plotWidth / chart.labels.length;
+    const { low, high, ticks, tickTexts, axisWidth, band, labelEvery, labelRoom } = verticalLayout(chart, unit, width, character);
+    const plotHeight = HEIGHT - PLOT_TOP - Math.round((LABEL_ROOM * character) / UI_CHART_CHARACTER);
     const y = (value: number): number => Math.round(PLOT_TOP + ((high - value) / (high - low)) * plotHeight);
     const baseline = y(0);
-    const ticks = low === 0 ? [0, high / 2, high] : [low, 0, high];
-    const labelEvery = Math.max(1, Math.ceil(LABEL_BAND / Math.max(1, band)));
-    const center = (index: number): number => Math.round(AXIS_WIDTH + band * index + band / 2);
+    const center = (index: number): number => Math.round(axisWidth + band * index + band / 2);
     const gap = band * 0.2;
     const barWidth = Math.max(1, (band - gap) / chart.series.length);
+    const labelAt = (index: number, text: string): number => {
+        const half = uiChartTextWidth(text, character) / 2;
+        return Math.round(Math.min(Math.max(center(index), axisWidth + half), width - half));
+    };
 
     const segments = (values: (number | null)[]): string =>
         values
@@ -157,30 +223,34 @@ function VerticalChart({ chart, kind, unit, width }: { chart: UiChartData; kind:
         <>
             <svg width={width} height={HEIGHT} aria-hidden className="block overflow-visible" onPointerLeave={() => setHover(null)}>
                 {hover !== null && (
-                    <rect x={Math.round(AXIS_WIDTH + band * hover)} y={PLOT_TOP} width={Math.round(band)} height={plotHeight} className="fill-surface-hover" />
+                    <rect x={Math.round(axisWidth + band * hover)} y={PLOT_TOP} width={Math.round(band)} height={plotHeight} className="fill-surface-hover" />
                 )}
-                {ticks.map((tick) => (
+                {ticks.map((tick, index) => (
                     <g key={tick}>
                         <line
-                            x1={AXIS_WIDTH}
+                            x1={axisWidth}
                             x2={width}
                             y1={y(tick)}
                             y2={y(tick)}
                             className={tick === 0 ? 'stroke-border' : 'stroke-border-soft'}
                             shapeRendering="crispEdges"
                         />
-                        <text x={AXIS_WIDTH - 6} y={y(tick)} dy="0.32em" textAnchor="end" className="fill-text-faint text-xs tabular-nums">
-                            {valueText(tick, unit)}
+                        <text x={axisWidth - 6} y={y(tick)} dy="0.32em" textAnchor="end" className="fill-text-faint text-xs tabular-nums">
+                            {tickTexts[index]}
                         </text>
                     </g>
                 ))}
-                {chart.labels.map((label, index) =>
-                    index % labelEvery === 0 ? (
-                        <text key={index} x={center(index)} y={HEIGHT - 4} textAnchor="middle" className="fill-text-faint text-xs">
-                            {label}
+                {chart.labels.map((label, index) => {
+                    if (index % labelEvery !== 0) {
+                        return null;
+                    }
+                    const text = uiChartText(label, labelRoom, character);
+                    return (
+                        <text key={index} x={labelAt(index, text)} y={HEIGHT - 4} textAnchor="middle" className="fill-text-faint text-xs">
+                            {text}
                         </text>
-                    ) : null
-                )}
+                    );
+                })}
                 {kind === 'bar' ? (
                     <g className={clsx(GROW, 'starting:scale-y-0')} style={{ transformOrigin: `0px ${baseline}px` }}>
                         {chart.series.map((series, at) =>
@@ -188,7 +258,7 @@ function VerticalChart({ chart, kind, unit, width }: { chart: UiChartData; kind:
                                 value === null ? null : (
                                     <rect
                                         key={`${series.key}:${index}`}
-                                        x={Math.round(AXIS_WIDTH + band * index + gap / 2 + barWidth * at)}
+                                        x={Math.round(axisWidth + band * index + gap / 2 + barWidth * at)}
                                         y={Math.min(y(value), baseline)}
                                         width={Math.max(1, Math.round(barWidth) - 1)}
                                         height={Math.abs(y(value) - baseline)}
@@ -222,7 +292,7 @@ function VerticalChart({ chart, kind, unit, width }: { chart: UiChartData; kind:
                 {chart.labels.map((_, index) => (
                     <rect
                         key={index}
-                        x={Math.round(AXIS_WIDTH + band * index)}
+                        x={Math.round(axisWidth + band * index)}
                         y={0}
                         width={Math.max(1, Math.round(band))}
                         height={HEIGHT}
@@ -266,7 +336,9 @@ function HorizontalChart({ chart, unit }: { chart: UiChartData; unit: string | u
                         })}
                     </span>
                     {single && (
-                        <span className="w-16 shrink-0 text-right text-text-faint tabular-nums">{valueText(chart.series[0]!.values[index] ?? null, unit)}</span>
+                        <span className="max-w-1/3 min-w-12 shrink-0 truncate text-right text-text-faint tabular-nums">
+                            {valueText(chart.series[0]!.values[index] ?? null, unit)}
+                        </span>
                     )}
                 </div>
             ))}
@@ -302,6 +374,7 @@ function StackedChart({ chart, unit }: { chart: UiChartData; unit: string | unde
 function ChartNotes({
     chart,
     requested,
+    cut,
     values,
     unit,
     context,
@@ -309,6 +382,8 @@ function ChartNotes({
 }: {
     chart: UiChartData;
     requested: ChartKind;
+    /* Whether a category label is cut short at this width. */
+    cut: boolean;
     values: UiChartValues;
     unit: string | undefined;
     context: UiRenderContext;
@@ -321,7 +396,7 @@ function ChartNotes({
         ...(chart.omitted.length > 0 ? [t('blocks.chart.seriesLeftOut', { count: chart.omitted.length, series: chart.omitted.join(', ') })] : []),
         ...(requested === 'stacked' && chart.kind !== 'stacked' ? [t('blocks.chart.sideBySide')] : [])
     ];
-    const partial = chart.truncated || chart.omitted.length > 0;
+    const partial = chart.truncated || chart.omitted.length > 0 || cut;
     return (
         <>
             {notes.length > 0 && (
@@ -332,8 +407,8 @@ function ChartNotes({
                 </div>
             )}
             {partial && (
-                <Button size="xs" variant="secondary" className="self-start" aria-expanded={shown} onClick={() => setShown(!shown)}>
-                    {shown ? t('blocks.chart.hideValues') : t('blocks.chart.showValues')}
+                <Button size="xs" variant="secondary" className="max-w-full self-start" aria-expanded={shown} onClick={() => setShown(!shown)}>
+                    <span className="min-w-0 truncate">{shown ? t('blocks.chart.hideValues') : t('blocks.chart.showValues')}</span>
                 </Button>
             )}
             <ValuesTable values={values} unit={unit} shown={partial && shown} />
@@ -358,21 +433,33 @@ function DrawnChart({
 }) {
     const { t } = useTranslation('agent-chat');
     const [measure, width] = useMeasuredWidth();
+    const character = useChartCharacter();
     const values = useMemo(() => uiChartValues(data), [data]);
     const { kind } = chart;
     return (
         <figure className="flex flex-col gap-2 px-2">
             {chart.series.length > 1 && <Legend chart={chart} />}
+            {(kind === 'bar' || kind === 'line') && unitApart(unit) && <p className="text-xs text-text-faint">{unit}</p>}
             <div ref={measure} role="img" aria-label={chartSummary(values, unit, t)} className="relative">
                 {kind === 'hbar' ? (
                     <HorizontalChart chart={chart} unit={unit} />
                 ) : kind === 'stacked' ? (
                     <StackedChart chart={chart} unit={unit} />
                 ) : (
-                    <div style={{ height: HEIGHT }}>{width > 0 && <VerticalChart chart={chart} kind={kind} unit={unit} width={width} />}</div>
+                    <div style={{ height: HEIGHT }}>
+                        {width > 0 && <VerticalChart chart={chart} kind={kind} unit={unit} width={width} character={character} />}
+                    </div>
                 )}
             </div>
-            <ChartNotes chart={chart} requested={requested} values={values} unit={unit} context={context} nodeId={nodeId} />
+            <ChartNotes
+                chart={chart}
+                requested={requested}
+                cut={labelsCut(chart, unit, width, character)}
+                values={values}
+                unit={unit}
+                context={context}
+                nodeId={nodeId}
+            />
         </figure>
     );
 }

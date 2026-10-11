@@ -72,9 +72,9 @@ export function ChoiceRenderer({ node, children, context }: UiRendererProps<UiPr
         >
             <Icon icon={ArrowRight} size={14} className={clsx('mt-1 shrink-0', primary === true ? 'text-accent' : 'text-text-faint')} />
             <span className="flex min-w-0 grow flex-col">
-                <span className="text-sm font-semibold text-text">{children}</span>
+                <span className="text-sm font-semibold wrap-anywhere text-text">{children}</span>
                 {described && (
-                    <span id={descriptionId} className="line-clamp-2 text-xs text-text-muted">
+                    <span id={descriptionId} className="line-clamp-2 text-xs wrap-anywhere text-text-muted">
                         {detail}
                     </span>
                 )}

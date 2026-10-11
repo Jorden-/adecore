@@ -70,7 +70,7 @@ Choose one value. `Segmented` holds only `Option`, and binds the chosen option's
 
 ## Button
 
-Runs one action on local state when pressed. Its children are the label.
+Runs one action on local state when pressed. Its children are the label, kept to one line: a label longer than the button can hold is cut short and shown whole in its tooltip.
 
 | Prop       | Type    | Required | Notes                                                     |
 | ---------- | ------- | -------- | --------------------------------------------------------- |

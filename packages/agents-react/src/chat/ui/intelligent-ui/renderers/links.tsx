@@ -115,11 +115,11 @@ function LinkRow({ target, context, described, children }: { target: UiLinkTarge
         return <UiLinkChip target={target} context={context} />;
     }
     return (
-        <div className="flex min-w-0 items-baseline gap-2 px-2 text-sm">
-            <span className="shrink-0">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 px-2 text-sm">
+            <span className="max-w-full min-w-0">
                 <UiLinkChip target={target} context={context} />
             </span>
-            <span className="min-w-0 text-text-muted">{children}</span>
+            <span className="min-w-0 wrap-break-word text-text-muted">{children}</span>
         </div>
     );
 }

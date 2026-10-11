@@ -2,7 +2,7 @@ import clsx from 'clsx';
 import { createContext, useContext, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { UiProps } from '@adecore/intelligent-ui';
-import { PreviewCard } from '@adecore/ui';
+import { PreviewCard, Tooltip } from '@adecore/ui';
 import { formatNumber } from '@adecore/ui/format';
 import { chatHost } from '../../../../host';
 import { CodeBlock } from '../../CodeBlock';
@@ -119,22 +119,25 @@ export function SourceRenderer({ node, context }: UiRendererProps<UiProps<'Sourc
         <>
             <span className="w-5 shrink-0 text-right text-text-faint tabular-nums">{number}</span>
             <span className="min-w-0 truncate text-text">{title}</span>
-            <span className="shrink-0 text-text-faint">{uiUrlDomain(url)}</span>
+            <span className="max-w-1/2 min-w-0 shrink-0 truncate text-text-faint">{uiUrlDomain(url)}</span>
         </>
     );
     return (
         <li data-ui-source={node.id} tabIndex={-1} className="chat-ui-source scroll-my-2 rounded-md">
-            {openUrl === undefined ? (
-                <span className="flex h-8 items-center gap-2 px-2 text-xs">{face}</span>
-            ) : (
-                <button
-                    type="button"
-                    className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs hover:bg-surface-hover"
-                    onClick={() => openUrl(url)}
-                >
-                    {face}
-                </button>
-            )}
+            {/* The row has one line, so the whole address it may cut short reads in its tooltip. */}
+            <Tooltip label={url}>
+                {openUrl === undefined ? (
+                    <span className="flex h-8 items-center gap-2 px-2 text-xs">{face}</span>
+                ) : (
+                    <button
+                        type="button"
+                        className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs hover:bg-surface-hover"
+                        onClick={() => openUrl(url)}
+                    >
+                        {face}
+                    </button>
+                )}
+            </Tooltip>
         </li>
     );
 }
