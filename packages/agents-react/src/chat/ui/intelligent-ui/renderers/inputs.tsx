@@ -5,6 +5,7 @@ import type { UiBinding, UiProps, UiViewNode } from '@adecore/intelligent-ui';
 import { Button, Checkbox, Segmented, Slider, Switch, Tooltip } from '@adecore/ui';
 import { uiChildrenOf, uiNodeLabel, uiWithUnit } from '../node-text';
 import type { UiRenderContext, UiRendererProps } from '../render-context';
+import { useTruncated } from '../use-truncated';
 
 type Scalar = UiProps<'Item'>['value'];
 
@@ -135,18 +136,18 @@ export function SegmentedRenderer({ node, context }: UiRendererProps<UiProps<'Se
     );
 }
 
-/* A label longer than this is cut to the button's one line and read whole in its tooltip. */
-const BUTTON_LABEL = 40;
-
-/* Runs its local action once its own node closed; like an input, it closes once the block is answered. */
+/* Runs its local action once its own node closed; like an input, it closes once the block is answered. A label cut to the button's one line reads whole in its tooltip. */
 export function ButtonRenderer({ node, children, context }: UiRendererProps<UiProps<'Button'>>) {
     const enabled = node.onAction !== undefined && node.complete && context.answer === null && node.props.disabled !== true;
     const label = uiNodeLabel(node);
+    const [measure, truncated] = useTruncated<HTMLSpanElement>();
     return (
         <div className={clsx('px-2', !node.complete && PENDING)}>
-            <Tooltip label={label} disabled={label.length <= BUTTON_LABEL}>
+            <Tooltip label={label} disabled={!truncated}>
                 <Button variant="secondary" size="sm" className="max-w-full" disabled={!enabled} onClick={() => node.onAction?.()}>
-                    <span className="min-w-0 truncate">{children}</span>
+                    <span ref={measure} className="min-w-0 truncate">
+                        {children}
+                    </span>
                 </Button>
             </Tooltip>
         </div>

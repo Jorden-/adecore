@@ -639,6 +639,11 @@
             "types": "./dist/chat/ui/intelligent-ui/use-later.d.ts",
             "default": "./dist/chat/ui/intelligent-ui/use-later.js"
         },
+        "./chat/ui/intelligent-ui/use-truncated": {
+            "source": "./src/chat/ui/intelligent-ui/use-truncated.ts",
+            "types": "./dist/chat/ui/intelligent-ui/use-truncated.d.ts",
+            "default": "./dist/chat/ui/intelligent-ui/use-truncated.js"
+        },
         "./chat/ui/intelligent-ui/use-ui-links": {
             "source": "./src/chat/ui/intelligent-ui/use-ui-links.ts",
             "types": "./dist/chat/ui/intelligent-ui/use-ui-links.d.ts",

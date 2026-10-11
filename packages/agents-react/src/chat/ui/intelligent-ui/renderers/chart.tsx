@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import type { UiProps } from '@adecore/intelligent-ui';
-import { Button, SegmentBar, useMeasuredWidth } from '@adecore/ui';
+import { Button, SegmentBar, Tooltip, useMeasuredWidth } from '@adecore/ui';
 import { formatNumber, formatRounded } from '@adecore/ui/format';
 import { useBlockLocal } from '../block-local';
 import {
@@ -20,6 +20,7 @@ import {
     type UiChartValues
 } from '../chart-data';
 import { uiWithUnit } from '../node-text';
+import { useTruncated } from '../use-truncated';
 import type { UiRenderContext, UiRendererProps } from '../render-context';
 import { UiFallbackPart } from '../UiFallbackPart';
 
@@ -66,14 +67,10 @@ function verticalLayout(chart: UiChartData, unit: string | undefined, width: num
     return { low, high, ticks, tickTexts, axisWidth, band, labelEvery, labelRoom: Math.min(band * labelEvery, Math.max(0, width - axisWidth)) };
 }
 
-/* Whether a drawing at this width cuts a category label short, which then offers the values to read it whole. */
+/* Whether a drawing in SVG at this width cuts a category label short, which then offers the values to read it whole; HTML rows are measured where they stand. */
 function labelsCut(chart: UiChartData, unit: string | undefined, width: number, character: number): boolean {
-    if (width <= 0) {
+    if (width <= 0 || chart.kind === 'hbar' || chart.kind === 'stacked') {
         return false;
-    }
-    if (chart.kind === 'hbar' || chart.kind === 'stacked') {
-        const room = Math.min(width * 0.4, (144 * character) / UI_CHART_CHARACTER);
-        return chart.labels.some((label) => uiChartTextWidth(label, character) > room);
     }
     const { labelRoom } = verticalLayout(chart, unit, width, character);
     return chart.labels.some((label) => uiChartTextWidth(label, character) > labelRoom);
@@ -308,6 +305,7 @@ function VerticalChart({
 
 /* A row of 24px per category, its label beside the bars, which grow from zero to either side. */
 function HorizontalChart({ chart, unit }: { chart: UiChartData; unit: string | undefined }) {
+    const valueUnit = unitApart(unit) ? undefined : unit;
     const { low, high } = uiChartRange(chart.min, chart.max)!;
     const span = high - low;
     const zero = (-low / span) * 100;
@@ -337,7 +335,7 @@ function HorizontalChart({ chart, unit }: { chart: UiChartData; unit: string | u
                     </span>
                     {single && (
                         <span className="max-w-1/3 min-w-12 shrink-0 truncate text-right text-text-faint tabular-nums">
-                            {valueText(chart.series[0]!.values[index] ?? null, unit)}
+                            {valueText(chart.series[0]!.values[index] ?? null, valueUnit)}
                         </span>
                     )}
                 </div>
@@ -397,6 +395,8 @@ function ChartNotes({
         ...(requested === 'stacked' && chart.kind !== 'stacked' ? [t('blocks.chart.sideBySide')] : [])
     ];
     const partial = chart.truncated || chart.omitted.length > 0 || cut;
+    const [measure, truncated] = useTruncated<HTMLSpanElement>();
+    const toggle = shown ? t('blocks.chart.hideValues') : t('blocks.chart.showValues');
     return (
         <>
             {notes.length > 0 && (
@@ -407,9 +407,13 @@ function ChartNotes({
                 </div>
             )}
             {partial && (
-                <Button size="xs" variant="secondary" className="max-w-full self-start" aria-expanded={shown} onClick={() => setShown(!shown)}>
-                    <span className="min-w-0 truncate">{shown ? t('blocks.chart.hideValues') : t('blocks.chart.showValues')}</span>
-                </Button>
+                <Tooltip label={toggle} disabled={!truncated}>
+                    <Button size="xs" variant="secondary" className="max-w-full self-start" aria-expanded={shown} onClick={() => setShown(!shown)}>
+                        <span ref={measure} className="min-w-0 truncate">
+                            {toggle}
+                        </span>
+                    </Button>
+                </Tooltip>
             )}
             <ValuesTable values={values} unit={unit} shown={partial && shown} />
         </>
@@ -434,17 +438,16 @@ function DrawnChart({
     const { t } = useTranslation('agent-chat');
     const [measure, width] = useMeasuredWidth();
     const character = useChartCharacter();
+    const [measureRows, rowsCut] = useTruncated<HTMLDivElement>(true);
     const values = useMemo(() => uiChartValues(data), [data]);
     const { kind } = chart;
     return (
         <figure className="flex flex-col gap-2 px-2">
             {chart.series.length > 1 && <Legend chart={chart} />}
-            {(kind === 'bar' || kind === 'line') && unitApart(unit) && <p className="text-xs text-text-faint">{unit}</p>}
+            {kind !== 'stacked' && unitApart(unit) && <p className="text-xs text-text-faint">{unit}</p>}
             <div ref={measure} role="img" aria-label={chartSummary(values, unit, t)} className="relative">
-                {kind === 'hbar' ? (
-                    <HorizontalChart chart={chart} unit={unit} />
-                ) : kind === 'stacked' ? (
-                    <StackedChart chart={chart} unit={unit} />
+                {kind === 'hbar' || kind === 'stacked' ? (
+                    <div ref={measureRows}>{kind === 'hbar' ? <HorizontalChart chart={chart} unit={unit} /> : <StackedChart chart={chart} unit={unit} />}</div>
                 ) : (
                     <div style={{ height: HEIGHT }}>
                         {width > 0 && <VerticalChart chart={chart} kind={kind} unit={unit} width={width} character={character} />}
@@ -454,7 +457,7 @@ function DrawnChart({
             <ChartNotes
                 chart={chart}
                 requested={requested}
-                cut={labelsCut(chart, unit, width, character)}
+                cut={rowsCut || labelsCut(chart, unit, width, character)}
                 values={values}
                 unit={unit}
                 context={context}

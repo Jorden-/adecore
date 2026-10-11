@@ -160,6 +160,7 @@ The renderers of [Intelligent UI](/agents-react/chat/intelligent-ui) blocks.
 | [`chat/ui/intelligent-ui/table-data`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/table-data.ts) | `UiColumnKind`, `UiTableColumn`, `UiTableCell`, `UI_TABLE_ROWS`, `isNumericColumn`, `uiTableColumns`, `uiTableCell` |
 | [`chat/ui/intelligent-ui/tones`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/tones.ts) | `UI_TONE_ICONS`, `UI_TONE_TEXT`, `UI_TONE_SURFACE`, `UI_TONE_PILL` |
 | [`chat/ui/intelligent-ui/use-later`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/use-later.ts) | `useLater` |
+| [`chat/ui/intelligent-ui/use-truncated`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/use-truncated.ts) | `useTruncated` |
 | [`chat/ui/intelligent-ui/use-ui-links`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/use-ui-links.ts) | `useUiLinks` |
 | [`chat/ui/intelligent-ui/use-ui-queries`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/use-ui-queries.ts) | `useUiQueries`, `useUiLiveValues` |
 

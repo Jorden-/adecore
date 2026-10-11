@@ -10,7 +10,7 @@ import { uiBlockHead, uiLiveChoiceReason, uiNodeLabel, uiNodeText, uiReasonText,
 import { UI_RENDERERS } from './registry';
 import type { UiRenderContext, UiRenderer, UiRendererProps } from './render-context';
 import { UiSourceCitation } from './renderers/content';
-import { ButtonRenderer, ChecklistRenderer } from './renderers/inputs';
+import { ChecklistRenderer } from './renderers/inputs';
 import { uiTableCell, uiTableColumns } from './table-data';
 import { UiBlockFrame, type UiBlockFrameProps } from './UiBlockFrame';
 
@@ -253,13 +253,7 @@ describe('local inputs', () => {
         );
     });
 
-    test('a button runs its action and closes once the block is answered', () => {
-        const { nodes, state } = evaluate('$mode = "all"\n<Button action={@Set($mode, "failed")}>Failed only</Button>');
-        const element = ButtonRenderer({ node: nodes[0] as never, children: 'Failed only', context: CONTEXT }) as ReactElement<{
-            children: ReactElement<{ children: ReactElement<{ onClick(): void }> }>;
-        }>;
-        element.props.children.props.children.props.onClick();
-        expect(state.scope().$mode).toBe('failed');
+    test('a button closes once the block is answered', () => {
         const html = markup('$mode = "all"\n<Button action={@Reset()}>Reset</Button>', { answer: { choiceId: 'other', state: 'sent' } });
         expect(html).toContain('Reset');
         expect(html).toContain('disabled');
@@ -492,6 +486,14 @@ describe('charts', () => {
         }
         expect(uiChartData([{ label: 'Wide', low: -9e307, high: 9e307 }], 'bar')).toBeNull();
         expect(uiChartRange(-3, 5)).toEqual({ low: -5, high: 5 });
+        // A subnormal span would scale every coordinate by an infinite factor.
+        expect(uiChartRange(0, Number.MIN_VALUE)).toBeNull();
+        expect(uiChartRange(0, 1e-310)).toBeNull();
+        expect(uiChartRange(0, 1e-300)).not.toBeNull();
+        expect(uiChartData([{ label: 'Tiny', value: Number.MIN_VALUE }], 'bar')).toBeNull();
+        const tiny = markup(`<Chart kind="hbar" data={[{label: "Tiny", value: ${Number.MIN_VALUE}}]}/>`);
+        expect(tiny).not.toMatch(/NaN|Infinity/);
+        expect(tiny).toContain('Could not draw this part');
         const drawn = markup('<Chart kind="bar" data={[{label: "Big", count: 9e307}]}/>');
         expect(drawn).not.toMatch(/NaN|Infinity/);
         expect(drawn).toContain('role="img"');

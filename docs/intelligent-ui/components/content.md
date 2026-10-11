@@ -42,4 +42,4 @@ Numbered sources, which prose in the block can cite as `[1]`. `Sources` has no p
 | `title` | string | Yes      |                                        |
 | `url`   | string | Yes      | Starts with `http://` or `https://`    |
 
-A renderer never preloads a source. It opens one through the host when a person clicks it.
+A renderer never preloads a source. It opens one through the host when a person clicks it. A long title wraps; a domain cut short reads whole, with the title, in the tooltip of the row, which takes keyboard focus while it cuts even where the host opens nothing.

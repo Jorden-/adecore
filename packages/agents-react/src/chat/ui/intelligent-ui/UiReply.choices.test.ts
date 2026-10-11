@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { compileUi, resolveUiChoice } from '@adecore/intelligent-ui';
 import { chatHost, setChatHost } from '../../../host';
 import { UiReply } from './UiReply';
+import { useTruncated } from './use-truncated';
 
 const SOURCES = {
     empty: '<Choices><Choice context="Run checks"></Choice></Choices>',
@@ -97,6 +98,41 @@ test.skipIf(typeof document === 'undefined')('the arrows pick the next option of
         const after = [...element.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
         expect(after.map((radio) => radio.getAttribute('aria-checked'))).toEqual(['false', 'true']);
         expect(document.activeElement).toBe(after[1]!);
+    } finally {
+        await act(async () => root.unmount());
+        element.remove();
+    }
+});
+
+test.skipIf(typeof document === 'undefined')('a button runs its action, and knows when its label is cut short', async () => {
+    const text = '```ui\n$mode = "all"\n<Button action={@Set($mode, "failed")}>Failed only</Button>\n<Summary>Mode {$mode}</Summary>\n```';
+    const blocks = compileUi(text, { id: 'button', final: true });
+    const element = document.createElement('div');
+    document.body.append(element);
+    const root = createRoot(element);
+    try {
+        await act(async () =>
+            root.render(createElement(UiReply, { text, blocks, context: { scopeId: 'button', chatId: 'chat', itemId: 'item', phase: 'final' } }))
+        );
+        await act(async () => element.querySelector('button')!.click());
+        expect(element.textContent).toContain('Mode failed');
+
+        const Probe = ({ width }: { width: number }) => {
+            const [measure, truncated] = useTruncated<HTMLSpanElement>();
+            return createElement('span', {
+                ref: (span: HTMLSpanElement | null) => {
+                    if (span !== null) {
+                        Object.defineProperties(span, { scrollWidth: { configurable: true, value: 120 }, clientWidth: { configurable: true, value: width } });
+                    }
+                    return measure(span);
+                },
+                'data-truncated': String(truncated)
+            });
+        };
+        await act(async () => root.render(createElement(Probe, { width: 80 })));
+        expect(element.querySelector('[data-truncated]')!.getAttribute('data-truncated')).toBe('true');
+        await act(async () => root.render(createElement(Probe, { key: 'wide', width: 120 })));
+        expect(element.querySelector('[data-truncated]')!.getAttribute('data-truncated')).toBe('false');
     } finally {
         await act(async () => root.unmount());
         element.remove();

@@ -10,6 +10,7 @@ import { CodeStreamingContext } from '../../code-streaming';
 import { ImageThumb } from '../../ImageView';
 import { uiChildrenOf, uiNodeLabel, uiNodeText, uiUrlDomain } from '../node-text';
 import type { UiRendererProps } from '../render-context';
+import { useTruncated } from '../use-truncated';
 
 // The number of every source by its node id, which the list counts in its own order.
 const SourceNumbers = createContext<ReadonlyMap<string, number>>(new Map());
@@ -115,23 +116,35 @@ export function SourceRenderer({ node, context }: UiRendererProps<UiProps<'Sourc
     const number = useContext(SourceNumbers).get(node.id);
     const { title, url } = node.props;
     const { openUrl } = context;
+    const [measureDomain, domainCut] = useTruncated<HTMLSpanElement>();
     const face = (
         <>
-            <span className="w-5 shrink-0 text-right text-text-faint tabular-nums">{number}</span>
-            <span className="min-w-0 truncate text-text">{title}</span>
-            <span className="max-w-1/2 min-w-0 shrink-0 truncate text-text-faint">{uiUrlDomain(url)}</span>
+            <span className="w-5 shrink-0 self-start text-right text-text-faint tabular-nums">{number}</span>
+            <span className="min-w-0 grow wrap-anywhere text-text">{title}</span>
+            <span ref={measureDomain} className="max-w-1/2 min-w-0 shrink-0 self-start truncate text-text-faint">
+                {uiUrlDomain(url)}
+            </span>
         </>
     );
     return (
         <li data-ui-source={node.id} tabIndex={-1} className="chat-ui-source scroll-my-2 rounded-md">
-            {/* The row has one line, so the whole address it may cut short reads in its tooltip. */}
-            <Tooltip label={url}>
+            {/* The title wraps and the domain may be cut short, so the tooltip says both whole; a row that opens nothing takes focus only while it cuts. */}
+            <Tooltip
+                label={
+                    <>
+                        <span className="block">{title}</span>
+                        <span className="block text-text-muted">{url}</span>
+                    </>
+                }
+            >
                 {openUrl === undefined ? (
-                    <span className="flex h-8 items-center gap-2 px-2 text-xs">{face}</span>
+                    <span tabIndex={domainCut ? 0 : undefined} className="flex min-h-8 items-start gap-2 rounded-md px-2 py-2 text-xs">
+                        {face}
+                    </span>
                 ) : (
                     <button
                         type="button"
-                        className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs hover:bg-surface-hover"
+                        className="flex min-h-8 w-full items-start gap-2 rounded-md px-2 py-2 text-left text-xs hover:bg-surface-hover"
                         onClick={() => openUrl(url)}
                     >
                         {face}
