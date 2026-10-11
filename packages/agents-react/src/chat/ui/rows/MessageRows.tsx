@@ -130,20 +130,22 @@ export function UserRow({ chatId, item }: { chatId: string; item: ChatUserItem }
                         {quoted !== null && source !== undefined ? (
                             <>
                                 {/* A div, since the quote is block markdown and a button holds none. */}
-                                <div
-                                    role="button"
-                                    tabIndex={0}
-                                    className="mb-2 cursor-pointer border-l-2 border-border-strong pl-2.5 text-text-muted hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
-                                    onClick={goToSource}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault();
-                                            goToSource();
-                                        }
-                                    }}
-                                >
-                                    <MessageMarkdown text={quoted.quote} />
-                                </div>
+                                <Tooltip label={t('composer.quote.goToSource')}>
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        className="mb-2 cursor-pointer rounded-sm border-l-2 border-border-strong pl-2.5 text-text-muted hover:bg-text/5 hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+                                        onClick={goToSource}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                goToSource();
+                                            }
+                                        }}
+                                    >
+                                        <MessageMarkdown text={quoted.quote} />
+                                    </div>
+                                </Tooltip>
                                 {missing && <div className="mb-2 text-xs text-text-faint">{t('rows.user.quoteGone')}</div>}
                                 {quoted.rest !== '' && <MessageMarkdown text={quoted.rest} mentions={item.mentions} skills={item.skills} />}
                             </>

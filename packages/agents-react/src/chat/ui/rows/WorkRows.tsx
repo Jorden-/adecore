@@ -329,7 +329,7 @@ function ChangedFilesCard({
                 <Icon icon={ChevronRight} size={12} className={clsx('shrink-0 text-text-faint transition-transform', expanded && 'rotate-90')} />
             </button>
             {baseMoved !== undefined && (
-                <div className="px-3 pb-2 text-xs text-text-faint">
+                <div className="pr-3 pb-2 pl-8 text-xs text-text-faint">
                     {t('work.baseMoved', { from: baseMoved.from.slice(0, 7), to: baseMoved.to.slice(0, 7) })}
                 </div>
             )}

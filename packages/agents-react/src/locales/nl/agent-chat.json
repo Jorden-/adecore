@@ -167,8 +167,8 @@
     },
     "changedFiles_one": "{{count}} gewijzigd bestand",
     "changedFiles_other": "{{count}} gewijzigde bestanden",
-    "folderChanges_one": "{{count}} mapwijziging tijdens de beurt",
-    "folderChanges_other": "{{count}} mapwijzigingen tijdens de beurt",
+    "folderChanges_one": "{{count}} wijziging in de map tijdens deze beurt",
+    "folderChanges_other": "{{count}} wijzigingen in de map tijdens deze beurt",
     "baseMoved": "De branch is tijdens deze beurt verplaatst ({{from}} naar {{to}}), dus dit omvat ook wat daarmee binnenkwam.",
     "andMore": "en meer, afgekapt",
     "edits_one": "{{count}} bewerking",
@@ -336,7 +336,7 @@
     "monitors_one": "{{count}} monitor",
     "monitors_other": "{{count}} monitors",
     "pausedUntil": "gepauzeerd tot {{time}}",
-    "progress": "{{done}}/{{total}} klaar",
+    "progress": "{{done}} van {{total}} sub-agents klaar",
     "needsYou_one": "{{count}} vraagt aandacht",
     "needsYou_other": "{{count}} vragen aandacht",
     "took": {
@@ -352,10 +352,10 @@
   "subagents": {
     "stop": {
       "task": "Deze taak stoppen",
-      "native": "Deze subagent stoppen",
+      "native": "Deze sub-agent stoppen",
       "mark": "Markeren als gestopt. De CLI kan een losse sub-agent niet stoppen, dus die werkt mogelijk door tot het proces van de chat eindigt."
     },
-    "stale": "Deze subagent hoort bij een proces dat al gestopt is.",
+    "stale": "Deze sub-agent hoort bij een proces dat al gestopt is.",
     "title": "Sub-agents",
     "backToMain": "Terug naar de main agent",
     "loading": "Gesprek laden…",

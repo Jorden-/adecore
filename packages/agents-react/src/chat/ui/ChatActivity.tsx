@@ -107,7 +107,7 @@ function Flyout({ icon, label, heading = label, children }: { icon: ReactNode; l
         <Popover.Root>
             <Surface
                 render={<Popover.Trigger />}
-                className="pointer-events-auto inline-flex h-7.5 items-center gap-1.5 rounded-full px-3 text-xs text-text-muted hover:text-text"
+                className="pointer-events-auto inline-flex h-7.5 items-center gap-1.5 rounded-full px-3 text-xs text-text-muted tabular-nums hover:text-text"
             >
                 {icon}
                 {label}
