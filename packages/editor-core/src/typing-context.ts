@@ -13,6 +13,7 @@ import {
     startsExpressionAfter,
     startsWord
 } from './lexical.ts';
+import { scanPhpMarkup } from './php-markup.ts';
 import type { DocumentLine } from './rope.ts';
 
 export interface TypingBracket {
@@ -43,6 +44,10 @@ export interface TypingContext {
     word: string;
     /* Where the comment the lexer is in began, in the document. */
     commentStart?: number;
+    /* PHP preserves these fields while code inside an attribute or raw block runs. */
+    markup?: 'text' | 'tag' | 'equals' | 'value' | 'comment' | 'raw';
+    markupQuote?: '"' | "'";
+    element?: 'script' | 'style';
 }
 
 interface Rules {
@@ -234,14 +239,7 @@ function scan(text: string, end: number, start: TypingContext, rules: Rules, off
             state.commentStart = undefined;
             at = tag + 1;
         } else if (state.mode === 'html') {
-            const open = PHP_OPEN.exec(text.slice(at));
-            if (open === null || at + open.index >= end) {
-                break;
-            }
-            state.mode = 'code';
-            state.expression = true;
-            state.word = '';
-            at += open.index + open[0].length - 1;
+            at = scanPhpMarkup(state, text, at, end);
         } else if (state.mode === 'heredoc') {
             const closing = new RegExp(`^[\\t ]*${state.quote}(?![\\w])`).exec(text);
             if (closing === null) {
@@ -271,7 +269,10 @@ function sameState(left: TypingContext, right: TypingContext): boolean {
         left.bracket === right.bracket &&
         left.expression === right.expression &&
         left.word === right.word &&
-        left.commentStart === right.commentStart
+        left.commentStart === right.commentStart &&
+        left.markup === right.markup &&
+        left.markupQuote === right.markupQuote &&
+        left.element === right.element
     );
 }
 
@@ -337,6 +338,9 @@ export class TypingContexts {
                 next.quote = undefined;
                 next.commentStart = undefined;
                 next.expression = true;
+            }
+            if (next.mode === 'html' && next.markup === 'value' && next.markupQuote === undefined) {
+                next.markup = 'tag';
             }
             next.escaped = false;
             this.states.push(sameState(next, previous) ? previous : next);
