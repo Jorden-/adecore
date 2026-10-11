@@ -16,6 +16,7 @@ import {
     registerTurnJumper,
     setTimelineAtEnd,
     wantsEarlier,
+    type ItemJumpOptions,
     type ReadingAnchor,
     type TurnTarget
 } from '../timeline-scroll';
@@ -222,7 +223,7 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
     const marks = useMemo(() => bookmarkRows(rows, bookmarks ?? [], items ?? {}), [rows, bookmarks, items]);
     const ticks = useMemo(() => ticksOf(rows, marks), [rows, marks]);
     // A message a jump is on its way to; it may first have to open the turn its reply folded into.
-    const [seeking, setSeeking] = useState<{ itemId: string; block?: UiReplyTarget; key: string } | null>(null);
+    const [seeking, setSeeking] = useState<{ itemId: string; block?: UiReplyTarget; key: string; options?: ItemJumpOptions } | null>(null);
     const [landing, setLanding] = useState<{ target: UiReplyTarget; key: string } | null>(null);
     // A turn a jump is on its way to, which waits for the page its messages are on to come in.
     const [revealing, setRevealing] = useState<{ turnId: string; target: TurnTarget } | null>(null);
@@ -451,6 +452,9 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
         if (index !== -1) {
             setSeeking(null);
             showRowAtTop(virtualizer, followRef, index);
+            if (seeking.options?.flash) {
+                useTimelineFlash.getState().flash(seeking.key, seeking.itemId, false);
+            }
             return;
         }
         const item = items?.[seeking.itemId];
@@ -464,12 +468,13 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
             return;
         }
         setSeeking(null);
+        seeking.options?.onMissing?.();
     }, [seeking, rows, items, turns, virtualizer, cursor, loadEarlier, keyOf, chatId]);
     useEffect(
         () =>
-            registerItemJumper(keyOf(chatId), (itemId) => {
+            registerItemJumper(keyOf(chatId), (itemId, options) => {
                 setLanding(null);
-                setSeeking({ itemId, key: keyOf(chatId) });
+                setSeeking({ itemId, key: keyOf(chatId), options });
             }),
         [keyOf, chatId]
     );

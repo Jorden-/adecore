@@ -130,15 +130,23 @@ function waitingJumps<T>(): { register(key: string, jump: (target: T) => void): 
     };
 }
 
-const itemJumps = waitingJumps<string>();
+/* What a jump to an item may ask beyond scrolling to it. */
+export interface ItemJumpOptions {
+    /* Lights the row up once it is in view. */
+    flash?: boolean;
+    /* Runs when the item is nowhere in the thread, after every earlier page has been tried. */
+    onMissing?(): void;
+}
 
-export function registerItemJumper(key: string, jump: (itemId: string) => void): () => void {
-    return itemJumps.register(key, jump);
+const itemJumps = waitingJumps<{ itemId: string; options: ItemJumpOptions }>();
+
+export function registerItemJumper(key: string, jump: (itemId: string, options: ItemJumpOptions) => void): () => void {
+    return itemJumps.register(key, ({ itemId, options }) => jump(itemId, options));
 }
 
 /* False when that chat has no thread on screen; the jump then waits for the next one that registers. */
-export function jumpToTimelineItem(key: string, itemId: string): boolean {
-    return itemJumps.jump(key, itemId);
+export function jumpToTimelineItem(key: string, itemId: string, options: ItemJumpOptions = {}): boolean {
+    return itemJumps.jump(key, { itemId, options });
 }
 
 /* Which part of a turn a jump lands on: the message that opened it, or the files it changed. */

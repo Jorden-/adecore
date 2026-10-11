@@ -14,12 +14,22 @@ export interface ChatDraft {
     attachments: ChatAttachmentUpload[];
     /* A piece of an answer that goes above the text as a blockquote; empty for none. */
     quote: string;
+    /* The reply the quote was taken from; null when the quote names none. */
+    quoteSource: string | null;
 }
 
-export const EMPTY_DRAFT: ChatDraft = { text: '', mentions: [], skills: [], chats: [], attachments: [], quote: '' };
+export const EMPTY_DRAFT: ChatDraft = { text: '', mentions: [], skills: [], chats: [], attachments: [], quote: '', quoteSource: null };
 
 // Older records only had text; the rest is filled in on read.
-type DraftRecord = { text: string; mentions?: string[]; skills?: string[]; chats?: string[]; attachments?: ChatAttachmentUpload[]; quote?: string };
+type DraftRecord = {
+    text: string;
+    mentions?: string[];
+    skills?: string[];
+    chats?: string[];
+    attachments?: ChatAttachmentUpload[];
+    quote?: string;
+    quoteSource?: string;
+};
 
 const storage = persistedJson<Record<string, DraftRecord>>(
     storageKey,
@@ -63,7 +73,8 @@ export function readDraft(chatId: string): ChatDraft {
               skills: record.skills ?? [],
               chats: record.chats ?? [],
               attachments: record.attachments ?? [],
-              quote: record.quote ?? ''
+              quote: record.quote ?? '',
+              quoteSource: record.quoteSource ?? null
           }
         : EMPTY_DRAFT;
 }
@@ -82,13 +93,21 @@ export function writeDraft(chatId: string, draft: ChatDraft): void {
         skills: draft.skills,
         chats: draft.chats,
         attachments: draft.attachments,
-        quote: draft.quote
+        quote: draft.quote,
+        ...(draft.quoteSource === null ? {} : { quoteSource: draft.quoteSource })
     };
     if (storage.write(drafts)) {
         return;
     }
     // A file can outgrow the storage quota; the text is the part worth keeping then.
-    drafts[chatId] = { text: draft.text, mentions: draft.mentions, skills: draft.skills, chats: draft.chats, quote: draft.quote };
+    drafts[chatId] = {
+        text: draft.text,
+        mentions: draft.mentions,
+        skills: draft.skills,
+        chats: draft.chats,
+        quote: draft.quote,
+        ...(draft.quoteSource === null ? {} : { quoteSource: draft.quoteSource })
+    };
     storage.write(drafts);
 }
 
@@ -108,7 +127,7 @@ function union(first: readonly string[], second: readonly string[]): string[] {
  */
 export function takeBackIntoDraft(
     current: ChatDraft,
-    taken: Omit<ChatDraft, 'quote'>
+    taken: Omit<ChatDraft, 'quote' | 'quoteSource'>
 ): { draft: ChatDraft; rejected: Array<{ name: string; reason: string }> } {
     const checked = checkAttachmentLimits(
         current.attachments.length,
@@ -122,7 +141,8 @@ export function takeBackIntoDraft(
             skills: union(taken.skills, current.skills),
             chats: union(taken.chats, current.chats),
             attachments: [...checked.accepted.map((entry) => entry.upload), ...current.attachments],
-            quote: current.quote
+            quote: current.quote,
+            quoteSource: current.quoteSource
         },
         rejected: checked.rejected
     };

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { CHAT_ATTACHMENTS_MAX_COUNT } from '@adecore/agent-contracts';
-import { EMPTY_DRAFT, joinDraftText, offerDraft, takeBackIntoDraft, takeDraftOffers } from './drafts';
+import { EMPTY_DRAFT, joinDraftText, offerDraft, readDraft, takeBackIntoDraft, takeDraftOffers, writeDraft } from './drafts';
 
 describe('text offered to a chat prompt', () => {
     test('goes under what was typed, never over it', () => {
@@ -24,7 +24,7 @@ describe('a queued message taken back to edit', () => {
 
     test('fills an empty composer as it was queued', () => {
         const taken = { text: 'see @src/a.ts', mentions: ['src/a.ts'], skills: ['review'], chats: ['chat-a'], attachments: [upload('a.txt')] };
-        expect(takeBackIntoDraft(EMPTY_DRAFT, taken)).toEqual({ draft: { ...taken, quote: '' }, rejected: [] });
+        expect(takeBackIntoDraft(EMPTY_DRAFT, taken)).toEqual({ draft: { ...taken, quote: '', quoteSource: null }, rejected: [] });
     });
 
     test('goes above what was typed since, with a blank line between, joins its mentions, chats and files, and leaves the quote in place', () => {
@@ -34,7 +34,8 @@ describe('a queued message taken back to edit', () => {
             skills: [],
             chats: ['chat-b', 'chat-a'],
             attachments: [upload('b.txt')],
-            quote: 'The cache is per machine.'
+            quote: 'The cache is per machine.',
+            quoteSource: 'answer-1'
         };
         const taken = { text: 'see @src/a.ts\n', mentions: ['src/a.ts'], skills: ['review'], chats: ['chat-a'], attachments: [upload('a.txt')] };
         expect(takeBackIntoDraft(current, taken).draft).toEqual({
@@ -43,7 +44,8 @@ describe('a queued message taken back to edit', () => {
             skills: ['review'],
             chats: ['chat-a', 'chat-b'],
             attachments: [upload('a.txt'), upload('b.txt')],
-            quote: 'The cache is per machine.'
+            quote: 'The cache is per machine.',
+            quoteSource: 'answer-1'
         });
     });
 
@@ -54,4 +56,10 @@ describe('a queued message taken back to edit', () => {
         expect(merged.draft.attachments[0]?.name).toBe('fits.txt');
         expect(merged.rejected).toEqual([{ name: 'over.txt', reason: `At most ${CHAT_ATTACHMENTS_MAX_COUNT} files per message` }]);
     });
+});
+
+test('the source of a quote survives a write and a read', () => {
+    writeDraft('chat-quote', { ...EMPTY_DRAFT, text: 'Why?', quote: 'One.', quoteSource: 'answer-1' });
+    expect(readDraft('chat-quote')).toMatchObject({ quote: 'One.', quoteSource: 'answer-1' });
+    writeDraft('chat-quote', EMPTY_DRAFT);
 });

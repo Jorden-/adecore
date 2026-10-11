@@ -52,7 +52,7 @@ import { PROMPT_MAX_CHARS, pasteBecomesAttachment, pastedTextName, promptGuard, 
 import { withQuote } from '../quote';
 import { rememberChatAccount, rememberChatPreferences, rememberChatSelection } from '../preferences';
 import { STASH_SHORTCUT, stashDraft, type StashedPrompt, useStash } from '../stash';
-import { pageTimeline, scrollTimelineToEnd, subscribeTimelineEnd, timelineAtEnd } from '../timeline-scroll';
+import { jumpToTimelineItem, pageTimeline, scrollTimelineToEnd, subscribeTimelineEnd, timelineAtEnd } from '../timeline-scroll';
 import { ChatActivity } from './ChatActivity';
 import { ChatReferenceChip } from './ChatReferenceChip';
 import { chipDecorations } from './composer/chips';
@@ -294,6 +294,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
     const queue = info.queue ?? [];
     const text = draft.text;
     const quote = draft.quote;
+    const quoteSource = draft.quoteSource;
     // The CLI announces its session on the first message, so anything before that is still a blank chat.
     const started = info.agentSessionId !== null || info.usage.turns > 0;
     const accountChoice = useAccountChoice(info.provider, info.account);
@@ -326,8 +327,8 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
 
     useEffect(
         () =>
-            registerQuoteTaker?.((selected) => {
-                setDraft((current) => ({ ...current, quote: selected }));
+            registerQuoteTaker?.((selected, itemId) => {
+                setDraft((current) => ({ ...current, quote: selected, quoteSource: itemId }));
                 inputRef.current?.focus();
             }),
         [registerQuoteTaker]
@@ -471,7 +472,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
     };
 
     const removeQuote = (): void => {
-        setDraft((current) => ({ ...current, quote: '' }));
+        setDraft((current) => ({ ...current, quote: '', quoteSource: null }));
         inputRef.current?.focus();
     };
 
@@ -713,6 +714,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
             mentions: presentMentions(trimmed, draft.mentions),
             skills: presentSkills(trimmed, draft.skills),
             chats: draft.chats,
+            quoteSource: quote !== '' && quoteSource !== null ? { itemId: quoteSource } : undefined,
             attachments: draft.attachments
         });
         clearDraft();
@@ -721,9 +723,20 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
         setHistoryIndex(null);
     };
 
-    /* A stashed prompt comes back as text, mentions and skills; its files were never kept. */
+    /*
+     * A stashed prompt comes back as text, mentions and skills; its files were never kept. Its quote
+     * keeps leading to its reply in the chat it came from, and is plain text in any other.
+     */
     const restoreStashed = (prompt: StashedPrompt): void => {
-        setDraft((current) => ({ ...current, text: prompt.text, mentions: [...prompt.mentions], skills: [...prompt.skills] }));
+        const stashedQuote = prompt.quote;
+        const here = stashedQuote !== undefined && stashedQuote.chatId === chatId;
+        setDraft((current) => ({
+            ...current,
+            text: stashedQuote === undefined || here ? prompt.text : withQuote(stashedQuote.text, prompt.text),
+            mentions: [...prompt.mentions],
+            skills: [...prompt.skills],
+            ...(here ? { quote: stashedQuote.text, quoteSource: stashedQuote.itemId } : {})
+        }));
         setHistoryIndex(null);
         inputRef.current?.focus();
     };
@@ -756,7 +769,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                 failed(e);
                 return;
             }
-            const taken: Omit<ChatDraft, 'quote'> = {
+            const taken: Omit<ChatDraft, 'quote' | 'quoteSource'> = {
                 text: message.text,
                 mentions: message.mentions ?? [],
                 skills: message.skills ?? [],
@@ -800,7 +813,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
             }
             return;
         }
-        if (stashDraft(draft)) {
+        if (stashDraft(draft, chatId)) {
             clearDraft();
             setMention(null);
             setSkillQuery(null);
@@ -1257,7 +1270,24 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                     )}
                     {quote !== '' && (
                         <div className="flex items-center gap-2 px-5 pt-4 @max-md/composer:px-3.5 @max-md/composer:pt-3">
-                            <span className="min-w-0 grow truncate border-l-2 border-border-strong pl-2.5 text-xs text-text-muted">{quote}</span>
+                            {quoteSource === null ? (
+                                <span className="min-w-0 grow truncate border-l-2 border-border-strong pl-2.5 text-xs text-text-muted">{quote}</span>
+                            ) : (
+                                <Tooltip label={t('composer.quote.goToSource')}>
+                                    <button
+                                        type="button"
+                                        className="min-w-0 grow truncate border-l-2 border-border-strong pl-2.5 text-left text-xs text-text-muted hover:text-text"
+                                        onClick={() =>
+                                            jumpToTimelineItem(scope.keyOf(chatId), quoteSource, {
+                                                flash: true,
+                                                onMissing: () => setNotice(t('rows.user.quoteGone'))
+                                            })
+                                        }
+                                    >
+                                        {quote}
+                                    </button>
+                                </Tooltip>
+                            )}
                             <IconButton icon={X} size="2xs" label={t('composer.quote.remove')} onClick={removeQuote} />
                         </div>
                     )}

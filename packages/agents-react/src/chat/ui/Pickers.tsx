@@ -247,7 +247,7 @@ export function StashPicker({ onRestore }: { onRestore(prompt: StashedPrompt): v
                                 className="flex min-w-0 grow flex-col gap-0.5 rounded-md px-2 py-1.5 text-left text-xs text-text-muted hover:bg-surface-hover hover:text-text"
                                 onClick={() => onRestore(prompt)}
                             >
-                                <span className="line-clamp-2 whitespace-pre-wrap">{prompt.text || t('pickers.stash.noText')}</span>
+                                <span className="line-clamp-2 whitespace-pre-wrap">{prompt.text || prompt.quote?.text || t('pickers.stash.noText')}</span>
                                 {prompt.attachments.length > 0 && (
                                     <span className="text-text-faint">{t('pickers.stash.files', { count: prompt.attachments.length })}</span>
                                 )}

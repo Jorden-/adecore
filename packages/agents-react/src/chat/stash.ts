@@ -27,7 +27,15 @@ export interface StashedPrompt {
     mentions: string[];
     skills: string[];
     attachments: StashedAttachment[];
+    /* A quote that knew its reply, kept apart from the text so it can lead back to it in the chat it came from. */
+    quote?: StashedQuote;
     createdAt: number;
+}
+
+export interface StashedQuote {
+    text: string;
+    chatId: string;
+    itemId: string;
 }
 
 function strings(value: unknown): string[] {
@@ -43,6 +51,18 @@ function attachments(value: unknown): StashedAttachment[] {
         mime: typeof entry.mime === 'string' ? entry.mime : '',
         size: typeof entry.size === 'number' ? entry.size : 0
     }));
+}
+
+function stashedQuote(value: unknown): StashedQuote | undefined {
+    if (!isRecord(value) || typeof value.text !== 'string' || typeof value.chatId !== 'string' || typeof value.itemId !== 'string') {
+        return undefined;
+    }
+    return { text: value.text, chatId: value.chatId, itemId: value.itemId };
+}
+
+function stashedQuoteField(value: unknown): { quote?: StashedQuote } {
+    const quote = stashedQuote(value);
+    return quote === undefined ? {} : { quote };
 }
 
 /* Only the fields we know today, so anything an older or a broken write left behind falls away here. */
@@ -64,6 +84,7 @@ export function parseStash(raw: string | null): StashedPrompt[] {
                 mentions: strings(entry.mentions),
                 skills: strings(entry.skills),
                 attachments: attachments(entry.attachments),
+                ...stashedQuoteField(entry.quote),
                 createdAt: typeof entry.createdAt === 'number' ? entry.createdAt : 0
             }))
             .slice(0, STASH_LIMIT);
@@ -77,14 +98,19 @@ export function withStashed(prompts: StashedPrompt[], entry: StashedPrompt): Sta
     return [entry, ...prompts].slice(0, STASH_LIMIT);
 }
 
-/* What a draft looks like on the shelf, its quote folded into the text; null when there is nothing worth putting there. */
-export function stashedFrom(draft: ChatDraft, id: string, now: number): StashedPrompt | null {
+/*
+ * What a draft looks like on the shelf; null when there is nothing worth putting there. A quote that
+ * knows its reply stays apart, since it leads back to that reply in `chatId`; any other is folded into the text.
+ */
+export function stashedFrom(draft: ChatDraft, id: string, now: number, chatId: string): StashedPrompt | null {
     if (isEmptyDraft(draft)) {
         return null;
     }
+    const kept = draft.quote !== '' && draft.quoteSource !== null;
     return {
         id,
-        text: withQuote(draft.quote, draft.text),
+        text: kept ? draft.text : withQuote(draft.quote, draft.text),
+        ...(kept ? { quote: { text: draft.quote, chatId, itemId: draft.quoteSource! } } : {}),
         mentions: [...draft.mentions],
         skills: [...draft.skills],
         attachments: draft.attachments.map((attachment) => ({ name: attachment.name, mime: attachment.mime, size: uploadBytes(attachment) })),
@@ -106,8 +132,8 @@ function write(prompts: StashedPrompt[]): void {
 }
 
 /* Puts a draft on the shelf; false when the composer held nothing to put there. */
-export function stashDraft(draft: ChatDraft): boolean {
-    const entry = stashedFrom(draft, `stash-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, Date.now());
+export function stashDraft(draft: ChatDraft, chatId: string): boolean {
+    const entry = stashedFrom(draft, `stash-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, Date.now(), chatId);
     if (!entry) {
         return false;
     }

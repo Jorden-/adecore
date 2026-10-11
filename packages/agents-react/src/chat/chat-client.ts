@@ -4,6 +4,7 @@ import type {
     ChatAttachResult,
     ChatBookmark,
     ChatPreferencesPayload,
+    ChatQuoteSource,
     ChatSkill,
     ChatVisual,
     ModelSelection,
@@ -35,6 +36,8 @@ export interface ChatSendExtras {
     skills?: string[];
     /* Chats of the project picked with `@`; only their ids travel, the agent reads them itself. */
     chats?: string[];
+    /* The reply a quote at the head of the text was taken from. */
+    quoteSource?: ChatQuoteSource;
     attachments?: ChatAttachmentUpload[];
 }
 
@@ -174,6 +177,7 @@ export class ChatClient {
             mentions: extras.mentions,
             skills: extras.skills,
             chats: extras.chats,
+            quoteSource: extras.quoteSource,
             attachments: extras.attachments
         });
     }

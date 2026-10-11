@@ -4,7 +4,8 @@ import { quoteOf } from '../quote';
 /* The text of an answer (`rows/MessageRows.tsx`), the only part of a thread a selection quotes from. */
 const ANSWER = '[data-quote-answer]';
 
-export type QuoteTaker = (quote: string) => void;
+/* `itemId` is the reply the quote came from, when the selection sits in a row that names one. */
+export type QuoteTaker = (quote: string, itemId: string | null) => void;
 
 /* Registers the composer below a thread as the one its quote button hands a quote to, until the returned call. */
 export const QuoteTakerContext = createContext<((take: QuoteTaker) => () => void) | null>(null);
@@ -35,8 +36,8 @@ function selectsOutside(range: Range, answer: Element): boolean {
     return false;
 }
 
-/* The quote the selection makes, when it lies in one answer of this thread. */
-export function selectedAnswerQuote(selection: Selection | null, thread: HTMLElement | null): string | null {
+/* The quote the selection makes, when it lies in one answer of this thread, and the reply it was taken from. */
+export function selectedAnswerQuote(selection: Selection | null, thread: HTMLElement | null): { text: string; itemId: string | null } | null {
     if (thread === null || selection === null || selection.isCollapsed || selection.rangeCount === 0) {
         return null;
     }
@@ -49,5 +50,6 @@ export function selectedAnswerQuote(selection: Selection | null, thread: HTMLEle
     if (!inside && selectsOutside(range, answer)) {
         return null;
     }
-    return quoteOf(selection.toString());
+    const text = quoteOf(selection.toString());
+    return text === null ? null : { text, itemId: answer.closest('[data-find-item]')?.getAttribute('data-find-item') ?? null };
 }

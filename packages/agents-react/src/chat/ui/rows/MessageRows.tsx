@@ -16,6 +16,8 @@ import { fileBadge, formatBytes, isImageAttachment } from '../../attachments';
 import { useChatRow, useCurrentItem } from '../../../state/chats';
 import { chatHost } from '../../../host';
 import { useChatScope } from '../../../scope';
+import { splitQuote } from '../../quote';
+import { jumpToTimelineItem } from '../../timeline-scroll';
 import { useProviders } from '../../../state/providers';
 import { ChatReferenceChip } from '../ChatReferenceChip';
 import { ImageThumb } from '../ImageView';
@@ -87,7 +89,19 @@ export function UserRow({ chatId, item }: { chatId: string; item: ChatUserItem }
     const long = item.text.split('\n').length > USER_FOLD_LINES || item.text.length > USER_FOLD_CHARS;
     const attachments = item.attachments ?? [];
     const chats = item.chats ?? [];
+    const [missing, setMissing] = useState(false);
+    const { keyOf } = useChatScope();
     useOpenForFind(item.id, 'text', setOpen);
+    // A quote only leads somewhere when the message still opens with the blockquote it was sent with.
+    const quoted = item.quoteSource === undefined ? null : splitQuote(item.text);
+    const source = item.quoteSource?.itemId;
+
+    function goToSource(): void {
+        if (source !== undefined) {
+            setMissing(false);
+            jumpToTimelineItem(keyOf(chatId), source, { flash: true, onMissing: () => setMissing(true) });
+        }
+    }
     return (
         <div data-find-item={item.id} className="flex flex-col items-end">
             <MessageHeading>{t('rows.user.heading')}</MessageHeading>
@@ -113,7 +127,29 @@ export function UserRow({ chatId, item }: { chatId: string; item: ChatUserItem }
             {item.text !== '' && (
                 <div className="relative max-w-[80%] rounded-2xl bg-surface-active px-3.5 py-2.5 text-sm wrap-anywhere text-text select-text">
                     <div data-find-field="text" className={clsx(long && !open && FOLD)}>
-                        <MessageMarkdown text={item.text} mentions={item.mentions} skills={item.skills} />
+                        {quoted !== null && source !== undefined ? (
+                            <>
+                                {/* A div, since the quote is block markdown and a button holds none. */}
+                                <div
+                                    role="button"
+                                    tabIndex={0}
+                                    className="mb-2 cursor-pointer border-l-2 border-border-strong pl-2.5 text-text-muted hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+                                    onClick={goToSource}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            goToSource();
+                                        }
+                                    }}
+                                >
+                                    <MessageMarkdown text={quoted.quote} />
+                                </div>
+                                {missing && <div className="mb-2 text-xs text-text-faint">{t('rows.user.quoteGone')}</div>}
+                                {quoted.rest !== '' && <MessageMarkdown text={quoted.rest} mentions={item.mentions} skills={item.skills} />}
+                            </>
+                        ) : (
+                            <MessageMarkdown text={item.text} mentions={item.mentions} skills={item.skills} />
+                        )}
                     </div>
                     {long && (
                         <button className="mt-1 flex items-center gap-1 text-xs text-text-muted hover:text-text" onClick={() => setOpen((o) => !o)}>

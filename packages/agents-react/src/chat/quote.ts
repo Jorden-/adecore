@@ -24,3 +24,23 @@ export function withQuote(quote: string, message: string): string {
         .join('\n');
     return message === '' ? block : `${block}\n\n${message}`;
 }
+
+/*
+ * The inverse of `withQuote`: the quote a message opens with and what follows it. Null when the text
+ * does not open with a blockquote that ends on a blank line or the end of the text.
+ */
+export function splitQuote(text: string): { quote: string; rest: string } | null {
+    const lines = text.split('\n');
+    let end = 0;
+    while (end < lines.length && (lines[end] === '>' || lines[end]!.startsWith('> '))) {
+        end += 1;
+    }
+    if (end === 0 || (end < lines.length && lines[end] !== '')) {
+        return null;
+    }
+    const quote = lines
+        .slice(0, end)
+        .map((line) => line.slice(2))
+        .join('\n');
+    return { quote, rest: lines.slice(end + 1).join('\n') };
+}

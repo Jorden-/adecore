@@ -91,7 +91,8 @@
     "user": {
       "heading": "Jij",
       "showAll": "Alles tonen",
-      "showLess": "Minder tonen"
+      "showLess": "Minder tonen",
+      "quoteGone": "Het antwoord waar dit citaat vandaan kwam, staat niet meer in deze chat."
     },
     "report": {
       "heading": "Rapport"
@@ -306,7 +307,8 @@
     },
     "quote": {
       "add": "Citeren",
-      "remove": "Citaat verwijderen"
+      "remove": "Citaat verwijderen",
+      "goToSource": "Naar het antwoord"
     },
     "removeAttachment": "{{name}} verwijderen",
     "attach": "Bestanden toevoegen",

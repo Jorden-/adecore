@@ -50,9 +50,10 @@ describe('stashedFrom', () => {
             skills: ['unslop'],
             chats: [],
             attachments: [{ name: 'shot.png', mime: 'image/png', data: 'AAAA' }],
-            quote: ''
+            quote: '',
+            quoteSource: null
         };
-        expect(stashedFrom(draft, 'id-1', 5)).toEqual({
+        expect(stashedFrom(draft, 'id-1', 5, 'chat-a')).toEqual({
             id: 'id-1',
             text: 'look at @src/a.ts',
             mentions: ['src/a.ts'],
@@ -63,11 +64,26 @@ describe('stashedFrom', () => {
     });
 
     test('keeps a quote as the blockquote it would have been sent as', () => {
-        expect(stashedFrom({ ...EMPTY_DRAFT, text: 'Why?', quote: 'One.' }, 'id-1', 5)?.text).toBe('> One.\n\nWhy?');
+        expect(stashedFrom({ ...EMPTY_DRAFT, text: 'Why?', quote: 'One.' }, 'id-1', 5, 'chat-a')?.text).toBe('> One.\n\nWhy?');
+    });
+
+    test('keeps a quote with a source apart, with the chat it came from', () => {
+        const stashed = stashedFrom({ ...EMPTY_DRAFT, text: 'Why?', quote: 'One.', quoteSource: 'answer-1' }, 'id-1', 5, 'chat-a');
+        expect(stashed).toMatchObject({ text: 'Why?', quote: { text: 'One.', chatId: 'chat-a', itemId: 'answer-1' } });
+    });
+
+    test('a stashed quote survives parsing, and a broken one falls away', () => {
+        const raw = JSON.stringify([
+            { id: 'a', text: 'x', quote: { text: 'One.', chatId: 'chat-a', itemId: 'answer-1' } },
+            { id: 'b', text: 'x', quote: { text: 'One.' } }
+        ]);
+        const [first, second] = parseStash(raw);
+        expect(first?.quote).toEqual({ text: 'One.', chatId: 'chat-a', itemId: 'answer-1' });
+        expect(second).not.toHaveProperty('quote');
     });
 
     test('a draft with nothing in it is not worth a slot', () => {
-        expect(stashedFrom(EMPTY_DRAFT, 'id-1', 5)).toBeNull();
-        expect(stashedFrom({ ...EMPTY_DRAFT, text: '   ' }, 'id-1', 5)).toBeNull();
+        expect(stashedFrom(EMPTY_DRAFT, 'id-1', 5, 'chat-a')).toBeNull();
+        expect(stashedFrom({ ...EMPTY_DRAFT, text: '   ' }, 'id-1', 5, 'chat-a')).toBeNull();
     });
 });

@@ -10,6 +10,7 @@ const EDGE_PX = 40;
 
 interface Offer {
     quote: string;
+    itemId: string | null;
     x: number;
     y: number;
 }
@@ -52,7 +53,7 @@ export function QuoteButton({
             const zoom = box.offsetWidth > 0 ? bounds.width / box.offsetWidth : 1;
             const x = Math.min(Math.max((line.right - bounds.left) / zoom, EDGE_PX), box.offsetWidth - EDGE_PX);
             const y = (line.bottom - bounds.top) / zoom + GAP_PX;
-            setOffer({ quote, x: Math.round(x), y: Math.round(y) });
+            setOffer({ quote: quote.text, itemId: quote.itemId, x: Math.round(x), y: Math.round(y) });
         };
         const press = (): void => {
             pressed = true;
@@ -91,7 +92,7 @@ export function QuoteButton({
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
                 document.getSelection()?.removeAllRanges();
-                taker.current?.(offer.quote);
+                taker.current?.(offer.quote, offer.itemId);
                 setOffer(null);
             }}
         >

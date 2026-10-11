@@ -91,7 +91,8 @@
     "user": {
       "heading": "You",
       "showAll": "Show all",
-      "showLess": "Show less"
+      "showLess": "Show less",
+      "quoteGone": "The reply this quote came from is no longer in this chat."
     },
     "report": {
       "heading": "Report"
@@ -306,7 +307,8 @@
     },
     "quote": {
       "add": "Quote",
-      "remove": "Remove quote"
+      "remove": "Remove quote",
+      "goToSource": "Go to the reply"
     },
     "removeAttachment": "Remove {{name}}",
     "attach": "Attach files",

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { quoteOf, withQuote } from './quote';
+import { quoteOf, splitQuote, withQuote } from './quote';
 
 describe('the text a selection quotes', () => {
     test('is nothing when only whitespace is selected', () => {
@@ -28,5 +28,22 @@ describe('a message with a quote', () => {
 
     test('is only the blockquote when nothing was typed', () => {
         expect(withQuote('One.', '')).toBe('> One.');
+    });
+});
+
+describe('a message split into its quote and the rest', () => {
+    test('is the inverse of withQuote, blank lines inside the quote included', () => {
+        const quote = 'One.\n\nTwo.\n    code';
+        expect(splitQuote(withQuote(quote, 'Why?\n\nAnd more.'))).toEqual({ quote, rest: 'Why?\n\nAnd more.' });
+    });
+
+    test('is only the quote when nothing was typed', () => {
+        expect(splitQuote(withQuote('One.', ''))).toEqual({ quote: 'One.', rest: '' });
+    });
+
+    test('is nothing for a message that does not open with a quote', () => {
+        expect(splitQuote('Why?')).toBeNull();
+        expect(splitQuote('>no space')).toBeNull();
+        expect(splitQuote('> One.\nno blank line')).toBeNull();
     });
 });
