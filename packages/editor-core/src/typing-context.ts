@@ -50,6 +50,8 @@ export interface TypingContext {
     element?: 'script' | 'style' | 'textarea' | 'title';
     embed?: TypingContext;
     embedded?: 'javascript';
+    /* Only a scan result keeps this; PHP consumes the newline immediately after a closing tag. */
+    phpClose?: number;
 }
 
 interface Rules {
@@ -164,6 +166,7 @@ function scanCode(state: TypingContext, rules: Rules, text: string, at: number, 
         }
     }
     if (rules.php && char === '?' && next === '>') {
+        state.phpClose = offset + at + 2;
         state.mode = 'html';
         return at + 1;
     }
@@ -262,6 +265,7 @@ function scan(text: string, end: number, start: TypingContext, rules: Rules, off
             if (tag < 0 || tag >= end) {
                 break;
             }
+            state.phpClose = offset + tag + 2;
             state.mode = 'html';
             state.commentStart = undefined;
             at = tag + 1;
@@ -300,6 +304,7 @@ function sameState(left: TypingContext, right: TypingContext): boolean {
         left.markup === right.markup &&
         left.markupQuote === right.markupQuote &&
         left.element === right.element &&
+        left.phpClose === right.phpClose &&
         (left.embed === right.embed || (left.embed !== undefined && right.embed !== undefined && sameState(left.embed, right.embed)))
     );
 }
@@ -361,9 +366,10 @@ export class TypingContexts {
             const source = this.line(this.states.length - 1);
             const next = scan(source.text, source.text.length, previous, rules, source.start);
             // A PHP island's source newlines are not newlines in the emitted script.
-            if (next.mode === 'html' && next.embed !== undefined) {
+            if (next.mode === 'html' && next.embed !== undefined && next.phpClose !== source.end) {
                 normalizeLine(next.embed, false);
             }
+            next.phpClose = undefined;
             normalizeLine(next, /^(php|rust|rs)$/i.test(id));
             if (next.mode === 'html' && next.markup === 'value' && next.markupQuote === undefined) {
                 next.markup = 'tag';

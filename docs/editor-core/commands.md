@@ -22,7 +22,7 @@ document.typeText(';', { language: 'typescript' });
 document.getText(); // 'call(x);'
 ```
 
-PHP script bodies use JavaScript comments, regexes, template literals and bracket stacks. PHP-only arrows, hash comments, heredocs and concatenation stay within PHP islands. Enter within a script string uses `+`; Enter within a PHP string uses `.`. A literal `</script>` ends the script even within a script string or comment, following HTML. The lexical editor treats `<script ... />` as self-closing and does not inspect its `type` attribute: all non-self-closing script bodies use JavaScript rules.
+PHP script bodies use JavaScript comments, regexes, template literals and bracket stacks. PHP-only arrows, hash comments, heredocs and concatenation stay within PHP islands. Enter within a script string uses `+`; Enter within a PHP string uses `.`. PHP source newlines inside an island do not reset the script context. The one newline immediately after a PHP closing tag is also consumed, as described by the [PHP manual](https://www.php.net/manual/en/language.basic-syntax.instruction-separation.php); a trailing space makes that newline script text again. A literal `</script>` ends the script even within a script string or comment, following HTML. The lexical editor treats `<script ... />` as self-closing and does not inspect its `type` attribute: all non-self-closing script bodies use JavaScript rules.
 
 Nothing pairs in plain text (`text`, `plaintext`, `txt` or `log`), inside a comment, or inside a string. Longer text is inserted as it is. Consecutive calls join one undo step, the `typing` group.
 

@@ -120,3 +120,14 @@ test('script queries do not mutate the state cached at the start of a line', () 
     expect(contexts.at(2, 0, 'php').mode).toBe('code');
     expect(contexts.at(1, 0, 'php').mode).toBe('code');
 });
+
+test('a real PHP closing tag consumes exactly its immediately trailing newline', () => {
+    for (const newline of ['\n', '\r\n']) {
+        expect(context('<script>// note <?php $x = 1; ?>' + newline + '¦call();</script>')).toMatchObject({ mode: 'line-comment', embedded: 'javascript' });
+        expect(context('<script>// note <?php $x = 1; ?>' + newline + newline + '¦call();</script>')).toMatchObject({ mode: 'code', embedded: 'javascript' });
+        expect(context('<script>// note <?php $x = 1; ?> ' + newline + '¦call();</script>')).toMatchObject({ mode: 'code', embedded: 'javascript' });
+    }
+    expect(context('<script>// note <?php // PHP note ?>\n¦call();</script>')).toMatchObject({ mode: 'line-comment', embedded: 'javascript' });
+    expect(context("<script>let value = '<?= $value ?>\n¦';</script>")).toMatchObject({ mode: 'quote', embedded: 'javascript' });
+    expect(context('<script>// ?>\n¦call();</script>')).toMatchObject({ mode: 'code', embedded: 'javascript' });
+});

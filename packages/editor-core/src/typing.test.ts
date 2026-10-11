@@ -512,3 +512,8 @@ it('keeps tag-like text in PHP title and textarea contents literal', () => {
         type('<' + tag + '>text</' + tag + '><a href=¦>', '"', '<' + tag + '>text</' + tag + '><a href="¦">', { language: 'php' });
     }
 });
+
+it('does not pair inside a script comment continued over a PHP-consumed newline', () => {
+    type('<script>// note <?php $value = 1; ?>\ncall¦</script>', '(', '<script>// note <?php $value = 1; ?>\ncall(¦</script>', { language: 'php' });
+    type('<script>// note <?php $value = 1; ?>\n\ncall¦</script>', '(', '<script>// note <?php $value = 1; ?>\n\ncall(¦)</script>', { language: 'php' });
+});
