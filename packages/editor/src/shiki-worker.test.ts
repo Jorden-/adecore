@@ -14,8 +14,13 @@ const DOCUMENT: DiffSyntaxDocument = { language: 'typescript', theme: THEME, blo
 
 function harness(highlighter: Highlighter, pause: () => Promise<void> = async () => undefined) {
     const messages: DiffSyntaxOutput[] = [];
+    // Protocol assertions bypass the wall-clock deadline; limit forwarding is tested separately.
+    const untimed: Highlighter = {
+        ...highlighter,
+        codeToTokensBase: (code, options) => highlighter.codeToTokensBase(code, { ...options, tokenizeTimeLimit: 0 })
+    };
     const service = createSyntaxService({
-        highlighter: async () => highlighter,
+        highlighter: async () => untimed,
         yield: pause,
         send(message, transfer) {
             // A real worker detaches the outgoing buffers; repeat requests must still work afterward.
@@ -81,7 +86,7 @@ describe('diff syntax service', () => {
         const { service, tokens } = harness(highlighter);
         const block = 'const cat = "😺";\r\nconst number = 42;';
         await service.handle({ type: 'request', generation: 1, index: 0, document: { ...DOCUMENT, blocks: [block] } });
-        const expected = highlighter.codeToTokensBase(block, { lang: 'typescript', theme: THEME });
+        const expected = highlighter.codeToTokensBase(block, { lang: 'typescript', theme: THEME, tokenizeTimeLimit: 0 });
         expect(slices(tokens()[0]!, block)).toEqual(
             expected.map((line) => line.map((token) => ({ content: token.content, color: token.color ?? '', fontStyle: token.fontStyle ?? 0 })))
         );
@@ -97,7 +102,7 @@ describe('diff syntax service', () => {
             index: 2,
             document: { ...DOCUMENT, blocks: ['/* opening', '', 'const answer = 42;'], resets: [2] }
         });
-        const expected = highlighter.codeToTokensBase(DOCUMENT.blocks[2]!, { lang: 'typescript', theme: THEME });
+        const expected = highlighter.codeToTokensBase(DOCUMENT.blocks[2]!, { lang: 'typescript', theme: THEME, tokenizeTimeLimit: 0 });
         expect(slices(tokens()[0]!, DOCUMENT.blocks[2]!)).toEqual(
             expected.map((line) => line.map((token) => ({ content: token.content, color: token.color ?? '', fontStyle: token.fontStyle ?? 0 })))
         );
