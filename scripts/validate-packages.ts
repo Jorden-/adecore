@@ -1,9 +1,10 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
+import { packPackages } from './pack-packages.ts';
 import { packedEntrypoints } from './packed-artifacts.ts';
-import { dependencyOrder, discoverPackages, repositoryRoot } from './workspaces.ts';
+import { dependencyOrder, discoverPackages, repositoryRoot, type PackageManifest } from './workspaces.ts';
 
 /* What a consumer runs against each packed package that is selected, in this order. */
 const SMOKE_CHECKS: Record<string, string> = {
@@ -52,6 +53,15 @@ const ui = await import('@adecore/ui'); assert.match(renderToStaticMarkup(React.
 const directory = mkdtempSync(join(tmpdir(), 'adecore-pack-'));
 const packages = dependencyOrder(discoverPackages());
 const only = process.argv.slice(2);
+const artifactIndex = only.indexOf('--artifacts');
+let artifacts: string | undefined;
+if (artifactIndex !== -1) {
+    const destination = only.splice(artifactIndex, 2)[1];
+    if (!destination) {
+        throw new Error('--artifacts requires a directory.');
+    }
+    artifacts = resolve(destination);
+}
 const selected = only.length === 0 ? packages : packages.filter((pkg) => only.includes(pkg.manifest.name));
 if (only.some((name) => !selected.some((pkg) => pkg.manifest.name === name))) {
     throw new Error('Every test:pack argument must be a workspace package name.');
@@ -69,34 +79,41 @@ try {
     mkdirSync(nodeModules);
     writeFileSync(join(directory, 'package.json'), JSON.stringify({ private: true, type: 'module' }));
     const entrypoints: string[] = [];
+    const archives: Record<string, string> = artifacts
+        ? JSON.parse(readFileSync(join(artifacts, 'packages.json'), 'utf8'))
+        : await packPackages(selected, directory);
+    const packedManifests = new Map<string, PackageManifest>();
     for (const pkg of selected) {
-        const output = run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', directory], pkg.directory);
-        const [artifact] = JSON.parse(output) as { filename: string; files: { path: string }[] }[];
-        if (!artifact) {
-            throw new Error(`npm pack returned no artifact for ${pkg.manifest.name}.`);
-        }
-        entrypoints.push(
-            ...packedEntrypoints(
-                pkg.manifest,
-                artifact.files.map((file) => file.path)
-            )
-        );
-        if (
-            process.env.ADECORE_REQUIRE_NATIVE_BINARIES === '1' &&
-            pkg.manifest.name.startsWith('@adecore/database-') &&
-            !artifact.files.some((file) => file.path.startsWith('bin/'))
-        ) {
-            throw new Error(`${pkg.manifest.name} is missing its release binary.`);
+        const filename = archives[pkg.manifest.name];
+        if (typeof filename !== 'string' || basename(filename) !== filename) {
+            throw new Error(`No packed artifact for ${pkg.manifest.name}.`);
         }
         const target = join(nodeModules, pkg.manifest.name);
         mkdirSync(target, { recursive: true });
-        run('tar', ['-xzf', join(directory, artifact.filename), '--strip-components=1', '-C', target]);
-        console.log(`Packed ${pkg.manifest.name}: ${artifact.files.length} files, validated all exports.`);
+        run('tar', ['-xzf', join(artifacts ?? directory, filename), '--strip-components=1', '-C', target]);
+        const manifest = JSON.parse(readFileSync(join(target, 'package.json'), 'utf8')) as PackageManifest;
+        if (manifest.name !== pkg.manifest.name) {
+            throw new Error(`Expected ${pkg.manifest.name}, received packed ${manifest.name}.`);
+        }
+        const files = readdirSync(target, { recursive: true, withFileTypes: true })
+            .filter((entry) => entry.isFile())
+            .map((entry) => relative(target, join(entry.parentPath, entry.name)).replaceAll('\\', '/'));
+        entrypoints.push(...packedEntrypoints(manifest, files));
+        if (
+            process.env.ADECORE_REQUIRE_NATIVE_BINARIES === '1' &&
+            manifest.name.startsWith('@adecore/database-') &&
+            !files.some((file) => file.startsWith('bin/'))
+        ) {
+            throw new Error(`${manifest.name} is missing its release binary.`);
+        }
+        packedManifests.set(manifest.name, manifest);
+        console.log(`Packed ${manifest.name}: ${files.length} files, validated all exports.`);
     }
 
     // External dependencies keep their installed transitive dependencies; Adecore packages always come from the tarballs.
     for (const pkg of selected) {
-        const groups = [pkg.manifest.dependencies, pkg.manifest.optionalDependencies, pkg.manifest.peerDependencies];
+        const manifest = packedManifests.get(pkg.manifest.name)!;
+        const groups = [manifest.dependencies, manifest.optionalDependencies, manifest.peerDependencies];
         for (const name of new Set(groups.flatMap((group) => Object.keys(group ?? {})))) {
             if (name.startsWith('@adecore/')) {
                 if (!existsSync(join(nodeModules, name))) {

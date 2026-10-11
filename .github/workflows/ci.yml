@@ -166,9 +166,40 @@ jobs:
         env:
           ADECORE_TEST_MYSQL_URL: mysql://root:test@127.0.0.1:33062
 
+  pack:
+    runs-on: ubuntu-latest
+    name: 📦 Build and pack workspaces
+    steps:
+      - name: 👀 Checkout
+        uses: actions/checkout@v6
+      - name: 🍞 Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - name: ✨ Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - name: 📦 Install dependencies
+        run: bun install --frozen-lockfile
+      - name: 🔨 Build packages
+        run: bun run build
+      - name: 📦 Pack workspaces
+        run: bun run pack "$RUNNER_TEMP/packed-workspaces"
+      - name: ⬆️ Upload packed workspaces
+        uses: actions/upload-artifact@v7
+        with:
+          name: packed-workspaces
+          path: |
+            ${{ runner.temp }}/packed-workspaces/*.tgz
+            ${{ runner.temp }}/packed-workspaces/packages.json
+          if-no-files-found: error
+          retention-days: 1
+
   packages:
     runs-on: ubuntu-latest
     name: 📦 Packed consumers (Node ${{ matrix.node }})
+    needs: pack
     strategy:
       fail-fast: false
       matrix:
@@ -186,7 +217,10 @@ jobs:
           node-version: ${{ matrix.node }}
       - name: 📦 Install dependencies
         run: bun install --frozen-lockfile
-      - name: 🔨 Build packages
-        run: bun run build
+      - name: ⬇️ Download packed workspaces
+        uses: actions/download-artifact@v8
+        with:
+          name: packed-workspaces
+          path: ${{ runner.temp }}/packed-workspaces
       - name: 🧪 Validate packed exports and Node/Bun consumers
-        run: bun run test:pack
+        run: bun run test:pack --artifacts "$RUNNER_TEMP/packed-workspaces"
