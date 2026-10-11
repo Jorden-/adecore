@@ -21,31 +21,18 @@ export function SubagentTitleCrumb({ chatId, className, children }: { chatId: st
     );
 }
 
-/*
- * The way down after the chat's title, each step a way back up, and a close that goes straight back
- * to the main agent. A bar that does not draw the title itself passes it, and it opens the way.
- * Nothing while the main agent itself is on screen.
- */
-export function SubagentBreadcrumb({ chatId, title, className }: { chatId: string; title?: string; className?: string }) {
+/* The way down to the sub-agent on screen, each step but the last a way back up. Nothing while the main agent is on screen. */
+export function SubagentBreadcrumb({ chatId, className }: { chatId: string; className?: string }) {
     const { t } = useTranslation('agent-chat');
     const { trail, show } = useSubagentTrail(chatId);
-    const subagents = useOpenableSubagents(chatId);
     if (trail.length === 0) {
         return null;
     }
-    const steps = breadcrumbOf(trail);
-    // Only a row of the chat's own thread can be stopped; a grandchild belongs to the sub-agent that opened it.
-    const shown = trail.length === 1 ? subagents.find((item) => item.toolUseId === trail[0]!.toolUseId) : undefined;
     return (
-        <nav aria-label={t('subagents.title')} className={clsx('flex min-w-0 items-center gap-1 text-xs', className)}>
-            {title !== undefined && (
-                <button type="button" className={clsx(CRUMB_LINK, 'min-w-0 shrink')} onClick={() => show(MAIN_AGENT)}>
-                    {title}
-                </button>
-            )}
-            {steps.map((step) => (
+        <nav aria-label={t('subagents.title')} className={clsx('flex min-w-0 items-center gap-1', className)}>
+            {breadcrumbOf(trail).map((step) => (
                 <Fragment key={step.depth}>
-                    <Icon icon={ChevronRight} size={12} className="shrink-0 text-text-faint" />
+                    {step.depth > 1 && <Icon icon={ChevronRight} size={12} className="shrink-0 text-text-faint" />}
                     {step.current ? (
                         <span aria-current="page" className="min-w-0 truncate text-text">
                             {step.label}
@@ -57,8 +44,24 @@ export function SubagentBreadcrumb({ chatId, title, className }: { chatId: strin
                     )}
                 </Fragment>
             ))}
+        </nav>
+    );
+}
+
+/* Stops the sub-agent on screen where that is on offer, and closes it straight back to the main agent. */
+export function SubagentActions({ chatId }: { chatId: string }) {
+    const { t } = useTranslation('agent-chat');
+    const { trail, show } = useSubagentTrail(chatId);
+    const subagents = useOpenableSubagents(chatId);
+    if (trail.length === 0) {
+        return null;
+    }
+    // Only a row of the chat's own thread can be stopped; a grandchild belongs to the sub-agent that opened it.
+    const shown = trail.length === 1 ? subagents.find((item) => item.toolUseId === trail[0]!.toolUseId) : undefined;
+    return (
+        <div className="flex shrink-0 items-center gap-1">
             {shown !== undefined && <SubagentStopButton chatId={chatId} item={shown} size="sm" />}
             <IconButton icon={X} size="sm" label={t('subagents.backToMain')} onClick={() => show(MAIN_AGENT)} />
-        </nav>
+        </div>
     );
 }
