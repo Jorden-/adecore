@@ -405,3 +405,30 @@ describe('Enter within PHP script elements', () => {
         enter('<script>\n<?php $value = "ab¦cd"; ?>\n</script>', '<script>\n<?php $value = "ab" .\n    "¦cd"; ?>\n</script>', { language: 'php' });
     });
 });
+
+describe('brace completion is scoped to the current PHP script body', () => {
+    it('ignores a backtick in preceding HTML', () => {
+        enter('<p>`</p>\n<script>\n    if (ready) {¦\n</script>', '<p>`</p>\n<script>\n    if (ready) {\n        ¦\n    }\n</script>', { language: 'php' });
+    });
+    it('ignores PHP strings within a script string', () => {
+        enter(
+            "<script>\nconst value = '<?php $s = \"'\"; ?>';\n    if (ready) {¦\n</script>",
+            "<script>\nconst value = '<?php $s = \"'\"; ?>';\n    if (ready) {\n        ¦\n    }\n</script>",
+            { language: 'php' }
+        );
+    });
+    it('ignores a raw closing tag within PHP code', () => {
+        enter(
+            '<script>\n<?php $s = "</script>"; ?>\n    if (ready) {¦\n</script>',
+            '<script>\n<?php $s = "</script>"; ?>\n    if (ready) {\n        ¦\n    }\n</script>',
+            { language: 'php' }
+        );
+    });
+    it('keeps scripts separate', () => {
+        enter(
+            '<script>const value = `unfinished</script>\n<script>\n    if (ready) {¦\n</script>',
+            '<script>const value = `unfinished</script>\n<script>\n    if (ready) {\n        ¦\n    }\n</script>',
+            { language: 'php' }
+        );
+    });
+});

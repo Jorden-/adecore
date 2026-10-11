@@ -131,3 +131,14 @@ test('a real PHP closing tag consumes exactly its immediately trailing newline',
     expect(context("<script>let value = '<?= $value ?>\n¦';</script>")).toMatchObject({ mode: 'quote', embedded: 'javascript' });
     expect(context('<script>// ?>\n¦call();</script>')).toMatchObject({ mode: 'code', embedded: 'javascript' });
 });
+
+test('each PHP script context retains its own absolute body start', () => {
+    const source = '<script>\nfirst();\n</script>\n<script>\nsecond();\n</script>';
+    const model = new DocumentModel(source);
+    const contexts = new TypingContexts((line) => model.getLine(line));
+    const first = contexts.at(1, 0, 'php').embedStart;
+    const second = contexts.at(4, 0, 'php').embedStart;
+    expect(first).toBe(source.indexOf('>') + 1);
+    expect(second).toBe(source.indexOf('>', source.indexOf('<script>', 1)) + 1);
+    expect(contexts.at(1, 0, 'php').embedStart).toBe(first);
+});

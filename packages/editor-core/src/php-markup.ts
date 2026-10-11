@@ -8,10 +8,13 @@ interface ScriptLexer {
     step(state: TypingContext, text: string, at: number, end: number, offset: number): number;
 }
 
-function finishTag(state: TypingContext, selfClosing: boolean, script: ScriptLexer): void {
+function finishTag(state: TypingContext, selfClosing: boolean, script: ScriptLexer, start: number): void {
     state.markup = !selfClosing && state.element !== undefined ? 'raw' : undefined;
     state.markupQuote = undefined;
     state.embed = state.markup === 'raw' && state.element === 'script' ? script.initial() : undefined;
+    if (state.embed !== undefined) {
+        state.embed.embedStart = start;
+    }
     if (selfClosing) {
         state.element = undefined;
     }
@@ -82,9 +85,9 @@ export function scanPhpMarkup(state: TypingContext, text: string, from: number, 
             continue;
         }
         if (char === '>') {
-            finishTag(state, false, script);
+            finishTag(state, false, script, offset + at + 1);
         } else if (char === '/' && text[at + 1] === '>' && at + 2 <= end) {
-            finishTag(state, true, script);
+            finishTag(state, true, script, offset + at + 2);
             at++;
         } else if (/\s/u.test(char)) {
             if (state.markup === 'value') {

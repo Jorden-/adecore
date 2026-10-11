@@ -50,6 +50,7 @@ export interface TypingContext {
     element?: 'script' | 'style' | 'textarea' | 'title';
     embed?: TypingContext;
     embedded?: 'javascript';
+    embedStart?: number;
     /* Only a scan result keeps this; PHP consumes the newline immediately after a closing tag. */
     phpClose?: number;
 }
@@ -305,6 +306,7 @@ function sameState(left: TypingContext, right: TypingContext): boolean {
         left.markupQuote === right.markupQuote &&
         left.element === right.element &&
         left.phpClose === right.phpClose &&
+        left.embedStart === right.embedStart &&
         (left.embed === right.embed || (left.embed !== undefined && right.embed !== undefined && sameState(left.embed, right.embed)))
     );
 }

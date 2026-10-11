@@ -517,3 +517,37 @@ it('does not pair inside a script comment continued over a PHP-consumed newline'
     type('<script>// note <?php $value = 1; ?>\ncall¦</script>', '(', '<script>// note <?php $value = 1; ?>\ncall(¦</script>', { language: 'php' });
     type('<script>// note <?php $value = 1; ?>\n\ncall¦</script>', '(', '<script>// note <?php $value = 1; ?>\n\ncall(¦)</script>', { language: 'php' });
 });
+
+describe('pairing is scoped to the current PHP script body', () => {
+    it('ignores brackets in following HTML and later scripts', () => {
+        for (const source of ['<script>call¦</script>\n<li>1) item</li>', '<script>call¦</script><script>)</script>']) {
+            type(source, '(', source.replace('¦', '(¦)'), { language: 'php' });
+        }
+    });
+    it('finds an existing closer despite a large unrelated HTML prefix', () => {
+        const source = '<p>' + 'x'.repeat(450000) + '</p>\n<script>call¦)</script>';
+        type(source, '(', source.replace('¦', '(¦'), { language: 'php' });
+    });
+});
+
+it('keeps same-line HTML outside the script out of its matching and preparation budgets', () => {
+    for (const source of ['<p>' + 'x'.repeat(450000) + '</p><script>call¦)</script>', '<script>call¦)</script><p>' + 'x'.repeat(450000) + '</p>']) {
+        type(source, '(', source.replace('¦', '(¦'), { language: 'php' });
+    }
+});
+
+it('invalidates a cached script projection when its PHP island changes', () => {
+    const model = new DocumentModel('<script>call<?php $text = ")"; ?>)</script>');
+    let at = model.getText().indexOf(')</script>');
+    model.setSelections([{ anchor: at, head: at }]);
+    model.typeText('(', { language: 'php' });
+    expect(model.getText()).toBe('<script>call<?php $text = ")"; ?>()</script>');
+    model.undo();
+    const from = model.getText().indexOf('<?php');
+    const to = model.getText().indexOf(')</script>') + 1;
+    model.applyEdits([{ from, to, text: '' }]);
+    at = model.getText().indexOf('</script>');
+    model.setSelections([{ anchor: at, head: at }]);
+    model.typeText('(', { language: 'php' });
+    expect(model.getText()).toBe('<script>call()</script>');
+});

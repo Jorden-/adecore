@@ -1,3 +1,4 @@
+import { scriptSource } from './script-source.ts';
 import { CloserTracker } from './closer-tracker.ts';
 import { planBlockComment, planLineComments } from './comments.ts';
 import { planEnter } from './enter.ts';
@@ -379,6 +380,7 @@ export class DocumentModel {
     occurrencesExhausted = false;
     private closers = new CloserTracker();
     private bracketCache?: { revision: number; language: string; index: BracketIndex };
+    private scriptCache?: { revision: number; sources: Map<number, { limit: number; text?: string; index?: BracketIndex }> };
 
     constructor(text = '') {
         this.rope = TextRope.from(text);
@@ -961,7 +963,7 @@ export class DocumentModel {
                 !this.completesTripleQuote(offset, opener, input.language)
             );
         }
-        return !this.hasMatch(offset, opener, context?.embedded ?? input.language);
+        return !this.hasMatch(offset, opener, input.language, context);
     }
 
     /* The third quote of a Python docstring opener is typed as it is, since the pair that came before it is the empty string. */
@@ -970,7 +972,15 @@ export class DocumentModel {
     }
 
     /* Whether the bracket just typed at `offset` would find its closer in the text that already follows it. */
-    private hasMatch(offset: number, opener: string, language: string): boolean {
+    private hasMatch(offset: number, opener: string, language: string, context?: TypingContext): boolean {
+        if (context?.embedded === 'javascript' && context.embedStart !== undefined) {
+            const source = this.scriptSource(context.embedStart, matchScanLimit)?.text;
+            if (source === undefined) {
+                return false;
+            }
+            const at = offset - context.embedStart;
+            return scanBrackets(source.slice(0, at) + opener + source.slice(at), 'javascript').pairs.has(at);
+        }
         if (this.rope.length > matchScanLimit) {
             return false;
         }
@@ -1593,7 +1603,7 @@ export class DocumentModel {
             newline: (index) => this.newlineAt(index),
             context: (offset) => this.typingContext(offset, language),
             region: (line) => (/^vue$/i.test(language) ? vueRegionAt((index) => this.getLine(index).text, line) : null),
-            unclosedBrace: (offset) => this.isUnclosedBrace(offset, this.typingContext(offset, language).embedded ?? language)
+            unclosedBrace: (offset) => this.isUnclosedBrace(offset, language)
         };
     }
 
@@ -1602,7 +1612,9 @@ export class DocumentModel {
      * it, which it took from that block. Such a closer sits shallower than the brace's line and leaves an opener before it unmatched.
      */
     private isUnclosedBrace(offset: number, language: string): boolean {
-        const index = this.bracketIndex(language);
+        const context = isPhp(language) ? this.typingContext(offset, language) : undefined;
+        const index =
+            context?.embedded === 'javascript' && context.embedStart !== undefined ? this.scriptBracketIndex(context.embedStart) : this.bracketIndex(language);
         if (index === undefined) {
             return false;
         }
@@ -1615,6 +1627,41 @@ export class DocumentModel {
             return false;
         }
         return [...index.unmatched].some((at) => at < offset && this.rope.charAt(at) === '{');
+    }
+
+    private scriptSource(start: number, limit: number): { limit: number; text?: string; index?: BracketIndex } {
+        if (this.scriptCache?.revision !== this.revision) {
+            this.scriptCache = { revision: this.revision, sources: new Map() };
+        }
+        const cached = this.scriptCache.sources.get(start);
+        if (cached !== undefined && (cached.text !== undefined || cached.limit >= limit)) {
+            return cached.text !== undefined && cached.text.length > limit ? { limit } : cached;
+        }
+        const end = Math.min(this.rope.length, start + limit + 11);
+        let work = bracketScanLimit;
+        const prepared = scriptSource(this.slice(start, end), start, end === this.rope.length, (at) => {
+            const position = this.positionAt(at);
+            work -= position.column + 1;
+            return work < 0 ? null : this.typingContext(at, 'php');
+        });
+        const result = { limit, text: prepared !== undefined && prepared.length <= limit ? prepared : undefined };
+        this.scriptCache.sources.set(start, result);
+        return result;
+    }
+
+    private scriptBracketIndex(start: number): BracketIndex | undefined {
+        const source = this.scriptSource(start, bracketScanLimit);
+        if (source.text === undefined) {
+            return undefined;
+        }
+        if (source.index === undefined) {
+            const index = scanBrackets(source.text, 'javascript');
+            source.index = {
+                pairs: new Map([...index.pairs].map(([from, to]) => [from + start, to + start])),
+                unmatched: new Set([...index.unmatched].map((at) => at + start))
+            };
+        }
+        return source.index;
     }
 
     /* Undefined for a document too large to scan on every Enter. */
