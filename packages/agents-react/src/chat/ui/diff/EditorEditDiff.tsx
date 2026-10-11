@@ -9,7 +9,7 @@ import type { FileChange } from '../../logic/tools';
 import { useDiffSourceTokens } from '../use-diff-source-tokens';
 import { diffSourceBudget } from './diff-source-budget';
 import { DiffOmitted } from './DiffOmitted';
-import { canRenderEditorDiff, EDITOR_DIFF_LIMITS } from './editor-edit-model';
+import { canRenderEditorDiff, EDITOR_DIFF_LIMITS, EDITOR_DIFF_WORK } from './editor-edit-model';
 
 type EngineLoader = () => Promise<EditorEngine>;
 
@@ -130,7 +130,7 @@ export default function EditorEditDiff({
     const document = useMemo(
         () =>
             diffSourceBudget(change.before, change.after)
-                ? diffDocument(patchOf(change.before, change.after), { old: change.before, new: change.after })
+                ? diffDocument(patchOf(change.before, change.after, 3, { maxWork: EDITOR_DIFF_WORK }), { old: change.before, new: change.after })
                 : undefined,
         [change.before, change.after]
     );

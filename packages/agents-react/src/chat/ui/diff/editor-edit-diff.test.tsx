@@ -14,6 +14,7 @@ import type { FileChange } from '../../logic/tools';
 import EditorEditDiff from './EditorEditDiff';
 import EditorPatchDiff from './EditorPatchDiff';
 import { DiffFallbackBoundary } from './DiffFallbackBoundary';
+import { EDITOR_DIFF_WORK } from './editor-edit-model';
 
 async function mounted(run: (page: ReturnType<typeof createPage>, root: ReturnType<typeof createRoot>) => Promise<void>): Promise<void> {
     const page = createPage();
@@ -347,6 +348,51 @@ test('oversize edits, patches and approvals never calculate hunks or mount an en
             patch.mockRestore();
             parse.mockRestore();
             setChatHost(previous);
+        }
+    });
+});
+
+test('many-hunk edits calculate once within a work budget and omit without loading the engine', async () => {
+    await mounted(async (page, root) => {
+        const engine = new FakeEditorEngine();
+        let loads = 0;
+        const loadEngine = async () => {
+            loads++;
+            return engine;
+        };
+        const lines = Array.from({ length: 19800 }, (_, index) => `line ${index}`);
+        const change = {
+            path: 'many.txt',
+            before: lines.join('\n'),
+            after: lines.map((line, index) => (index % 11 === 0 ? `changed ${index}` : line)).join('\n')
+        };
+        const patch = spyOn(merge, 'patchOf');
+        try {
+            await act(async () => root.render(createElement(EditorEditDiff, { change, loadEngine, fallback: 'Legacy' })));
+            expect(patch).toHaveBeenCalledTimes(1);
+            expect(patch).toHaveBeenCalledWith(change.before, change.after, 3, { maxWork: EDITOR_DIFF_WORK });
+            expect(page.host.querySelector('[data-diff-omitted]')).not.toBeNull();
+            expect(loads).toBe(0);
+            expect(engine.editors).toHaveLength(0);
+        } finally {
+            patch.mockRestore();
+        }
+    });
+});
+
+test('edits within the work budget render exact source rows', async () => {
+    await mounted(async (page, root) => {
+        const engine = new FakeEditorEngine();
+        const change = { path: 'small.ts', before: 'start\nold\nend', after: 'start\nnew\nend' };
+        const patch = spyOn(merge, 'patchOf');
+        try {
+            await act(async () => root.render(createElement(EditorEditDiff, { change, loadEngine: async () => engine, fallback: 'Legacy' })));
+            expect(patch).toHaveBeenCalledTimes(1);
+            expect(patch).toHaveBeenCalledWith(change.before, change.after, 3, { maxWork: EDITOR_DIFF_WORK });
+            expect(engine.last.getText()).toBe('start\nold\nnew\nend');
+            expect(page.host.querySelector('[data-diff-omitted]')).toBeNull();
+        } finally {
+            patch.mockRestore();
         }
     });
 });

@@ -84,7 +84,7 @@ The document and rows describe a view; they do not authorize applying a patch. K
 
 ## Computed patches and word changes
 
-`patchOf(oldText, newText, context = 3, options?)` returns a `ParsedPatch` for two complete texts. It uses `diffLines`, merges changes whose context overlaps or touches, and retains raw CRLF data and final newline markers in the serialized `text`. It moves a repeated blank from the end of a pure insertion or deletion to its beginning, so an added or removed function includes its leading separator. This alignment applies only to computed patches; `parsePatch` keeps a supplied patch's hunk boundaries.
+`patchOf(oldText, newText, context = 3, options?)` returns a `ParsedPatch` for two complete texts. It uses the same Myers walk as `diffLines`, merges changes whose context overlaps or touches, and retains raw CRLF data and final newline markers in the serialized `text`. It moves a repeated blank from the end of a pure insertion or deletion to its beginning, so an added or removed function includes its leading separator. This alignment applies only to computed patches; `parsePatch` keeps a supplied patch's hunk boundaries.
 
 ```ts
 import { diffDocument, diffRows, patchOf, wordChanges } from '@adecore/merge';
