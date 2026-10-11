@@ -27,8 +27,8 @@ interface Geometry {
     length: number;
 }
 
-function syntaxOf(source: EditSource, options: CommentOptions, line: number): CommentSyntax {
-    const syntax = commentSyntax(options.language, source.region(line));
+function syntaxOf(source: EditSource, options: CommentOptions, line: number, offset?: number): CommentSyntax {
+    const syntax = commentSyntax(options.language, source.region(line, offset));
     return options.lineToken === undefined ? syntax : { ...syntax, line: options.lineToken };
 }
 
@@ -90,18 +90,24 @@ function geometryOf(source: EditSource, edits: readonly TextEdit[], index: numbe
  */
 export function planLineComments(source: EditSource, selections: readonly Selection[], options: CommentOptions): EditPlan | null {
     const blocks = blocksOf(source, selections, options.lineSpan);
-    const syntaxes = blocks.map((block) => syntaxOf(source, options, block.first));
-    if (syntaxes.some((syntax) => syntax.line === null && syntax.block === null)) {
-        return null;
+    const lineBased = new Map<number, CommentSyntax>();
+    for (const block of blocks) {
+        for (let line = block.first; line <= block.last; line++) {
+            const syntax = syntaxOf(source, options, line);
+            lineBased.set(line, syntax.line === null ? syntax : { ...syntax, block: null });
+        }
     }
-    const lineBased = syntaxes.map((syntax): CommentSyntax => (syntax.line === null ? syntax : { ...syntax, block: null }));
     let allCommented = true;
     let anyCommented = false;
-    for (const [position, block] of blocks.entries()) {
+    for (const block of blocks) {
         const single = block.first === block.last;
         for (let line = block.first; line <= block.last; line++) {
             const text = source.line(line).text;
-            const commented = isCommented(text, lineBased[position]!, !single);
+            const syntax = lineBased.get(line)!;
+            if (syntax.line === null && syntax.block === null) {
+                continue;
+            }
+            const commented = isCommented(text, syntax, !single);
             if (commented && !isBlank(text)) {
                 anyCommented = true;
             }
@@ -116,8 +122,8 @@ export function planLineComments(source: EditSource, selections: readonly Select
 
     const edits: TextEdit[] = [];
     const placed = new Set<number>();
-    for (const [position, block] of blocks.entries()) {
-        const syntax = lineBased[position]!;
+    for (const block of blocks) {
+        const syntax = lineBased.get(block.first)!;
         const multiline = block.first !== block.last;
         const startingNewLine =
             !multiline &&
@@ -127,6 +133,10 @@ export function planLineComments(source: EditSource, selections: readonly Select
         const minimum = allCommented ? 0 : minimumIndent(source, block, syntax, options);
         for (let line = block.first; line <= block.last; line++) {
             const bounds = source.line(line);
+            const syntax = lineBased.get(line)!;
+            if (syntax.line === null && syntax.block === null) {
+                continue;
+            }
             const edit = allCommented
                 ? uncommentLine(bounds.start, bounds.text, syntax)
                 : commentLine(bounds.start, bounds.text, syntax, minimum, multiline, startingNewLine, options);
@@ -239,7 +249,7 @@ function finalSelections(
     edits: readonly TextEdit[],
     allCommented: boolean,
     placed: ReadonlySet<number>,
-    syntaxes: readonly CommentSyntax[],
+    syntaxes: ReadonlyMap<number, CommentSyntax>,
     span: CommentOptions['lineSpan']
 ): Selection[] {
     const sorted = [...edits].sort((left, right) => left.from - right.from);
@@ -251,13 +261,17 @@ function finalSelections(
     if (!moveCarets) {
         return result;
     }
-    for (const [position, block] of blocks.entries()) {
+    for (const block of blocks) {
         for (const index of block.carets) {
             const selection = selections[index]!;
             const { from, to } = rangeOf(selection);
             const line = source.lineAt(from);
             if (from === to) {
-                result[index] = caretAfter(source, sorted, line, span?.(line).last ?? line, selection.head, allCommented, placed, syntaxes[position]!);
+                const syntax = syntaxes.get(line)!;
+                if (syntax.line === null && syntax.block === null) {
+                    continue;
+                }
+                result[index] = caretAfter(source, sorted, line, span?.(line).last ?? line, selection.head, allCommented, placed, syntax);
                 continue;
             }
             const lastLine = source.lineAt(to - 1);
@@ -302,7 +316,7 @@ function commentAround(source: EditSource, offset: number, block: BlockComment):
     if ((context.mode !== 'block-comment' && context.mode !== 'html-comment') || context.commentStart === undefined) {
         return null;
     }
-    const from = context.commentStart;
+    const from = block.open === '{/*' && source.charAt(context.commentStart - 1) === '{' ? context.commentStart - 1 : context.commentStart;
     if (source.slice(from, from + block.open.length) !== block.open) {
         return null;
     }
@@ -332,7 +346,7 @@ export function planBlockComment(source: EditSource, selections: readonly Select
     let offsetDelta = 0;
     for (const selection of selections) {
         const { from, to } = rangeOf(selection);
-        const block = syntaxOf(source, options, source.lineAt(from)).block;
+        const block = syntaxOf(source, options, source.lineAt(from), from).block;
         if (!block) {
             return null;
         }

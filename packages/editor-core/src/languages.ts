@@ -11,6 +11,7 @@ export interface CommentSyntax {
 
 /* The part of a Vue single file component a line sits in. */
 export type VueRegion = 'template' | 'script' | 'style';
+export type EditRegion = VueRegion | 'jsx' | 'mixed';
 
 const slashStar: BlockComment = { open: '/*', close: '*/' };
 const html: BlockComment = { open: '<!--', close: '-->' };
@@ -45,9 +46,15 @@ register('haskell hs', { line: '--', block: { open: '{-', close: '-}' } });
 register('plaintext text txt log', none);
 
 /* An id nothing knows has no comment syntax, which toggling a comment answers by doing nothing. */
-export function commentSyntax(language: string, region?: VueRegion | null): CommentSyntax {
+export function commentSyntax(language: string, region?: EditRegion | null): CommentSyntax {
     const id = language.toLowerCase();
-    if (id === 'vue') {
+    if (region === 'mixed') {
+        return none;
+    }
+    if (region === 'jsx') {
+        return { line: null, block: { open: '{/*', close: '*/}' } };
+    }
+    if (id === 'vue' || (id === 'php' && region !== null && region !== undefined)) {
         if (region === 'script') {
             return cLike;
         }

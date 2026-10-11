@@ -84,3 +84,7 @@ A view with folds passes `lineSpan`: a collapsed fold is then one line to delete
 ## Comments
 
 `toggleLineComment` and `toggleBlockComment` read a table of markers per language: `//` and `/* */` for the C family, PHP, JSON and the like, `#` for Python, shell, YAML and others, `<!-- -->` for HTML, XML and Markdown, `--` for SQL, Lua and Haskell. In a Vue file the marker follows the block the caret is in. A language with block comments only, such as CSS, wraps each line. An id the table does not know has no markers, and the toggle does nothing.
+
+JSX child text and nested element lines use `{/* */}`; attribute lines and JavaScript expression bodies keep JavaScript markers. Block comments use the context at the selection start. PHP markup uses HTML comments, `<script>` content uses JavaScript markers, and `<style>` content uses CSS markers. A line containing both PHP tags and markup is skipped by `toggleLineComment`, including within a multiline selection. HTML comments do not disable embedded PHP execution.
+
+The additional JSX and PHP region scan is limited to two million UTF-16 code units per command. Above that limit, JSX keeps the existing script markers and PHP markup comments are skipped. PHP tag checks also have a work limit for repeated context scans on a long line. The scans are lexical and require recognizable JSX elements and static markup tags.

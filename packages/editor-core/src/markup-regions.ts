@@ -15,14 +15,17 @@ const CLOSERS: Readonly<Record<string, string>> = { '{': '}', '(': ')', '[': ']'
  */
 class JsxScanner {
     readonly ranges: { from: number; to: number }[] = [];
+    readonly children: { from: number; to: number }[] = [];
+    private readonly collectChildren: boolean;
     /* The quoted values of attributes, quotes included. */
     readonly values: { from: number; to: number }[] = [];
     private readonly text: string;
     private depth = 0;
     private budget: number;
 
-    constructor(text: string) {
+    constructor(text: string, collectChildren = false) {
         this.text = text;
+        this.collectChildren = collectChildren;
         this.budget = text.length * 12 + 1_000;
     }
 
@@ -178,13 +181,36 @@ class JsxScanner {
 
     /* An element from its `<`, recorded when no element holds it, and the offset after its closing tag; -1 when it is not one. */
     private element(from: number, outermost: boolean): number {
+        const children = this.children.length;
+        const previousEnd = this.children.at(-1)?.to;
+        if (this.depth > 0) {
+            this.child(from, from + 1);
+        }
         this.depth++;
         const end = this.parseElement(from);
         this.depth--;
+        if (end < 0) {
+            this.children.length = children;
+            if (previousEnd !== undefined) {
+                this.children[children - 1]!.to = previousEnd;
+            }
+        }
         if (end >= 0 && outermost && this.depth === 0) {
             this.ranges.push({ from, to: end });
         }
         return end;
+    }
+
+    private child(from: number, to: number): void {
+        if (!this.collectChildren || from >= to) {
+            return;
+        }
+        const previous = this.children.at(-1);
+        if (previous !== undefined && previous.to === from) {
+            previous.to = to;
+        } else {
+            this.children.push({ from, to });
+        }
     }
 
     private skipSpace(from: number): number {
@@ -253,14 +279,20 @@ class JsxScanner {
             }
         }
         for (;;) {
+            const start = at;
             while (at < text.length && text[at] !== '<' && text[at] !== '{') {
                 at++;
             }
+            this.child(start, text[at] === '<' ? at + 1 : at);
             if (at >= text.length || --this.budget < 0) {
                 return -1;
             }
             if (text[at] === '{') {
+                const from = at;
                 at = this.code(at + 1, '}');
+                if (at >= 0 && /^\{\s*\/\*/.test(text.slice(from, from + 20))) {
+                    this.child(from, at);
+                }
             } else if (text[at + 1] === '/') {
                 const closing = /^<\/\s*([\w$.:-]*)\s*>/.exec(text.slice(at, at + 200));
                 return closing !== null && closing[1] === name ? at + closing[0].length : -1;
@@ -299,6 +331,13 @@ function insideAny(ranges: readonly { from: number; to: number }[], offset: numb
         }
     }
     return false;
+}
+
+/* Child text and nested tags use JSX comments; attributes and embedded expressions stay code. */
+export function jsxChildren(text: string): (offset: number) => boolean {
+    const scanner = new JsxScanner(text, true);
+    scanner.scan();
+    return (offset) => insideAny(scanner.children, offset);
 }
 
 /* Whether a language is one whose scripts can hold JSX. */

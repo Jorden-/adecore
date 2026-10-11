@@ -162,3 +162,108 @@ describe('block comments', () => {
         block('<template>\n[<div/>]\n</template>', '<template>\n[<!-- <div/> -->]\n</template>', { language: 'vue' });
     });
 });
+
+describe('comments in embedded markup', () => {
+    function commented(source: string, language: string, command: EditorCommand = 'toggleLineComment'): DocumentModel {
+        const at = source.indexOf('¦');
+        const model = new DocumentModel(source.replace('¦', ''));
+        model.setSelections([{ anchor: at, head: at }]);
+        model.execute(command, { language });
+        return model;
+    }
+
+    for (const language of ['tsx', 'typescriptreact', 'jsx', 'javascriptreact']) {
+        it(`wraps JSX children and toggles them back in ${language}`, () => {
+            for (const text of ['<span>text</span>', 'ordinary JSX text']) {
+                const source = `const view = (\n    <div>\n        ¦${text}\n    </div>\n);`;
+                const model = commented(source, language);
+                expect(model.getText()).toBe(source.replace('¦' + text, `{/* ${text} */}`));
+                const at = model.getLine(2).start;
+                model.setSelections([{ anchor: at, head: at }]);
+                model.execute('toggleLineComment', { language });
+                expect(model.getText()).toBe(source.replace('¦', ''));
+            }
+        });
+    }
+
+    it('keeps attribute lines and expression bodies in JavaScript comment syntax', () => {
+        const attribute = 'const view = <div\n    ¦className="box"\n>text</div>;';
+        expect(commented(attribute, 'tsx').getText()).toBe(attribute.replace('¦', '// '));
+        const expression = 'const view = <div>{\n    ¦items.map(item => item.name)\n}</div>;';
+        expect(commented(expression, 'tsx').getText()).toBe(expression.replace('¦', '// '));
+        const ordinary = 'const ¦value = 1;';
+        expect(commented(ordinary, 'typescript').getText()).toBe('// const value = 1;');
+    });
+
+    it('recognizes an element nested in an expression inside another element', () => {
+        const source = 'const view = <div>{items.map(item => (\n    <span>\n        ¦{item.name}\n    </span>\n))}</div>;';
+        const element = source.replace('¦{item.name}', '{item.name}').replace('<span>', '¦<span>');
+        expect(commented(element, 'tsx').getText()).toBe(element.replace('¦<span>', '{/* <span> */}'));
+    });
+
+    it('uses JSX block comments for child text and JavaScript blocks within an expression', () => {
+        const source = 'const view = <div><span>¦text</span></div>;';
+        expect(commented(source, 'tsx', 'toggleBlockComment').getText()).toBe(source.replace('¦', '{/*  */}'));
+        const expression = 'const view = <div>{¦value}</div>;';
+        expect(commented(expression, 'tsx', 'toggleBlockComment').getText()).toBe(expression.replace('¦', '/*  */'));
+    });
+
+    it('wraps and unwraps a selected JSX text range', () => {
+        block('const view = <div>[text]</div>;', 'const view = <div>[{/* text */}]</div>;', { language: 'tsx' });
+        block('const view = <div>[{/* text */}]</div>;', 'const view = <div>[text]</div>;', { language: 'tsx' });
+        block('const view = <div>{/* te¦xt */}</div>;', 'const view = <div>te¦xt</div>;', { language: 'tsx' });
+    });
+
+    it('uses HTML comments for PHP markup and code comments within PHP tags', () => {
+        const markup = '<div>\n    ¦<p>text</p>\n</div>\n<?php echo 1; ?>';
+        expect(commented(markup, 'php').getText()).toBe(markup.replace('¦<p>text</p>', '<!-- <p>text</p> -->'));
+        const code = '<div>\n<?php\n¦$value = 1;\n?>\n</div>';
+        expect(commented(code, 'php').getText()).toBe(code.replace('¦', '// '));
+        const phpFirst = '<?php\n¦$value = 1;';
+        expect(commented(phpFirst, 'php').getText()).toBe(phpFirst.replace('¦', '// '));
+    });
+
+    it('recognizes script and style content in PHP markup', () => {
+        const script = '<script>\n¦const value = 1;\n</script>';
+        expect(commented(script, 'php').getText()).toBe(script.replace('¦', '// '));
+        const rawScript = '<script>\nconst text = "<style>";\n¦const value = 1;\n</script>';
+        expect(commented(rawScript, 'php').getText()).toBe(rawScript.replace('¦', '// '));
+        const style = '<style>\n¦.box { color: red; }\n</style>';
+        expect(commented(style, 'php').getText()).toBe(style.replace('¦.box { color: red; }', '/* .box { color: red; } */'));
+    });
+
+    it('does not treat tags inside PHP strings or HTML attributes and comments as embedded sections', () => {
+        for (const prefix of ['<div title="<script>">', '<!-- <script> -->', '<?php\n$value = "<script>";\n?>']) {
+            const source = prefix + '\n¦<p>text</p>';
+            expect(commented(source, 'php').getText()).toBe(source.replace('¦<p>text</p>', '<!-- <p>text</p> -->'));
+        }
+        const heredoc = '<?php\n$value = <<<HTML\n¦<script>\nHTML;';
+        expect(commented(heredoc, 'php').getText()).toBe(heredoc.replace('¦', '// '));
+    });
+
+    it('leaves mixed PHP and HTML lines unchanged', () => {
+        for (const source of ['¦<?php if ($value): ?>', '<p>¦<?= $value ?></p>', '<?php\n¦echo $value; ?> <p>text</p>']) {
+            const model = commented(source, 'php');
+            expect(model.getText()).toBe(source.replace('¦', ''));
+            expect(model.getSnapshot().canUndo).toBe(false);
+        }
+    });
+
+    it('leaves markup beyond the scan budget unchanged', () => {
+        const source = '<p>text</p>\n' + 'x'.repeat(2_000_001);
+        const model = new DocumentModel(source);
+        expect(model.execute('toggleLineComment', { language: 'php' })).toBe(false);
+        expect(model.getText()).toBe(source);
+    });
+
+    it('skips mixed PHP lines within a selection and comments its markup neighbors', () => {
+        const source = '<p>one</p>\n<?php echo $value; ?>\n<p>two</p>';
+        const model = new DocumentModel(source);
+        model.setSelections([{ anchor: 0, head: source.length }]);
+        expect(model.execute('toggleLineComment', { language: 'php' })).toBe(true);
+        expect(model.getText()).toBe('<!-- <p>one</p> -->\n<?php echo $value; ?>\n<!-- <p>two</p> -->');
+        model.setSelections([{ anchor: 0, head: model.getText().length }]);
+        model.execute('toggleLineComment', { language: 'php' });
+        expect(model.getText()).toBe(source);
+    });
+});
