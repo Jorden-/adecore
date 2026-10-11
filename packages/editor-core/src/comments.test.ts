@@ -311,3 +311,35 @@ describe('JSX line comment context remains stable across toggles', () => {
         expect(model.getLine(1).text).toBe('    // <li />');
     });
 });
+
+describe('JSX attribute comments retain child context', () => {
+    it('toggles a child after commenting an attribute and restores both', () => {
+        const source = 'const view = <div>\n    <Foo\n        bar="x"\n    />\n    text\n</div>;';
+        const model = new DocumentModel(source);
+        const toggle = (line: number) => {
+            const at = model.getLine(line).start;
+            model.setSelections([{ anchor: at, head: at }]);
+            model.execute('toggleLineComment', { language: 'tsx' });
+        };
+        toggle(2);
+        const attributeComment = model.getText();
+        expect(model.getLine(2).text).toBe('        // bar="x"');
+        toggle(4);
+        expect(model.getLine(4).text).toBe('    {/* text */}');
+        toggle(4);
+        expect(model.getText()).toBe(attributeComment);
+        toggle(2);
+        expect(model.getText()).toBe(source);
+    });
+    it('recognizes children around block comments between attributes', () => {
+        const source = 'const view = <div>\n    <Foo\n        /* bar="x" */\n    />\n    text\n</div>;';
+        const model = new DocumentModel(source);
+        const at = model.getLine(4).start;
+        model.setSelections([{ anchor: at, head: at }]);
+        model.execute('toggleLineComment', { language: 'tsx' });
+        expect(model.getLine(4).text).toBe('    {/* text */}');
+        model.setSelections([{ anchor: at, head: at }]);
+        model.execute('toggleLineComment', { language: 'tsx' });
+        expect(model.getText()).toBe(source);
+    });
+});

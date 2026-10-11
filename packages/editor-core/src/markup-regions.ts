@@ -231,6 +231,22 @@ class JsxScanner {
             if (char === undefined || --this.budget < 0) {
                 return -1;
             }
+            if (char === '/' && text[at + 1] === '/') {
+                const end = text.indexOf('\n', at + 2);
+                if (end < 0) {
+                    return -1;
+                }
+                at = end + 1;
+                continue;
+            }
+            if (char === '/' && text[at + 1] === '*') {
+                const end = text.indexOf('*/', at + 2);
+                if (end < 0) {
+                    return -1;
+                }
+                at = end + 2;
+                continue;
+            }
             if (char === '/' && text[at + 1] === '>') {
                 return at + 2;
             }
@@ -289,7 +305,7 @@ class JsxScanner {
                 const from = at;
                 at = this.code(at + 1, '}');
                 if (at >= 0 && /^\{\s*\/\*/.test(text.slice(from, from + 20))) {
-                    this.child(from, at);
+                    this.child(from + 1, at);
                 }
             } else if (text[at + 1] === '/') {
                 const closing = /^<\/\s*([\w$.:-]*)\s*>/.exec(text.slice(at, at + 200));
