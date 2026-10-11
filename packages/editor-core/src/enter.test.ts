@@ -351,3 +351,44 @@ describe('Enter continues code comments inside embedded markup', () => {
         enter('<?php // header¦ text\n$value = 1;', '<?php // header\n//¦text\n$value = 1;', { language: 'php' });
     });
 });
+
+describe('Enter in PHP markup', () => {
+    it('splits an open and closing tag and indents after an opening tag', () => {
+        enter('<div>¦</div>', '<div>\n    ¦\n</div>', { language: 'php' });
+        enter('<div>¦', '<div>\n    ¦', { language: 'php' });
+        enter('<div>\n    <span>¦</span>\n</div>', '<div>\n    <span>\n        ¦\n    </span>\n</div>', { language: 'php' });
+        enter('<?php if ($value): ?>\n<div>¦</div>\n<?php endif; ?>', '<?php if ($value): ?>\n<div>\n    ¦\n</div>\n<?php endif; ?>', { language: 'php' });
+    });
+    it('uses the context before a script or style opener', () => {
+        enter('<script>¦</script>', '<script>\n    ¦\n</script>', { language: 'php' });
+        enter('<style>¦</style>', '<style>\n    ¦\n</style>', { language: 'php' });
+    });
+    it('keeps void and self-closing tags at their current indentation', () => {
+        enter('<br>¦', '<br>\n¦', { language: 'php' });
+        enter('<div>\n    <img src="icon.svg">¦\n</div>', '<div>\n    <img src="icon.svg">\n    ¦\n</div>', { language: 'php' });
+        enter('<component />¦', '<component />\n¦', { language: 'php' });
+    });
+    it('leaves PHP strings, heredocs and HTML comments under their existing rules', () => {
+        enter('<?php\n$value = "<div>¦";', '<?php\n$value = "<div>" .\n    "¦";', { language: 'php' });
+        enter('<?php\n$value = <<<HTML\n<div>¦\nHTML;', '<?php\n$value = <<<HTML\n<div>\n¦\nHTML;', { language: 'php' });
+        enter('<!-- <div>¦', '<!-- <div>\n¦', { language: 'php' });
+    });
+    it('does not treat tags in raw script or style content as markup openers', () => {
+        enter('<script>\n"<div>¦\n</script>', '<script>\n"<div>\n¦\n</script>', { language: 'php' });
+        enter('<style>\n.box::after { content: "<div>¦\n</style>', '<style>\n.box::after { content: "<div>\n¦\n</style>', { language: 'php' });
+    });
+    it('keeps existing HTML, JSX and Vue tag behavior', () => {
+        for (const language of ['html', 'tsx', 'vue']) {
+            enter('<div>¦</div>', '<div>\n    ¦\n</div>', { language });
+        }
+    });
+    it('does not scan a PHP document beyond its region budget', () => {
+        const initial = marked('<div>¦</div>\n' + 'x'.repeat(2_000_001));
+        const model = new DocumentModel(initial.text);
+        model.setSelections([{ anchor: initial.offset, head: initial.offset }]);
+        model.execute('insertNewline', { language: 'php' });
+        expect(model.getLine(0).text).toBe('<div>');
+        expect(model.getLine(1).text).toBe('</div>');
+        expect(model.getSelections()[0]!.head).toBe(6);
+    });
+});

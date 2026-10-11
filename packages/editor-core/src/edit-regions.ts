@@ -7,7 +7,7 @@ export type EditRegions = (line: number, offset?: number) => EditRegion | null;
 const SCAN_LIMIT = 2_000_000;
 interface TagRegion {
     readonly at: number;
-    readonly region: 'template' | 'script' | 'style';
+    readonly region: 'template' | 'script' | 'style' | 'mixed';
 }
 
 function firstContent(source: EditSource, line: number): number {
@@ -54,7 +54,8 @@ function phpTags(source: EditSource, end: number): TagRegion[] | null {
         }
         at = match.index + match[0].length;
         const name: string | undefined = active ?? match[2]?.toLowerCase();
-        if (name !== 'script' && name !== 'style') {
+        const comment = active === null && match[0].startsWith('<!--');
+        if (!comment && name !== 'script' && name !== 'style') {
             continue;
         }
         const line = source.line(source.lineAt(match.index));
@@ -63,6 +64,16 @@ function phpTags(source: EditSource, end: number): TagRegion[] | null {
             return null;
         }
         if (source.context(match.index).mode !== 'html') {
+            continue;
+        }
+        if (comment) {
+            regions.push({ at: match.index + 4, region: 'mixed' });
+            if (match[0].endsWith('-->')) {
+                regions.push({ at, region: 'template' });
+            }
+            continue;
+        }
+        if (name !== 'script' && name !== 'style') {
             continue;
         }
         const closes: boolean = active !== null || match[1] === '/';
@@ -87,7 +98,7 @@ function tagRegionAt(tags: readonly TagRegion[], offset: number): EditRegion {
 }
 
 /* Scans once for one command, without retaining offsets after its edits. */
-export function editRegions(source: EditSource, language: string): EditRegions {
+export function editRegions(source: EditSource, language: string, through?: number): EditRegions {
     const id = language.toLowerCase();
     const end = source.line(source.lineCount - 1).end;
     if (id === 'vue') {
@@ -117,7 +128,7 @@ export function editRegions(source: EditSource, language: string): EditRegions {
                 return 'mixed';
             }
             if (tags === undefined) {
-                tags = phpTags(source, end);
+                tags = phpTags(source, Math.min(end, through ?? end));
             }
             return tags === null ? 'mixed' : tagRegionAt(tags, at);
         };

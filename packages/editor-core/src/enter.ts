@@ -1,4 +1,5 @@
 import type { EditSource } from './edit-source.ts';
+import { editRegions } from './edit-regions.ts';
 import { commentSyntax } from './languages.ts';
 import { hasHashComments, isBraced, isPhp, openers } from './lexical.ts';
 import { whitespaceOf } from './line-text.ts';
@@ -149,6 +150,17 @@ class Enter {
         const start = leading.length < before.length ? base : leading;
         const plain = (indent: string): EnterPlan => ({ from, to: afterWhitespace, text: newline + indent, caret: newline.length + indent.length });
 
+        if (context.mode === 'code' || (isPhp(language) && context.mode === 'html')) {
+            const tag = this.openTag(trimmed, index);
+            if (tag) {
+                const inner = start + unit;
+                if (new RegExp(`^</${escapeForPattern(tag)}\\s*>`, 'i').test(source.slice(afterWhitespace, line.end))) {
+                    return { from, to: afterWhitespace, text: newline + inner + newline + start, caret: newline.length + inner.length };
+                }
+                return plain(inner);
+            }
+        }
+
         if (context.mode !== 'code') {
             return plain(leading);
         }
@@ -162,15 +174,6 @@ class Enter {
             const closing =
                 last === '{' && source.unclosedBrace(context.bracket!.at) ? this.closeBrace(from, afterWhitespace, line, rest, newline, start, inner) : null;
             return closing ?? plain(inner);
-        }
-
-        const tag = this.openTag(trimmed, index);
-        if (tag) {
-            const inner = start + unit;
-            if (new RegExp(`^</${escapeForPattern(tag)}\\s*>`, 'i').test(source.slice(afterWhitespace, line.end))) {
-                return { from, to: afterWhitespace, text: newline + inner + newline + start, caret: newline.length + inner.length };
-            }
-            return plain(inner);
         }
 
         if (this.opensIndentedBlock(trimmed, context)) {
@@ -210,7 +213,7 @@ class Enter {
     /* The name of the tag the text ends in, when it is an open tag with children to come. */
     private openTag(trimmed: string, index: number): string | null {
         const { language } = this.options;
-        if (!markupLanguages.test(language)) {
+        if (!markupLanguages.test(language) && !isPhp(language)) {
             return null;
         }
         if (/^vue$/i.test(language) && this.source.region(index) === 'script') {
@@ -219,6 +222,14 @@ class Enter {
         const match = /(?:^|[^\w$)\]])<([A-Za-z][\w:.-]*)(?:\s(?:[^<>]|=>)*)?>$/.exec(trimmed);
         if (!match || trimmed.endsWith('/>') || (voidElements.test(match[1]!) && !/^xml$/i.test(language))) {
             return null;
+        }
+        if (isPhp(language)) {
+            const offset = this.source.line(index).start + trimmed.indexOf('<', match.index);
+            // Only earlier tags establish this opener's region; its content can be script or style.
+            const regions = editRegions(this.source, language, offset);
+            if (regions(index, offset) !== 'template') {
+                return null;
+            }
         }
         return match[1]!;
     }
