@@ -1,6 +1,6 @@
 import './test-setup.ts';
 import { expect, test } from 'bun:test';
-import { act, createElement } from 'react';
+import { act, Component, createElement, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createSmartEditorEngine, type Editor, type EditorEngine, type LineToken } from '@adecore/editor';
 import { clipboard, createPage, press } from '@adecore/editor/testing';
@@ -324,5 +324,49 @@ test('split unfolds both sides without remounting and falls back to unified for 
         expect(editors.length).toBe(3);
         expect(page.host.querySelectorAll('.se-editor').length).toBe(1);
         expect(editors[2]!.getText()).toBe('added');
+    });
+});
+
+class TestBoundary extends Component<{ children?: ReactNode }, { failed: boolean }> {
+    state = { failed: false };
+
+    static getDerivedStateFromError() {
+        return { failed: true };
+    }
+
+    render() {
+        return this.state.failed ? createElement('div', { 'data-fallback': true }, 'Legacy diff') : this.props.children;
+    }
+}
+
+test('an asynchronous split alignment failure reaches the local fallback and disposes both editors', async () => {
+    await pageTest(async (page, root) => {
+        const core = createSmartEditorEngine({ tokenizer: async () => null });
+        let disposals = 0;
+        const engine: EditorEngine = {
+            mount(host, options) {
+                const editor = core.mount(host, options);
+                const dispose = editor.dispose.bind(editor);
+                editor.dispose = () => {
+                    disposals++;
+                    dispose();
+                };
+                editor.getLineHeight = () => {
+                    throw new Error('Measurement failed');
+                };
+                return editor;
+            }
+        };
+        await act(async () =>
+            root.render(
+                createElement(
+                    TestBoundary,
+                    null,
+                    createElement(DiffView, { engine, document: snapshots('old', 'new'), layout: 'split', theme: 'dark', label: 'Review' })
+                )
+            )
+        );
+        expect(page.host.querySelector('[data-fallback]')?.textContent).toBe('Legacy diff');
+        expect(disposals).toBe(2);
     });
 });

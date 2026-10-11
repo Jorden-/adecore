@@ -9,6 +9,7 @@ import { DiffOverlays, type MountedDiff } from './diff-overlays.tsx';
 import { wordMarks } from './diff-wordmarks.ts';
 import { RowHost, LineActionHost } from './row-host.ts';
 import { splitAlignment } from './split-alignment.ts';
+import { SplitScroll } from './split-scroll.ts';
 
 const SIDES = ['old', 'new'] as const;
 
@@ -16,6 +17,7 @@ interface MountedSplit {
     old: MountedDiff;
     new: MountedDiff;
     align(): void;
+    drive(side: DiffSourceSide): void;
     update(run: () => void): void;
 }
 
@@ -28,7 +30,7 @@ export function SplitDiffView({ engine, document, theme, tokens, wrap = true, fi
     const newElement = useRef<HTMLDivElement>(null);
     const labels = { old: `${label}: ${t('diff.oldSide')}`, new: `${label}: ${t('diff.newSide')}` };
     const current = useRef({ display, tokens, theme, wrap, label, labels });
-    const leader = useRef<DiffSourceSide>('new');
+    const [failure, setFailure] = useState<{ error: unknown } | null>(null);
     const [mounted, setMounted] = useState<MountedSplit | null>(null);
     const [height, setHeight] = useState(0);
     useLayoutEffect(() => {
@@ -71,35 +73,24 @@ export function SplitDiffView({ engine, document, theme, tokens, wrap = true, fi
         const sides = { old, new: fresh };
         let stopped = false;
         let pending = false;
-        let syncing = false;
+        let failed = false;
+        const scroll = new SplitScroll({ old: old.editor, new: fresh.editor });
         let aligning = false;
         let updating = false;
-        const sync = (side: DiffSourceSide): void => {
-            if (syncing || aligning || updating) {
-                return;
-            }
-            const other = side === 'old' ? sides.new.editor : sides.old.editor;
-            const top = sides[side].editor.getScrollTop();
-            if (Math.abs(other.getScrollTop() - top) < 1) {
-                return;
-            }
-            syncing = true;
-            try {
-                other.setScrollTop(top);
-            } finally {
-                syncing = false;
-            }
+        const fail = (error: unknown): void => {
+            failed = true;
+            setFailure({ error });
         };
         const measure = (): void => setHeight(Math.max(sides.old.editor.getContentHeight(), sides.new.editor.getContentHeight()));
         const align = (): void => {
-            if (pending || stopped) {
+            if (pending || stopped || failed) {
                 return;
             }
             pending = true;
             // Intrinsic measurements arrive after each render; align both editors before the next paint.
             queueMicrotask(() => {
                 pending = false;
-                if (stopped) {
+                if (stopped || failed) {
                     return;
                 }
                 aligning = true;
@@ -111,11 +102,18 @@ export function SplitDiffView({ engine, document, theme, tokens, wrap = true, fi
                     );
                     sides.old.rows.set(rows.old);
                     sides.new.rows.set(rows.new);
+                } catch (error) {
+                    fail(error);
+                    return;
                 } finally {
                     aligning = false;
                 }
-                measure();
-                sync(leader.current);
+                try {
+                    measure();
+                    scroll.sync();
+                } catch (error) {
+                    fail(error);
+                }
             });
         };
         const update = (run: () => void): void => {
@@ -130,11 +128,18 @@ export function SplitDiffView({ engine, document, theme, tokens, wrap = true, fi
         const stops = SIDES.flatMap((side) => [
             sides[side].editor.onLineHeights(align),
             sides[side].editor.onViewChange(() => {
-                measure();
-                sync(side);
+                if (stopped || failed || aligning || updating) {
+                    return;
+                }
+                try {
+                    measure();
+                    scroll.changed(side);
+                } catch (error) {
+                    fail(error);
+                }
             })
         ]);
-        setMounted({ old: sides.old, new: sides.new, align, update });
+        setMounted({ old: sides.old, new: sides.new, align, update, drive: (side) => scroll.drive(side) });
         measure();
         return () => {
             stopped = true;
@@ -247,6 +252,9 @@ export function SplitDiffView({ engine, document, theme, tokens, wrap = true, fi
     const limit = maxHeight !== undefined && Number.isFinite(maxHeight) && maxHeight > 0 ? maxHeight : Infinity;
     const unfold = (id: number): void =>
         setExpanded((previous) => ({ document, gaps: new Map([...(previous.document === document ? previous.gaps : []), [id, Infinity]]) }));
+    if (failure !== null) {
+        throw failure.error;
+    }
     return (
         <div
             className={`adecore-editor-diff adecore-editor-diff-split ${className ?? ''}`}
@@ -260,10 +268,16 @@ export function SplitDiffView({ engine, document, theme, tokens, wrap = true, fi
                     className="adecore-editor-diff-side"
                     data-side={side}
                     onWheelCapture={() => {
-                        leader.current = side;
+                        mounted?.drive(side);
                     }}
                     onFocusCapture={() => {
-                        leader.current = side;
+                        mounted?.drive(side);
+                    }}
+                    onPointerDownCapture={() => {
+                        mounted?.drive(side);
+                    }}
+                    onKeyDownCapture={() => {
+                        mounted?.drive(side);
                     }}
                 >
                     <div ref={side === 'old' ? oldElement : newElement} className="adecore-editor-diff-surface" />
