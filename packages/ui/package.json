@@ -85,7 +85,6 @@
     "@types/react-dom": "^19.3.0",
     "i18next": "^26.4.2",
     "opentype.js": "2.0.0",
-    "oxc-parser": "^0.151.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-i18next": "^17.0.15",

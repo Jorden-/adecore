@@ -11,7 +11,7 @@
   "scripts": {
     "build": "bun scripts/build.ts",
     "typecheck": "tsc -p tsconfig.scripts.json && bun run --filter './packages/*' --filter './examples/*' typecheck",
-    "lint": "oxlint --deny-warnings",
+    "lint": "oxlint --deny-warnings && bun scripts/check-design-conventions.ts",
     "check": "bun run typecheck && bun run lint",
     "test": "bun test",
     "format": "oxfmt --write \"packages/*/src/**/*.{ts,tsx}\" \"packages/*/scripts/**/*.ts\" \"docs/**/*.{ts,tsx}\" \"scripts/**/*.ts\"",
@@ -25,6 +25,7 @@
     "@types/bun": "^1.4.2",
     "@types/node": "^24.13.6",
     "i18next": "^26.4.2",
+    "oxc-parser": "^0.151.0",
     "oxfmt": "^0.70.0",
     "oxlint": "^1.85.0",
     "react": "^19.3.0",

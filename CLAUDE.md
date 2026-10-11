@@ -83,7 +83,7 @@ All three of check, test and build pass before a commit, and so does `bun run --
 
 ## Design rules
 
-`packages/ui/src/conventions.test.ts` holds every file of that package to these:
+`scripts/check-design-conventions.ts` checks UI and database sources during `bun run lint` using the shared rules in `scripts/design-conventions.ts`:
 
 - Type in the sizes of the theme's scale, never a size in brackets, nothing below 12px.
 - A hint is a `Tooltip`, never a `title`.
