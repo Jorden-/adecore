@@ -7,13 +7,13 @@ function allows(before: string, after: string): boolean {
     return canRenderEditorDiff(diffDocument(patchOf(before, after), { old: before, new: after }));
 }
 
-test('the initial editor rollout bounds displayed rows, text and individual lines', () => {
+test('editor rendering bounds displayed rows, text and individual lines', () => {
     expect(allows('old', 'new')).toBe(true);
-    expect(allows('', 'line\n'.repeat(401))).toBe(false);
-    expect(allows('', Array.from({ length: 101 }, () => 'x'.repeat(1000)).join('\n'))).toBe(false);
+    expect(allows('', 'line\n'.repeat(2001))).toBe(false);
+    expect(allows('', Array.from({ length: 2000 }, () => 'x'.repeat(1000)).join('\n'))).toBe(false);
     expect(allows('a'.repeat(10000), 'b')).toBe(true);
     expect(allows('a'.repeat(10001), 'b')).toBe(false);
-    expect(allows('', Array.from({ length: 400 }, () => 'added').join('\n'))).toBe(true);
+    expect(allows('', Array.from({ length: 2000 }, () => 'added').join('\n'))).toBe(true);
 });
 
 test('a small change in a 5000-line snapshot uses the editor based on the visible hunk', () => {

@@ -239,7 +239,7 @@ test('a small edit in a large snapshot mounts while a large displayed edit shows
         await act(async () => render(before, after));
         expect(engine.last.getText().split('\n').length).toBeLessThan(20);
         expect(engine.last.getText()).toContain('changed');
-        await act(async () => render('', 'added\n'.repeat(401)));
+        await act(async () => render('', 'added\n'.repeat(2001)));
         expect(page.host.querySelector('[data-diff-omitted]')).not.toBeNull();
         expect(engine.editors).toHaveLength(1);
     });

@@ -5,12 +5,19 @@ export function wordMarks(document: DiffDocument): {
     new: Map<number, readonly (readonly [number, number])[]>;
 } {
     const marks = { old: new Map<number, readonly (readonly [number, number])[]>(), new: new Map<number, readonly (readonly [number, number])[]>() };
+    let pairs = 0;
+    let characters = 0;
     for (const row of diffRows(document, 'split')) {
         if (row.kind !== 'line' || row.change !== 'pair' || document.hunks[row.hunk!]!.coarse) {
             continue;
         }
         const old = document.sides.old[row.old!.index]!;
         const fresh = document.sides.new[row.new!.index]!;
+        characters += old.length + fresh.length;
+        // Per-pair limits alone still allow thousands of expensive word diffs during one mount.
+        if (++pairs > 1000 || characters > 100000) {
+            break;
+        }
         const words = wordChanges(old, fresh);
         if (words === null) {
             continue;

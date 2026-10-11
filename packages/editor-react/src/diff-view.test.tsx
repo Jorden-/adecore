@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test';
 import { act, Component, createElement, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createSmartEditorEngine, type Editor, type EditorEngine, type LineToken } from '@adecore/editor';
+import { FakeEditorEngine } from '@adecore/editor/fake';
 import { clipboard, createPage, press } from '@adecore/editor/testing';
 import { diffDocument, parsePatch, patchOf, type DiffDocument } from '@adecore/merge';
 import { DiffView } from './DiffView.tsx';
@@ -368,5 +369,73 @@ test('an asynchronous split alignment failure reaches the local fallback and dis
         );
         expect(page.host.querySelector('[data-fallback]')?.textContent).toBe('Legacy diff');
         expect(disposals).toBe(2);
+    });
+});
+
+test('split disables wrap above 2000 displayed unified rows while unified keeps it', async () => {
+    await pageTest(async (_page, root) => {
+        const engine = new FakeEditorEngine();
+        const old = Array.from({ length: 2000 }, (_, index) => `line ${index}`).join('\n');
+        const document = diffDocument(patchOf(old, old.replace('line 1000\n', 'changed\n'), 2000), { old, new: old.replace('line 1000\n', 'changed\n') });
+        const render = (layout: 'unified' | 'split') =>
+            root.render(createElement(DiffView, { engine, document, layout, wrap: true, theme: 'dark', label: 'Review' }));
+        await act(async () => render('split'));
+        expect(engine.editors.map((editor) => editor.wrap)).toEqual([false, false]);
+        await act(async () => render('unified'));
+        expect(engine.last.wrap).toBe(true);
+    });
+});
+
+test('unfolding across the split wrap limit updates both existing editors', async () => {
+    await pageTest(async (page, root) => {
+        const core = createSmartEditorEngine({ tokenizer: async () => null });
+        const wraps: boolean[] = [];
+        let mounts = 0;
+        const engine: EditorEngine = {
+            mount(host, options) {
+                const editor = core.mount(host, options);
+                mounts++;
+                wraps.push(options.wrap!);
+                const setWrap = editor.setWrap.bind(editor);
+                editor.setWrap = (wrap) => {
+                    wraps.push(wrap);
+                    setWrap(wrap);
+                };
+                return editor;
+            }
+        };
+        const old = Array.from({ length: 16 }, (_, index) => `line ${index}`).join('\n');
+        await act(async () =>
+            root.render(
+                createElement(DiffView, {
+                    engine,
+                    document: snapshots(old, old.replace('line 8', 'changed')),
+                    layout: 'split',
+                    splitWrapLimit: 4,
+                    theme: 'dark',
+                    label: 'Review'
+                })
+            )
+        );
+        expect(wraps).not.toContain(false);
+        await act(async () => (page.host.querySelector('.adecore-editor-diff-gap button') as HTMLElement).click());
+        expect(mounts).toBe(2);
+        expect(wraps.slice(-2)).toEqual([false, false]);
+    });
+});
+
+test('a gap blocked by a long hidden line stays disabled when another gap unfolds', async () => {
+    await pageTest(async (page, root) => {
+        const engine = createSmartEditorEngine({ tokenizer: async () => null });
+        const old = ['start', 'x'.repeat(10001), 'context', 'old', 'after', 'end'].join('\n');
+        const fresh = old.replace('\nold\n', '\nnew\n');
+        const document = diffDocument(patchOf(old, fresh, 0), { old, new: fresh });
+        await act(async () => root.render(createElement(DiffView, { engine, document, theme: 'dark', label: 'Review' })));
+        const buttons = () => [...page.host.querySelectorAll('.adecore-editor-diff-gap button')] as HTMLButtonElement[];
+        await act(async () => buttons()[0]!.click());
+        await act(async () => buttons()[0]!.click());
+        expect(buttons()[0]!.disabled).toBe(true);
+        await act(async () => buttons()[1]!.click());
+        expect(buttons()[0]!.disabled).toBe(true);
     });
 });

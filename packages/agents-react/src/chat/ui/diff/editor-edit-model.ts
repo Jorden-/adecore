@@ -1,7 +1,7 @@
 import { diffRows, type DiffDocument } from '@adecore/merge';
 
-/* Keep the rollout below the displayed sizes that still need native input and scroll measurements. */
-export const EDITOR_DIFF_LIMITS = { rows: 400, characters: 100000, lineLength: 10000 };
+// Large computed diffs still exceed the native mount budget; retain a smaller production display limit.
+export const EDITOR_DIFF_LIMITS = { rows: 2000, characters: 2000000, lineLength: 10000 };
 
 export function canRenderEditorDiff(document: DiffDocument): boolean {
     let rows = 0;

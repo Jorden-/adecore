@@ -16,6 +16,8 @@ export interface DiffViewProps {
     tokens?: DiffSourceTokens;
     wrap?: boolean;
     layout?: 'unified' | 'split';
+    /* Above this many displayed unified rows, split uses fixed line heights. Defaults to 2000. */
+    splitWrapLimit?: number;
     /* A fixed-height host supplies the height; otherwise the view grows with its rows. */
     fill?: boolean;
     /* Positive pixels; taller content scrolls inside the editor. Ignored with fill. */
@@ -214,11 +216,13 @@ export function DiffView(props: DiffViewProps) {
             return {
                 document,
                 gaps: next,
-                blocked: next === gaps ? new Set([...(previous.document === document ? previous.blocked : []), id]) : new Set()
+                blocked: new Set([...(previous.document === document ? previous.blocked : []), ...(next === gaps ? [id] : [])])
             };
         });
     if ('aligned' in projection && projection.old.lines.length > 0 && projection.new.lines.length > 0) {
-        return <SplitDiffView {...props} display={projection} unfold={unfold} blocked={blocked} />;
+        const visibleRows = projection.aligned.reduce((count, row) => count + (row.kind === 'gap' ? 0 : row.row.change === 'pair' ? 2 : 1), 0);
+        const wrap = props.wrap !== false && visibleRows <= (props.splitWrapLimit ?? 2000);
+        return <SplitDiffView {...props} wrap={wrap} display={projection} unfold={unfold} blocked={blocked} />;
     }
     // An absent side has no selectable text; keep additions and deletions in the unified editor.
     const display = 'aligned' in projection ? (projection.old.lines.length > 0 ? projection.old : projection.new) : projection;
