@@ -21,8 +21,8 @@ export type UiTableCell =
 
 /* Rows shown before a person asks for all of them. */
 export const UI_TABLE_ROWS = 50;
-/* Columns a table without Column children takes from its rows. */
-const DERIVED_COLUMNS = 8;
+/* The furthest a JavaScript Date reaches from the epoch either way, in milliseconds. */
+const DATE_RANGE = 8.64e15;
 const NUMERIC_KINDS: ReadonlySet<UiColumnKind> = new Set(['number', 'bytes', 'duration']);
 
 export function isNumericColumn(column: UiTableColumn): boolean {
@@ -51,7 +51,7 @@ export function uiTableColumns(node: UiViewNode<UiProps<'Table'>>): UiTableColum
     const keys: string[] = [];
     for (const row of rows) {
         for (const key of Object.keys(row)) {
-            if (!keys.includes(key) && keys.length < DERIVED_COLUMNS) {
+            if (!keys.includes(key)) {
                 keys.push(key);
             }
         }
@@ -92,7 +92,7 @@ export function uiTableCell(value: unknown, column: UiTableColumn): UiTableCell 
         }
         case 'date': {
             const at = typeof value === 'number' ? value : typeof value === 'string' ? Date.parse(value) : Number.NaN;
-            return Number.isFinite(at) ? { kind: 'date', at } : { kind: 'text', text: textOf(value) };
+            return Number.isFinite(at) && Math.abs(at) <= DATE_RANGE ? { kind: 'date', at } : { kind: 'text', text: textOf(value) };
         }
         case 'file':
             return typeof value === 'string' ? { kind: 'file', path: value } : { kind: 'text', text: textOf(value) };

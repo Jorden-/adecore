@@ -527,7 +527,13 @@
     "chart": {
       "values": "Values",
       "summary": "{{count}} values, highest {{label}} at {{value}}",
-      "summarySeries": "{{count}} categories, highest {{series}} for {{label}} at {{value}}"
+      "summarySeries": "{{count}} categories, highest {{series}} for {{label}} at {{value}}",
+      "rowsLeftOut": "The first {{shown}} of {{total}} rows are drawn.",
+      "seriesLeftOut_one": "{{series}} is not drawn.",
+      "seriesLeftOut_other": "{{series}} are not drawn.",
+      "sideBySide": "Negative values cannot be stacked, so the series stand side by side.",
+      "showValues": "Show all values",
+      "hideValues": "Hide values"
     },
     "image": {
       "label": "Image",

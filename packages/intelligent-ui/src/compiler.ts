@@ -138,6 +138,21 @@ function isConstant(expression: UiExpression): boolean {
     }
 }
 
+const CHART_SERIES = 6;
+
+/* The keys besides `label` that hold a finite number in some row of a chart's data. */
+function chartSeries(data: unknown): number {
+    const keys = new Set<string>();
+    for (const row of Array.isArray(data) ? data : []) {
+        for (const [key, value] of Object.entries((row ?? {}) as Record<string, unknown>)) {
+            if (key !== 'label' && typeof value === 'number' && Number.isFinite(value)) {
+                keys.add(key);
+            }
+        }
+    }
+    return keys.size;
+}
+
 /* Whether a child can give a Choice words: a component, an expression, or text that is more than whitespace. */
 function isLabelSource(child: UiSyntaxNode): boolean {
     return child.type !== '$text' || child.expression !== undefined || (child.text ?? '').trim() !== '';
@@ -265,6 +280,15 @@ export function compileUiBlock(source: string, options: UiCompileOptions): UiBlo
                 if (!parsed.success) {
                     throw new UiFailure('invalid_props', parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; '));
                 }
+            }
+            // The catalog promises six series, one per chart color; more still reach the values a person can open.
+            if (!unresolved && syntax.complete && syntax.type === 'Chart' && chartSeries(evaluated.data) > CHART_SERIES) {
+                diagnose(
+                    new UiFailure('too_many_series', `Chart draws up to ${CHART_SERIES} numeric series; the rest are only in its values.`),
+                    syntax.start,
+                    syntax.end,
+                    syntax.id
+                );
             }
             // A Choice sends its label, so one without a label can never send; whether it closed is only known once final.
             if (syntax.type === 'Choice' && syntax.complete && !syntax.children.some(isLabelSource)) {

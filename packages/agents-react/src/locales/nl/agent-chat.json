@@ -527,7 +527,13 @@
     "chart": {
       "values": "Waarden",
       "summary": "{{count}} waarden, hoogste {{label}} met {{value}}",
-      "summarySeries": "{{count}} categorieën, hoogste {{series}} bij {{label}} met {{value}}"
+      "summarySeries": "{{count}} categorieën, hoogste {{series}} bij {{label}} met {{value}}",
+      "rowsLeftOut": "De eerste {{shown}} van {{total}} rijen zijn getekend.",
+      "seriesLeftOut_one": "{{series}} is niet getekend.",
+      "seriesLeftOut_other": "{{series}} zijn niet getekend.",
+      "sideBySide": "Negatieve waarden kunnen niet gestapeld worden, dus de reeksen staan naast elkaar.",
+      "showValues": "Alle waarden tonen",
+      "hideValues": "Waarden verbergen"
     },
     "image": {
       "label": "Afbeelding",

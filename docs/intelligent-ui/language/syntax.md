@@ -99,6 +99,7 @@ Every problem becomes a `UiDiagnostic` with a `code`, a `message`, a source rang
 | `invalid_declaration`, `duplicate_declaration`, `invalid_default` | A declaration that is malformed, repeated or not a literal |
 | `unclosed_tag`, `unmatched_tag`              | Tags that do not pair                                        |
 | `duplicate_prop`, `refused_prop`, `invalid_props` | A prop written twice, unknown, or failing its schema    |
+| `too_many_series`                            | A Chart with more numeric series than a drawing holds; the rest stay in its values |
 | `unknown_component`                          | A name outside the catalog                                   |
 | `invalid_parent`, `invalid_child`            | A component in the wrong place                               |
 | `invalid_expression`, `incomplete_expression`, `invalid_value` | An expression that does not parse or evaluate |

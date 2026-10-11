@@ -56,7 +56,7 @@ Rows with named columns. `Table` holds only `Column`, which describes a field of
 | `unit`      | string | No       | Written after each number                                                    |
 | `as`        | string | No       | `text`, `number`, `bytes`, `duration`, `date`, `file` or `tag`                |
 
-A `duration` is in milliseconds. A `date` is milliseconds since the epoch or an ISO string. A `file` is a path in mono text. A value of the wrong kind reads as text, and a missing one as nothing.
+A `duration` is in milliseconds. A `date` is milliseconds since the epoch or an ISO string, within the range a JavaScript `Date` holds (8.64e15 milliseconds either way). A `file` is a path in mono text. A value of the wrong kind reads as text, and a missing one as nothing.
 
 ## Chart
 
@@ -68,7 +68,9 @@ Labeled numeric series. Each row of `data` has a `label` and up to six numeric s
 | `data` | array of records | Yes      | At most 1,000 rows of scalars                      |
 | `unit` | string           | No       | Written after each value                           |
 
-A renderer draws only the series it can use. A value that is not a finite number is a gap, and a chart without one usable series draws as its data.
+A renderer draws only the series it can use. A value that is not a finite number is a gap, and a chart without one usable series, or with numbers too large to scale, draws as its data.
+
+A bar and an `hbar` grow from zero to either side, so a negative value reads as one. Stacked parts cannot be negative: stacked data with a negative value is drawn as bars side by side, with a line that says so. A drawing holds the first 60 rows and the first six series; whatever it leaves out it names under the chart, with every value a press away. A chart with more than six series is noted as `too_many_series`.
 
 ```ui
 $weeks = [{"label": "W1", "opened": 12, "closed": 9}, {"label": "W2", "opened": 8, "closed": 14}]

@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { compileUiBlock, evaluateUiBlock, UI_CATALOG, UiState, type UiComponentName, type UiViewNode } from '@adecore/intelligent-ui';
 import { chatHost, setChatHost } from '../../../host';
 import { UiPageMemory } from './block-local';
-import { uiChartData, niceCeiling, UI_CHART_SERIES } from './chart-data';
+import { uiChartData, uiChartRange, niceCeiling, UI_CHART_SERIES } from './chart-data';
 import i18next from 'i18next';
 import { uiBlockHead, uiLiveChoiceReason, uiNodeLabel, uiNodeText, uiReasonText, uiUrlDomain, uiWithUnit } from './node-text';
 import { UI_RENDERERS } from './registry';
@@ -305,6 +305,24 @@ describe('tables', () => {
         expect(uiTableCell('12', columns[1]!)).toEqual({ kind: 'number', as: 'number', value: 12 });
     });
 
+    test('a date beyond what a Date can hold is text, and the rest of the table still draws', () => {
+        const column = { key: 'at', title: 'at', as: 'date' as const };
+        for (const value of [1e20, 8.64e15 + 1, -8.64e15 - 1]) {
+            expect(uiTableCell(value, column).kind).toBe('text');
+        }
+        expect(uiTableCell(8.64e15, column)).toEqual({ kind: 'date', at: 8.64e15 });
+        expect(uiTableCell('2026-10-11T08:00:00Z', column)).toEqual({ kind: 'date', at: Date.parse('2026-10-11T08:00:00Z') });
+        const html = markup('<Table rows={[{at: 1e20, name: "Far"}, {at: 0, name: "Epoch"}]}><Column key="at" as="date"/><Column key="name"/></Table>');
+        expect(html).toContain('<table');
+        expect(html).toContain('Epoch');
+        expect(html).not.toContain('Could not draw this part');
+    });
+
+    test('a table without columns shows every key of its rows', () => {
+        const { nodes } = evaluate('<Table rows={[{a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, i: 9}]}/>');
+        expect(uiTableColumns(nodes[0] as never).map((column) => column.key)).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']);
+    });
+
     test('show fifty rows until a person asks for all of them', () => {
         const rows = Array.from({ length: 60 }, (_, index) => `{n: ${index}}`).join(', ');
         const html = markup(`<Table rows={[${rows}]}/>`);
@@ -376,10 +394,58 @@ describe('charts', () => {
         expect(markup('<Chart kind="line" data={[{label: "x", value: "none"}]}/>')).toContain('Could not draw this part');
     });
 
-    test('a horizontal chart of only negative values draws no bar instead of a width that is not a number', () => {
-        const html = markup('<Chart kind="hbar" data={[{label: "Core", value: -3}, {label: "Client", value: -1}]}/>');
+    test('a horizontal chart draws a negative value from zero to the left', () => {
+        const html = markup('<Chart kind="hbar" data={[{label: "Balance", income: 10, cost: -6}]}/>');
         expect(html).not.toContain('NaN');
-        expect(html).toContain('width:0%');
+        expect(html).toContain('left:50%;width:50%');
+        expect(html).toContain('left:20%;width:30%');
+        const negative = markup('<Chart kind="hbar" data={[{label: "Core", value: -3}, {label: "Client", value: -1}]}/>');
+        expect(negative).not.toContain('NaN');
+        expect(negative).toContain('left:40%;width:60%');
+        expect(negative).toContain('-3');
+    });
+
+    test('stacked data with a negative value stands side by side and says why', () => {
+        const chart = uiChartData([{ label: 'Balance', income: 10, cost: -6 }], 'stacked')!;
+        expect([chart.kind, chart.min, chart.max]).toEqual(['bar', -6, 10]);
+        expect(markup('<Chart kind="stacked" data={[{label: "Balance", income: 10, cost: -6}]}/>')).toContain(
+            'Negative values cannot be stacked, so the series stand side by side.'
+        );
+        expect(uiChartData([{ label: 'Total', a: 2, b: 3 }], 'stacked')!.kind).toBe('stacked');
+    });
+
+    test('say which rows and series they leave out, and keep every value reachable', () => {
+        const rows = Array.from({ length: 61 }, (_, index) => ({ label: `Row ${index}`, count: index === 60 ? 1_000_000 : 1 }));
+        const chart = uiChartData(rows, 'hbar')!;
+        expect([chart.labels.length, chart.total, chart.truncated]).toEqual([60, 61, true]);
+        const html = markup(`<Chart kind="hbar" data={${JSON.stringify(rows)}}/>`);
+        expect(html).toContain('The first 60 of 61 rows are drawn.');
+        expect(html).toContain('Show all values');
+        expect(html).toContain('61 values, highest Row 60 at 1,000,000');
+        expect(html).toContain('<th scope="row">Row 60</th>');
+        const wide = '<Chart kind="stacked" data={[{label: "Total", a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7}]}/>';
+        expect(uiChartData([{ label: 'Total', a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7 }], 'stacked')!.omitted).toEqual(['g']);
+        const seven = markup(wide);
+        expect(seven).toContain('g is not drawn.');
+        expect(seven).toContain('<th scope="col">g</th>');
+        expect(compiled(wide).diagnostics.map((diagnostic) => diagnostic.code)).toEqual(['too_many_series']);
+        expect(markup('<Chart kind="bar" data={[{label: "Core", count: 2}]}/>')).not.toContain('Show all values');
+    });
+
+    test('numbers too large to scale draw as text, never as a coordinate that is not a number', () => {
+        for (const source of [
+            '<Chart kind="bar" data={[{label: "Huge", count: 1.5e308}]}/>',
+            '<Chart kind="stacked" data={[{label: "Huge", a: 1e308, b: 1e308}]}/>'
+        ]) {
+            const html = markup(source);
+            expect(html).not.toMatch(/NaN|Infinity/);
+            expect(html).toContain('Could not draw this part');
+        }
+        expect(uiChartData([{ label: 'Wide', low: -9e307, high: 9e307 }], 'bar')).toBeNull();
+        expect(uiChartRange(-3, 5)).toEqual({ low: -5, high: 5 });
+        const drawn = markup('<Chart kind="bar" data={[{label: "Big", count: 9e307}]}/>');
+        expect(drawn).not.toMatch(/NaN|Infinity/);
+        expect(drawn).toContain('role="img"');
     });
 });
 

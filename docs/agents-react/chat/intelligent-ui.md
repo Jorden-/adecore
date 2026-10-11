@@ -56,4 +56,4 @@ A renderer gets `UiRendererProps`: the evaluated `UiViewNode`, its rendered `chi
 
 The words live in the `agent-chat` namespace under `blocks`, in English and Dutch; what the agent wrote is never translated. A reason code from the host reads in the person's language through `uiReasonText`, and an unknown code falls back to the host's sentence.
 
-Every tone has its own icon, so color never carries meaning alone. A card is a named group and never a live region. A chart is an image with one sentence and a hidden table of its values. A primary choice comes first in the document as well as on screen. Motion follows the person's reduced-motion setting.
+Every tone has its own icon, so color never carries meaning alone. A card is a named group and never a live region. A chart is an image with one sentence over all of its data and a hidden table of its values, which a person can open when the drawing left rows or series out. A primary choice comes first in the document as well as on screen. Motion follows the person's reduced-motion setting.

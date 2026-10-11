@@ -3,11 +3,12 @@ import type { TFunction } from 'i18next';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import type { UiProps } from '@adecore/intelligent-ui';
-import { SegmentBar, useMeasuredWidth } from '@adecore/ui';
-import { formatRounded } from '@adecore/ui/format';
-import { niceCeiling, UI_CHART_ROWS, uiChartData, type UiChartData } from '../chart-data';
+import { Button, SegmentBar, useMeasuredWidth } from '@adecore/ui';
+import { formatNumber, formatRounded } from '@adecore/ui/format';
+import { useBlockLocal } from '../block-local';
+import { UI_CHART_ROWS, uiChartData, uiChartRange, uiChartValues, type UiChartData, type UiChartValues } from '../chart-data';
 import { uiWithUnit } from '../node-text';
-import type { UiRendererProps } from '../render-context';
+import type { UiRenderContext, UiRendererProps } from '../render-context';
 import { UiFallbackPart } from '../UiFallbackPart';
 
 type ChartKind = UiProps<'Chart'>['kind'];
@@ -38,23 +39,23 @@ function chartHeight(kind: ChartKind, rows: number): number {
     return kind === 'hbar' ? count * HBAR_ROW : kind === 'stacked' ? count * STACKED_ROW : HEIGHT;
 }
 
-/* One sentence with the main point, which a screen reader hears in place of the drawing. */
-function chartSummary(chart: UiChartData, unit: string | undefined, t: TFunction<'agent-chat'>): string {
+/* One sentence with the main point over all of the data, drawn or not, which a screen reader hears in place of the drawing. */
+function chartSummary(values: UiChartValues, unit: string | undefined, t: TFunction<'agent-chat'>): string {
     let top: { label: string; series: string; value: number } | null = null;
-    for (const series of chart.series) {
+    for (const series of values.series) {
         for (let i = 0; i < series.values.length; i++) {
             const value = series.values[i];
             if (value !== null && value !== undefined && (top === null || value > top.value)) {
-                top = { label: chart.labels[i] ?? '', series: series.key, value };
+                top = { label: values.labels[i] ?? '', series: series.key, value };
             }
         }
     }
     if (top === null) {
         return t('blocks.chart.values');
     }
-    return chart.series.length > 1
-        ? t('blocks.chart.summarySeries', { count: chart.labels.length, series: top.series, label: top.label, value: valueText(top.value, unit) })
-        : t('blocks.chart.summary', { count: chart.labels.length, label: top.label, value: valueText(top.value, unit) });
+    return values.series.length > 1
+        ? t('blocks.chart.summarySeries', { count: values.labels.length, series: top.series, label: top.label, value: valueText(top.value, unit) })
+        : t('blocks.chart.summary', { count: values.labels.length, label: top.label, value: valueText(top.value, unit) });
 }
 
 function Legend({ chart }: { chart: UiChartData }) {
@@ -70,34 +71,39 @@ function Legend({ chart }: { chart: UiChartData }) {
     );
 }
 
-/* The numbers behind the drawing, for a screen reader. */
-function ValuesTable({ chart, unit }: { chart: UiChartData; unit: string | undefined }) {
+/* Every number of the data, for a screen reader, and on screen once a person opens it. */
+function ValuesTable({ values, unit, shown }: { values: UiChartValues; unit: string | undefined; shown: boolean }) {
     const { t } = useTranslation('agent-chat');
-    return (
-        <table className="sr-only">
-            <caption>{t('blocks.chart.values')}</caption>
-            <thead>
+    const table = (
+        <table className={shown ? 'w-full border-collapse text-xs tabular-nums' : 'sr-only'}>
+            <caption className={shown ? 'sr-only' : undefined}>{t('blocks.chart.values')}</caption>
+            <thead className={shown ? 'sticky top-0 z-1 bg-surface-hover' : undefined}>
                 <tr>
                     <td />
-                    {chart.series.map((series) => (
-                        <th key={series.key} scope="col">
+                    {values.series.map((series) => (
+                        <th key={series.key} scope="col" className={shown ? 'h-8 px-2 text-right font-medium whitespace-nowrap text-text-muted' : undefined}>
                             {series.key}
                         </th>
                     ))}
                 </tr>
             </thead>
             <tbody>
-                {chart.labels.map((label, index) => (
-                    <tr key={index}>
-                        <th scope="row">{label}</th>
-                        {chart.series.map((series) => (
-                            <td key={series.key}>{valueText(series.values[index] ?? null, unit)}</td>
+                {values.labels.map((label, index) => (
+                    <tr key={index} className={shown ? 'border-t border-border-soft' : undefined}>
+                        <th scope="row" className={shown ? 'h-8 px-2 text-left font-normal wrap-anywhere text-text-muted' : undefined}>
+                            {label}
+                        </th>
+                        {values.series.map((series) => (
+                            <td key={series.key} className={shown ? 'h-8 px-2 text-right whitespace-nowrap text-text' : undefined}>
+                                {valueText(series.values[index] ?? null, unit)}
+                            </td>
                         ))}
                     </tr>
                 ))}
             </tbody>
         </table>
     );
+    return shown ? <div className="max-h-80 w-full overflow-auto rounded-md border border-border-soft">{table}</div> : table;
 }
 
 /* The values of one category beside the pointer. */
@@ -123,8 +129,8 @@ function Readout({ chart, index, left, unit }: { chart: UiChartData; index: numb
 /* Bars and lines over a value axis, in SVG at the measured width. */
 function VerticalChart({ chart, kind, unit, width }: { chart: UiChartData; kind: 'bar' | 'line'; unit: string | undefined; width: number }) {
     const [hover, setHover] = useState<number | null>(null);
-    const low = chart.min < 0 ? -niceCeiling(-chart.min) : 0;
-    const high = chart.max > 0 ? niceCeiling(chart.max) : low === 0 ? 1 : 0;
+    // uiChartData only hands over data whose range is finite.
+    const { low, high } = uiChartRange(chart.min, chart.max)!;
     const plotWidth = Math.max(0, width - AXIS_WIDTH);
     const plotHeight = HEIGHT - PLOT_TOP - LABEL_ROOM;
     const band = plotWidth / chart.labels.length;
@@ -230,24 +236,34 @@ function VerticalChart({ chart, kind, unit, width }: { chart: UiChartData; kind:
     );
 }
 
-/* A row of 24px per category, its label beside the bars. */
+/* A row of 24px per category, its label beside the bars, which grow from zero to either side. */
 function HorizontalChart({ chart, unit }: { chart: UiChartData; unit: string | undefined }) {
-    // Bars grow right from zero only, so a chart of only negative values has no length to share and keeps a unit scale.
-    const high = niceCeiling(chart.max) || 1;
+    const { low, high } = uiChartRange(chart.min, chart.max)!;
+    const span = high - low;
+    const zero = (-low / span) * 100;
     const single = chart.series.length === 1;
     return (
         <div aria-hidden className="flex flex-col">
             {chart.labels.map((label, index) => (
                 <div key={index} className="flex h-6 items-center gap-2 text-xs">
                     <span className="w-2/5 max-w-36 shrink-0 truncate text-text-muted">{label}</span>
-                    <span className="flex min-w-0 grow flex-col justify-center gap-px">
-                        {chart.series.map((series, at) => (
-                            <span
-                                key={series.key}
-                                className={clsx(GROW, 'block origin-left rounded-sm starting:scale-x-0', single ? 'h-3' : 'h-1')}
-                                style={{ width: `${(Math.max(0, series.values[index] ?? 0) / high) * 100}%`, backgroundColor: seriesColor(at) }}
-                            />
-                        ))}
+                    <span className="relative flex min-w-0 grow flex-col justify-center gap-px">
+                        {low < 0 && <span className="absolute inset-y-0 w-px bg-border" style={{ left: `${zero}%` }} />}
+                        {chart.series.map((series, at) => {
+                            const value = series.values[index] ?? 0;
+                            return (
+                                <span key={series.key} className={clsx('relative block', single ? 'h-3' : 'h-1')}>
+                                    <span
+                                        className={clsx(GROW, 'absolute inset-y-0 rounded-sm starting:scale-x-0', value < 0 ? 'origin-right' : 'origin-left')}
+                                        style={{
+                                            left: `${((Math.min(value, 0) - low) / span) * 100}%`,
+                                            width: `${(Math.abs(value) / span) * 100}%`,
+                                            backgroundColor: seriesColor(at)
+                                        }}
+                                    />
+                                </span>
+                            );
+                        })}
                     </span>
                     {single && (
                         <span className="w-16 shrink-0 text-right text-text-faint tabular-nums">{valueText(chart.series[0]!.values[index] ?? null, unit)}</span>
@@ -271,7 +287,7 @@ function StackedChart({ chart, unit }: { chart: UiChartData; unit: string | unde
                         label={label}
                         range={[0, chart.max]}
                         parts={chart.series.map((series, at) => ({
-                            value: Math.max(0, series.values[index] ?? 0),
+                            value: series.values[index] ?? 0,
                             color: seriesColor(at),
                             label: `${series.key} ${valueText(series.values[index] ?? 0, unit)}`
                         }))}
@@ -282,13 +298,72 @@ function StackedChart({ chart, unit }: { chart: UiChartData; unit: string | unde
     );
 }
 
-function DrawnChart({ chart, kind, unit }: { chart: UiChartData; kind: ChartKind; unit: string | undefined }) {
+/* What the drawing leaves out or draws otherwise, said in words, with every value a press away. */
+function ChartNotes({
+    chart,
+    requested,
+    values,
+    unit,
+    context,
+    nodeId
+}: {
+    chart: UiChartData;
+    requested: ChartKind;
+    values: UiChartValues;
+    unit: string | undefined;
+    context: UiRenderContext;
+    nodeId: string;
+}) {
+    const { t } = useTranslation('agent-chat');
+    const [shown, setShown] = useBlockLocal(context, `${nodeId}:values`, () => false);
+    const notes = [
+        ...(chart.truncated ? [t('blocks.chart.rowsLeftOut', { shown: formatNumber(chart.labels.length), total: formatNumber(chart.total) })] : []),
+        ...(chart.omitted.length > 0 ? [t('blocks.chart.seriesLeftOut', { count: chart.omitted.length, series: chart.omitted.join(', ') })] : []),
+        ...(requested === 'stacked' && chart.kind !== 'stacked' ? [t('blocks.chart.sideBySide')] : [])
+    ];
+    const partial = chart.truncated || chart.omitted.length > 0;
+    return (
+        <>
+            {notes.length > 0 && (
+                <div className="flex flex-col gap-0.5 text-xs text-text-muted">
+                    {notes.map((note) => (
+                        <p key={note}>{note}</p>
+                    ))}
+                </div>
+            )}
+            {partial && (
+                <Button size="xs" variant="secondary" className="self-start" aria-expanded={shown} onClick={() => setShown(!shown)}>
+                    {shown ? t('blocks.chart.hideValues') : t('blocks.chart.showValues')}
+                </Button>
+            )}
+            <ValuesTable values={values} unit={unit} shown={partial && shown} />
+        </>
+    );
+}
+
+function DrawnChart({
+    chart,
+    requested,
+    data,
+    unit,
+    context,
+    nodeId
+}: {
+    chart: UiChartData;
+    requested: ChartKind;
+    data: UiProps<'Chart'>['data'];
+    unit: string | undefined;
+    context: UiRenderContext;
+    nodeId: string;
+}) {
     const { t } = useTranslation('agent-chat');
     const [measure, width] = useMeasuredWidth();
+    const values = useMemo(() => uiChartValues(data), [data]);
+    const { kind } = chart;
     return (
         <figure className="flex flex-col gap-2 px-2">
             {chart.series.length > 1 && <Legend chart={chart} />}
-            <div ref={measure} role="img" aria-label={chartSummary(chart, unit, t)} className="relative">
+            <div ref={measure} role="img" aria-label={chartSummary(values, unit, t)} className="relative">
                 {kind === 'hbar' ? (
                     <HorizontalChart chart={chart} unit={unit} />
                 ) : kind === 'stacked' ? (
@@ -297,7 +372,7 @@ function DrawnChart({ chart, kind, unit }: { chart: UiChartData; kind: ChartKind
                     <div style={{ height: HEIGHT }}>{width > 0 && <VerticalChart chart={chart} kind={kind} unit={unit} width={width} />}</div>
                 )}
             </div>
-            <ValuesTable chart={chart} unit={unit} />
+            <ChartNotes chart={chart} requested={requested} values={values} unit={unit} context={context} nodeId={nodeId} />
         </figure>
     );
 }
@@ -306,7 +381,7 @@ function DrawnChart({ chart, kind, unit }: { chart: UiChartData; kind: ChartKind
  * Draws only once its node closed; until then a quiet surface of the height it will take holds its
  * place. It grows in once, and not at all for a person who asked for less motion.
  */
-export function ChartRenderer({ node }: UiRendererProps<UiProps<'Chart'>>) {
+export function ChartRenderer({ node, context }: UiRendererProps<UiProps<'Chart'>>) {
     const { kind, data, unit } = node.props;
     const chart = useMemo(() => (node.complete ? uiChartData(data, kind) : null), [node.complete, data, kind]);
     if (!node.complete) {
@@ -315,5 +390,5 @@ export function ChartRenderer({ node }: UiRendererProps<UiProps<'Chart'>>) {
     if (chart === null) {
         return <UiFallbackPart fallback={node.fallback} problem={{ kind: 'failed' }} />;
     }
-    return <DrawnChart chart={chart} kind={kind} unit={unit} />;
+    return <DrawnChart chart={chart} requested={kind} data={data} unit={unit} context={context} nodeId={node.id} />;
 }
