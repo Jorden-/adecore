@@ -4,6 +4,7 @@ import i18next from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, FileDiff, X } from 'lucide-react';
 import type { ChatCheckpointDiff, ChatCheckpointFile, ChatFileChange, ChatToolItem, ChatTurnItem } from '@adecore/agent-contracts';
+import type { BaseMoved } from '../../logic/timeline';
 import { fileChanges, liveOutput, readImagePath, toolStartedAt, toolSummary, unifiedChanges, type FileChange } from '../../logic/tools';
 import { useOpenForFind } from '../find-reveal';
 import { chatHost } from '../../../host';
@@ -289,10 +290,13 @@ function ChangedFilesCard({
     added,
     deleted,
     revealNonce = 0,
+    baseMoved,
     children
 }: {
     count: number;
     truncated?: boolean;
+    /* Set when the branch moved during the turn: the count is then what changed in the folder, not only the agent's work. */
+    baseMoved?: BaseMoved | undefined;
     added?: number;
     deleted?: number;
     /* A jump from outside the chat that asked for this card; each new one opens it. */
@@ -315,13 +319,20 @@ function ChangedFilesCard({
                 onClick={() => setExpanded((value) => !value)}
             >
                 <Icon icon={FileDiff} size={12} className="shrink-0" />
-                <span className="shrink-0 font-medium text-text">{t('work.changedFiles', { count })}</span>
+                <span className="shrink-0 font-medium text-text">
+                    {baseMoved === undefined ? t('work.changedFiles', { count }) : t('work.folderChanges', { count })}
+                </span>
                 {truncated && <span className="min-w-0 truncate text-text-faint">{t('work.andMore')}</span>}
                 <span className="grow" />
                 {added !== undefined && <span className="text-chat-added tabular-nums">+{added}</span>}
                 {deleted !== undefined && <span className="text-chat-removed tabular-nums">-{deleted}</span>}
                 <Icon icon={ChevronRight} size={12} className={clsx('shrink-0 text-text-faint transition-transform', expanded && 'rotate-90')} />
             </button>
+            {baseMoved !== undefined && (
+                <div className="px-3 pb-2 text-xs text-text-faint">
+                    {t('work.baseMoved', { from: baseMoved.from.slice(0, 7), to: baseMoved.to.slice(0, 7) })}
+                </div>
+            )}
             {expanded && children}
         </div>
     );
@@ -337,12 +348,14 @@ export function ChangedFilesRow({
     tools,
     diff,
     checkpoint,
+    baseMoved,
     chatId,
     turnId
 }: {
     tools: ChatToolItem[];
     diff: ChatCheckpointDiff | null;
     checkpoint: boolean;
+    baseMoved?: BaseMoved | undefined;
     chatId: string;
     turnId: string;
 }) {
@@ -375,6 +388,7 @@ export function ChangedFilesRow({
         return (
             <ChangedFilesCard
                 revealNonce={revealNonce}
+                baseMoved={baseMoved}
                 count={files.length}
                 truncated={checkpointDiff.truncated}
                 added={files.reduce((sum, file) => sum + file.added, 0)}

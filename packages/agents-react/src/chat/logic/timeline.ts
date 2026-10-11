@@ -52,7 +52,7 @@ export type TimelineRow =
     | { kind: 'question'; id: string; item: ChatQuestionItem }
     | { kind: 'note'; id: string; level: 'info' | 'warning' | 'error'; text: string; from?: string }
     | { kind: 'compaction'; id: string; preTokens: number | null }
-    | { kind: 'changed-files'; id: string; turnId: string; tools: ChatToolItem[]; diff: ChatCheckpointDiff | null; checkpoint: boolean }
+    | { kind: 'changed-files'; id: string; turnId: string; tools: ChatToolItem[]; diff: ChatCheckpointDiff | null; checkpoint: boolean; baseMoved?: BaseMoved }
     | { kind: 'turn-fold'; id: string; turn: ChatTurnItem; label: string; work: string[]; hiddenCount: number; expanded: boolean }
     | { kind: 'forks'; id: string; turnId: string }
     | { kind: 'working'; id: string; startedAt: number }
@@ -322,6 +322,12 @@ function rowsForItems(items: ChatItem[], options: TimelineOptions, children: Map
     return rows;
 }
 
+/* The branch the turn started on was not the one it ended on, so its diff also holds what came in with the move. */
+export interface BaseMoved {
+    from: string;
+    to: string;
+}
+
 /* The card of a settled turn: the checkpoint diff when the host took one, else what the tool calls carry. */
 function changedFilesRow(turn: ChatTurnItem, items: ChatItem[]): TimelineRow | null {
     const edits = items.filter(
@@ -332,7 +338,16 @@ function changedFilesRow(turn: ChatTurnItem, items: ChatItem[]): TimelineRow | n
     if (empty) {
         return null;
     }
-    return { kind: 'changed-files', id: `files-${turn.id}`, turnId: turn.id, tools: edits, diff, checkpoint: turn.checkpoint !== undefined };
+    const moved = turn.checkpointHead !== undefined && turn.checkpointHeadAfter !== undefined && turn.checkpointHead !== turn.checkpointHeadAfter;
+    return {
+        kind: 'changed-files',
+        id: `files-${turn.id}`,
+        turnId: turn.id,
+        tools: edits,
+        diff,
+        checkpoint: turn.checkpoint !== undefined,
+        ...(moved ? { baseMoved: { from: turn.checkpointHead!, to: turn.checkpointHeadAfter! } } : {})
+    };
 }
 
 function lastAssistantRow(rows: TimelineRow[]): TimelineRow | null {

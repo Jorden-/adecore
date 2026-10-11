@@ -67,7 +67,9 @@ export function Row({ row, chatId, toggleGroup, toggleTurn, toggleSubagent, open
         case 'forks':
             return <ForksRow chatId={chatId} turnId={row.turnId} />;
         case 'changed-files':
-            return <ChangedFilesRow chatId={chatId} turnId={row.turnId} tools={row.tools} diff={row.diff} checkpoint={row.checkpoint} />;
+            return (
+                <ChangedFilesRow chatId={chatId} turnId={row.turnId} tools={row.tools} diff={row.diff} checkpoint={row.checkpoint} baseMoved={row.baseMoved} />
+            );
         case 'approval':
             return <ApprovalHistoryRow item={row.item} />;
         case 'question':

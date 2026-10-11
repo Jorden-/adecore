@@ -37,6 +37,26 @@ describe('isBlock', () => {
     });
 });
 
+describe('the base moving during a turn', () => {
+    const rowsFor = (heads: { checkpointHead?: string; checkpointHeadAfter?: string }) => {
+        const turn = {
+            ...thread[0]!,
+            checkpoint: 'tree',
+            checkpointDiff: { files: [{ path: 'a.ts', status: 'modified', added: 1, deleted: 0, patch: '' }], truncated: false },
+            ...heads
+        };
+        const rows = deriveTimelineRows([turn as ChatItem, ...thread.slice(1)], { ...options, expandedTurns: new Set(['t1']) });
+        return rows.find((row) => row.kind === 'changed-files');
+    };
+
+    test('is named only when both heads are there and differ', () => {
+        expect(rowsFor({ checkpointHead: 'aaa', checkpointHeadAfter: 'bbb' })).toMatchObject({ baseMoved: { from: 'aaa', to: 'bbb' } });
+        expect(rowsFor({ checkpointHead: 'aaa', checkpointHeadAfter: 'aaa' })).not.toHaveProperty('baseMoved');
+        expect(rowsFor({ checkpointHead: 'aaa' })).not.toHaveProperty('baseMoved');
+        expect(rowsFor({})).not.toHaveProperty('baseMoved');
+    });
+});
+
 describe('deriveTimelineRows', () => {
     test.each(['running', 'done', 'error'] as const)('a %s image stays outside a settled turn fold', (state) => {
         const items: ChatItem[] = [
