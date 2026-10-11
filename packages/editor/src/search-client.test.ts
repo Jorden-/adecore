@@ -183,10 +183,11 @@ test('syntax, factory, post and worker errors have distinct outcomes without a m
     const message = worker.messages[0]!;
     worker.reply({ type: 'error', id: message.id, revision: 0, kind: 'syntax', message: 'bad pattern' });
     expect((await invalid).kind).toBe('syntax');
-    expect(worker.stopped).toBe(1);
+    expect(worker.stopped).toBe(0);
     const crashed = caught(host.client.search(snapshot, query));
     await Promise.resolve();
-    host.workers[1]!.emit('error', { message: 'worker crashed' } as ErrorEvent);
+    host.workers[0]!.reply({ type: 'ready' });
+    host.workers[0]!.emit('error', { message: 'worker crashed' } as ErrorEvent);
     expect((await crashed).kind).toBe('error');
     const client = createSearchClient({
         ...host.options,
@@ -233,4 +234,89 @@ test('invalid deadlines are rejected before any worker is created', () => {
             })
         ).toThrow(RangeError);
     }
+});
+
+test('a worker load error stays unavailable without repeated starts', async () => {
+    const host = setup();
+    const failed = caught(host.client.search(snapshot, query));
+    await Promise.resolve();
+    host.workers[0]!.emit('error', { message: 'CSP blocked worker' } as ErrorEvent);
+    expect((await failed).kind).toBe('unavailable');
+    expect((await caught(host.client.search(snapshot, query))).kind).toBe('unavailable');
+    expect(host.workers).toHaveLength(1);
+    expect(host.workers[0]!.stopped).toBe(1);
+    host.client.dispose();
+});
+
+test('an unavailable factory is not retried on every query', async () => {
+    let starts = 0;
+    const client = createSearchClient({
+        workerFactory: () => {
+            starts++;
+            throw new Error('unavailable');
+        }
+    });
+    expect((await caught(client.search(snapshot, query))).kind).toBe('unavailable');
+    expect((await caught(client.search(snapshot, query))).kind).toBe('unavailable');
+    expect(starts).toBe(1);
+    client.dispose();
+});
+
+test('a message decode error fails immediately and a later query gets a fresh worker', async () => {
+    const host = setup();
+    const failed = caught(host.client.search(snapshot, query));
+    await Promise.resolve();
+    host.workers[0]!.emit('messageerror', {} as MessageEvent);
+    expect((await failed).kind).toBe('error');
+    expect(host.timers[0]!.cancelled).toBe(true);
+    const next = host.client.search(snapshot, query);
+    await Promise.resolve();
+    expect(host.workers).toHaveLength(2);
+    host.result();
+    await next;
+    host.client.dispose();
+});
+
+test('invalid client input does not start a worker or discard an idle snapshot', async () => {
+    const host = setup();
+    expect((await caught(host.client.search(snapshot, { ...query, text: '(' }))).kind).toBe('syntax');
+    for (const options of [{ from: -1 }, { from: 3, to: 2 }, { to: 5 }, { maxResults: 10001 }, { maxResults: -1 }]) {
+        expect((await caught(host.client.search(snapshot, query, options))).kind).toBe('range');
+    }
+    expect((await caught(host.client.search({ ...snapshot, revision: -1 }, query))).kind).toBe('range');
+    expect(host.workers).toHaveLength(0);
+    const first = host.client.search(snapshot, query);
+    await Promise.resolve();
+    host.result();
+    await first;
+    expect((await caught(host.client.search(snapshot, { ...query, text: '(' }))).kind).toBe('syntax');
+    const next = host.client.search(snapshot, query);
+    await Promise.resolve();
+    expect(host.workers).toHaveLength(1);
+    expect(host.workers[0]!.messages[1]).not.toHaveProperty('text');
+    host.result();
+    await next;
+    host.client.dispose();
+});
+
+test('deterministic worker range errors retain the loaded snapshot, but desync restarts it', async () => {
+    const host = setup();
+    const failure = caught(host.client.search(snapshot, query));
+    await Promise.resolve();
+    const message = host.workers[0]!.messages[0]!;
+    host.workers[0]!.reply({ type: 'error', id: message.id, revision: 0, kind: 'range', message: 'response too large' });
+    expect((await failure).kind).toBe('range');
+    expect(host.workers[0]!.stopped).toBe(0);
+    const desynced = caught(host.client.search(snapshot, query));
+    await Promise.resolve();
+    const nextMessage = host.workers[0]!.messages[1]!;
+    host.workers[0]!.reply({ type: 'error', id: nextMessage.id, revision: 0, kind: 'snapshot', message: 'missing snapshot' });
+    expect((await desynced).kind).toBe('snapshot');
+    expect(host.workers[0]!.stopped).toBe(1);
+    const retry = host.client.search(snapshot, query);
+    await Promise.resolve();
+    expect(host.workers[1]!.messages[0]).toHaveProperty('text', 'word');
+    host.result();
+    await retry;
+    host.client.dispose();
 });

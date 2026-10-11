@@ -27,7 +27,14 @@ export function serveEditorSearch(endpoint: EditorSearchWorkerEndpoint): () => v
                 snapshot = { revision: request.revision, text: request.text };
             }
             if (snapshot === undefined || snapshot.revision !== request.revision) {
-                throw new RangeError('The search worker needs the text of this revision.');
+                endpoint.postMessage({
+                    type: 'error',
+                    id: request.id,
+                    revision: request.revision,
+                    kind: 'snapshot',
+                    message: 'The search worker needs the text of this revision.'
+                });
+                return;
             }
             const matches = findMatches(snapshot.text, request.query.text, request.revision, {
                 caseSensitive: request.query.caseSensitive,
@@ -69,6 +76,7 @@ export function serveEditorSearch(endpoint: EditorSearchWorkerEndpoint): () => v
         }
     };
     endpoint.addEventListener('message', listener);
+    endpoint.postMessage({ type: 'ready' });
     return () => {
         endpoint.removeEventListener('message', listener);
         snapshot = undefined;

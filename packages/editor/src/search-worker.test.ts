@@ -4,7 +4,7 @@ import { serveEditorSearch, type EditorSearchInput, type EditorSearchOutput, typ
 
 function endpoint() {
     let listener: ((event: MessageEvent<EditorSearchInput>) => void) | undefined;
-    const sent: EditorSearchOutput[] = [];
+    const sent: Exclude<EditorSearchOutput, { type: 'ready' }>[] = [];
     const port: EditorSearchWorkerEndpoint = {
         addEventListener(_type, next) {
             listener = next;
@@ -15,7 +15,9 @@ function endpoint() {
             }
         },
         postMessage(message) {
-            sent.push(message);
+            if (message.type !== 'ready') {
+                sent.push(message);
+            }
         }
     };
     return {
@@ -58,7 +60,7 @@ test('worker snapshots are reused only for their revision and released on dispos
     wire.send(request(undefined, { id: 2 }));
     expect(wire.sent[1]).toMatchObject({ type: 'matches', id: 2, matches: [{ text: 'word' }] });
     wire.send(request(undefined, { id: 3, revision: 1 }));
-    expect(wire.sent[2]).toMatchObject({ type: 'error', id: 3, kind: 'range' });
+    expect(wire.sent[2]).toMatchObject({ type: 'error', id: 3, kind: 'snapshot' });
     wire.send(request('next', { id: 4, revision: 1, query: { text: 'next', caseSensitive: false, wholeWord: false, regex: false } }));
     expect(wire.sent[3]).toMatchObject({ type: 'matches', matches: [{ text: 'next', revision: 1 }] });
     dispose();

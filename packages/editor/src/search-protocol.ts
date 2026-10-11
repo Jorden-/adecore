@@ -32,5 +32,12 @@ export interface EditorSearchInput {
 }
 
 export type EditorSearchOutput =
+    | { readonly type: 'ready' }
     | ({ readonly type: 'matches'; readonly id: number } & EditorSearchResult)
-    | { readonly type: 'error'; readonly id: number; readonly revision: number; readonly kind: 'syntax' | 'range' | 'error'; readonly message: string };
+    | {
+          readonly type: 'error';
+          readonly id: number;
+          readonly revision: number;
+          readonly kind: 'syntax' | 'range' | 'snapshot' | 'error';
+          readonly message: string;
+      };

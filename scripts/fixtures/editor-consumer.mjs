@@ -37,7 +37,9 @@ const stopSearch = serveEditorSearch({
         }
     },
     postMessage(message) {
-        searchReplies.push(message);
+        if (message.type !== 'ready') {
+            searchReplies.push(message);
+        }
     }
 });
 searchListener({
