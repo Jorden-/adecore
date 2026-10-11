@@ -359,4 +359,14 @@ describe('open wire and agent text', () => {
         expect(uiSessionNote()).toContain('@Filter(list,row,predicate)');
         expect(uiSessionNote().length).toBeLessThan(2400);
     });
+
+    test('keeps a question the agent needs answered before it acts out of Choices, naming no tool', () => {
+        for (const instruction of [uiSessionNote(), uiReferenceText()]) {
+            expect(instruction).toContain('optional next steps after a finished answer');
+            expect(instruction).toMatch(
+                /needed before acting: use your own question tool if you have one, otherwise ask in prose|needed before acting with your own question tool if you have one, otherwise in prose/
+            );
+            expect(instruction).not.toMatch(/AskUserQuestion|request_user_input|ask_user/i);
+        }
+    });
 });

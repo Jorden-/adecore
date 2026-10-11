@@ -1,6 +1,6 @@
 # Choices
 
-Ask the person to pick a next step. A Choice sends its label and its context as a message, once, after the reply finished streaming. See [Choices](/intelligent-ui/host/choices) for what the host checks.
+Optional next steps after a finished answer. Information or a decision the agent needs before it acts is not a Choice: the agent asks with its own question tool when it has one, and otherwise in prose. A Choice sends its label and its context as a message, once, after the reply finished streaming. See [Choices](/intelligent-ui/host/choices) for what the host checks.
 
 <Demo src="intelligent-ui/choices" />
 
