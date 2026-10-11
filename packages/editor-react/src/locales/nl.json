@@ -148,6 +148,7 @@
     "find": {
         "label": "Zoeken",
         "count": "{{current}} / {{total}}",
+        "countLimited": "{{current}} / {{total}}+",
         "none": "Geen resultaten",
         "invalid": "Ongeldige reguliere expressie",
         "caseSensitive": "Hoofdlettergevoelig",

@@ -31,7 +31,10 @@ export function FindReplace({ editor, className, onClose }: { editor: Editor; cl
             ? t('find.invalid')
             : state.noSelection
               ? t('find.noSelection')
-              : t('find.count', { total: formatNumber(state.count), current: state.current === null ? '0' : formatNumber(state.current + 1) });
+              : t(state.limited ? 'find.countLimited' : 'find.count', {
+                    total: formatNumber(state.count),
+                    current: state.current === null ? '0' : formatNumber(state.current + 1)
+                });
     return (
         <div className={`adecore-editor-find ${className ?? ''}`} role="search" aria-label={t('find.label')}>
             <div className="adecore-editor-find-row">
