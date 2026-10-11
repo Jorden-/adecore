@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { act, useState, type ReactNode } from 'react';
+import type { Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import i18next from 'i18next';
 import { setFormatSource, type FormatSource } from './format/locale.ts';
@@ -48,16 +49,11 @@ describe('a slider', () => {
     });
 });
 
-const flush = async (): Promise<void> => {
-    for (let i = 0; i < 12; i++) {
-        await Promise.resolve();
-    }
-};
-
 // Runs with the DOM preload: `bun test --preload ./packages/ui/src/file-tree/testing/preload.ts packages/ui/src/Slider.test.tsx`.
 describe.skipIf(typeof document === 'undefined')('a slider under the keyboard', () => {
     let container: HTMLDivElement;
     let changes: number[];
+    let root: Root;
 
     function Harness(props: Omit<SliderProps, 'value' | 'onValueChange' | 'label'> & { initial: number }) {
         const { initial, ...rest } = props;
@@ -77,10 +73,9 @@ describe.skipIf(typeof document === 'undefined')('a slider under the keyboard', 
 
     const mount = async (node: ReactNode): Promise<HTMLInputElement> => {
         const { createRoot } = await import('react-dom/client');
-        const root = createRoot(container);
+        root = createRoot(container);
         await act(async () => {
             root.render(<UIProvider i18n={i18n}>{node}</UIProvider>);
-            await flush();
         });
         const input = container.querySelector<HTMLInputElement>('input[type="range"]');
         if (input === null) {
@@ -100,7 +95,6 @@ describe.skipIf(typeof document === 'undefined')('a slider under the keyboard', 
             } finally {
                 Reflect.deleteProperty(globalThis, 'event');
             }
-            await flush();
         });
     };
 
@@ -110,7 +104,8 @@ describe.skipIf(typeof document === 'undefined')('a slider under the keyboard', 
         document.body.append(container);
     });
 
-    afterEach(() => {
+    afterEach(async () => {
+        await act(async () => root.unmount());
         container.remove();
     });
 

@@ -12,11 +12,6 @@ import i18next from 'i18next';
 
 const i18n = i18next.createInstance();
 await i18n.init({ lng: 'en', resources: {}, interpolation: { escapeValue: false } });
-const flush = async (): Promise<void> => {
-    for (let i = 0; i < 12; i++) {
-        await Promise.resolve();
-    }
-};
 let command: (value: SplitCommand) => void;
 let setAppearance: (value: WorkspaceLayout) => void;
 let current: SplitLayout;
@@ -78,7 +73,6 @@ describe.skipIf(typeof document === 'undefined')('workspace interaction', () => 
     afterEach(async () => {
         await act(async () => {
             root.unmount();
-            await flush();
         });
         container.remove();
         if (widthDescriptor) {
@@ -95,13 +89,11 @@ describe.skipIf(typeof document === 'undefined')('workspace interaction', () => 
     const mount = async (node: ReactNode): Promise<void> => {
         await act(async () => {
             root.render(<UIProvider i18n={i18n}>{node}</UIProvider>);
-            await flush();
         });
     };
     const change = async (run: () => void): Promise<void> => {
         await act(async () => {
             run();
-            await flush();
         });
     };
     test('keeps the exact view DOM across splits, moves, maximize, and layout changes', async () => {
