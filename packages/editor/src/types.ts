@@ -68,6 +68,8 @@ export interface EditorOptions {
     readonly rightMargin?: number | null;
     /* When the arrow that folds a block shows in the gutter; on hover by default. */
     readonly foldOutline?: EditorFoldOutline;
+    /* False disables automatic and selection folds, including fold commands. */
+    readonly folding?: boolean;
     /* What the editor says to a person itself, in the host's words. */
     readonly messages?: Partial<EditorMessages>;
     /* The accessible name of the editor, such as "Commit message", in the host's language; `Code editor` without one. */
@@ -314,6 +316,8 @@ export interface EditorWidget {
     readonly placement?: 'above' | 'below';
     /* The height the row has until it has been measured. */
     readonly height?: number;
+    /* Uses height as exact pixels and never measures the row. */
+    readonly fixed?: boolean;
     /* Fills the element the row is drawn in, which the editor makes again whenever the row scrolls back into view. */
     render(container: HTMLElement): void;
 }
@@ -571,6 +575,12 @@ export interface Editor {
     getCaret(): EditorPosition;
     /* In pixels, what `scrollTop` on mounting takes back. */
     getScrollTop(): number;
+    /* Immediate pixels, canceling an animated scroll and repainting before returning. */
+    setScrollTop(top: number): void;
+    /* Intrinsic text height of a zero-based line, estimated until drawn; zero for hidden or absent lines. */
+    getLineHeight(line: number): number;
+    /* Text heights changed after a measurement, edit, wrap width or font change; excludes widget heights. */
+    onLineHeights(listener: () => void): () => void;
     /* All rows in pixels, including the horizontal scrollbar, for a host that grows with its contents. */
     getContentHeight(): number;
     /* Which lines are folded, for `folds` on mounting. */

@@ -96,7 +96,8 @@ class SmartEditor implements Editor {
             guides: options.guides !== false,
             whitespace: options.whitespace === true,
             rightMargin: options.rightMargin ?? null,
-            foldOutline: options.foldOutline ?? 'hover'
+            foldOutline: options.foldOutline ?? 'hover',
+            folding: options.folding !== false
         };
         this.view = new EditorView(element, this.model, this.settings);
         this.controller = new InputController(this.view, {
@@ -221,6 +222,18 @@ class SmartEditor implements Editor {
 
     getScrollTop(): number {
         return this.view.scrollPlace.y;
+    }
+
+    setScrollTop(top: number): void {
+        this.view.setScrollTop(top);
+    }
+
+    getLineHeight(line: number): number {
+        return this.view.getLineHeight(line);
+    }
+
+    onLineHeights(listener: Listener): () => void {
+        return this.view.onLineHeights(listener);
     }
 
     getContentHeight(): number {
@@ -559,6 +572,7 @@ class SmartEditor implements Editor {
                 at: this.offsetAt({ line: widget.line, character: 0 }),
                 placement: widget.placement ?? 'below',
                 height: widget.height,
+                fixed: widget.fixed,
                 render: (container: HTMLElement) => {
                     container.classList.add('se-widget');
                     widget.render(container);

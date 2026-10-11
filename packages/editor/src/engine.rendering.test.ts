@@ -542,3 +542,78 @@ describe('content height', () => {
         editor.dispose();
     });
 });
+
+describe('linked read-only layouts', () => {
+    test('fixed widgets ignore measurements and intrinsic heights exclude their rows', () => {
+        const { editor, host } = setup({ text: 'old\nnext', wrap: false });
+        const height = editor.getLineHeight(0);
+        editor.setWidgets([
+            {
+                id: 'space',
+                line: 0,
+                height: 75,
+                fixed: true,
+                render: (element) => {
+                    element.textContent = 'spacer';
+                }
+            }
+        ]);
+        expect(editor.getLineHeight(0)).toBe(height);
+        expect(editor.getLineHeight(1)).toBe(height);
+        expect((host.querySelector('.se-block') as HTMLElement).style.height).toBe('75px');
+        expect(editor.getContentHeight()).toBe(height * 2 + 75 + 8);
+        expect(editor.getLineHeight(-1)).toBe(0);
+        expect(editor.getLineHeight(2)).toBe(0);
+        editor.dispose();
+    });
+
+    test('height listeners run after rendering and can add rows without recursive notifications', () => {
+        const { editor, host } = setup({ text: 'word '.repeat(200), wrap: false });
+        Object.defineProperty(host.querySelector('.se-viewport')!, 'clientWidth', { value: 200 });
+        let changes = 0;
+        const stop = editor.onLineHeights(() => {
+            changes++;
+            editor.setWidgets([{ id: 'space', line: 0, placement: 'above', height: 40, fixed: true, render: () => {} }]);
+        });
+        editor.setWrap(true);
+        expect(changes).toBeGreaterThan(0);
+        expect(editor.getLineHeight(0)).toBeGreaterThan(20);
+        expect(host.querySelector('.se-block')).not.toBeNull();
+        const before = changes;
+        editor.setWidgets([]);
+        expect(changes).toBe(before);
+        stop();
+        editor.setWrap(false);
+        expect(changes).toBe(before);
+        editor.dispose();
+    });
+
+    test('synchronized scroll paints immediately and does nothing for an unchanged position', () => {
+        const { editor, host } = setup({ text: Array.from({ length: 400 }, (_, index) => `line ${index}`).join('\n') });
+        let changes = 0;
+        editor.onViewChange(() => changes++);
+        editor.setScrollTop(2000);
+        expect(editor.getScrollTop()).toBe(2000);
+        expect(host.querySelector('.se-line[data-line="100"]')).not.toBeNull();
+        const before = changes;
+        editor.setScrollTop(2000);
+        expect(changes).toBe(before);
+        editor.setScrollTop(Number.NaN);
+        expect(editor.getScrollTop()).toBe(2000);
+        editor.dispose();
+    });
+
+    test('disabled folding ignores restored folds and selection fold commands', () => {
+        const { editor } = setup({
+            text: 'function call() {\n    body();\n}\n',
+            folding: false,
+            folds: { collapsed: [{ startLine: 0, endLine: 2 }], custom: [] }
+        });
+        editor.setSelection({ start: { line: 0, character: 0 }, end: { line: 2, character: 1 } });
+        expect(editor.runCommand('foldSelection')).toBe(false);
+        expect(editor.runCommand('collapseAllRegions')).toBe(false);
+        expect(editor.getFolds()).toEqual({ collapsed: [], custom: [] });
+        expect(editor.getLineHeight(1)).toBeGreaterThan(0);
+        editor.dispose();
+    });
+});

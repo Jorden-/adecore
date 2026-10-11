@@ -40,6 +40,7 @@ export interface BlockWidget {
     revision?: number;
     /* A quiet row of one code line's height, placed at the indentation of its line and never measured. */
     lens?: boolean;
+    fixed?: boolean;
 }
 
 /* Collapsed, it hides the lines after `startLine` through `endLine`. */
@@ -322,6 +323,7 @@ export interface LayoutConfig {
 export class EditorLayout {
     rows: LayoutRow[] = [];
     height = 0;
+    lineHeightsVersion = 0;
     /* The widest line measured since the text last changed, and the room past it; what a horizontal scroll bar needs. */
     width = 0;
     private lineRows: number[] = [];
@@ -367,8 +369,10 @@ export class EditorLayout {
         }
         if (config.folds) {
             this.folds = config.folds;
+            this.lineHeightsVersion++;
         }
         if (measureAgain || config.textChanged) {
+            this.lineHeightsVersion++;
             this.geometryCache.clear();
             this.measuredRows.clear();
             this.width = 0;
@@ -424,7 +428,11 @@ export class EditorLayout {
                 line,
                 widget,
                 top: 0,
-                height: widget.lens ? this.metrics.lineHeight : (this.measuredHeights.get(key) ?? widget.height ?? DEFAULT_BLOCK_HEIGHT)
+                height: widget.lens
+                    ? this.metrics.lineHeight
+                    : widget.fixed
+                      ? Math.max(1, widget.height ?? DEFAULT_BLOCK_HEIGHT)
+                      : (this.measuredHeights.get(key) ?? widget.height ?? DEFAULT_BLOCK_HEIGHT)
             });
         };
         for (let line = 0; line < count; line++) {
@@ -480,7 +488,7 @@ export class EditorLayout {
     setMeasuredHeight(key: string, height: number): boolean {
         const row = this.rows.find((candidate) => candidate.key === key);
         const next = Math.max(1, Math.round(height));
-        if (!row || !Number.isFinite(next) || row.height === next) {
+        if (!row || (row.kind === 'block' && row.widget.fixed) || !Number.isFinite(next) || row.height === next) {
             return false;
         }
         this.measuredHeights.set(key, next);
@@ -505,6 +513,7 @@ export class EditorLayout {
             }
         }
         if (changed) {
+            this.lineHeightsVersion++;
             this.reflow();
         }
         return changed;

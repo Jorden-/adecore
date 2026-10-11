@@ -119,6 +119,7 @@ export function DiffView({ engine, document, theme, tokens, wrap = true, fill = 
             readOnly: true,
             guides: false,
             foldOutline: 'off',
+            folding: false,
             // Prompt cards use this chord for their primary action; a read-only review has no split-line action.
             handBack: [parseChord('Mod+Enter')]
         });

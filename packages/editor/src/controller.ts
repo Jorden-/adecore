@@ -306,6 +306,9 @@ export class InputController {
     /* Folding is the view's, since it knows where the ranges are. */
     private viewCommand(name: EditorViewCommand): boolean {
         const { view } = this;
+        if (view.settings.folding === false && name !== 'toggleColumnMode') {
+            return false;
+        }
         const run: Record<EditorViewCommand, () => void> = {
             collapseRegion: () => view.collapseRegion(),
             expandRegion: () => view.expandRegion(),

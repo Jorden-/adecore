@@ -95,6 +95,7 @@ export interface ViewSettings {
     rightMargin: number | null;
     /* When the arrow that folds a block shows in the gutter. */
     foldOutline: 'off' | 'hover' | 'always';
+    folding?: boolean;
 }
 
 /* The lines past the visible ones that are colored ahead of the scroll, and how long one slice of that work may take. */
@@ -190,6 +191,8 @@ export class EditorView {
     private readonly findListeners = new Set<(state: EditorFindState) => void>();
     private readonly scopeListeners = new Set<(scope: readonly EditorBlock[]) => void>();
     private readonly viewListeners = new Set<() => void>();
+    private readonly lineHeightListeners = new Set<() => void>();
+    private announcedLineHeights = -1;
     private readonly gutterActionListeners = new Set<(line: number) => void>();
     private gutterAction: { line: number; label: string } | null = null;
     private readonly gutterMarkerListeners = new Set<(id: string) => void>();
@@ -787,12 +790,15 @@ export class EditorView {
     /* The folds of the document, a moment after the last edit since they read all of it. */
     private scheduleFolds(): void {
         clearTimeout(this.foldTimer);
+        if (this.settings.folding === false) {
+            return;
+        }
         this.foldTimer = setTimeout(() => this.refreshFolds(), FOLD_DELAY_MS);
     }
 
     /* Reads the folds off the document now, which otherwise waits for a pause in editing. */
     refreshFolds(): void {
-        if (this.disposed) {
+        if (this.disposed || this.settings.folding === false) {
             return;
         }
         const ranges =
@@ -965,6 +971,9 @@ export class EditorView {
      * and closes one of the document's own. A selection inside one line has no line to fold.
      */
     foldSelection(): void {
+        if (this.settings.folding === false) {
+            return;
+        }
         const { anchor, head } = this.model.getPrimary();
         let from = Math.min(anchor, head);
         let to = Math.max(anchor, head);
@@ -1016,6 +1025,9 @@ export class EditorView {
         state: { collapsed: readonly { startLine: number; endLine: number }[]; custom: readonly { startLine: number; endLine: number }[] } | null,
         defaults: readonly FoldRole[] = []
     ): void {
+        if (this.settings.folding === false) {
+            return;
+        }
         const last = this.model.getLineCount() - 1;
         if (state !== null) {
             this.customFolds = state.custom
@@ -1535,6 +1547,30 @@ export class EditorView {
         emit(this.hoverListeners, offset);
     }
 
+    getLineHeight(line: number): number {
+        if (!Number.isInteger(line) || line < 0 || line >= this.model.getLineCount() || this.layout.isHidden(line)) {
+            return 0;
+        }
+        return this.layout.rowForLine(line).height;
+    }
+
+    onLineHeights(listener: () => void): () => void {
+        return subscribe(this.lineHeightListeners, listener);
+    }
+
+    setScrollTop(top: number): void {
+        if (!Number.isFinite(top)) {
+            return;
+        }
+        this.cancelScroll();
+        const next = Math.max(0, top);
+        if (this.viewport.scrollTop === next) {
+            return;
+        }
+        this.viewport.scrollTop = next;
+        this.render();
+    }
+
     onViewChange(listener: () => void): () => void {
         return subscribe(this.viewListeners, listener);
     }
@@ -1837,6 +1873,11 @@ export class EditorView {
         } finally {
             this.frameGeometry = null;
             this.rendering = false;
+        }
+        if (!this.disposed && this.announcedLineHeights !== this.layout.lineHeightsVersion) {
+            this.announcedLineHeights = this.layout.lineHeightsVersion;
+            // Hosts may adjust rows in response; rendering must already have finished.
+            emit(this.lineHeightListeners);
         }
     }
 
@@ -2484,6 +2525,7 @@ export class EditorView {
         this.findListeners.clear();
         this.scopeListeners.clear();
         this.viewListeners.clear();
+        this.lineHeightListeners.clear();
         this.hoverListeners.clear();
         this.gutterActionListeners.clear();
         this.gutterMarkerListeners.clear();

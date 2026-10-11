@@ -286,7 +286,7 @@ export class RowPainter {
             element.dataset.widgetId = widget.id;
             this.fillBlock(element, widget);
             this.code.append(element);
-            if (!widget.lens) {
+            if (!widget.lens && !widget.fixed) {
                 this.observer?.observe(element);
             }
             entry = { element, text: '', tokens: null, layoutVersion: 0, whitespace: false, folded: false, tail: '', tailTokens: null, revision };
@@ -308,6 +308,13 @@ export class RowPainter {
         } else {
             entry.element.style.width = `${Math.max(80, paint.viewportWidth)}px`;
         }
+        if (widget.fixed) {
+            this.observer?.unobserve(entry.element);
+            entry.element.style.height = `${row.height}px`;
+            return false;
+        }
+        entry.element.style.height = '';
+        this.observer?.observe(entry.element);
         const height = entry.element.getBoundingClientRect?.().height ?? 0;
         return height > 0 && this.layout.setMeasuredHeight(row.key, height);
     }

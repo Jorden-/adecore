@@ -66,3 +66,7 @@ The row is one code line high and stands at the declaration's indentation. It ke
 ## Content height
 
 `getContentHeight()` returns the height in pixels needed to show all rows without vertical scrolling, including wrapped lines, widget rows, bottom padding and the horizontal scrollbar when present. Read it after mounting and on `onViewChange` to size a host that grows with its contents. A fixed-height host can keep its existing height and let the editor scroll.
+
+`getLineHeight(line)` returns the intrinsic text height of a zero-based line, excluding widgets. Wrapped lines outside the viewport use an estimate until drawn; hidden or absent lines return zero. `onLineHeights(listener)` reports changes after rendering, so the listener can safely adjust widgets. Widget height changes alone do not trigger it. Use `setScrollTop(top)` to synchronize viewports immediately; it cancels an animated scroll and repaints before returning.
+
+A widget with `fixed: true` uses its `height` as exact pixels and is never measured. This keeps spacer and gap rows identical across linked layouts. Omitted height uses the normal initial widget height.

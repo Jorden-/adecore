@@ -60,7 +60,7 @@ export class FakeEditor implements Editor {
     readonly language: string | undefined;
     readonly path: string | undefined;
     readonly column: number | null;
-    readonly scrollTop: number | null;
+    scrollTop: number | null;
     wrap: boolean;
     theme: EditorTheme;
     readOnly: boolean;
@@ -499,6 +499,7 @@ export class FakeEditor implements Editor {
     charSize = { width: 8, height: 20 };
     private readonly carets = new Set<(position: EditorPosition) => void>();
     private readonly hovers = new Set<(hover: EditorHover | null) => void>();
+    private readonly lineHeights = new Set<Listener>();
     private readonly views = new Set<Listener>();
     private readonly keys = new Set<EditorKeyHandler>();
 
@@ -558,6 +559,21 @@ export class FakeEditor implements Editor {
 
     /* A test supplies the measured height; this fake has no layout. */
     contentHeight = 0;
+
+    setScrollTop(top: number): void {
+        if (Number.isFinite(top) && this.getScrollTop() !== Math.max(0, top)) {
+            this.scrollTop = Math.max(0, top);
+            emit(this.views);
+        }
+    }
+
+    getLineHeight(line: number): number {
+        return Number.isInteger(line) && line >= 0 && line < this.text.split('\n').length ? this.charSize.height : 0;
+    }
+
+    onLineHeights(listener: Listener): () => void {
+        return subscribe(this.lineHeights, listener);
+    }
 
     getContentHeight(): number {
         return this.contentHeight;
@@ -763,6 +779,7 @@ export class FakeEditor implements Editor {
         this.hovers.clear();
         this.attributionHovers.clear();
         this.views.clear();
+        this.lineHeights.clear();
         this.keys.clear();
         this.saves.clear();
         this.blurs.clear();
