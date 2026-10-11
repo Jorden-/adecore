@@ -69,7 +69,7 @@ While a person types, a prompt card (an approval or a question) stays out of the
 
 ## Menus for screen readers
 
-`composerMenuAria(input)` builds the combobox and listbox attributes of the mention, skill and command menus, and `optionIdOf` gives each option the id the input points at (`ComposerMenuAriaInput` is the input of the first).
+`composerMenuAria(input)` builds the combobox and listbox attributes of the mention, skill and command menus, and `optionIdOf` gives each option the id the input points at (`ComposerMenuAriaInput` is the input of the first). `clampMenuIndex(index, count)` holds a stale highlighted index on the last option once the list shrank.
 
 ## Quoting
 
