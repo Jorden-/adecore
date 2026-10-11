@@ -397,7 +397,10 @@
       "noMatch": "Geen modellen gevonden",
       "legacyGroup_one": "Legacy-modellen ({{count}})",
       "legacyGroup_other": "Legacy-modellen ({{count}})",
-      "legacy": "Legacy"
+      "legacy": "Legacy",
+      "requires": "Vereist {{cli}} {{version}} of nieuwer op {{machine}}",
+      "requiresHere": "Vereist {{cli}} {{version}} of nieuwer",
+      "providerSettings": "Providerinstellingen"
     },
     "stash": {
       "title": "Stashed prompts",

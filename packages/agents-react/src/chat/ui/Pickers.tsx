@@ -1,25 +1,23 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bookmark, ChevronDown, ChevronRight, Search, Trash2 } from 'lucide-react';
-import type { AgentKind, ModelInfo, ModelSelection, ProviderInfo, UsageProvider } from '@adecore/agent-contracts';
+import type { AgentKind, ModelSelection, ProviderInfo, UsageProvider } from '@adecore/agent-contracts';
 import { AgentIcon } from '../../agents/AgentIcon';
 import { ProviderLogo } from '../../agents/ProviderLogo';
 import { agentChipOf, modelName } from '../../agents/model-name';
+import { modelRequirementOf } from '../../agents/model-requirement';
+import { chatHost } from '../../host';
+import { ChatScopeContext } from '../../scope';
+import { useReportedModels } from '../../state/chats';
+import { pickerEntriesOf, type PickerEntry } from '../logic/picker-entries';
 import { forgetStashed, STASH_SHORTCUT, useStash, type StashedPrompt } from '../stash';
-import { Icon, IconButton, Menu, Popover, Tooltip } from '@adecore/ui';
+import { Button, Icon, IconButton, Menu, Popover, Tooltip } from '@adecore/ui';
 
 const triggerClass =
     'flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 text-xs text-text-muted hover:bg-surface-hover hover:text-text data-[popup-open]:bg-surface-active data-[popup-open]:text-text';
 
 const chipClass =
     'flex h-6 min-w-0 shrink items-center gap-1.5 whitespace-nowrap rounded-md bg-surface-hover px-2 text-xs text-text hover:bg-surface-active data-[popup-open]:bg-surface-active';
-
-/* A model row, or the one row that folds the legacy models open. Both take a turn in the arrow keys. */
-type PickerEntry = { kind: 'model'; provider: ProviderInfo; model: ModelInfo } | { kind: 'legacy'; count: number };
-
-function matches(model: ModelInfo, query: string): boolean {
-    return model.name.toLowerCase().includes(query) || model.slug.toLowerCase().includes(query);
-}
 
 interface ModelPickerProps {
     /* Whose models may be picked: every installed chat CLI before the first message, the chat's own after it. */
@@ -73,18 +71,11 @@ export function ModelPicker({
     const grouped = providers.length > 1;
     const trimmed = query.trim().toLowerCase();
 
-    const entries = useMemo((): PickerEntry[] => {
-        const rows = providers.flatMap((entry) => entry.models.map((model) => ({ kind: 'model' as const, provider: entry, model })));
-        if (trimmed !== '') {
-            return rows.filter((row) => matches(row.model, trimmed));
-        }
-        const live = rows.filter((row) => !row.model.legacy);
-        const legacy = rows.filter((row) => row.model.legacy);
-        if (legacy.length === 0) {
-            return live;
-        }
-        return legacyOpen ? [...live, { kind: 'legacy', count: legacy.length }, ...legacy] : [...live, { kind: 'legacy', count: legacy.length }];
-    }, [providers, trimmed, legacyOpen]);
+    const entries = useMemo(() => pickerEntriesOf(providers, trimmed, legacyOpen), [providers, trimmed, legacyOpen]);
+    const scope = useContext(ChatScopeContext);
+    const machine = chatHost().useMachineLabel(scope?.id ?? '');
+    const reported = useReportedModels(provider);
+    const requirementOf = (entry: PickerEntry & { kind: 'model' }) => modelRequirementOf(entry.model, entry.provider, reported);
 
     /* Closing forgets the search, so the next open (a click or `/model`) starts on the whole list. */
     const setOpen = (next: boolean): void => {
@@ -108,6 +99,9 @@ export function ModelPicker({
         if (entry.kind === 'legacy') {
             setLegacyOpen(true);
             inputRef.current?.focus();
+            return;
+        }
+        if (requirementOf(entry) !== null) {
             return;
         }
         onChange(entry.provider.kind, entry.model.slug);
@@ -184,6 +178,7 @@ export function ModelPicker({
                         }
                         const previous = entries[i - 1];
                         const first = grouped && (previous === undefined || previous.kind !== 'model' || previous.provider.kind !== entry.provider.kind);
+                        const requirement = requirementOf(entry);
                         const chosen = entry.provider.kind === provider && entry.model.slug === selection.model;
                         return (
                             <div key={`${entry.provider.kind}/${entry.model.slug}`}>
@@ -196,21 +191,38 @@ export function ModelPicker({
                                 <button
                                     role="option"
                                     aria-selected={chosen}
+                                    aria-disabled={requirement !== null || undefined}
                                     data-active={i === index}
-                                    className="cursor-row flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm text-text-muted"
+                                    className={`cursor-row flex w-full flex-col items-stretch gap-0.5 rounded-md px-2.5 py-1.5 text-left text-sm ${requirement === null ? 'text-text-muted' : 'text-text-faint'}`}
                                     onMouseEnter={() => setIndex(i)}
                                     onClick={() => choose(entry)}
                                 >
-                                    <Menu.Check kind="radio" checked={chosen} />
-                                    <span className="min-w-0 truncate">{entry.model.name}</span>
-                                    {entry.model.badge && (
-                                        <span className="rounded bg-accent-soft px-1 text-[11px] leading-5 font-medium uppercase text-accent">
-                                            {entry.model.badge}
+                                    <span className="flex w-full items-center gap-2">
+                                        <Menu.Check kind="radio" checked={chosen} />
+                                        <span className="min-w-0 truncate">{entry.model.name}</span>
+                                        {entry.model.badge && (
+                                            <span className="rounded bg-accent-soft px-1 text-[11px] leading-5 font-medium uppercase text-accent">
+                                                {entry.model.badge}
+                                            </span>
+                                        )}
+                                        <span className="grow" />
+                                        {entry.model.legacy && <span className="text-xs text-text-faint">{t('pickers.model.legacy')}</span>}
+                                    </span>
+                                    {requirement !== null && (
+                                        <span className="pl-6 text-xs text-text-faint">
+                                            {machine === null
+                                                ? t('pickers.model.requiresHere', { cli: requirement.cli, version: requirement.minVersion })
+                                                : t('pickers.model.requires', { cli: requirement.cli, version: requirement.minVersion, machine })}
                                         </span>
                                     )}
-                                    <span className="grow" />
-                                    {entry.model.legacy && <span className="text-xs text-text-faint">{t('pickers.model.legacy')}</span>}
                                 </button>
+                                {requirement !== null && (
+                                    <div className="pb-1 pl-8">
+                                        <Button size="sm" variant="ghost" onClick={() => chatHost().openSettings('providers')}>
+                                            {t('pickers.model.providerSettings')}
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         );
                     })}

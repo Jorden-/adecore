@@ -279,6 +279,8 @@ export interface ChatHost {
     useLoginBlocked(scopeId: string): string | null;
     /* The name and the mark of a project of the host, for the usage per project; null draws the folder's own. */
     useProjectLook(scopeId: string, projectId: string | null): { name: string; mark: ReactNode } | null;
+    /* What a person calls the machine the scope's chats run on, or null when it has no name worth saying. */
+    useMachineLabel(scopeId: string): string | null;
     /* Where another chat of the app stands, for a fork's way back and a note from a fork. */
     useChatPlace(chatId: string): ChatPlace;
     /* What a chat may read besides its folder, named under an empty thread. */
@@ -345,6 +347,7 @@ const DEFAULT_HOST: ChatHost = {
     openLogin: null,
     useLoginBlocked: () => null,
     useProjectLook: () => null,
+    useMachineLabel: () => null,
     useChatPlace: () => NOWHERE,
     useContextSources: () => NO_SOURCES,
     useHidesFolder: () => false,

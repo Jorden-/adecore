@@ -34,6 +34,11 @@
             "types": "./dist/agents/accounts.d.ts",
             "default": "./dist/agents/accounts.js"
         },
+        "./agents/model-requirement": {
+            "source": "./src/agents/model-requirement.ts",
+            "types": "./dist/agents/model-requirement.d.ts",
+            "default": "./dist/agents/model-requirement.js"
+        },
         "./agents/model-name": {
             "source": "./src/agents/model-name.ts",
             "types": "./dist/agents/model-name.d.ts",
@@ -103,6 +108,11 @@
             "source": "./src/chat/guards.ts",
             "types": "./dist/chat/guards.d.ts",
             "default": "./dist/chat/guards.js"
+        },
+        "./chat/logic/picker-entries": {
+            "source": "./src/chat/logic/picker-entries.ts",
+            "types": "./dist/chat/logic/picker-entries.d.ts",
+            "default": "./dist/chat/logic/picker-entries.js"
         },
         "./chat/logic/ansi": {
             "source": "./src/chat/logic/ansi.ts",

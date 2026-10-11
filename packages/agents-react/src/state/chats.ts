@@ -1,6 +1,17 @@
+import { useContext, useMemo } from 'react';
 import { create } from 'zustand';
-import type { ChatApprovalItem, ChatBookmark, ChatEvent, ChatHistoryResult, ChatInfo, ChatItem, ChatQuestionItem, ChatVisual } from '@adecore/agent-contracts';
-import { useChatScope } from '../scope';
+import type {
+    AgentKind,
+    ChatApprovalItem,
+    ChatBookmark,
+    ChatEvent,
+    ChatHistoryResult,
+    ChatInfo,
+    ChatItem,
+    ChatQuestionItem,
+    ChatVisual
+} from '@adecore/agent-contracts';
+import { ChatScopeContext, useChatScope } from '../scope';
 
 export interface ChatState {
     info: ChatInfo;
@@ -292,6 +303,24 @@ export function chatSink(keyOf: (chatId: string) => string): ChatSink {
 export function useChatRow<T>(chatId: string, select: (row: ChatState | undefined) => T): T {
     const { keyOf } = useChatScope();
     return useChats((s) => select(s.byKey[keyOf(chatId)]));
+}
+
+/*
+ * The models the CLI of this provider reported running in the chats this client holds of the host.
+ * A model it ran is proof the CLI offers it, whatever the version says. Outside a scope there is none.
+ */
+export function useReportedModels(provider: AgentKind): ReadonlySet<string> {
+    const scope = useContext(ChatScopeContext);
+    const joined = useChats((s) => {
+        const names = new Set<string>();
+        for (const [key, state] of Object.entries(s.statusByKey)) {
+            if (scope?.owns(key) === true && state.info.provider === provider && state.info.model !== null) {
+                names.add(state.info.model);
+            }
+        }
+        return [...names].sort().join('\n');
+    });
+    return useMemo(() => new Set(joined === '' ? [] : joined.split('\n')), [joined]);
 }
 
 /* The item as the thread holds it now, for a row derived from the structure, which a delta leaves alone. */
