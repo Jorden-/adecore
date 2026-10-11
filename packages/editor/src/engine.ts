@@ -1,4 +1,5 @@
 import { changedSpans, DocumentModel, type EditorSnapshot, type FoldHints, replacementText } from '@adecore/editor-core';
+import { GrammarPreparation } from './grammar-preparation.ts';
 import { InputController } from './controller.ts';
 import { resolveSmartKeys } from './smart-keys.ts';
 import { emit, type Listener, subscribe } from './listeners.ts';
@@ -60,6 +61,7 @@ class SmartEditor implements Editor {
     private readonly settings: ViewSettings;
     private readonly view: EditorView;
     private readonly controller: InputController;
+    private readonly grammarPreparation: GrammarPreparation;
     private readonly changes = new Set<Listener>();
     private readonly textChanges = new Set<(change: EditorTextChange) => void>();
     private readonly carets = new Set<(position: EditorPosition) => void>();
@@ -100,6 +102,7 @@ class SmartEditor implements Editor {
             folding: options.folding !== false
         };
         this.view = new EditorView(element, this.model, this.settings);
+        this.grammarPreparation = new GrammarPreparation(this.model, () => this.view.grammarChanged());
         this.controller = new InputController(this.view, {
             handBack: [...(engine.handBack ?? []), ...(options.handBack ?? [])],
             keymap: engine.keymap,
@@ -113,6 +116,7 @@ class SmartEditor implements Editor {
             this.caretMoved(snapshot.selections.at(-1)!.head);
             if (snapshot.revision !== this.revision) {
                 this.revision = snapshot.revision;
+                this.grammarPreparation.edited(snapshot.changes ?? []);
                 if (snapshot.contentEdits !== undefined && snapshot.contentEdits.length > 0) {
                     this.announceTextChange(snapshot.contentEdits, snapshot.source ?? 'external');
                 }
@@ -149,6 +153,7 @@ class SmartEditor implements Editor {
 
     private loadTokenizer(): void {
         const request = ++this.tokenizerRequest;
+        this.grammarPreparation.begin();
         void this.engine
             .scopeColors?.(this.theme)
             .catch(() => null)
@@ -163,6 +168,7 @@ class SmartEditor implements Editor {
             .then((tokenizer) => {
                 if (!this.disposed && request === this.tokenizerRequest) {
                     this.view.setTokenizer(tokenizer);
+                    this.grammarPreparation.ready(tokenizer);
                 }
             });
     }
@@ -549,6 +555,7 @@ class SmartEditor implements Editor {
     }
 
     setLineTokens(tokens: ((line: number) => readonly LineToken[] | null | undefined) | null): void {
+        this.grammarPreparation.pause(tokens !== null);
         this.view.setLineTokens(tokens);
     }
 
@@ -758,6 +765,7 @@ class SmartEditor implements Editor {
             return;
         }
         this.disposed = true;
+        this.grammarPreparation.dispose();
         this.changes.clear();
         this.textChanges.clear();
         this.carets.clear();

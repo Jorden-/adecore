@@ -393,6 +393,12 @@ export class EditorView {
         this.render();
     }
 
+    grammarChanged(): void {
+        if (!this.disposed && this.lineTokenProvider === null && this.tokens.revalidate()) {
+            this.colorAhead(true);
+        }
+    }
+
     setLineTokens(tokens: ((line: number) => readonly LineToken[] | null | undefined) | null): void {
         this.lineTokenProvider = tokens;
         clearTimeout(this.colorTimer);

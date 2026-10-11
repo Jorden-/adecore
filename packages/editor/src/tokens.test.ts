@@ -148,3 +148,27 @@ describe('TokenCache', () => {
         expect(cache.tokensOf(0)).toEqual([{ length: 30000, color: '', fontStyle: 0 }]);
     });
 });
+
+test('revalidation keeps old colors and recolors all states from the top', () => {
+    const { cache, counter } = setup('one\ntwo\nthree');
+    let stale = false;
+    cache.setTokenizer({
+        ...commentTokenizer(counter),
+        stale: () => {
+            const changed = stale;
+            stale = false;
+            return changed;
+        }
+    });
+    cache.advance(10, 1000);
+    const previous = cache.tokensOf(1);
+    expect(cache.revalidate()).toBe(false);
+    stale = true;
+    expect(cache.revalidate()).toBe(true);
+    expect(cache.colored).toBe(0);
+    expect(cache.tokensOf(1)).toBe(previous);
+    expect(cache.revalidate()).toBe(false);
+    counter.lines = 0;
+    cache.advance(10, 1000);
+    expect(counter.lines).toBe(3);
+});

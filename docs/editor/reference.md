@@ -14,3 +14,5 @@ Every name each entry point exports, types included, by the path you import it f
 ### Embedded languages during edits
 
 A `LineTokenizer` may provide `prepare(text)` to load embedded grammars named by edited text. It resolves to `true` when a load can invalidate earlier states; `stale()` then reports the rebuild once. Shiki tokenizers recognize Markdown and MDX fence info and `lang` attributes in Vue, Svelte and Astro. Ordinary prose does not load fence languages. Concurrent documents share each language load.
+
+The editor checks declarations in edited lines 200 ms after the last edit, with one preparation running at a time. Undo, redo and external edits use the same path. A buffer above 64 KiB triggers one scan of the current document. After a grammar rebuild, coloring starts at the first line while previous colors stay visible. External `setLineTokens` providers pause preparation; clearing the provider schedules a full scan. Theme changes and disposal ignore late preparation results.

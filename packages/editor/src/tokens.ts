@@ -116,6 +116,16 @@ export class TokenCache {
         this.reusableFrom = lastNew + 1;
     }
 
+    /* Old colors stay visible until the rebuilt grammar reaches each line. */
+    revalidate(): boolean {
+        if (this.tokenizer?.stale?.() !== true) {
+            return false;
+        }
+        this.frontier = 0;
+        this.forgetPivot();
+        return true;
+    }
+
     /*
      * Colors lines from the frontier until `until` is reached, the colors are right for the rest of
      * the document, or `budget` milliseconds are spent. Returns the first line that changed, so a
@@ -126,10 +136,7 @@ export class TokenCache {
         if (tokenizer === null) {
             return null;
         }
-        if (tokenizer.stale?.() === true) {
-            this.frontier = 0;
-            this.forgetPivot();
-        }
+        this.revalidate();
         const count = this.source.getLineCount();
         const limit = Math.min(until, count - 1);
         const deadline = now() + budget;
