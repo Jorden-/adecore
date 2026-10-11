@@ -1,3 +1,4 @@
+import { useReviewSettled } from './review-settle';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getFiletypeFromFileName } from '@pierre/diffs';
@@ -33,6 +34,7 @@ function ReadyDiff({
     layout: 'unified' | 'split';
     maxHeight: number;
 }) {
+    useReviewSettled();
     const { t } = useTranslation('agent-chat');
     const mode = chatHost().code.useMode();
     const theme = chatHost().code.useThemes()[mode];

@@ -1,3 +1,4 @@
+import { useReviewSettled } from './review-settle';
 import { useMemo } from 'react';
 import clsx from 'clsx';
 import { FileDiff, PatchDiff } from '@pierre/diffs/react';
@@ -43,6 +44,7 @@ function lineClass(line: string): string {
 }
 
 export default function LegacyUnifiedDiff({ change, overflow = 'wrap', diffStyle = 'unified', fill = false, contents, maxHeight }: UnifiedDiffProps) {
+    useReviewSettled();
     const resolved = chatHost().code.useMode();
     const theme = useDiffTheme();
     const patch = useMemo(() => asPatch(change), [change]);

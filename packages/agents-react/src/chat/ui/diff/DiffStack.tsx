@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@adecore/ui';
+import { ReviewSettleContext } from './review-settle';
 import { ReviewDiff } from './ReviewDiff';
 import { reviewSize, type ReviewEntry } from './review-plan';
 import { useReviewStack, type ReviewStack } from './use-review-stack';
@@ -19,7 +20,9 @@ export function ReviewStackView({ entries, stack }: { entries: readonly ReviewEn
                         )}
                     </div>
                     {stack.ready.has(entry.key) ? (
-                        <ReviewDiff entry={entry} />
+                        <ReviewSettleContext value={{ key: entry.key, settle: stack.settle }}>
+                            <ReviewDiff entry={entry} />
+                        </ReviewSettleContext>
                     ) : stack.slots.get(entry.key) === 'editor' ? (
                         <div
                             data-review-pending={entry.key}

@@ -1,3 +1,4 @@
+import { useReviewSettled } from './review-settle';
 import { useMemo } from 'react';
 import { MultiFileDiff } from '@pierre/diffs/react';
 import { chatHost } from '../../../host';
@@ -5,6 +6,7 @@ import { useDiffTheme } from '../diff-theme';
 import type { FileChange } from '../../logic/tools';
 
 export default function LegacyEditDiff({ change, maxHeight }: { change: FileChange; maxHeight?: number }) {
+    useReviewSettled();
     const resolved = chatHost().code.useMode();
     const theme = useDiffTheme();
     const oldFile = useMemo(() => ({ name: change.path, contents: change.before }), [change.path, change.before]);

@@ -1,9 +1,10 @@
 import { expect, test } from 'bun:test';
-import { act } from 'react';
+import { act, StrictMode } from 'react';
 import type { ChatToolItem } from '@adecore/agent-contracts';
 import { ChatScopeContext, type ChatScope } from '../../../scope';
 import { ChangedFilesRow } from '../rows/WorkRows';
 import { createRoot } from 'react-dom/client';
+import type { EditorEngine } from '@adecore/editor';
 import { FakeEditorEngine } from '@adecore/editor/fake';
 import { createPage } from '@adecore/editor/testing';
 import { chatHost, setChatHost } from '../../../host';
@@ -163,6 +164,127 @@ test('closing and reopening the changed-files card restarts its per-frame admiss
         await act(async () => card.click());
         expect(engine.editors.every((editor) => editor.disposed)).toBe(true);
         await act(async () => card.click());
+        expect(engine.editors.filter((editor) => !editor.disposed)).toHaveLength(1);
+        await nextFrame();
+        expect(engine.editors.filter((editor) => !editor.disposed)).toHaveLength(2);
+    });
+});
+
+function delayedEngine() {
+    let resolve!: (engine: EditorEngine) => void;
+    let reject!: (error: Error) => void;
+    const pending = new Promise<EditorEngine>((yes, no) => {
+        resolve = yes;
+        reject = no;
+    });
+    return { load: () => pending, resolve, reject };
+}
+
+for (const strict of [false, true]) {
+    test(`cold grouped loader admits only one waiting review${strict ? ' under StrictMode' : ''}`, async () => {
+        await mounted(async (page, root) => {
+            const nextFrame = frames(page);
+            const engine = new FakeEditorEngine();
+            const delayed = delayedEngine();
+            setChatHost({ code: { ...chatHost().code, editor: delayed.load } });
+            const view = <DiffStack entries={entries} />;
+            await act(async () => root.render(strict ? <StrictMode>{view}</StrictMode> : view));
+            for (let index = 0; index < 3; index++) {
+                await nextFrame();
+            }
+            expect(engine.editors).toHaveLength(0);
+            expect(page.host.querySelectorAll('[data-review-entry]')).toHaveLength(1);
+            await act(async () => delayed.resolve(engine));
+            expect(engine.editors.filter((editor) => !editor.disposed)).toHaveLength(1);
+            await nextFrame();
+            expect(engine.editors.filter((editor) => !editor.disposed)).toHaveLength(2);
+            await nextFrame();
+            expect(engine.editors.filter((editor) => !editor.disposed)).toHaveLength(3);
+        });
+    });
+}
+
+test('a rejected grouped engine settles its fallback before admitting the next review', async () => {
+    await mounted(async (page, root) => {
+        const nextFrame = frames(page);
+        const delayed = delayedEngine();
+        setChatHost({ code: { ...chatHost().code, editor: delayed.load } });
+        const fallbackEntries = reviewEntries(
+            entries.slice(1).map((entry) => ({ path: entry.path, kind: 'update', diff: 'raw fallback' })),
+            [{ path: 'first.txt', before: 'old\n'.repeat(201), after: 'new\n'.repeat(201) }]
+        );
+        const ordered = [fallbackEntries.at(-1)!, ...fallbackEntries.slice(0, -1)];
+        await act(async () => root.render(<DiffStack entries={ordered} />));
+        await nextFrame();
+        expect(page.host.querySelectorAll('[data-review-entry]')).toHaveLength(1);
+        await act(async () => delayed.reject(new Error('unavailable')));
+        expect(page.host.querySelectorAll('[data-diff-omitted]')).toHaveLength(1);
+        await nextFrame();
+        expect(page.host.querySelectorAll('[data-review-entry]')).toHaveLength(2);
+        await nextFrame();
+        expect(page.host.querySelectorAll('[data-review-entry]')).toHaveLength(3);
+    });
+});
+
+test('an omitted head settles without loading an engine', async () => {
+    await mounted(async (page, root) => {
+        const nextFrame = frames(page);
+        const engine = new FakeEditorEngine();
+        let loads = 0;
+        setChatHost({
+            code: {
+                ...chatHost().code,
+                editor: async () => {
+                    loads++;
+                    return engine;
+                }
+            }
+        });
+        const oversized = reviewEntries([], [{ path: 'long.txt', before: 'old', after: 'x'.repeat(10001) }]);
+        await act(async () => root.render(<DiffStack entries={[...oversized, ...entries]} />));
+        expect(loads).toBe(0);
+        expect(page.host.querySelectorAll('[data-diff-omitted]')).toHaveLength(1);
+        await nextFrame();
+        expect(engine.editors.filter((editor) => !editor.disposed)).toHaveLength(1);
+    });
+});
+
+test('removing a waiting review does not block its successor', async () => {
+    await mounted(async (page, root) => {
+        const nextFrame = frames(page);
+        const delayed = delayedEngine();
+        const engine = new FakeEditorEngine();
+        setChatHost({ code: { ...chatHost().code, editor: delayed.load } });
+        await act(async () => root.render(<DiffStack entries={entries} />));
+        await nextFrame();
+        await act(async () => root.render(<DiffStack entries={entries.slice(1)} />));
+        await nextFrame();
+        expect(page.host.querySelector('[data-review-entry]')?.getAttribute('data-review-entry')).toBe(entries[1]!.key);
+        expect(page.host.querySelectorAll('[data-review-entry]')).toHaveLength(1);
+        await act(async () => delayed.resolve(engine));
+        expect(engine.editors.filter((editor) => !editor.disposed)).toHaveLength(1);
+        await nextFrame();
+        expect(engine.editors.filter((editor) => !editor.disposed)).toHaveLength(2);
+    });
+});
+
+test('reopening a review group with a fresh cold loader waits for its first mount', async () => {
+    await mounted(async (page, root) => {
+        const nextFrame = frames(page);
+        const engine = new FakeEditorEngine();
+        setChatHost({ code: { ...chatHost().code, editor: async () => engine } });
+        await act(async () => root.render(<OpenFiles entries={entries} />));
+        await nextFrame();
+        await nextFrame();
+        await act(async () => root.render(<OpenFiles entries={[]} />));
+        const delayed = delayedEngine();
+        setChatHost({ code: { ...chatHost().code, editor: delayed.load } });
+        await act(async () => root.render(<OpenFiles entries={entries} />));
+        await nextFrame();
+        await nextFrame();
+        expect(engine.editors.every((editor) => editor.disposed)).toBe(true);
+        expect(page.host.querySelectorAll('[data-review-entry]')).toHaveLength(1);
+        await act(async () => delayed.resolve(engine));
         expect(engine.editors.filter((editor) => !editor.disposed)).toHaveLength(1);
         await nextFrame();
         expect(engine.editors.filter((editor) => !editor.disposed)).toHaveLength(2);

@@ -1,6 +1,8 @@
+import { useReviewSettled } from './review-settle';
 import { useTranslation } from 'react-i18next';
 
 export function DiffOmitted({ path }: { path: string }) {
+    useReviewSettled();
     const { t } = useTranslation('agent-chat');
     return (
         <div role="status" data-diff-omitted className="px-3 py-2 text-xs text-text-muted">
