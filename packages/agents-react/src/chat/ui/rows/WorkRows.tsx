@@ -18,7 +18,7 @@ import { Icon, Spinner, useTickingText } from '@adecore/ui';
 import { ROW_GUTTER, toolIcon } from '../icons';
 import { AnsiOutput } from '../AnsiOutput';
 import { DiffStack, ReviewStackView } from '../diff/DiffStack';
-import { reviewEntries } from '../diff/review-plan';
+import { reviewEntries, type ReviewEntry } from '../diff/review-plan';
 import { useReviewStack } from '../diff/use-review-stack';
 
 // A checkpoint opens its renderer only when a file is expanded.
@@ -408,6 +408,36 @@ export function ChangedFilesRow({
     return <ProviderChangedFiles tools={tools} open={open} setOpen={setOpen} revealNonce={revealNonce} />;
 }
 
+interface FileReviews {
+    readonly path: string;
+    readonly count: number;
+    readonly reviews: readonly ReviewEntry[];
+}
+
+function ProviderReviewFiles({
+    reviews,
+    open,
+    setOpen
+}: {
+    reviews: readonly FileReviews[];
+    open: Record<string, boolean>;
+    setOpen: Dispatch<SetStateAction<Record<string, boolean>>>;
+}) {
+    const { t } = useTranslation('agent-chat');
+    const stack = useReviewStack(reviews.filter(({ path }) => open[path] === true).flatMap(({ reviews }) => reviews));
+    return reviews.map(({ path, count, reviews }) => (
+        <ChangedFileLine
+            key={path}
+            path={path}
+            open={open[path] === true}
+            onToggle={() => setOpen((previous) => ({ ...previous, [path]: !previous[path] }))}
+            trailing={<span className="text-text-faint">{t('work.edits', { count })}</span>}
+        >
+            <ReviewStackView entries={reviews} stack={stack} />
+        </ChangedFileLine>
+    ));
+}
+
 /* The fallback card, built from what the CLI itself reported about its edits. */
 function ProviderChangedFiles({
     tools,
@@ -420,7 +450,6 @@ function ProviderChangedFiles({
     revealNonce: number;
     setOpen: Dispatch<SetStateAction<Record<string, boolean>>>;
 }) {
-    const { t } = useTranslation('agent-chat');
     const byPath = new Map<string, { edits: FileChange[]; patches: ChatFileChange[] }>();
     const entryFor = (path: string) => {
         const existing = byPath.get(path);
@@ -443,21 +472,14 @@ function ProviderChangedFiles({
             entryFor(change.path || tool.id).edits.push(change);
         }
     }
-    const reviews = [...byPath].map(([path, entry]) => ({ path, entry, reviews: reviewEntries(entry.patches, entry.edits) }));
-    const stack = useReviewStack(reviews.filter(({ path }) => open[path] === true).flatMap(({ reviews }) => reviews));
+    const reviews = [...byPath].map(([path, entry]) => ({
+        path,
+        count: entry.patches.length + entry.edits.length,
+        reviews: reviewEntries(entry.patches, entry.edits)
+    }));
     return (
         <ChangedFilesCard count={byPath.size} revealNonce={revealNonce}>
-            {reviews.map(({ path, entry, reviews }) => (
-                <ChangedFileLine
-                    key={path}
-                    path={path}
-                    open={open[path] === true}
-                    onToggle={() => setOpen((o) => ({ ...o, [path]: !o[path] }))}
-                    trailing={<span className="text-text-faint">{t('work.edits', { count: entry.edits.length + entry.patches.length })}</span>}
-                >
-                    <ReviewStackView entries={reviews} stack={stack} />
-                </ChangedFileLine>
-            ))}
+            <ProviderReviewFiles reviews={reviews} open={open} setOpen={setOpen} />
         </ChangedFilesCard>
     );
 }

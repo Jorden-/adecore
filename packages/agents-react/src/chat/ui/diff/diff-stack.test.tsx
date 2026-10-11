@@ -1,5 +1,8 @@
 import { expect, test } from 'bun:test';
 import { act } from 'react';
+import type { ChatToolItem } from '@adecore/agent-contracts';
+import { ChatScopeContext, type ChatScope } from '../../../scope';
+import { ChangedFilesRow } from '../rows/WorkRows';
 import { createRoot } from 'react-dom/client';
 import { FakeEditorEngine } from '@adecore/editor/fake';
 import { createPage } from '@adecore/editor/testing';
@@ -114,5 +117,51 @@ test('open files share one group budget and reopening a closed group starts with
         await act(async () => root.render(null));
         await nextFrame();
         expect(engine.editors.every((editor) => editor.disposed)).toBe(true);
+    });
+});
+
+test('closing and reopening the changed-files card restarts its per-frame admissions', async () => {
+    await mounted(async (page, root) => {
+        const nextFrame = frames(page);
+        const engine = new FakeEditorEngine();
+        setChatHost({ code: { ...chatHost().code, editor: async () => engine } });
+        const scope: ChatScope = {
+            id: 'review',
+            keyOf: (id) => id,
+            owns: () => true,
+            transport: {} as ChatScope['transport'],
+            chats: {} as ChatScope['chats']
+        };
+        const tools: ChatToolItem[] = entries.map((entry, index) => ({
+            id: `tool-${index}`,
+            kind: 'tool',
+            createdAt: 0,
+            turnId: null,
+            toolUseId: `call-${index}`,
+            parentToolUseId: null,
+            name: 'Edit',
+            input: { file_path: entry.path, old_string: 'old', new_string: 'new' },
+            state: 'done',
+            output: null
+        }));
+        await act(async () =>
+            root.render(
+                <ChatScopeContext value={scope}>
+                    <ChangedFilesRow tools={tools} diff={null} checkpoint={false} chatId="review" turnId="turn" />
+                </ChatScopeContext>
+            )
+        );
+        const card = page.host.querySelector<HTMLButtonElement>('button[aria-expanded]')!;
+        await act(async () => card.click());
+        await act(async () => page.host.querySelectorAll<HTMLButtonElement>('button[data-file-path]').forEach((button) => button.click()));
+        await nextFrame();
+        await nextFrame();
+        expect(engine.editors.filter((editor) => !editor.disposed)).toHaveLength(3);
+        await act(async () => card.click());
+        expect(engine.editors.every((editor) => editor.disposed)).toBe(true);
+        await act(async () => card.click());
+        expect(engine.editors.filter((editor) => !editor.disposed)).toHaveLength(1);
+        await nextFrame();
+        expect(engine.editors.filter((editor) => !editor.disposed)).toHaveLength(2);
     });
 });
