@@ -1,16 +1,16 @@
 import { useMemo, type ReactNode } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
-import { Activity, Square, SquareTerminal } from 'lucide-react';
+import { Activity, MessageCircleQuestionMark, Square, SquareTerminal } from 'lucide-react';
 import type { ChatBackgroundTask, ChatSubagentItem } from '@adecore/agent-contracts';
 import { backgroundCounts } from '../activity';
-import { badgeCountOf, entryTimeOf, flyoutSubagents, statusWordOf, subagentTitle, summaryWordOf, taskIdOf } from '../subagent-list';
+import { badgeCountOf, entryTimeOf, flyoutSubagents, progressOf, statusWordOf, subagentTitle, summaryWordOf, taskIdOf, taskRowStateOf } from '../subagent-list';
 import { useSubagentSupport } from '../subagent-support';
 import { canOpenSubagent, crumbOf, openFromMain, useSubagentTrail } from '../subagent-view';
 import { SubagentStopButton } from './SubagentStopButton';
 import { formatElapsedShort } from '@adecore/ui/format';
 import { Icon, IconButton, Popover, Surface, useNow } from '@adecore/ui';
-import { useChatRow } from '../../state/chats';
+import { useChatRow, useChats } from '../../state/chats';
 import { chatHost } from '../../host';
 import { useChatScope } from '../../scope';
 import { useChatActions } from '../actions';
@@ -28,8 +28,20 @@ export function ChatActivity({ chatId }: { chatId: string }) {
     const order = useChatRow(chatId, (row) => row?.order) ?? NO_ITEMS;
     const structure = useChatRow(chatId, (row) => row?.structure);
     const subagents = useMemo(() => (structure === undefined ? [] : flyoutSubagents(order, structure)), [order, structure]);
-    const { id } = useChatScope();
+    const { id, keyOf } = useChatScope();
     const tasks = chatHost().tasks.useTasks(id);
+    const statuses = useChats((s) => s.statusByKey);
+    const progress = useMemo(
+        () =>
+            progressOf(
+                subagents.map((item) => {
+                    const taskId = taskIdOf(item);
+                    const child = item.childId === undefined ? undefined : statuses[keyOf(item.childId)]?.info;
+                    return taskRowStateOf(item, taskId === null ? null : (tasks?.[taskId] ?? null), child);
+                })
+            ),
+        [subagents, tasks, statuses, keyOf]
+    );
     const words = useMemo(
         () =>
             subagents.map((item) => {
@@ -44,13 +56,25 @@ export function ChatActivity({ chatId }: { chatId: string }) {
     }
     const { shells, monitors } = backgroundCounts(background);
     const Slot = chatHost().SubagentSlot;
+    const counting = progress.active > 0 && progress.total > 1;
+    const label = counting
+        ? [t('activity.progress', { done: progress.done, total: progress.total }), progress.waiting > 0 && t('activity.needsYou', { count: progress.waiting })]
+              .filter(Boolean)
+              .join(', ')
+        : t('activity.subagents', { count: badgeCountOf(words) });
     return (
         <div className="mb-3 flex flex-wrap items-center gap-2">
             {subagents.length > 0 &&
                 (Slot === null ? (
                     <Flyout
-                        icon={<StatusIcon word={summaryWordOf(words)} />}
-                        label={t('activity.subagents', { count: badgeCountOf(words) })}
+                        icon={
+                            progress.waiting > 0 ? (
+                                <Icon icon={MessageCircleQuestionMark} size={14} className="shrink-0 text-status-needs-you" />
+                            ) : (
+                                <StatusIcon word={summaryWordOf(words)} />
+                            )
+                        }
+                        label={label}
                         heading={t('activity.subagents', { count: subagents.length })}
                     >
                         <SubagentRows chatId={chatId} items={subagents} />
@@ -148,11 +172,13 @@ function SubagentRows({ chatId, items }: { chatId: string; items: readonly ChatS
 
 function SubagentEntry({ chatId, item, now }: { chatId: string; item: ChatSubagentItem; now: number }) {
     const { t } = useTranslation('agent-chat');
-    const { id } = useChatScope();
+    const { id, keyOf } = useChatScope();
     const refused = useSubagentSupport((s) => s.unsupported[id] === true);
     const task = chatHost().tasks.useTask(id, taskIdOf(item));
     const { show } = useSubagentTrail(chatId);
+    const child = useChats((s) => (item.childId === undefined ? undefined : s.statusByKey[keyOf(item.childId)]?.info));
     const word = statusWordOf(item, task);
+    const state = taskRowStateOf(item, task, child);
     return (
         <ActivityRow
             icon={<StatusIcon word={word} />}
@@ -160,7 +186,7 @@ function SubagentEntry({ chatId, item, now }: { chatId: string; item: ChatSubage
                 <>
                     {subagentTitle(item)}
                     {/* The icon says the state to the eye; a screen reader hears it with the title. */}
-                    <span className="sr-only">, {t(`common.status.${word}`)}</span>
+                    <span className="sr-only">, {state === 'waiting' ? t('rows.task.waiting') : t(`common.status.${word}`)}</span>
                 </>
             }
             time={entryTimeOf(item, task, now)}

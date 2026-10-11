@@ -48,6 +48,16 @@ export function taskRowStateOf(item: ChatSubagentItem, task: SubagentTask | null
     return word;
 }
 
+/* How far delegated work is: what settled as done, what still runs or waits, and how many of those wait on a person. */
+export function progressOf(states: readonly TaskRowState[]): { done: number; total: number; waiting: number; active: number } {
+    return {
+        done: states.filter((state) => state === 'done').length,
+        total: states.length,
+        waiting: states.filter((state) => state === 'waiting').length,
+        active: states.filter((state) => state === 'running' || state === 'paused' || state === 'waiting').length
+    };
+}
+
 /*
  * What the flyout over the composer lists: every sub-agent still at work, and the ones that settled
  * since the last message, so a finished batch stays until the next message is sent. That includes an

@@ -11,6 +11,7 @@ import type {
     ChatUiChoiceOrigin,
     ChatUserItem
 } from '@adecore/agent-contracts';
+import { WAITING_NOTE_PREFIX } from '@adecore/agent-contracts';
 import { fileBadge, formatBytes, isImageAttachment } from '../../attachments';
 import { useChatRow, useCurrentItem } from '../../../state/chats';
 import { chatHost } from '../../../host';
@@ -364,7 +365,7 @@ export function NoteRow({ id, level, text, from }: { id: string; level: 'info' |
                             {open ? t('rows.note.hide') : t('rows.note.show')}
                         </button>
                     )}
-                    {from !== undefined && <OpenChatButton chatId={from} />}
+                    {from !== undefined && <OpenChatButton chatId={from} label={id.startsWith(WAITING_NOTE_PREFIX) ? 'openWaiting' : 'openFork'} />}
                 </div>
                 {open && rest !== '' && (
                     <div data-find-field="output" className="mt-1 text-text-muted select-text">
@@ -376,8 +377,8 @@ export function NoteRow({ id, level, text, from }: { id: string; level: 'info' |
     );
 }
 
-/* "Open fork" on a note a fork sent, while that fork is still in the project. */
-function OpenChatButton({ chatId }: { chatId: string }) {
+/* "Open fork" on a note a fork sent, or "Open to answer" on one about a waiting child, while that chat is still in the project. */
+function OpenChatButton({ chatId, label }: { chatId: string; label: 'openFork' | 'openWaiting' }) {
     const { t } = useTranslation('agent-chat');
     const place = chatHost().useChatPlace(chatId);
     if (place.title === null) {
@@ -385,7 +386,7 @@ function OpenChatButton({ chatId }: { chatId: string }) {
     }
     return (
         <button className="text-text-muted hover:text-text" onClick={place.go}>
-            {t('rows.note.openFork')}
+            {t(`rows.note.${label}`)}
         </button>
     );
 }

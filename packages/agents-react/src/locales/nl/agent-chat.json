@@ -107,7 +107,8 @@
     "note": {
       "hide": "Verbergen",
       "show": "Tonen",
-      "openFork": "Fork openen"
+      "openFork": "Fork openen",
+      "openWaiting": "Openen om te antwoorden"
     },
     "compaction": {
       "plain": "Context gecomprimeerd",
@@ -319,6 +320,9 @@
     "monitors_one": "{{count}} monitor",
     "monitors_other": "{{count}} monitors",
     "pausedUntil": "gepauzeerd tot {{time}}",
+    "progress": "{{done}}/{{total}} klaar",
+    "needsYou_one": "{{count}} vraagt aandacht",
+    "needsYou_other": "{{count}} vragen aandacht",
     "took": {
       "done": "klaar in {{duration}}",
       "failed": "mislukt na {{duration}}",

@@ -7,6 +7,7 @@ import {
     composerStopOf,
     entryTimeOf,
     flyoutSubagents,
+    progressOf,
     statusWordOf,
     stopOf,
     subagentFacts,
@@ -212,5 +213,19 @@ describe('the row of a task', () => {
         expect(taskRowStateOf({ ...row, status: 'done' }, null, waiting)).toBe('done');
         const paused: SubagentTask = { status: 'open', createdAt: 0, settledAt: null, paused: {} };
         expect(taskRowStateOf(row, paused, waiting)).toBe('paused');
+    });
+});
+
+describe('progressOf', () => {
+    test('counts only done as done and lets running, paused and waiting stay active', () => {
+        expect(progressOf(['done', 'running', 'waiting', 'paused'])).toEqual({ done: 1, total: 4, waiting: 1, active: 3 });
+    });
+
+    test('failed and cancelled work is neither done nor active', () => {
+        expect(progressOf(['failed', 'cancelled', 'done'])).toEqual({ done: 1, total: 3, waiting: 0, active: 0 });
+    });
+
+    test('nothing at all is zero', () => {
+        expect(progressOf([])).toEqual({ done: 0, total: 0, waiting: 0, active: 0 });
     });
 });

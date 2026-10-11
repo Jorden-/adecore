@@ -107,7 +107,8 @@
     "note": {
       "hide": "Hide",
       "show": "Show",
-      "openFork": "Open fork"
+      "openFork": "Open fork",
+      "openWaiting": "Open to answer"
     },
     "compaction": {
       "plain": "Context compacted",
@@ -319,6 +320,9 @@
     "monitors_one": "{{count}} monitor",
     "monitors_other": "{{count}} monitors",
     "pausedUntil": "paused until {{time}}",
+    "progress": "{{done}}/{{total}} done",
+    "needsYou_one": "{{count}} needs you",
+    "needsYou_other": "{{count}} need you",
     "took": {
       "done": "done in {{duration}}",
       "failed": "failed after {{duration}}",
