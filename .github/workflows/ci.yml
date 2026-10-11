@@ -44,9 +44,9 @@ jobs:
               - 'package.json'
               - 'bun.lock'
 
-  check:
+  verify:
     runs-on: ubuntu-latest
-    name: ✅ Check, test and build
+    name: ✅ TypeScript checks and tests
     steps:
       - name: 👀 Checkout
         uses: actions/checkout@v6
@@ -106,6 +106,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: packages/database/helper
+          # Reuse the release dependencies cached by the former check job.
+          shared-key: check
       - name: 🦀 Build the database helper
         run: bun run --cwd packages/database helper:build
       - name: 🧪 Test the database client, host and helper
@@ -224,3 +226,14 @@ jobs:
           path: ${{ runner.temp }}/packed-workspaces
       - name: 🧪 Validate packed exports and Node/Bun consumers
         run: bun run test:pack --artifacts "$RUNNER_TEMP/packed-workspaces"
+
+  check:
+    runs-on: ubuntu-latest
+    name: ✅ Check, test and build
+    if: ${{ always() }}
+    needs: [changes, verify, docs, helper-integration, helper, pack, packages]
+    steps:
+      - name: Check all results
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: jq -e 'all(.[]; . == "success" or . == "skipped")' <<< "$RESULTS"
