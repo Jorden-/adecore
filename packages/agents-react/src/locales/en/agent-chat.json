@@ -250,6 +250,11 @@
   },
   "composer": {
     "slotFailed": "This control failed to render",
+    "held": {
+      "question": "A question is waiting. It opens when you pause typing.",
+      "approval": "An approval is waiting. It opens when you pause typing.",
+      "show": "Show now"
+    },
     "commands": {
       "model": "Switch the model",
       "compact": "Compact the context",

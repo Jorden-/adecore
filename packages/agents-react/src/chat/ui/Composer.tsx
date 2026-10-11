@@ -58,7 +58,8 @@ import { ChatReferenceChip } from './ChatReferenceChip';
 import { chipDecorations } from './composer/chips';
 import { enterAction, inCode, inFenceBody, inOpenFence, listItemAt, recallDirection, tabSpaces } from './composer/keys';
 import { ComposerInput, type ComposerInputHandle } from './ComposerInput';
-import { PromptComposer } from './PromptComposer';
+import { holdLiftsIn, type HoldRelease } from '../prompt-hold';
+import { PromptComposer, type PromptHold } from './PromptComposer';
 import { QuoteTakerContext } from './quote-selection';
 import { LimitDock } from './LimitState';
 import { ResumeCompactionDock } from './ResumeCompactionDock';
@@ -177,6 +178,59 @@ function splitPath(path: string): { name: string; dir: string } {
 }
 
 // Keep the editor mounted while a pending request takes over, so its selection and draft survive.
+/*
+ * Keeps a waiting prompt card behind the draft while the person types. Typing, pasting and dictating
+ * all change the draft, so `noteInput` is called from its change handler; the hold lifts after a pause.
+ */
+function usePromptHold(): PromptHold & { noteInput(): void; setComposing(composing: boolean): void } {
+    const typedAt = useRef<number | null>(null);
+    const composing = useRef(false);
+    const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [state, setState] = useState<{ held: boolean; releasedBy: HoldRelease | null }>({ held: false, releasedBy: null });
+
+    const clearTimer = (): void => {
+        if (timer.current !== null) {
+            clearTimeout(timer.current);
+            timer.current = null;
+        }
+    };
+
+    const release = (reason: HoldRelease): void => {
+        clearTimer();
+        typedAt.current = null;
+        composing.current = false;
+        setState((current) => (current.held ? { held: false, releasedBy: reason } : current));
+    };
+
+    const schedule = (): void => {
+        clearTimer();
+        const wait = holdLiftsIn({ typedAt: typedAt.current, composing: composing.current }, Date.now());
+        if (wait !== null) {
+            timer.current = setTimeout(() => release('pause'), wait);
+        }
+    };
+
+    const noteInput = (): void => {
+        typedAt.current = Date.now();
+        setState({ held: true, releasedBy: null });
+        schedule();
+    };
+
+    const setComposing = (next: boolean): void => {
+        composing.current = next;
+        if (next) {
+            setState({ held: true, releasedBy: null });
+        } else {
+            typedAt.current = Date.now();
+        }
+        schedule();
+    };
+
+    useEffect(() => clearTimer, []);
+
+    return { held: state.held, releasedBy: state.releasedBy, release, noteInput, setComposing };
+}
+
 export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabled, readOnly = false, providerFixed, onSend, onRetarget }: ComposerProps) {
     const { t } = useTranslation('agent-chat');
     const sendDelivery = chatHost().useSendDelivery();
@@ -200,6 +254,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
     const { isApplePlatform, notify } = chatHost();
     const registerQuoteTaker = useContext(QuoteTakerContext);
     const inputRef = useRef<ComposerInputHandle>(null);
+    const hold = usePromptHold();
     // Taking a queued message back waits on the machine, and what was typed meanwhile is what it merges with.
     const draftRef = useRef(draft);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -618,6 +673,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
             setNotice(`${rejected.name}: ${rejected.reason}`);
             return;
         }
+        hold.release('send');
         const chosen = commands[menuIndex];
         if (commandQuery !== null && chosen?.local && runCommand(chosen.name)) {
             clearDraft();
@@ -996,6 +1052,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                     hasDraft={!isEmptyDraft(draft)}
                     denyReason={capabilities?.denyReason === true}
                     onAllAnswered={() => inputRef.current?.focus()}
+                    hold={hold}
                 >
                     <LimitDock chatId={chatId} info={info} />
                     {compactionOffer && (
@@ -1199,6 +1256,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                         tabbable={focused}
                         extensions={editorExtensions}
                         onChange={(value, selection, state) => {
+                            hold.noteInput();
                             setText(value);
                             setMenuIndex(0);
                             trackTriggers(value, selection, state);
@@ -1210,7 +1268,9 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                         onBlur={() => {
                             setMention(null);
                             setSkillQuery(null);
+                            hold.release('blur');
                         }}
+                        onComposing={hold.setComposing}
                         onKeyDown={onKeyDown}
                         onPaste={onPaste}
                     />

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDown, Hand, MessageCircleQuestionMark } from 'lucide-react';
+import type { HoldRelease } from '../prompt-hold';
 import { focusPromptHeading, focusPromptStart } from '../../prompts/logic/focus';
 import { orderPrompts, type PendingPrompt } from '../../prompts/logic/prompts';
 import { answerPrompt, isBlockingSubject, promptCreatedAt, promptIdOf, type PromptSubject } from '../../prompts/logic/subjects';
@@ -10,7 +11,14 @@ import { PromptView } from '../../prompts/ui/PromptView';
 import { chatHost } from '../../host';
 import { useChatScope } from '../../scope';
 import { useChatActions } from '../actions';
-import { Icon } from '@adecore/ui';
+import { Button, Icon } from '@adecore/ui';
+
+/* Keeps a prompt card behind the draft while the person types; `released` says what lifted the hold last. */
+export interface PromptHold {
+    held: boolean;
+    releasedBy: HoldRelease | null;
+    release(reason: HoldRelease): void;
+}
 
 /* The one being read stays in front; otherwise blocking before optional, oldest first, as everywhere else. */
 function pickSubject(waiting: readonly PromptSubject[], activeId: string | null): PromptSubject | null {
@@ -26,6 +34,7 @@ export function PromptComposer({
     hasDraft,
     denyReason,
     onAllAnswered,
+    hold,
     children
 }: {
     chatId: string;
@@ -38,6 +47,8 @@ export function PromptComposer({
     denyReason: boolean;
     /* Takes the keyboard back to the composer once the last prompt was answered from its card. */
     onAllAnswered?: () => void;
+    /* Without it a card takes the composer's place at once. */
+    hold?: PromptHold;
     children: ReactNode;
 }) {
     const { t } = useTranslation('agent-chat');
@@ -56,10 +67,23 @@ export function PromptComposer({
     const session = usePromptSession({ prompts: subjects, idOf: promptIdOf, pick: pickSubject, disabled });
     const ref = useRef<HTMLDivElement>(null);
     const { active, activeId: activeKey } = session;
-    const expanded = !!active;
+    const asksApproval = active?.kind === 'chat' ? active.item.kind === 'approval' : active?.prompt.asks === 'approval';
+    const held = !!active && (hold?.held ?? false);
+    const expanded = !!active && !held;
+    // The card that waited behind the draft, so a blur that released it is not mistaken for one released long before.
+    const heldKey = useRef<string | null>(null);
     const refocus = useFocusAfterAnswer(activeKey, ref, () => onAllAnswered?.());
 
     useEffect(() => {
+        if (held) {
+            heldKey.current = activeKey;
+        }
+    }, [held, activeKey]);
+
+    useEffect(() => {
+        if (hold?.releasedBy === 'blur' && heldKey.current === activeKey) {
+            return;
+        }
         if (focused && expanded && !elsewhere && !ref.current?.querySelector('.prompt-card')?.contains(document.activeElement)) {
             // Keys meant for the draft may still be coming, and on a button the next Space would answer the card.
             if (hasDraft) {
@@ -68,7 +92,7 @@ export function PromptComposer({
                 focusPromptStart(ref.current);
             }
         }
-    }, [activeKey, expanded, focused, elsewhere, hasDraft]);
+    }, [activeKey, expanded, focused, elsewhere, hasDraft, hold?.releasedBy]);
 
     return (
         <div ref={ref} onPointerDownCapture={session.onPointerDownCapture} onClickCapture={session.onClickCapture}>
@@ -78,11 +102,7 @@ export function PromptComposer({
                     className="flex w-full items-center gap-2 px-3.5 py-3 text-left text-sm text-text-muted hover:text-text"
                     onClick={onShowElsewhere}
                 >
-                    <Icon
-                        icon={(active.kind === 'chat' ? active.item.kind === 'approval' : active.prompt.asks === 'approval') ? Hand : MessageCircleQuestionMark}
-                        size={16}
-                        className="shrink-0 text-status-needs-you"
-                    />
+                    <Icon icon={asksApproval ? Hand : MessageCircleQuestionMark} size={16} className="shrink-0 text-status-needs-you" />
                     <span className="grow">{t('composer.waitingBelow')}</span>
                     <Icon icon={ArrowDown} size={16} className="shrink-0" />
                 </button>
@@ -111,6 +131,15 @@ export function PromptComposer({
                         sending={session.sending}
                         error={session.errorOf(promptIdOf(active))}
                     />
+                </div>
+            )}
+            {held && active && (
+                <div role="status" className="flex items-center gap-2 border-b border-border px-3.5 py-2.5">
+                    <Icon icon={asksApproval ? Hand : MessageCircleQuestionMark} size={16} className="shrink-0 text-status-needs-you" />
+                    <span className="grow text-sm text-text-muted">{t(asksApproval ? 'composer.held.approval' : 'composer.held.question')}</span>
+                    <Button size="sm" onMouseDown={(e) => e.preventDefault()} onClick={() => hold?.release('show')}>
+                        {t('composer.held.show')}
+                    </Button>
                 </div>
             )}
             <div hidden={expanded}>{children}</div>

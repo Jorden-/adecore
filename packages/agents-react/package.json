@@ -219,6 +219,11 @@
             "types": "./dist/chat/preferences.d.ts",
             "default": "./dist/chat/preferences.js"
         },
+        "./chat/prompt-hold": {
+            "source": "./src/chat/prompt-hold.ts",
+            "types": "./dist/chat/prompt-hold.d.ts",
+            "default": "./dist/chat/prompt-hold.js"
+        },
         "./chat/quote": {
             "source": "./src/chat/quote.ts",
             "types": "./dist/chat/quote.d.ts",

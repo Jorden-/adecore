@@ -250,6 +250,11 @@
   },
   "composer": {
     "slotFailed": "Dit onderdeel kon niet worden getekend",
+    "held": {
+      "question": "Er wacht een vraag. Die opent zodra je even stopt met typen.",
+      "approval": "Er wacht een goedkeuring. Die opent zodra je even stopt met typen.",
+      "show": "Nu tonen"
+    },
     "commands": {
       "model": "Wissel van model",
       "compact": "Comprimeer de context",

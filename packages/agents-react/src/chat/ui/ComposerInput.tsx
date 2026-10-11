@@ -32,6 +32,8 @@ interface ComposerInputProps {
     onChange(text: string, selection: InputSelection, state: EditorState): void;
     onSelectionChange?(text: string, selection: InputSelection, state: EditorState): void;
     onBlur?(): void;
+    /* An IME composition starts or ends; the text it builds is not in the document until it ends. */
+    onComposing?(composing: boolean): void;
     /* Runs before the editor's own keymap; true means the key is handled and its default prevented. */
     onKeyDown?(event: KeyboardEvent, view: EditorView): boolean;
     /* Runs before the editor pastes the plain text itself; true means the paste is handled. */
@@ -94,7 +96,15 @@ export function ComposerInput({
                     Prec.highest(
                         EditorView.domEventHandlers({
                             keydown: (event, target) => latest.current.handlers.onKeyDown?.(event, target) ?? false,
-                            paste: (event, target) => latest.current.handlers.onPaste?.(event, target) ?? false
+                            paste: (event, target) => latest.current.handlers.onPaste?.(event, target) ?? false,
+                            compositionstart: () => {
+                                latest.current.handlers.onComposing?.(true);
+                                return false;
+                            },
+                            compositionend: () => {
+                                latest.current.handlers.onComposing?.(false);
+                                return false;
+                            }
                         })
                     ),
                     EditorView.updateListener.of((update) => {
