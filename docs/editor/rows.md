@@ -47,6 +47,12 @@ Pass prepared `tokens` to `renderCode` when a block starts inside a multiline co
 
 A color here, and in `renderCode` and the [agent marks](/editor/agents), is the name of a custom property such as `--editor-added` or `--agent-1`, or any CSS color.
 
+## Displayed lines from other documents
+
+`setLineNumbers(labels)` supplies a string or `null` for each zero-based document line. A null label hides its number; passing `null` as the provider restores normal numbering. The gutter and sticky headers use the same labels, and the gutter reserves room for the longest label. Labels are read again after a text edit or another call to the setter.
+
+`setLineTokens(provider)` supplies prepared `LineToken` arrays for the displayed lines. A null or undefined result draws plain text while tokens are unavailable. Local grammar tokenization pauses while a provider is installed, so a document containing lines from different files never mixes their syntax states. Call the setter again when results change; passing `null` restores local grammar coloring. The host must keep the provider aligned with the current document text.
+
 ## Line actions
 
 `setLineActions(actions, owner?)` puts DOM after the last character of a line, such as the buttons of a change under review. An `EditorLineAction` has an `id`, a zero-based `line` and `render(container)`, which runs once and keeps its element for as long as the action stands. An action takes no height, follows its line through edits, is hidden on a folded line, and a press on it never moves the caret. On a long line without wrap it can sit past the right edge.

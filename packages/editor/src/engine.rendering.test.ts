@@ -97,6 +97,100 @@ describe('coloring', () => {
     });
 });
 
+describe('prepared line tokens', () => {
+    test('never locally tokenizes unknown projected lines and resumes when the provider is removed', async () => {
+        const tokenizeLine = jest.fn((text: string) => ({ tokens: [{ length: text.length, color: '#112233', fontStyle: 0 }], state: null }));
+        const { editor, host } = setup({ text: 'old\nnew', readOnly: true }, { tokenizer: async () => ({ tokenizeLine, sameState: () => true }) });
+        editor.setLineTokens(() => undefined);
+        await settle();
+        expect(tokenizeLine).not.toHaveBeenCalled();
+        expect(host.querySelector('.se-run span')).toBeNull();
+        const prepared = [{ length: 3, color: '#336699', fontStyle: 1 }];
+        const provider = (line: number) => (line === 0 ? prepared : null);
+        editor.setLineTokens(provider);
+        expect([...host.querySelectorAll('.se-run span')].map((span) => span.textContent)).toEqual(['old']);
+        expect((host.querySelector('.se-run span') as HTMLElement).style.fontStyle).toBe('italic');
+        prepared[0]!.color = '#884422';
+        editor.setLineTokens(provider);
+        expect((host.querySelector('.se-run span') as HTMLElement).style.color).toBe('#884422');
+        editor.setText('old\nnewer');
+        await settle();
+        expect(tokenizeLine).not.toHaveBeenCalled();
+        editor.setLineTokens(null);
+        expect(tokenizeLine).toHaveBeenCalled();
+        expect([...host.querySelectorAll('.se-run span')].map((span) => span.textContent)).toEqual(['old', 'newer']);
+        editor.dispose();
+    });
+
+    test('keeps removed lines in keyboard selection, find and copy, without gutter or status text', () => {
+        const { editor, host, press, clip } = setup({ text: 'old\nnew', readOnly: true });
+        editor.setLineNumbers((line) => (line === 0 ? '200' : '300'));
+        editor.setLineTokens((line) => [{ length: 3, color: line === 0 ? '#336699' : '#884422', fontStyle: 0 }]);
+        editor.setLineHighlights([
+            { startLine: 1, endLine: 1, color: '--editor-deleted', sign: '-' },
+            { startLine: 2, endLine: 2, color: '--editor-added', sign: '+' }
+        ]);
+        editor.setLineActions([
+            {
+                id: 'noNL',
+                line: 0,
+                render: (container) => {
+                    container.textContent = 'No final newline';
+                }
+            }
+        ]);
+        press('ArrowDown', { shiftKey: true });
+        expect(clip('copy')).toBe('old\n');
+        press('a', { ctrlKey: true });
+        expect(clip('copy')).toBe('old\nnew');
+        expect([...host.querySelectorAll('.se-line-number > span:first-child')].map((number) => number.textContent)).toEqual(['200', '300']);
+        const states: number[] = [];
+        editor.onFind((state) => states.push(state.count));
+        editor.find({ text: 'old', caseSensitive: false, wholeWord: false, regex: false });
+        expect(states.at(-1)).toBe(1);
+        editor.dispose();
+    });
+});
+
+describe('source line numbers', () => {
+    const labels = (host: HTMLElement): (string | null)[] => [...host.querySelectorAll('.se-line-number > span:first-child')].map((span) => span.textContent);
+
+    test('hides null labels, sizes the gutter from source numbers and restores document numbering', () => {
+        const { editor, host } = setup({ text: 'old\nnew\nlast' });
+        const provider = (line: number) => ['123456', '123457', null][line] ?? null;
+        editor.setLineNumbers(provider);
+        expect(labels(host)).toEqual(['123456', '123457', '']);
+        const root = host.querySelector('.se-editor') as HTMLElement;
+        expect(parseFloat(root.style.getPropertyValue('--se-gutter-width'))).toBeGreaterThan(64);
+        editor.setLineNumbers(null);
+        expect(labels(host)).toEqual(['1', '2', '3']);
+        expect(root.style.getPropertyValue('--se-gutter-width')).toBe('64px');
+        editor.dispose();
+    });
+
+    test('updates labels with the text and when a provider changes in place', () => {
+        const { editor, host } = setup({ text: 'old' });
+        const source = ['200', '201'];
+        const provider = (line: number) => source[line] ?? null;
+        editor.setLineNumbers(provider);
+        editor.setText('old\nnew');
+        expect(labels(host)).toEqual(['200', '201']);
+        source[0] = '400';
+        editor.setLineNumbers(provider);
+        expect(labels(host)).toEqual(['400', '201']);
+        editor.dispose();
+    });
+
+    test('can hide the editor empty line without hiding a real blank source line', () => {
+        const { editor, host } = setup({ text: '' });
+        editor.setLineNumbers(() => null);
+        expect(labels(host)).toEqual(['']);
+        editor.setLineNumbers(() => '20');
+        expect(labels(host)).toEqual(['20']);
+        editor.dispose();
+    });
+});
+
 describe('markers', () => {
     const range = (line: number, start: number, end: number) => ({ start: { line, character: start }, end: { line, character: end } });
 

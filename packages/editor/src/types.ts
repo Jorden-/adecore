@@ -534,6 +534,10 @@ export interface Editor {
     setRemoteCursors(cursors: readonly EditorRemoteCursor[]): void;
     /* Lines tinted behind the text, replacing the ones set before. They follow their text through edits until set again, and cost one mapping of two offsets per highlight. */
     setLineHighlights(highlights: readonly EditorLineHighlight[]): void;
+    /* Source labels for zero-based document lines; a null label hides the number. Null restores document numbering. */
+    setLineNumbers(labels: ((line: number) => string | null) | null): void;
+    /* Prepared colors for displayed lines. Unknown or null results stay plain; null restores grammar tokenization. Call again when results change. */
+    setLineTokens(tokens: ((line: number) => readonly LineToken[] | null | undefined) | null): void;
     /*
      * Fills a widget row's element with lines of code that are not in the document, such as the lines an
      * agent removed, in the editor's face and colors for the language, a gutter column as wide as the

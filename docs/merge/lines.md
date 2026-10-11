@@ -9,11 +9,11 @@ import type { Change, TextShape } from '@adecore/merge';
 
 ## Text shape
 
-| Function | |
-| --- | --- |
-| `splitLines(text)` | The lines of `text`, split on LF and CRLF. A final newline leaves no empty last line, and `''` gives `[]`. A lone CR stays in the line. |
-| `shapeOf(text)` | The `TextShape` of `text`: `{ eol: '\n' \| '\r\n', finalNewline: boolean }`. `eol` is CRLF when the first LF has a CR before it. `''` counts as ending on a newline. |
-| `joinLines(lines, shape)` | The lines joined with `shape.eol`, plus one at the end when `shape.finalNewline` is set. `[]` gives `''`. |
+| Function                  |                                                                                                                                                                      |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `splitLines(text)`        | The lines of `text`, split on LF and CRLF. A final newline leaves no empty last line, and `''` gives `[]`. A lone CR stays in the line.                              |
+| `shapeOf(text)`           | The `TextShape` of `text`: `{ eol: '\n' \| '\r\n', finalNewline: boolean }`. `eol` is CRLF when the first LF has a CR before it. `''` counts as ending on a newline. |
+| `joinLines(lines, shape)` | The lines joined with `shape.eol`, plus one at the end when `shape.finalNewline` is set. `[]` gives `''`.                                                            |
 
 Take the shape before you split, and pick which version owns it: `shapeOf(ours)` keeps the file as it is on disk. A file that mixes LF and CRLF comes back with one kind only, and a change that only touches line endings is invisible to the diff. An app that has to keep mixed endings or the original encoding needs its own representation around these functions.
 
@@ -55,7 +55,6 @@ patchFits(patch, 'old\n', 'new\n', false); // true
 These helpers preserve patch text rather than normalizing its line endings. Git shows a CRLF file's carriage returns in the hunk body. The `\ No newline at end of file` marker carries no source line and does not advance either snapshot position. Changes outside the displayed hunks are not checked.
 
 `patchFits` is a snapshot alignment check for ordinary single-file unified hunks, not a complete patch validator. It does not validate hunk counts, the final newline markers or combined/multi-file patch syntax. Do not use it to authorize applying an untrusted patch.
-
 
 ## Parsed patches and diff rows
 
@@ -100,6 +99,23 @@ const words = wordChanges(document.sides.old[0]!, document.sides.new[0]!);
 An unchanged pair yields no hunks and empty patch text. An empty text is a file with zero lines; it does not imply a missing filename, so both `missing` fields stay false. Context must be a nonnegative safe integer; invalid values throw `RangeError`. A computed hunk containing a changed block larger than 4000 lines has `coarse: true`, allowing a renderer to skip word pairing for that block.
 
 `wordChanges(oldLine, newLine)` returns `{ old, new }` arrays of `DiffWordRange` entries. `from` and `to` are UTF-16 offsets with an exclusive end. Word segmentation retains combining characters and emoji sequences. Whitespace changes are included. Unchanged sides have no ranges. The function returns `null` above 20,000 combined UTF-16 code units or 2000 combined segments, bounding the work for long or minified lines.
+
+## Unified display documents
+
+`diffDisplay(document, unfolded?)` turns unified diff rows into selectable text and a source map. `DiffDisplay.lines` and `rows` have one entry per display line; `text` joins those lines with LF. Removed lines are real text, so an editor can select, search, wrap and copy them alongside added lines. Context reads the new side, including its own whitespace when snapshots were verified with `ignoreWhitespace`.
+
+Each `DiffDisplayGap` has the original gap `row` and a zero-based `before` position outside the selectable text. A position equal to the display line count means a trailing gap. The host can render gaps as widgets and regenerate the display when one unfolds. Source indices and numbers in `rows` still refer to the original old and new sides, not to display positions. Final newline flags stay on those rows and never become copied status text.
+
+An empty display has no source rows, even though a mounted text editor may draw its own empty line. One changed blank source line instead has a single row with empty text. The host can distinguish them through `rows.length` and suppress a synthetic gutter label.
+
+```ts
+import { diffDisplay, diffDocument, patchOf } from '@adecore/merge';
+
+const contents = { old: 'oldName\n', new: 'newName\n' };
+const document = diffDocument(patchOf(contents.old, contents.new), contents);
+const display = diffDisplay(document);
+// display.text is 'oldName\nnewName'; each row names its source side.
+```
 
 ## Limits
 

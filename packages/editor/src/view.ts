@@ -194,6 +194,11 @@ export class EditorView {
     private gutterAction: { line: number; label: string } | null = null;
     private readonly gutterMarkerListeners = new Set<(id: string) => void>();
     private readonly gutterMarkers = new Map<string, readonly { id: string; line: number; label: string }[]>();
+    private lineTokenProvider: ((line: number) => readonly LineToken[] | null | undefined) | null = null;
+    private lineNumberProvider: ((line: number) => string | null) | null = null;
+    private lineNumberLabels: (string | null)[] = [];
+    private lineNumberRevision = -1;
+    private lineNumberWidth = 0;
     private semantic: ViewSemanticToken[] = [];
     private scopeColors: ScopeColors | null = null;
     private semanticVersion = 0;
@@ -385,6 +390,25 @@ export class EditorView {
         this.render();
     }
 
+    setLineTokens(tokens: ((line: number) => readonly LineToken[] | null | undefined) | null): void {
+        this.lineTokenProvider = tokens;
+        clearTimeout(this.colorTimer);
+        this.semanticLines.clear();
+        this.layoutVersion++;
+        this.render();
+    }
+
+    setLineNumbers(labels: ((line: number) => string | null) | null): void {
+        this.lineNumberProvider = labels;
+        this.lineNumberRevision = -1;
+        this.stickyEntries = [];
+        this.render();
+    }
+
+    private lineNumberLabel(line: number): string | null {
+        return this.lineNumberProvider === null ? String(line + 1) : (this.lineNumberLabels[line] ?? null);
+    }
+
     setInlays(inlays: readonly Inlay[]): void {
         this.inlays = inlays.map((inlay) => ({ ...inlay, text: inlay.text.replace(/[\r\n]/g, ' ') }));
         this.configureText();
@@ -445,7 +469,7 @@ export class EditorView {
 
     /* The grammar's colors of a line with the servers' laid over them, the same object for as long as neither changed. */
     private styledTokensOf(line: number): readonly LineToken[] | null {
-        const base = this.tokens.tokensOf(line);
+        const base = this.lineTokenProvider === null ? this.tokens.tokensOf(line) : (this.lineTokenProvider(line) ?? null);
         if (base === null || this.semantic.length === 0 || this.scopeColors === null) {
             return base;
         }
@@ -1690,7 +1714,7 @@ export class EditorView {
 
     /* Colors the lines on and just past the screen, a slice at a time so typing never waits on a grammar. */
     colorAhead(immediate = false): void {
-        if (this.disposed || !this.tokens.ready) {
+        if (this.disposed || this.lineTokenProvider !== null || !this.tokens.ready) {
             return;
         }
         clearTimeout(this.colorTimer);
@@ -1710,9 +1734,16 @@ export class EditorView {
         );
     }
 
-    /* The gutter is as wide as its widest number needs, which only changes when the line count gains a digit. */
+    /* Source numbering can be much larger than the display document's line count. */
     private syncGutter(): void {
-        const digits = String(this.model.getLineCount()).length;
+        if (this.lineNumberProvider !== null && this.lineNumberRevision !== this.model.getRevision()) {
+            const provider = this.lineNumberProvider;
+            this.lineNumberLabels = Array.from({ length: this.model.getLineCount() }, (_, line) => provider(line));
+            this.lineNumberWidth = this.lineNumberLabels.reduce((width, label) => Math.max(width, label?.length ?? 0), 0);
+            this.lineNumberRevision = this.model.getRevision();
+            this.stickyEntries = [];
+        }
+        const digits = this.lineNumberProvider === null ? String(this.model.getLineCount()).length : this.lineNumberWidth;
         const width = Math.max(MIN_GUTTER_WIDTH, Math.ceil(digits * this.layout.metrics.charWidth) + 40);
         if (width !== this.gutterWidth) {
             this.gutterWidth = width;
@@ -1768,7 +1799,7 @@ export class EditorView {
             const lastLine = rows.at(-1)?.line ?? 0;
             const firstRow = this.layout.rowAt(this.scrollTop);
             this.topAnchor = { offset: this.model.getLine(firstRow.line).start, delta: this.scrollTop - firstRow.top };
-            if (lastLine - this.tokens.colored <= COLOR_MARGIN * 4) {
+            if (this.lineTokenProvider === null && lastLine - this.tokens.colored <= COLOR_MARGIN * 4) {
                 this.tokens.advance(lastLine, FIRST_PAINT_MS);
             }
             const paint = {
@@ -1818,6 +1849,7 @@ export class EditorView {
         const lastLine = lastRow?.kind === 'text' ? lastRow.lastLine : (lastRow?.line ?? 0);
         const highlighted = this.highlightedLines(firstLine, lastLine);
         paintGutter(this.gutterLines, this.layout, rows, {
+            lineNumber: (line) => this.lineNumberLabel(line),
             changes: this.changedLines(rows),
             attribution: this.attributedLines(firstLine, lastLine),
             highlights: highlighted,
@@ -2319,13 +2351,18 @@ export class EditorView {
         const placements = this.scrollTop <= 0 ? [] : this.stickyAt(this.scrollTop);
         const entries = placements.map((placement): StickyEntry => {
             const row = this.layout.rowForLine(placement.block.startLine) as TextRow;
-            return { line: placement.block.startLine, geometry: this.layout.geometry(row), tokens: this.styledTokensOf(placement.block.startLine) };
+            return {
+                line: placement.block.startLine,
+                label: this.lineNumberLabel(placement.block.startLine),
+                geometry: this.layout.geometry(row),
+                tokens: this.styledTokensOf(placement.block.startLine)
+            };
         });
         const changed =
             entries.length !== this.stickyEntries.length ||
             entries.some((entry, index) => {
                 const before = this.stickyEntries[index]!;
-                return entry.line !== before.line || entry.geometry !== before.geometry || entry.tokens !== before.tokens;
+                return entry.line !== before.line || entry.label !== before.label || entry.geometry !== before.geometry || entry.tokens !== before.tokens;
             });
         this.sticky.hidden = entries.length === 0;
         this.sticky.style.setProperty('--se-scroll-left', `${this.scrollLeft}px`);

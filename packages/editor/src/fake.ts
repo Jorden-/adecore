@@ -6,6 +6,7 @@ import type {
     EditorCodeBlockOptions,
     EditorLineAction,
     EditorLineHighlight,
+    LineToken,
     EditorChangeMark,
     EditorCodeVision,
     EditorClick,
@@ -304,6 +305,17 @@ export class FakeEditor implements Editor {
 
     /* What the host drew as code outside the document: the text and how, and into which element. */
     codeBlocks: { container: HTMLElement; text: string; options: EditorCodeBlockOptions }[] = [];
+
+    lineNumbers: ((line: number) => string | null) | null = null;
+    lineTokens: ((line: number) => readonly LineToken[] | null | undefined) | null = null;
+
+    setLineNumbers(labels: ((line: number) => string | null) | null): void {
+        this.lineNumbers = labels;
+    }
+
+    setLineTokens(tokens: ((line: number) => readonly LineToken[] | null | undefined) | null): void {
+        this.lineTokens = tokens;
+    }
 
     renderCode(container: HTMLElement, text: string, options: EditorCodeBlockOptions = {}): void {
         this.codeBlocks.push({ container, text, options });

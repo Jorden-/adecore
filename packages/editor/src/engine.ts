@@ -10,6 +10,7 @@ import type {
     EditorCodeBlockOptions,
     EditorLineAction,
     EditorLineHighlight,
+    LineToken,
     EditorChangeMark,
     EditorCodeVision,
     EditorClickHandler,
@@ -524,6 +525,14 @@ class SmartEditor implements Editor {
 
     setLineHighlights(highlights: readonly EditorLineHighlight[]): void {
         this.view.setLineHighlights(highlights);
+    }
+
+    setLineNumbers(labels: ((line: number) => string | null) | null): void {
+        this.view.setLineNumbers(labels);
+    }
+
+    setLineTokens(tokens: ((line: number) => readonly LineToken[] | null | undefined) | null): void {
+        this.view.setLineTokens(tokens);
     }
 
     renderCode(container: HTMLElement, text: string, options: EditorCodeBlockOptions = {}): void {

@@ -330,6 +330,7 @@ export class RowPainter {
 }
 
 export interface GutterPaint {
+    lineNumber(line: number): string | null;
     activeLines: ReadonlySet<number>;
     /* How the lines the host marked differ from what it compares against. */
     changes: ReadonlyMap<number, EditorChangeKind>;
@@ -371,7 +372,7 @@ export function paintGutter(container: HTMLElement, layout: EditorLayout, rows: 
             item.style.background = colorValue(fill);
         }
         const number = document.createElement('span');
-        number.textContent = String(row.line + 1);
+        number.textContent = paint.lineNumber(row.line);
         item.append(number);
         if (paint.action?.line === row.line) {
             const button = gutterButton(document, 'se-gutter-action', paint.action.label);
@@ -515,6 +516,7 @@ export function paintRemoteCarets(container: HTMLElement, carets: readonly Remot
 
 export interface StickyEntry {
     line: number;
+    label: string | null;
     geometry: LineGeometry;
     tokens: readonly LineToken[] | null;
 }
@@ -530,7 +532,7 @@ export function paintSticky(container: HTMLElement, entries: readonly StickyEntr
             row.dataset.depth = String(depth);
             const number = document.createElement('span');
             number.className = 'se-sticky-number';
-            number.textContent = String(entry.line + 1);
+            number.textContent = entry.label;
             const code = document.createElement('div');
             code.className = 'se-sticky-code';
             code.append(lineElement(document, entry.geometry, entry.tokens, lineHeight, true));

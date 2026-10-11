@@ -61,6 +61,19 @@ describe('sticky scroll', () => {
         expect(rows[1]!.querySelector('.se-run')!.textContent).toBe('  function inner() {');
     });
 
+    test('uses source labels and refreshes them while a header is pinned', () => {
+        const { host, view } = mount(text);
+        view.refreshFolds();
+        view.viewport.scrollTop = 20 * 20;
+        view.setLineNumbers((line) => (line === 0 ? '1000' : null));
+        expect([...host.querySelectorAll('.se-sticky-number')].map((number) => number.textContent)).toEqual(['1000', '']);
+        view.setLineNumbers(() => '2000');
+        expect([...host.querySelectorAll('.se-sticky-number')].map((number) => number.textContent)).toEqual(['2000', '2000']);
+        view.setLineNumbers(null);
+        expect([...host.querySelectorAll('.se-sticky-number')].map((number) => number.textContent)).toEqual(['1', '2']);
+        view.dispose();
+    });
+
     test('goes away again at the top and past the end of the block', () => {
         const { host, view } = mount(text);
         const viewport = view.viewport;
