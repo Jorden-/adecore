@@ -15,9 +15,12 @@ const KINDS: Record<number, LineTokenKind | undefined> = { 1: 'comment', 2: 'str
 const PLAIN_TEXT = new Set(['', 'text', 'txt', 'plain', 'plaintext']);
 
 /* Colors one line at a time and hands the grammar's state from one line to the next. A grammar Shiki rebuilt does not know the states of the old one. */
-function lineTokenizer(highlighter: Highlighter, language: string, theme: string): LineTokenizer {
+function lineTokenizer(highlighter: Highlighter, language: string, theme: string, embedded: EmbeddedIndex): LineTokenizer {
     let grammar = highlighter.getLanguage(language);
     return {
+        prepare(text) {
+            return loadEmbedded(highlighter, embedded, text);
+        },
         stale() {
             const current = highlighter.getLanguage(language);
             const changed = current !== grammar;
@@ -51,41 +54,99 @@ function lineTokenizer(highlighter: Highlighter, language: string, theme: string
     };
 }
 
-/* The words of a document that name a language, an alias or the id itself, and not part of a longer word. */
-function mentions(text: string, names: readonly string[]): boolean {
-    return names.some((name) => new RegExp(`(?<![\\w-])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`, 'i').test(text));
+interface EmbeddedIndex {
+    readonly names: ReadonlyMap<string, string>;
+    readonly matcher: RegExp | null;
 }
 
-/*
- * A grammar embeds some languages only on demand (Vue's `lang="scss"` styles, the fences of Markdown),
- * and Shiki builds the host grammar anew each time one of them loads later, which drops the states
- * of every line colored before. So the ones a document names are loaded together with the host.
- */
-async function loadEmbedded(highlighter: Highlighter, grammar: string, text: string): Promise<void> {
-    const { bundledLanguages, bundledLanguagesInfo } = await import('shiki');
-    const bundled = bundledLanguages[grammar as keyof typeof bundledLanguages];
-    if (bundled === undefined) {
-        return;
+const languageLoads = new WeakMap<Highlighter, Map<string, Promise<void>>>();
+const embeddedIndexes = new Map<string, Promise<EmbeddedIndex>>();
+
+/* A second registration rebuilds the host grammar, so concurrent documents share the load. */
+function loadOnce(highlighter: Highlighter, id: string): Promise<void> {
+    if (highlighter.getLoadedLanguages().includes(id)) {
+        return Promise.resolve();
     }
-    const registrations = (await bundled()).default as readonly { readonly name: string; readonly embeddedLangsLazy?: readonly string[] }[];
-    const lazy = registrations.find((registration) => registration.name === grammar)?.embeddedLangsLazy ?? [];
-    const named = lazy.filter((id) => {
-        const aliases = bundledLanguagesInfo.find((info) => info.id === id)?.aliases ?? [];
-        return !highlighter.getLoadedLanguages().includes(id) && mentions(text, [id, ...aliases]);
+    let loads = languageLoads.get(highlighter);
+    if (loads === undefined) {
+        loads = new Map();
+        languageLoads.set(highlighter, loads);
+    }
+    const pending = loads.get(id);
+    if (pending !== undefined) {
+        return pending;
+    }
+    const load = (async () => {
+        await loadDocumentLanguage(highlighter, id);
+        if (!highlighter.getLoadedLanguages().includes(id)) {
+            await highlighter.loadLanguage(id as LanguageId);
+        }
+    })();
+    loads.set(id, load);
+    void load.catch(() => {
+        if (loads.get(id) === load) {
+            loads.delete(id);
+        }
     });
-    await Promise.allSettled(named.map((id) => highlighter.loadLanguage(id as LanguageId)));
+    return load;
 }
 
-/*
- * Loads the grammar of a language with what a document in it embeds, and says whether Shiki has it.
- * `text` is the document, which decides the embedded languages that load only when named.
- */
-export async function loadGrammar(highlighter: Highlighter, grammar: string, text = ''): Promise<boolean> {
-    await loadDocumentLanguage(highlighter, grammar);
-    if (!highlighter.getLoadedLanguages().includes(grammar)) {
-        await highlighter.loadLanguage(grammar as LanguageId);
+function embedIndex(grammar: string): Promise<EmbeddedIndex> {
+    const cached = embeddedIndexes.get(grammar);
+    if (cached !== undefined) {
+        return cached;
     }
-    await loadEmbedded(highlighter, grammar, text);
+    const pending = (async (): Promise<EmbeddedIndex> => {
+        const { bundledLanguages, bundledLanguagesInfo } = await import('shiki');
+        const bundled = bundledLanguages[grammar as keyof typeof bundledLanguages];
+        const registrations = bundled === undefined ? [] : (await bundled()).default;
+        const lazy = registrations.find((registration) => registration.name === grammar)?.embeddedLangsLazy ?? [];
+        const names = new Map<string, string>();
+        for (const id of lazy) {
+            const aliases = bundledLanguagesInfo.find((info) => info.id === id)?.aliases ?? [];
+            for (const name of [id, ...aliases]) {
+                names.set(name.toLowerCase(), id);
+            }
+        }
+        if (names.size === 0) {
+            return { names, matcher: null };
+        }
+        let matcher: RegExp;
+        if (grammar === 'markdown' || grammar === 'mdx') {
+            matcher = /^\s*(?:`{3,}|~{3,})[ \t]*([\w#+.-]+)/gm;
+        } else if (grammar === 'vue' || grammar === 'svelte' || grammar === 'astro') {
+            matcher = /\blang\s*=\s*["']([\w#+.-]+)["']/gi;
+        } else {
+            const alternatives = [...names.keys()].map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+            matcher = new RegExp(`(?<![\\w-])(${alternatives})(?![\\w-])`, 'gi');
+        }
+        return { names, matcher };
+    })();
+    embeddedIndexes.set(grammar, pending);
+    void pending.catch(() => embeddedIndexes.delete(grammar));
+    return pending;
+}
+
+async function loadEmbedded(highlighter: Highlighter, embedded: EmbeddedIndex, text: string): Promise<boolean> {
+    if (embedded.matcher === null) {
+        return false;
+    }
+    const loaded = new Set(highlighter.getLoadedLanguages());
+    const named = new Set<string>();
+    for (const match of text.matchAll(embedded.matcher)) {
+        const id = embedded.names.get(match[1]!.toLowerCase());
+        if (id !== undefined && !loaded.has(id)) {
+            named.add(id);
+        }
+    }
+    const results = await Promise.allSettled([...named].map((id) => loadOnce(highlighter, id)));
+    return results.some((result) => result.status === 'fulfilled');
+}
+
+/* Text names the optional embedded grammars that must load before the host hands out states. */
+export async function loadGrammar(highlighter: Highlighter, grammar: string, text = ''): Promise<boolean> {
+    await loadOnce(highlighter, grammar);
+    await loadEmbedded(highlighter, await embedIndex(grammar), text);
     return highlighter.getLoadedLanguages().includes(grammar);
 }
 
@@ -104,7 +165,7 @@ export function shikiTokenizers(highlighter: () => Promise<Highlighter>): Tokeni
             if (!shiki.getLoadedThemes().includes(theme)) {
                 await shiki.loadTheme(theme as ThemeId);
             }
-            return (await loadGrammar(shiki, grammar, text)) ? lineTokenizer(shiki, grammar, theme) : null;
+            return (await loadGrammar(shiki, grammar, text)) ? lineTokenizer(shiki, grammar, theme, await embedIndex(grammar)) : null;
         } catch {
             return null;
         }

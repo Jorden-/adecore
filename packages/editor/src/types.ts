@@ -686,6 +686,8 @@ export interface LineTokenizer {
     sameState(a: unknown, b: unknown): boolean;
     /* True once, when the grammar was rebuilt and the states handed out before it are void. */
     stale?(): boolean;
+    /* Loads missing embedded grammars named by text; true when a load can invalidate earlier states. */
+    prepare?(text: string): Promise<boolean>;
 }
 
 /* A tokenizer for a language in a theme, or null when there is no grammar for it. May load the grammar, so it is async; `text` is the document, for the embedded languages it names. */

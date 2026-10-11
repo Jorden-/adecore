@@ -1,6 +1,6 @@
-import { beforeAll, describe, expect, test } from 'bun:test';
+import { beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { createHighlighter, type Highlighter } from 'shiki';
-import { shikiTokenizers } from './shiki.ts';
+import { loadGrammar, shikiTokenizers } from './shiki.ts';
 
 const THEME = 'github-dark';
 /* The theme's plain text color; a token in it was not colored by a grammar. */
@@ -113,5 +113,70 @@ describe('a PHP file', () => {
     test('keeps the code between the tags a PHP grammar colors', async () => {
         const colors = await colorsOf('php', '<?php\n\nnamespace App;\n\necho "hi";\n?>\n<p>text</p>');
         expectColored(colors, ['namespace', 'echo', '"hi"', 'p']);
+    });
+});
+
+describe('embedded grammars added while editing', () => {
+    test('prepares a new fence once and invalidates its host once', async () => {
+        const fresh = await createHighlighter({ themes: [THEME], langs: [] });
+        try {
+            const tokenizer = (await shikiTokenizers(async () => fresh)('markdown', THEME, '# Title'))!;
+            expect(await tokenizer.prepare?.('```ts')).toBe(true);
+            expect(tokenizer.stale?.()).toBe(true);
+            expect(tokenizer.stale?.()).toBe(false);
+            expect(await tokenizer.prepare?.('```ts')).toBe(false);
+        } finally {
+            fresh.dispose();
+        }
+    });
+
+    test('does not load languages named only in Markdown prose', async () => {
+        const fresh = await createHighlighter({ themes: [THEME], langs: [] });
+        try {
+            const tokenizer = (await shikiTokenizers(async () => fresh)('markdown', THEME, 'go make a log diff'))!;
+            const before = fresh.getLoadedLanguages();
+            expect(await tokenizer.prepare?.('go make a log diff')).toBe(false);
+            expect(fresh.getLoadedLanguages()).toEqual(before);
+        } finally {
+            fresh.dispose();
+        }
+    });
+
+    test('shares a language load between a new fence and another document', async () => {
+        const fresh = await createHighlighter({ themes: [THEME], langs: [] });
+        try {
+            const tokenizer = (await shikiTokenizers(async () => fresh)('markdown', THEME, ''))!;
+            const load = spyOn(fresh, 'loadLanguage');
+            await Promise.all([tokenizer.prepare!('```ts'), loadGrammar(fresh, 'typescript')]);
+            expect(load.mock.calls.filter(([id]) => id === 'typescript')).toHaveLength(1);
+            load.mockRestore();
+        } finally {
+            fresh.dispose();
+        }
+    });
+
+    test('prepares a Vue lang attribute but not ordinary words', async () => {
+        const fresh = await createHighlighter({ themes: [THEME], langs: [] });
+        try {
+            const tokenizer = (await shikiTokenizers(async () => fresh)('vue', THEME, '<template />'))!;
+            expect(await tokenizer.prepare?.('scss')).toBe(false);
+            expect(await tokenizer.prepare?.('<style lang="scss">')).toBe(true);
+            expect(fresh.getLoadedLanguages()).toContain('scss');
+        } finally {
+            fresh.dispose();
+        }
+    });
+
+    test('a language without lazy embeds needs no further loads', async () => {
+        const fresh = await createHighlighter({ themes: [THEME], langs: [] });
+        try {
+            const tokenizer = (await shikiTokenizers(async () => fresh)('typescript', THEME, ''))!;
+            const load = spyOn(fresh, 'loadLanguage');
+            expect(await tokenizer.prepare?.('```scss')).toBe(false);
+            expect(load).not.toHaveBeenCalled();
+            load.mockRestore();
+        } finally {
+            fresh.dispose();
+        }
     });
 });

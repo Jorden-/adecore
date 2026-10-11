@@ -10,3 +10,7 @@ Every name each entry point exports, types included, by the path you import it f
 | [`@adecore/editor/shiki-worker`](https://github.com/basmilius/adecore/blob/main/packages/editor/src/shiki-worker.ts) | `createSyntaxService`, `serveDiffSyntax`, `lineTokensOf`, `DiffSyntaxDocument`, `DiffSyntaxInput`, `DiffSyntaxOutput`, `DiffSyntaxTokens`, `DiffSyntaxService`, `DiffSyntaxServiceOptions`, `DiffSyntaxWorkerEndpoint` |
 | [`@adecore/editor/keymap`](https://github.com/basmilius/adecore/blob/main/packages/editor/src/keymap-table.ts) | `TakenKey`, `KeyBinding`, `KEYMAP`, `KeymapId`, `Keymap`, `KeymapOverrides`, `KEYMAP_IDS`, `resolveKeymap`, `chordOf`, `parseChord` |
 | [`@adecore/editor/testing`](https://github.com/basmilius/adecore/blob/main/packages/editor/src/testing.ts) | `createPage`, `KeyOptions`, `press`, `release`, `typeInto`, `clipboard`, `pointer`, `MountedEditor`, `mountEditor` |
+
+### Embedded languages during edits
+
+A `LineTokenizer` may provide `prepare(text)` to load embedded grammars named by edited text. It resolves to `true` when a load can invalidate earlier states; `stale()` then reports the rebuild once. Shiki tokenizers recognize Markdown and MDX fence info and `lang` attributes in Vue, Svelte and Astro. Ordinary prose does not load fence languages. Concurrent documents share each language load.
