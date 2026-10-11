@@ -1181,7 +1181,10 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                                         </div>
                                     )}
                                     {files.length > 0 && (
-                                        <div role="group" {...(filesLabelShown ? { 'aria-labelledby': filesLabelId } : { 'aria-label': t('composer.mentions.files') })}>
+                                        <div
+                                            role="group"
+                                            {...(filesLabelShown ? { 'aria-labelledby': filesLabelId } : { 'aria-label': t('composer.mentions.files') })}
+                                        >
                                             {filesLabelShown && (
                                                 <Menu.Label id={filesLabelId}>
                                                     {mention.query === '' ? t('composer.mentions.here') : t('composer.mentions.files')}
