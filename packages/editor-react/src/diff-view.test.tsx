@@ -391,10 +391,14 @@ test('unfolding across the split wrap limit updates both existing editors', asyn
         const core = createSmartEditorEngine({ tokenizer: async () => null });
         const wraps: boolean[] = [];
         let mounts = 0;
+        const editors: Editor[] = [];
         const engine: EditorEngine = {
             mount(host, options) {
                 const editor = core.mount(host, options);
                 mounts++;
+                Object.defineProperty(host.querySelector('.se-viewport')!, 'clientWidth', { value: 220 });
+                Object.defineProperty(host.querySelector('.se-viewport')!, 'clientHeight', { value: 100 });
+                editors.push(editor);
                 wraps.push(options.wrap!);
                 const setWrap = editor.setWrap.bind(editor);
                 editor.setWrap = (wrap) => {
@@ -404,12 +408,12 @@ test('unfolding across the split wrap limit updates both existing editors', asyn
                 return editor;
             }
         };
-        const old = Array.from({ length: 16 }, (_, index) => `line ${index}`).join('\n');
+        const old = Array.from({ length: 16 }, (_, index) => `line ${index} ${'words '.repeat(20)}`).join('\n');
         await act(async () =>
             root.render(
                 createElement(DiffView, {
                     engine,
-                    document: snapshots(old, old.replace('line 8', 'changed')),
+                    document: snapshots(old, old.replace('line 8', 'changed 8')),
                     layout: 'split',
                     splitWrapLimit: 4,
                     theme: 'dark',
@@ -418,9 +422,26 @@ test('unfolding across the split wrap limit updates both existing editors', asyn
             )
         );
         expect(wraps).not.toContain(false);
-        await act(async () => (page.host.querySelector('.adecore-editor-diff-gap button') as HTMLElement).click());
+        await act(async () => editors[0]!.setScrollTop(80));
+        const beforeLine = editors[0]!
+            .getText()
+            .split('\n')
+            .findIndex((line) => line.startsWith('line 7 '));
+        const beforeTop = editors[0]!.rectAt({ line: beforeLine, character: 0 })!.top;
+        expect(beforeTop).toBeLessThan(0);
+        expect(beforeTop + editors[0]!.getLineHeight(beforeLine)).toBeGreaterThan(0);
+        const buttons = [...page.host.querySelectorAll('.adecore-editor-diff-gap button')];
+        await act(async () => (buttons.at(-1) as HTMLElement).click());
         expect(mounts).toBe(2);
         expect(wraps.slice(-2)).toEqual([false, false]);
+        const afterLine = editors[0]!
+            .getText()
+            .split('\n')
+            .findIndex((line) => line.startsWith('line 7 '));
+        const afterTop = editors[0]!.rectAt({ line: afterLine, character: 0 })!.top;
+        expect(afterTop).toBeLessThanOrEqual(0);
+        expect(afterTop + editors[0]!.getLineHeight(afterLine)).toBeGreaterThan(0);
+        expect(editors[0]!.getScrollTop()).toBe(editors[1]!.getScrollTop());
     });
 });
 

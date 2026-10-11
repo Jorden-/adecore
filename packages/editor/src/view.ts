@@ -1152,7 +1152,8 @@ export class EditorView {
         action();
         const next = this.layout.rows.find((row) => row.key === anchor.key);
         if (next) {
-            this.viewport.scrollTop = Math.max(0, next.top + offset);
+            // Unwrapping can shrink the anchor below its old offset.
+            this.viewport.scrollTop = Math.max(0, next.top + Math.min(offset, Math.max(0, next.height - 1)));
         }
     }
 

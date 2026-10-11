@@ -543,6 +543,21 @@ describe('content height', () => {
     });
 });
 
+describe('scroll anchors', () => {
+    test('unwrapping keeps the top line visible when its old offset exceeds one line', () => {
+        const { editor, viewport } = setup({ text: Array.from({ length: 20 }, () => 'words '.repeat(20)).join('\n'), wrap: true });
+        Object.defineProperties(viewport, { clientWidth: { value: 220 }, clientHeight: { value: 100 } });
+        editor.setWrap(true);
+        editor.setScrollTop(80);
+        expect(editor.rectAt({ line: 0, character: 0 })!.top).toBeLessThan(0);
+        editor.setWrap(false);
+        const top = editor.rectAt({ line: 0, character: 0 })!.top;
+        expect(top).toBeLessThanOrEqual(0);
+        expect(top + editor.getLineHeight(0)).toBeGreaterThan(0);
+        editor.dispose();
+    });
+});
+
 describe('linked read-only layouts', () => {
     test('fixed widgets ignore measurements and intrinsic heights exclude their rows', () => {
         const { editor, host } = setup({ text: 'old\nnext', wrap: false });

@@ -207,12 +207,13 @@ export function SplitDiffView({
         if (mounted === null || mounted.old.engine !== engine) {
             return;
         }
-        for (const side of SIDES) {
-            mounted[side].editor.setTheme(theme);
-            mounted[side].editor.setWrap(wrap);
-            mounted[side].editor.setLabel(`${label}: ${t(`diff.${side}Side`)}`);
-        }
-        mounted.align();
+        mounted.update(() => {
+            for (const side of SIDES) {
+                mounted[side].editor.setTheme(theme);
+                mounted[side].editor.setWrap(wrap);
+                mounted[side].editor.setLabel(`${label}: ${t(`diff.${side}Side`)}`);
+            }
+        });
     }, [mounted, engine, theme, wrap, label, t]);
     useLayoutEffect(() => {
         if (mounted === null || mounted.old.engine !== engine) {
