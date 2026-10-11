@@ -52,3 +52,34 @@ describe('a failed open', () => {
         off();
     });
 });
+
+test('a fallback module can opt out of idle prefetch and still open on first render', async () => {
+    const registered: unknown[] = [];
+    setLazyPrefetch((load) => registered.push(load));
+    const before = registered.length;
+    let opens = 0;
+    let opened!: () => void;
+    const ready = new Promise<void>((resolve) => {
+        opened = resolve;
+    });
+    const Surface = lazyNamed(
+        async () => {
+            opens++;
+            opened();
+            return { Surface: () => createElement('p', null, 'Fallback') };
+        },
+        'Surface',
+        { prefetch: false }
+    );
+    expect(registered).toHaveLength(before);
+    expect(opens).toBe(0);
+    const replayed: unknown[] = [];
+    setLazyPrefetch((load) => replayed.push(load));
+    expect(replayed).toHaveLength(before);
+    renderToStaticMarkup(createElement(Suspense, { fallback: null }, createElement(Surface)));
+    await ready;
+    await Promise.resolve();
+    expect(opens).toBe(1);
+    expect(renderToStaticMarkup(createElement(Surface))).toBe('<p>Fallback</p>');
+    setLazyPrefetch(() => {});
+});

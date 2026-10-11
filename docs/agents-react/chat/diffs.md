@@ -79,3 +79,5 @@ The Pierre fallback is limited to 400 combined lines, 100,000 combined code unit
 Syntax preparation also checks complete source sides, including hidden context: at most 20,000 rows, 2,000,000 UTF-16 code units including separators and 10,000 code units per line. A side outside this budget remains plain and sends no worker requests. The other side can still be highlighted. This avoids preserving stale grammar state after a skipped long line and keeps an oversize snapshot out of the shared cache.
 
 Syntax budgets apply independently to the old and new snapshots. A hidden line over 10,000 code units makes that entire side plain, so a split review may show colors on one side and plain text on the other.
+
+The public diff views load their Pierre renderers only when the legacy fallback is rendered. Those chunks opt out of idle prefetch and have their own suspense and error boundary; a failed fallback chunk shows the omission status. `DiffPool` and `useDiffTheme` retain their legacy Pierre dependencies for existing consumers.

@@ -126,7 +126,7 @@ The frame reads a page's bytes through `attachments.read`, since a stored page i
 
 ## Lazy modules
 
-The diff views and a few heavy parts load on first use. `setLazyPrefetch(register)` hands every such loader to a prefetcher of yours, the ones made so far and every later one. `onLazyOpenError(listener)` tells you when a loader fails during a render, and answers the function that stops listening; a failed prefetch does not reach it. `lazyNamed(load, name)` is the `React.lazy` they are made with, for a module that exports its component by name.
+The diff views and a few heavy parts load on first use. `setLazyPrefetch(register)` hands every such loader to a prefetcher of yours, the ones made so far and every later one. `onLazyOpenError(listener)` tells you when a loader fails during a render, and answers the function that stops listening; a failed prefetch does not reach it. `lazyNamed(load, name, options?)` is the `React.lazy` they are made with, for a module that exports its component by name. Set `{ prefetch: false }` for a fallback that should only load when rendered; it is never registered with the prefetcher.
 
 ## Diff syntax worker
 

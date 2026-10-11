@@ -35,7 +35,8 @@ export function onLazyOpenError(listener: (error: unknown) => void): () => void 
  */
 export function lazyNamed<Module extends Record<Name, ComponentType<any>>, Name extends keyof Module>(
     load: () => Promise<Module>,
-    name: Name
+    name: Name,
+    options?: { readonly prefetch?: boolean }
 ): ComponentType<ComponentProps<Module[Name]>> {
     let loaded: ComponentType<any> | null = null;
     const open = async (): Promise<ComponentType<any>> => {
@@ -43,8 +44,10 @@ export function lazyNamed<Module extends Record<Name, ComponentType<any>>, Name 
         loaded ??= component;
         return component;
     };
-    loaders.push(open);
-    register?.(open);
+    if (options?.prefetch !== false) {
+        loaders.push(open);
+        register?.(open);
+    }
     // Only a render loads through here; a prefetch calls `open` itself, so its failures report nothing.
     const Lazy = lazy(async () => {
         try {
