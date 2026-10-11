@@ -1,5 +1,7 @@
-import type { GrammarState, Highlighter, ShikiTransformer } from 'shiki';
+import type { GrammarState, Highlighter, ShikiTransformer, ThemedToken } from 'shiki';
 import { documentLanguageOf, loadGrammar } from './shiki.ts';
+
+type TokenOptions = Parameters<Highlighter['codeToTokensBase']>[1];
 
 export function shikiDocumentHighlighter(
     highlighter: () => Promise<Highlighter>,
@@ -8,6 +10,51 @@ export function shikiDocumentHighlighter(
     theme: string,
     transformers: readonly ShikiTransformer[] = []
 ): (index: number) => Promise<string> {
+    return documentHighlighter(highlighter, blocks, language, theme, (loaded, code, grammar, theme, state) => {
+        let root: Parameters<NonNullable<ShikiTransformer['root']>>[0] | undefined;
+        const value = loaded.codeToHtml(code, {
+            lang: grammar,
+            theme,
+            grammarState: state,
+            transformers: [
+                ...transformers,
+                {
+                    root(node) {
+                        root = node;
+                    }
+                }
+            ]
+        });
+        return { value, state: root === undefined ? undefined : loaded.getLastGrammarState(root) };
+    });
+}
+
+export function shikiDocumentTokens(
+    highlighter: () => Promise<Highlighter>,
+    blocks: readonly string[],
+    language: string,
+    theme: string
+): (index: number) => Promise<ThemedToken[][]> {
+    return documentHighlighter(highlighter, blocks, language, theme, (loaded, code, grammar, theme, state) => {
+        // Shiki 4.4 caches the active theme by argument identity, even after a same-name replacement.
+        const value = loaded.codeToTokensBase(code, { lang: grammar, theme: loaded.getTheme(theme), grammarState: state } as TokenOptions);
+        return { value, state: loaded.getLastGrammarState(value) };
+    });
+}
+
+function documentHighlighter<Value>(
+    highlighter: () => Promise<Highlighter>,
+    blocks: readonly string[],
+    language: string,
+    theme: string,
+    render: (
+        highlighter: Highlighter,
+        code: string,
+        language: string,
+        theme: string,
+        state: GrammarState | undefined
+    ) => { value: Value; state: GrammarState | undefined }
+): (index: number) => Promise<Value> {
     // A CR before the removed LF belongs to the block separator, not the last source line.
     const code = blocks.map((block, index) => (index < blocks.length - 1 ? block.replace(/\r$/, '') : block));
     let prepared: Promise<{ highlighter: Highlighter; language: string }> | undefined;
@@ -15,7 +62,7 @@ export function shikiDocumentHighlighter(
     let grammar: unknown;
     let themeRegistration: unknown;
     let state: GrammarState | undefined;
-    let html: string[] = [];
+    let values: Value[] = [];
 
     const prepare = async (): Promise<{ highlighter: Highlighter; language: string }> => {
         const loaded = await highlighter();
@@ -47,35 +94,22 @@ export function shikiDocumentHighlighter(
                     grammar = currentGrammar;
                     themeRegistration = currentTheme;
                     state = undefined;
-                    html = [];
+                    values = [];
                 }
             };
             refresh();
-            while (html.length <= index) {
-                const block = html.length;
-                let root: Parameters<NonNullable<ShikiTransformer['root']>>[0] | undefined;
-                const rendered = loaded.codeToHtml(code[block]!, {
-                    lang: grammarId,
-                    theme,
-                    grammarState: state,
-                    transformers: [
-                        ...transformers,
-                        {
-                            root(node) {
-                                root = node;
-                            }
-                        }
-                    ]
-                });
-                state = root === undefined ? undefined : loaded.getLastGrammarState(root);
-                html.push(rendered);
+            while (values.length <= index) {
+                const block = values.length;
+                const rendered = render(loaded, code[block]!, grammarId, theme, state);
+                state = rendered.state;
+                values.push(rendered.value);
                 if (block < index) {
                     // A jump deep into a file must leave room for input and painting between blocks.
                     await new Promise<void>((resolve) => setTimeout(resolve, 0));
                     refresh();
                 }
             }
-            return html[index]!;
+            return values[index]!;
         });
         // A failed theme or grammar load can be retried without rejecting every later request.
         pending = result.then(

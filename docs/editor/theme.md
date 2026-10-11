@@ -56,6 +56,21 @@ A request for a later block first highlights its predecessors. Concurrent reques
 
 The full document chooses the embedded languages to load, including languages named only in a later block. If another user of the highlighter rebuilds the grammar or replaces the theme, the next request discards its cached states and HTML. Create a new helper when the text, language, theme or transformers change. Register custom themes on the shared highlighter before returning it from `getHighlighter`.
 
+## Tokens for a document
+
+`shikiDocumentTokens(getHighlighter, blocks, language, theme)` from `@adecore/editor/shiki` returns `(index) => Promise<ThemedToken[][]>`. It uses the same block preparation, state propagation, cache invalidation and host yields as `shikiDocumentHighlighter`, then calls Shiki's `codeToTokensBase` instead of rendering HTML.
+
+Each result contains one token array per line. Tokens retain Shiki's `content`, optional `color`, `fontStyle` flags and UTF-16 `offset` relative to the requested block. Treat cached results as immutable. Text is literal; a renderer must use text nodes or escape it before writing HTML.
+
+```ts
+import { shikiDocumentTokens } from '@adecore/editor/shiki';
+
+const tokens = shikiDocumentTokens(getHighlighter, ['/* opening', 'still a comment */'], 'typescript', 'github-dark');
+const secondBlock = await tokens(1);
+```
+
+Whole-file snapshots can share a tokenizer across their blocks. A patch without snapshots needs a separate tokenizer for each hunk, because grammar state cannot continue through unknown omitted lines. Old and new sides also need separate tokenizers. Multiple tokenizers can share one highlighter.
+
 ## A tokenizer of your own
 
 A `TokenizerSource` is `(language, theme, text?) => Promise<LineTokenizer | null>`. A `LineTokenizer` colors one line at a time, from the state the line before it ended in:
