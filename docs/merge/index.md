@@ -33,3 +33,5 @@ With `base` as `'title\r\nold value\r\nfooter\r\n'`, `ours` changing the middle 
 Every function is synchronous, does no I/O and keeps no state, so there is nothing to subscribe to or dispose. Reading the three versions, deciding who may resolve a conflict, showing the blocks and writing the result belong to the app. A large comparison blocks the thread it runs on; move it to a worker when the page has to stay responsive.
 
 The package is licensed under [FSL-1.1-MIT](https://github.com/basmilius/adecore/blob/main/packages/merge/LICENSE).
+
+`diffSplit(document, unfolded)` returns compact old and new `DiffDisplay` documents and aligned rows (`DiffSplitRow`). Line entries refer to zero-based display indexes on either side and retain the original `DiffLineRow`; gap entries retain their `DiffGapRow`. Each side includes its own source text, numbers and no-newline markers. Placeholder text is never added. The `DiffSplit` shape can drive two synchronized editor layouts.

@@ -4,7 +4,7 @@ The editor draws what an agent proposed or wrote; these parts give that a React 
 
 ## DiffView
 
-`DiffView` (`DiffViewProps`) is a read-only unified diff in the editor engine, supplied through `engine`. Pass a `DiffDocument` from [`@adecore/merge`](/merge/lines), a syntax `theme` and an accessible `label`. Optional `wrap` defaults to true. With `fill`, the parent supplies its height; otherwise the component grows to the editor's content height. Set a positive `maxHeight` in pixels to bound that growth: taller diffs scroll internally and keep editor virtualization. It is ignored with `fill`; invalid or nonpositive limits leave the height unbounded. Token arrivals coalesce into one repaint per animation frame. `className` and `ref` belong to the outer element. `onMount(editor)` can attach a find bar or editor commands and return a cleanup function.
+`DiffView` (`DiffViewProps`) is a read-only diff in the editor engine, supplied through `engine`. Pass a `DiffDocument` from [`@adecore/merge`](/merge/lines), a syntax `theme` and an accessible `label`. Optional `wrap` defaults to true. With `fill`, the parent supplies its height; otherwise the component grows to the editor's content height. Set a positive `maxHeight` in pixels to bound that growth: taller diffs scroll internally and keep editor virtualization. It is ignored with `fill`; invalid or nonpositive limits leave the height unbounded. Token arrivals coalesce into one repaint per animation frame. `className` and `ref` belong to the outer element. `onMount(editor)` can attach a find bar or editor commands and return a cleanup function.
 
 ```tsx
 import { DiffView } from '@adecore/editor-react';
@@ -83,10 +83,14 @@ const container = rows.container('proposal');
 return container === undefined ? null : createPortal(<ChangeReview editor={editor} {...review} />, container);
 ```
 
-`set(rows)` replaces the owner's rows; the same ids, lines and placements again change nothing, so a new `height` alone does not reach the editor. `clear()` removes them. Since the element comes and goes, keep state outside it.
+`set(rows)` replaces the owner's rows; identical ids, lines, placements, heights and flags change nothing. `clear()` removes them. Since the element comes and goes, keep state outside it.
 
 `LineActionHost(editor, owner)` does the same for [line actions](/editor/rows#line-actions): `set` takes `{ id, line }`s, and an element lives as long as its action, so React state in it survives.
 
 The editor has one set of line highlights, and a review and a conflict may both want some. `highlightLayers(editor)` returns the `HighlightLayers` of an editor: `set(owner, provider)` takes a function that returns the owner's highlights as they stand now, and `set(owner, null)` removes them. Every change reads all owners again, so one owner never brings back the old lines of another.
 
 DiffView hands Mod+Enter back to its container so a read-only review does not swallow a prompt card's primary action. Other engine-level host shortcuts still pass through.
+
+Pass `layout="split"` to `DiffView` for two read-only editors. Each side contains only its real text, with its own source labels, tokens, word emphasis, copy and Find. Vertical scrolling and wrapped row heights are synchronized; horizontal scrolling remains independent. Fixed filler rows take up space without entering the text. Hidden context unfolds on both sides. A wholly absent side uses unified view. Ordinary folding is disabled in both layouts. `onMount(editor, side)` runs for each split editor, with `side` equal to `old` or `new`; unified passes no side.
+
+`HostedRow.fixed` supplies an exact height and `HostedRow.filler` draws a noninteractive hatched spacer without a portal. Changing height or either flag updates the row.

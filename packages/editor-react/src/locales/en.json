@@ -171,6 +171,8 @@
     },
     "diff": {
         "hidden": "Show {{count}} hidden lines",
+        "oldSide": "Old version",
+        "newSide": "New version",
         "noNewline": "No final newline"
     }
 }

@@ -6,6 +6,8 @@ export interface HostedRow {
     line: number;
     placement: 'above' | 'below';
     height: number;
+    fixed?: boolean;
+    filler?: boolean;
 }
 
 export interface HostedAction {
@@ -76,7 +78,7 @@ abstract class ContainerHost {
  */
 export class RowHost extends ContainerHost {
     set(rows: readonly HostedRow[]): void {
-        const signature = rows.map((row) => `${row.id}@${row.line}${row.placement}`).join('|');
+        const signature = rows.map((row) => `${row.id}@${row.line}${row.placement}:${row.height}:${row.fixed}:${row.filler}`).join('|');
         if (
             !this.replace(
                 signature,
@@ -87,11 +89,18 @@ export class RowHost extends ContainerHost {
         }
         this.editor.setWidgets(
             rows.map((row) => ({
-                id: row.id,
+                id: row.filler ? `${row.id}-filler` : row.id,
                 line: row.line,
                 placement: row.placement,
                 height: row.height,
-                render: (container: HTMLElement) => this.mounted(row.id, container)
+                fixed: row.fixed,
+                render: (container: HTMLElement) => {
+                    if (row.filler) {
+                        container.classList.add('adecore-editor-diff-filler');
+                    } else {
+                        this.mounted(row.id, container);
+                    }
+                }
             })),
             this.owner
         );

@@ -242,3 +242,87 @@ test('token arrivals coalesce per frame and cancel a scheduled repaint on unmoun
         expect(colors.listeners.size).toBe(0);
     });
 });
+
+test('split preserves side-specific copy and aligns wrapped rows, unmatched blocks and synchronized scroll', async () => {
+    await pageTest(async (page, root) => {
+        const old = 'start\nshort\nend\n' + Array.from({ length: 100 }, (_, index) => `context ${index}`).join('\n');
+        const fresh =
+            'first\nsecond\nstart\n' + 'many words '.repeat(20) + '\nend\n' + Array.from({ length: 100 }, (_, index) => `context ${index}`).join('\n');
+        const document = diffDocument(patchOf(old, fresh, 200), { old, new: fresh });
+        const editors: Editor[] = [];
+        const core = createSmartEditorEngine({ tokenizer: async () => null });
+        const engine: EditorEngine = {
+            mount(host, options) {
+                const editor = core.mount(host, options);
+                Object.defineProperty(host.querySelector('.se-viewport')!, 'clientWidth', { value: 240 });
+                Object.defineProperty(host.querySelector('.se-viewport')!, 'clientHeight', { value: 200 });
+                editors.push(editor);
+                return editor;
+            }
+        };
+        const render = (wrap = true) =>
+            root.render(createElement(DiffView, { engine, document, layout: 'split', wrap, maxHeight: 200, theme: 'dark', label: 'Review' }));
+        await act(async () => render());
+        expect(editors.length).toBe(2);
+        expect(editors[0]!.getText()).toBe(old);
+        expect(editors[1]!.getText()).toBe(fresh);
+        expect(editors[0]!.rectAt({ line: 0, character: 0 })!.top).toBe(editors[1]!.rectAt({ line: 2, character: 0 })!.top);
+        expect(editors[0]!.rectAt({ line: 2, character: 0 })!.top).toBe(editors[1]!.rectAt({ line: 4, character: 0 })!.top);
+        expect(editors[0]!.getContentHeight()).toBe(editors[1]!.getContentHeight());
+        const inputs = page.host.querySelectorAll('textarea');
+        for (const [index, input] of [...inputs].entries()) {
+            await act(async () => press(page.window, input, 'a', { ctrlKey: true }));
+            expect(clipboard(page.window, input, 'copy').text).toBe(index === 0 ? old : fresh);
+            expect(editors[index]!.runCommand('foldSelection')).toBe(false);
+        }
+        await act(async () => editors[0]!.setScrollTop(900));
+        expect(editors[1]!.getScrollTop()).toBe(editors[0]!.getScrollTop());
+        expect(page.host.querySelectorAll('.se-line').length).toBeLessThan(160);
+        await act(async () => render(false));
+        expect(editors.length).toBe(2);
+        expect(editors[0]!.getContentHeight()).toBe(editors[1]!.getContentHeight());
+        const counts = [0, 0];
+        editors.forEach((editor, index) =>
+            editor.onFind((state) => {
+                counts[index] = state.count;
+            })
+        );
+        await act(async () => {
+            editors[0]!.find({ text: 'short', caseSensitive: false, wholeWord: false, regex: false });
+            editors[1]!.find({ text: 'short', caseSensitive: false, wholeWord: false, regex: false });
+        });
+        expect(counts).toEqual([1, 0]);
+    });
+});
+
+test('split unfolds both sides without remounting and falls back to unified for a wholly absent side', async () => {
+    await pageTest(async (page, root) => {
+        const old = Array.from({ length: 16 }, (_, index) => `line ${index}`).join('\n') + '\n';
+        const fresh = old.replace('line 8', 'changed');
+        const editors: Editor[] = [];
+        const core = createSmartEditorEngine({ tokenizer: async () => null });
+        const engine: EditorEngine = {
+            mount(host, options) {
+                const editor = core.mount(host, options);
+                editors.push(editor);
+                return editor;
+            }
+        };
+        await act(async () =>
+            root.render(createElement(DiffView, { engine, document: snapshots(old, fresh), layout: 'split', theme: 'dark', label: 'Review' }))
+        );
+        const changed = editors[1]!.getText().split('\n').indexOf('changed');
+        editors[1]!.setSelection({ start: { line: changed, character: 0 }, end: { line: changed, character: 7 } });
+        await act(async () => (page.host.querySelector('.adecore-editor-diff-gap button') as HTMLElement).click());
+        expect(editors.length).toBe(2);
+        expect(editors[0]!.getText()).toStartWith('line 0\n');
+        expect(editors[1]!.getText()).toStartWith('line 0\n');
+        expect(editors[1]!.textInRange(editors[1]!.getSelection())).toBe('changed');
+        await act(async () =>
+            root.render(createElement(DiffView, { engine, document: snapshots('', 'added'), layout: 'split', theme: 'dark', label: 'Review' }))
+        );
+        expect(editors.length).toBe(3);
+        expect(page.host.querySelectorAll('.se-editor').length).toBe(1);
+        expect(editors[2]!.getText()).toBe('added');
+    });
+});

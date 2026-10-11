@@ -61,3 +61,28 @@
 .adecore-editor-diff[data-scroll='false'] .se-viewport {
     overflow-y: hidden;
 }
+
+.adecore-editor-diff-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    min-height: 0;
+}
+.adecore-editor-diff-side {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+}
+.adecore-editor-diff-side + .adecore-editor-diff-side {
+    border-inline-start: 1px solid var(--border);
+}
+.adecore-editor-diff-surface {
+    position: absolute;
+    inset: 0;
+}
+.adecore-editor-diff-split .se-viewport {
+    scrollbar-gutter: stable;
+}
+.adecore-editor-diff-filler {
+    background: repeating-linear-gradient(135deg, transparent 0 6px, var(--editor-hatch) 6px 7px);
+    pointer-events: none;
+}

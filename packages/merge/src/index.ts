@@ -8,3 +8,4 @@ export { diffDocument, diffRows, type DiffDocument, type DiffGapRow, type DiffLi
 export { patchOf } from './patch-of.ts';
 export { wordChanges, type DiffWordRange } from './word-changes.ts';
 export { diffDisplay, type DiffDisplay, type DiffDisplayGap } from './diff-display.ts';
+export { diffSplit, type DiffSplit, type DiffSplitRow } from './diff-split.ts';
