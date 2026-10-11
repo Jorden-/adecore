@@ -41,16 +41,29 @@ test('stops at the limit', () => {
     expect(searchThreadItems(items, 'x', { limit: 0 })).toEqual([]);
 });
 
-test('cuts the snippet to one line of context around the match', () => {
-    const text = `${'a'.repeat(100)}\nNEEDLE ${'b'.repeat(100)}`;
+test('cuts the snippet to one line of context around the match, on word boundaries', () => {
+    const text = `${'word '.repeat(40)}\nNEEDLE ${'word '.repeat(40)}`;
     const [hit] = searchThreadItems([user('u', text)], 'needle', { limit: 1 });
     expect(hit!.snippet).not.toContain('\n');
-    expect(hit!.snippet.startsWith('…')).toBe(true);
-    expect(hit!.snippet.endsWith('…')).toBe(true);
+    expect(hit!.snippet.startsWith('…word')).toBe(true);
+    expect(hit!.snippet.endsWith('word…')).toBe(true);
     expect(hit!.snippet.slice(hit!.matchStart, hit!.matchStart + hit!.matchLength)).toBe('NEEDLE');
-    // 60 characters either side of the match, plus the ellipses.
-    expect(hit!.matchStart).toBe(1 + 60);
-    expect(hit!.snippet.length).toBe(1 + 60 + 6 + 60 + 1);
+    expect(hit!.matchStart).toBeLessThanOrEqual(1 + 60);
+    expect(hit!.snippet.length).toBeLessThanOrEqual(1 + 60 + 6 + 60 + 1);
+});
+
+test('does not open or close the snippet on half a word', () => {
+    const text = `${'x'.repeat(30)} alpha beta${'y'.repeat(50)} NEEDLE ${'z'.repeat(50)}gamma delta`;
+    const [hit] = searchThreadItems([user('u', text)], 'needle', { limit: 1 });
+    expect(hit!.snippet.startsWith('…')).toBe(true);
+    expect(hit!.snippet.slice(1).startsWith('y')).toBe(false);
+    expect(hit!.snippet).not.toMatch(/z…$/);
+});
+
+test('drops emphasis and code markers from the snippet and keeps the match in place', () => {
+    const [hit] = searchThreadItems([user('u', 'a **bold** claim about `code` and the NEEDLE here')], 'needle', { limit: 1 });
+    expect(hit!.snippet).toBe('a bold claim about code and the NEEDLE here');
+    expect(hit!.snippet.slice(hit!.matchStart, hit!.matchStart + hit!.matchLength)).toBe('NEEDLE');
 });
 
 test('a match at the start or end of a short text has no ellipsis', () => {

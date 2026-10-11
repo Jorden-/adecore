@@ -19,16 +19,35 @@ export interface ThreadSearchOptions {
 // Characters kept on each side of the match.
 const CONTEXT = 60;
 
-function oneLine(text: string): string {
-    return text.replace(/\s+/g, ' ');
+// Emphasis and code markers carry no meaning in a one-line snippet, where they only read as noise.
+function plain(text: string): string {
+    return text.replace(/\*{1,3}|_{2,}|`+/g, '').replace(/\s+/g, ' ');
+}
+
+// Moves a cut forward to the start of the next word, never past `limit`, so a snippet does not open on half a word.
+function wordStart(text: string, from: number, limit: number): number {
+    if (from === 0 || /\s/.test(text[from - 1]!) || /\s/.test(text[from]!)) {
+        return from;
+    }
+    const space = text.slice(from, limit).search(/\s/);
+    return space === -1 ? from : from + space + 1;
+}
+
+// Moves a cut back to the end of the previous word, never before `limit`.
+function wordEnd(text: string, to: number, limit: number): number {
+    if (to === text.length || /\s/.test(text[to - 1]!) || /\s/.test(text[to]!)) {
+        return to;
+    }
+    const space = text.slice(limit, to).search(/\s\S*$/);
+    return space === -1 ? to : limit + space;
 }
 
 function snippetOf(text: string, index: number, length: number): { snippet: string; matchStart: number; matchLength: number } {
-    const from = Math.max(0, index - CONTEXT);
-    const to = Math.min(text.length, index + length + CONTEXT);
-    const before = `${from > 0 ? '…' : ''}${oneLine(text.slice(from, index))}`;
-    const match = oneLine(text.slice(index, index + length));
-    const after = `${oneLine(text.slice(index + length, to))}${to < text.length ? '…' : ''}`;
+    const from = wordStart(text, Math.max(0, index - CONTEXT), index);
+    const to = wordEnd(text, Math.min(text.length, index + length + CONTEXT), index + length);
+    const before = `${from > 0 ? '…' : ''}${plain(text.slice(from, index))}`;
+    const match = plain(text.slice(index, index + length));
+    const after = `${plain(text.slice(index + length, to))}${to < text.length ? '…' : ''}`;
     return { snippet: `${before}${match}${after}`, matchStart: before.length, matchLength: match.length };
 }
 
