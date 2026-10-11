@@ -204,7 +204,7 @@ for (const strict of [false, true]) {
     });
 }
 
-test('a rejected grouped engine settles its fallback before admitting the next review', async () => {
+test('a rejected grouped engine settles its status before admitting the next review', async () => {
     await mounted(async (page, root) => {
         const nextFrame = frames(page);
         const delayed = delayedEngine();
@@ -218,7 +218,7 @@ test('a rejected grouped engine settles its fallback before admitting the next r
         await nextFrame();
         expect(page.host.querySelectorAll('[data-review-entry]')).toHaveLength(1);
         await act(async () => delayed.reject(new Error('unavailable')));
-        expect(page.host.querySelectorAll('[data-diff-omitted]')).toHaveLength(1);
+        expect(page.host.querySelectorAll('[data-diff-unavailable]')).toHaveLength(1);
         await nextFrame();
         expect(page.host.querySelectorAll('[data-review-entry]')).toHaveLength(2);
         await nextFrame();

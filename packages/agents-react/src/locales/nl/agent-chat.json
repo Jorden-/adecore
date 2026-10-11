@@ -160,6 +160,7 @@
     "diffLabel": "Wijzigingen in {{path}}",
     "showDiff": "Diff tonen",
     "loadingDiff": "Diff laden",
+    "diffUnavailable": "Deze diff kon niet worden geladen",
     "runningFor": "loopt al {{elapsed}}",
     "forksAfter_one": "Een fork gaat verder na deze turn",
     "forksAfter_other": "{{count}} forks gaan verder na deze turn",

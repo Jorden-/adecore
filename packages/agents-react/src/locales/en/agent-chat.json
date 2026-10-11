@@ -160,6 +160,7 @@
     "diffLabel": "Changes in {{path}}",
     "showDiff": "Show diff",
     "loadingDiff": "Loading diff",
+    "diffUnavailable": "Could not load this diff",
     "runningFor": "running for {{elapsed}}",
     "forksAfter_one": "A fork goes on after this turn",
     "forksAfter_other": "{{count}} forks go on after this turn",

@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { lazyNamed } from '../../lazy';
 import { diffSourceBudget, legacyDiffBudget, patchSourceBudget } from './diff/diff-source-budget';
 import { DiffOmitted } from './diff/DiffOmitted';
+import { DiffUnavailable } from './diff/DiffUnavailable';
+import { RawDiff } from './diff/RawDiff';
 import { DiffFallbackBoundary } from './diff/DiffFallbackBoundary';
 import { chatHost } from '../../host';
 import type { UnifiedDiffProps } from './diff/diff-props';
@@ -17,7 +19,10 @@ export default function UnifiedDiff(props: UnifiedDiffProps) {
     const oldText = contents?.old ?? '';
     const newText = contents?.new ?? '';
     const sourceAllowed = useMemo(() => diffSourceBudget(oldText, newText) && patchSourceBudget(change.diff), [oldText, newText, change.diff]);
-    const legacyAllowed = useMemo(() => legacyDiffBudget(oldText, newText, change.diff), [oldText, newText, change.diff]);
+    const legacyMode = !allowEditor || loadEngine === undefined;
+    const hasHunks = /^@@/m.test(change.diff);
+    const legacyAllowed = useMemo(() => legacyMode && legacyDiffBudget(oldText, newText, change.diff), [legacyMode, oldText, newText, change.diff]);
+    const rawAllowed = useMemo(() => hasHunks || legacyDiffBudget('', '', change.diff), [hasHunks, change.diff]);
     const omitted = <DiffOmitted path={change.path} />;
     const fallback = legacyAllowed ? (
         <DiffFallbackBoundary fallback={omitted} resetKeys={[change.path, change.diff, oldText, newText, diffStyle]}>
@@ -31,11 +36,15 @@ export default function UnifiedDiff(props: UnifiedDiffProps) {
     if (!sourceAllowed) {
         return omitted;
     }
-    if (!allowEditor || loadEngine === undefined || !/^@@/m.test(change.diff)) {
+    if (!hasHunks) {
+        return rawAllowed ? <RawDiff text={change.diff} overflow={overflow} fill={fill} maxHeight={maxHeight} /> : omitted;
+    }
+    if (legacyMode) {
         return fallback;
     }
+    const unavailable = <DiffUnavailable path={change.path} />;
     return (
-        <DiffFallbackBoundary fallback={fallback} resetKeys={[change.path, change.diff, oldText, newText, ignoreWhitespace, diffStyle, loadEngine]}>
+        <DiffFallbackBoundary fallback={unavailable} resetKeys={[change.path, change.diff, oldText, newText, ignoreWhitespace, diffStyle, loadEngine]}>
             <Suspense fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
                 <EditorPatchDiff
                     change={change}
@@ -46,8 +55,8 @@ export default function UnifiedDiff(props: UnifiedDiffProps) {
                     fill={fill}
                     maxHeight={maxHeight}
                     layout={diffStyle}
-                    loadEngine={loadEngine}
-                    fallback={fallback}
+                    loadEngine={loadEngine!}
+                    fallback={unavailable}
                 />
             </Suspense>
         </DiffFallbackBoundary>

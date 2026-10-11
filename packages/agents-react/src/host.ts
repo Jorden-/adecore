@@ -251,7 +251,7 @@ export interface ChatHost {
         legacyDiffWorker?: () => Worker;
         /* Borrow the page highlighter for fallback; the host retains ownership. */
         highlighter?: () => Promise<Highlighter>;
-        /* Opt in to editor-rendered, bounded edit reviews; omitted, keep the legacy diff renderer. */
+        /* Opt in to bounded editor reviews; failures show a status, omitted keeps the legacy renderer. */
         editor?: () => Promise<EditorEngine>;
     };
     /* How a reply appears while it streams: a word, a block or the whole of it at a time. */

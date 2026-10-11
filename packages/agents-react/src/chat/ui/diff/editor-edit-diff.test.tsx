@@ -439,3 +439,118 @@ test('the public edit and patch paths check complete sources once', async () => 
         }
     });
 });
+
+for (const kind of ['edit', 'patch'] as const) {
+    test(`a rejected ${kind} engine shows its own failure status without starting legacy workers`, async () => {
+        await mounted(async (page, root) => {
+            const previous = chatHost();
+            let workers = 0;
+            const loadEngine = async (): Promise<EditorEngine> => {
+                throw new Error('engine unavailable');
+            };
+            setChatHost({
+                code: {
+                    ...previous.code,
+                    editor: loadEngine,
+                    legacyDiffWorker: () => {
+                        workers++;
+                        throw new Error('legacy worker must stay idle');
+                    }
+                }
+            });
+            try {
+                await act(async () =>
+                    root.render(
+                        kind === 'edit' ? (
+                            <EditDiff change={{ path: 'file.ts', before: 'old', after: 'new' }} />
+                        ) : (
+                            <UnifiedDiff change={{ path: 'file.ts', kind: 'update', diff: '@@ -1 +1 @@\n-old\n+new\n' }} />
+                        )
+                    )
+                );
+                expect(page.host.querySelector('[data-diff-unavailable]')?.textContent).toContain('Could not load this diff');
+                expect(page.host.textContent).toContain('file.ts');
+                expect(page.host.querySelector('[data-diff-omitted]')).toBeNull();
+                expect(page.host.querySelector('diffs-container')).toBeNull();
+                expect(workers).toBe(0);
+            } finally {
+                setChatHost(previous);
+            }
+        });
+    });
+
+    test(`a failed ${kind} mount leaves a local status without a legacy renderer`, async () => {
+        await mounted(async (page, root) => {
+            const previous = chatHost();
+            const engine = new FakeEditorEngine();
+            engine.mount = () => {
+                throw new Error('mount unavailable');
+            };
+            let workers = 0;
+            setChatHost({
+                code: {
+                    ...previous.code,
+                    editor: async () => engine,
+                    legacyDiffWorker: () => {
+                        workers++;
+                        throw new Error('legacy worker must stay idle');
+                    }
+                }
+            });
+            try {
+                await act(async () =>
+                    root.render(
+                        kind === 'edit' ? (
+                            <EditDiff change={{ path: 'mount.ts', before: 'old', after: 'new' }} />
+                        ) : (
+                            <UnifiedDiff change={{ path: 'mount.ts', kind: 'update', diff: '@@ -1 +1 @@\n-old\n+new\n' }} />
+                        )
+                    )
+                );
+                expect(page.host.querySelector('[data-diff-unavailable]')?.textContent).toContain('Could not load this diff');
+                expect(page.host.querySelector('diffs-container')).toBeNull();
+                expect(workers).toBe(0);
+            } finally {
+                setChatHost(previous);
+            }
+        });
+    });
+}
+
+test('a patch without hunks uses a bounded raw view without loading the engine or legacy workers', async () => {
+    await mounted(async (page, root) => {
+        const previous = chatHost();
+        let loads = 0;
+        let workers = 0;
+        setChatHost({
+            code: {
+                ...previous.code,
+                editor: async () => {
+                    loads++;
+                    return new FakeEditorEngine();
+                },
+                legacyDiffWorker: () => {
+                    workers++;
+                    throw new Error('legacy worker must stay idle');
+                }
+            }
+        });
+        try {
+            await act(async () =>
+                root.render(<UnifiedDiff change={{ path: 'raw.ts', kind: 'update', diff: 'rename from old.ts\nrename to raw.ts\n' }} maxHeight={176} />)
+            );
+            const raw = page.host.querySelector('[data-diff-raw]') as HTMLElement;
+            expect(raw.textContent).toBe('rename from old.ts\nrename to raw.ts');
+            expect(raw.style.maxHeight).toBe('176px');
+            expect(loads).toBe(0);
+            expect(workers).toBe(0);
+            await act(async () => root.render(<UnifiedDiff change={{ path: 'large.ts', kind: 'update', diff: 'raw line\n'.repeat(500) }} />));
+            expect(page.host.querySelector('[data-diff-raw]')).toBeNull();
+            expect(page.host.querySelector('[data-diff-omitted]')).not.toBeNull();
+            expect(loads).toBe(0);
+            expect(workers).toBe(0);
+        } finally {
+            setChatHost(previous);
+        }
+    });
+});

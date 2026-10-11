@@ -11,7 +11,7 @@ interface State {
     resetKeys: readonly unknown[];
 }
 
-/* A failed editor or lazy chunk must keep the file review available through the legacy renderer. */
+/* A failed view or lazy chunk must leave the containing review card usable. */
 export class DiffFallbackBoundary extends Component<Props, State> {
     state: State = { failed: false, resetKeys: this.props.resetKeys };
 
