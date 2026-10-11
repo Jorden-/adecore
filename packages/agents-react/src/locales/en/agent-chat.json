@@ -250,6 +250,12 @@
   },
   "composer": {
     "slotFailed": "This control failed to render",
+    "inputLabel": "Message",
+    "menu": {
+      "commands": "Commands",
+      "skills": "Skills",
+      "mentions": "Mentions"
+    },
     "held": {
       "question": "A question is waiting. It opens when you pause typing.",
       "approval": "An approval is waiting. It opens when you pause typing.",

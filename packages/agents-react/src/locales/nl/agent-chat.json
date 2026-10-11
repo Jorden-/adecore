@@ -250,6 +250,12 @@
   },
   "composer": {
     "slotFailed": "Dit onderdeel kon niet worden getekend",
+    "inputLabel": "Bericht",
+    "menu": {
+      "commands": "Commando's",
+      "skills": "Skills",
+      "mentions": "Vermeldingen"
+    },
     "held": {
       "question": "Er wacht een vraag. Die opent zodra je even stopt met typen.",
       "approval": "Er wacht een goedkeuring. Die opent zodra je even stopt met typen.",

@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useContext, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { indentLess, indentMore, insertNewline } from '@codemirror/commands';
 import { ensureSyntaxTree, syntaxTree } from '@codemirror/language';
@@ -56,6 +56,7 @@ import { pageTimeline, scrollTimelineToEnd, subscribeTimelineEnd, timelineAtEnd 
 import { ChatActivity } from './ChatActivity';
 import { ChatReferenceChip } from './ChatReferenceChip';
 import { chipDecorations } from './composer/chips';
+import { composerMenuAria, optionIdOf } from './composer/menu-aria';
 import { enterAction, inCode, inFenceBody, inOpenFence, listItemAt, recallDirection, tabSpaces } from './composer/keys';
 import { ComposerInput, type ComposerInputHandle } from './ComposerInput';
 import { holdLiftsIn, type HoldRelease } from '../prompt-hold';
@@ -438,6 +439,23 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
         [chatId, chats, draft.chats, mention]
     );
     const mentionCount = chatMatches.length + files.length;
+    // One menu is open at a time, so they share an id.
+    const listId = useId();
+    const mentionsLabelId = `${listId}-chats`;
+    const filesLabelId = `${listId}-files`;
+    const menuOpen = commandMenuOpen || skillMenuOpen || mentionMenuOpen;
+    const menuCount = commandMenuOpen ? commands.length : skillMenuOpen ? skillMatches.length : mentionCount;
+    const inputAria = useMemo(
+        () =>
+            composerMenuAria({
+                label: t('composer.inputLabel'),
+                listId,
+                open: menuOpen,
+                activeIndex: Math.min(menuIndex, Math.max(menuCount - 1, 0)),
+                count: menuCount
+            }),
+        [t, listId, menuOpen, menuIndex, menuCount]
+    );
     const editorExtensions = useMemo(
         () => [chipDecorations({ mentions: draft.mentions, skills: draft.skills }), LEAVE_DROPS_TO_THE_CARD],
         [draft.mentions, draft.skills]
@@ -1063,10 +1081,14 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                         />
                     )}
                     {commandMenuOpen && (
-                        <div className="border-b border-border px-1.5 py-1.5">
+                        <div id={listId} role="listbox" aria-label={t('composer.menu.commands')} className="border-b border-border px-1.5 py-1.5">
                             {commands.map((command, index) => (
                                 <button
                                     key={command.name}
+                                    id={optionIdOf(listId, index)}
+                                    role="option"
+                                    aria-selected={index === menuIndex}
+                                    tabIndex={-1}
                                     data-active={index === menuIndex}
                                     className="cursor-row flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-text-muted"
                                     onMouseEnter={() => setMenuIndex(index)}
@@ -1093,10 +1115,14 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                         </div>
                     )}
                     {skillMenuOpen && (
-                        <div className="border-b border-border px-1.5 py-1.5">
+                        <div id={listId} role="listbox" aria-label={t('composer.menu.skills')} className="border-b border-border px-1.5 py-1.5">
                             {skillMatches.map((skill, index) => (
                                 <button
                                     key={skill.name}
+                                    id={optionIdOf(listId, index)}
+                                    role="option"
+                                    aria-selected={index === menuIndex}
+                                    tabIndex={-1}
                                     data-active={index === menuIndex}
                                     className="cursor-row flex w-full items-start gap-2 rounded-md px-2 py-1 text-left text-xs text-text-muted"
                                     onMouseEnter={() => setMenuIndex(index)}
@@ -1114,45 +1140,67 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                     )}
                     {mentionMenuOpen && (
                         <div className="border-b border-border px-1.5 py-1.5">
-                            {chatMatches.length > 0 && <Menu.Label>{t('composer.mentions.chats')}</Menu.Label>}
-                            {chatMatches.map((chat, index) => (
-                                <button
-                                    key={chat.id}
-                                    data-active={index === menuIndex}
-                                    className="cursor-row flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-text-muted"
-                                    onMouseEnter={() => setMenuIndex(index)}
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={() => chooseChat(chat.id)}
-                                >
-                                    <Icon icon={MessageSquare} size={14} className="shrink-0 text-text-faint" />
-                                    <span className="truncate text-text">{chat.title || t('chatReference.untitled')}</span>
-                                </button>
-                            ))}
-                            {files.length > 0 && (mention.query === '' || chatMatches.length > 0) && (
-                                <Menu.Label>{mention.query === '' ? t('composer.mentions.here') : t('composer.mentions.files')}</Menu.Label>
+                            {mentionCount > 0 && (
+                                <div id={listId} role="listbox" aria-label={t('composer.menu.mentions')}>
+                                    {chatMatches.length > 0 && (
+                                        <div role="group" aria-labelledby={mentionsLabelId}>
+                                            <Menu.Label id={mentionsLabelId}>{t('composer.mentions.chats')}</Menu.Label>
+                                            {chatMatches.map((chat, index) => (
+                                                <button
+                                                    key={chat.id}
+                                                    id={optionIdOf(listId, index)}
+                                                    role="option"
+                                                    aria-selected={index === menuIndex}
+                                                    tabIndex={-1}
+                                                    data-active={index === menuIndex}
+                                                    className="cursor-row flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-text-muted"
+                                                    onMouseEnter={() => setMenuIndex(index)}
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                    onClick={() => chooseChat(chat.id)}
+                                                >
+                                                    <Icon icon={MessageSquare} size={14} className="shrink-0 text-text-faint" />
+                                                    <span className="truncate text-text">{chat.title || t('chatReference.untitled')}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {files.length > 0 && (
+                                        <div role="group" aria-labelledby={filesLabelId}>
+                                            {(mention.query === '' || chatMatches.length > 0) && (
+                                                <Menu.Label id={filesLabelId}>
+                                                    {mention.query === '' ? t('composer.mentions.here') : t('composer.mentions.files')}
+                                                </Menu.Label>
+                                            )}
+                                            {files.map((path, index) => {
+                                                const { name, dir } = splitPath(path);
+                                                return (
+                                                    <button
+                                                        key={path}
+                                                        id={optionIdOf(listId, chatMatches.length + index)}
+                                                        role="option"
+                                                        aria-selected={chatMatches.length + index === menuIndex}
+                                                        tabIndex={-1}
+                                                        data-active={chatMatches.length + index === menuIndex}
+                                                        className="cursor-row flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-text-muted"
+                                                        onMouseEnter={() => setMenuIndex(chatMatches.length + index)}
+                                                        onMouseDown={(e) => e.preventDefault()}
+                                                        onClick={() => chooseMention(path)}
+                                                    >
+                                                        <FileIcon path={path} size={14} />
+                                                        <span className="truncate font-mono text-text">{name}</span>
+                                                        {dir && <span className="min-w-0 truncate text-text-faint">{dir}</span>}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
                             )}
                             {mentionCount === 0 && (
                                 <div className="px-2 py-1 text-xs text-text-faint">
                                     {mention.query ? t('composer.mentions.noMatch') : t('composer.mentions.empty')}
                                 </div>
                             )}
-                            {files.map((path, index) => {
-                                const { name, dir } = splitPath(path);
-                                return (
-                                    <button
-                                        key={path}
-                                        data-active={chatMatches.length + index === menuIndex}
-                                        className="cursor-row flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-text-muted"
-                                        onMouseEnter={() => setMenuIndex(chatMatches.length + index)}
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={() => chooseMention(path)}
-                                    >
-                                        <FileIcon path={path} size={14} />
-                                        <span className="truncate font-mono text-text">{name}</span>
-                                        {dir && <span className="min-w-0 truncate text-text-faint">{dir}</span>}
-                                    </button>
-                                );
-                            })}
                         </div>
                     )}
                     {queue.length > 0 && (
@@ -1255,6 +1303,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                         disabled={!writable}
                         tabbable={focused}
                         extensions={editorExtensions}
+                        aria={inputAria}
                         onChange={(value, selection, state) => {
                             hold.noteInput();
                             setText(value);

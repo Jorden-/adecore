@@ -29,6 +29,8 @@ interface ComposerInputProps {
     className?: string;
     /* Keep the reference stable. A new one reconfigures the editor. */
     extensions?: Extension;
+    /* Attributes for the editable element, such as its label and the option a menu points at; keep the reference stable. */
+    aria?: Readonly<Record<string, string>>;
     onChange(text: string, selection: InputSelection, state: EditorState): void;
     onSelectionChange?(text: string, selection: InputSelection, state: EditorState): void;
     onBlur?(): void;
@@ -41,6 +43,8 @@ interface ComposerInputProps {
 }
 
 const NO_EXTENSIONS: Extension = [];
+
+const NO_ARIA: Readonly<Record<string, string>> = {};
 
 /*
  * A multi-line text field on CodeMirror, controlled by a plain string. The editor draws the text
@@ -56,6 +60,7 @@ export function ComposerInput({
     className,
     dictationToolbar,
     extensions = NO_EXTENSIONS,
+    aria = NO_ARIA,
     ...handlers
 }: ComposerInputProps) {
     const hostRef = useRef<HTMLDivElement>(null);
@@ -138,13 +143,13 @@ export function ComposerInput({
         viewRef.current?.dispatch({
             effects: [
                 // Spellcheck stays on, as it was on the textarea this editor replaced.
-                compartments.attributes.reconfigure(EditorView.contentAttributes.of({ spellcheck: 'true', tabindex: tabbable ? '0' : '-1' })),
+                compartments.attributes.reconfigure(EditorView.contentAttributes.of({ ...aria, spellcheck: 'true', tabindex: tabbable ? '0' : '-1' })),
                 compartments.editable.reconfigure([EditorView.editable.of(!disabled), EditorState.readOnly.of(disabled)]),
                 compartments.placeholder.reconfigure(placeholderText(placeholder)),
                 compartments.extensions.reconfigure(extensions)
             ]
         });
-    }, [compartments, tabbable, disabled, placeholder, extensions]);
+    }, [compartments, tabbable, disabled, placeholder, extensions, aria]);
 
     useLayoutEffect(() => {
         const view = viewRef.current;
