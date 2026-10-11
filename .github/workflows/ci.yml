@@ -40,11 +40,13 @@ jobs:
               - 'packages/database/src/ddl/**'
               - 'packages/database/src/helper.integration.test.ts'
               - '.github/workflows/ci.yml'
+              - 'helper.bunfig.toml'
+              - 'package.json'
+              - 'bun.lock'
 
   check:
     runs-on: ubuntu-latest
     name: ✅ Check, test and build
-    needs: changes
     steps:
       - name: 👀 Checkout
         uses: actions/checkout@v6
@@ -57,21 +59,6 @@ jobs:
       - name: 📦️ Install dependencies
         run: bun install --frozen-lockfile
 
-      # The tests that run the page, the host and the helper together need the helper built; without it they skip.
-      - name: 🦀 Setup Rust
-        if: needs.changes.outputs.helper == 'true'
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: 💾 Cache cargo
-        if: needs.changes.outputs.helper == 'true'
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: packages/database/helper
-
-      - name: 🦀 Build the database helper
-        if: needs.changes.outputs.helper == 'true'
-        run: bun run --cwd packages/database helper:build
-
       # Before the tests: a test that imports another package of the repository reads its `dist`.
       - name: 🔨 Build
         run: bun run build
@@ -82,10 +69,49 @@ jobs:
       - name: 🧪 Test
         run: bun run test
 
+  docs:
+    runs-on: ubuntu-latest
+    name: 📚 Check and build the docs
+    steps:
+      - name: 👀 Checkout
+        uses: actions/checkout@v6
+      - name: 🍞 Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - name: 📦️ Install dependencies
+        run: bun install --frozen-lockfile
       - name: 📚 Check and build the docs
         run: |
           bun run --cwd docs typecheck
           bun run --cwd docs build
+
+  helper-integration:
+    runs-on: ubuntu-latest
+    name: 🔗 Database client, host and helper
+    needs: changes
+    if: needs.changes.outputs.helper == 'true'
+    steps:
+      - name: 👀 Checkout
+        uses: actions/checkout@v6
+      - name: 🍞 Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - name: 📦️ Install dependencies
+        run: bun install --frozen-lockfile
+      - name: 🦀 Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: 💾 Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/database/helper
+      - name: 🦀 Build the database helper
+        run: bun run --cwd packages/database helper:build
+      - name: 🧪 Test the database client, host and helper
+        run: bun run test:helper
+        env:
+          ADECORE_REQUIRE_DATABASE_HELPER: '1'
 
   helper:
     runs-on: ubuntu-latest

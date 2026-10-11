@@ -35,7 +35,12 @@ afterAll(async () => {
     rmSync(folder, { recursive: true, force: true });
 });
 
-describe.skipIf(!speaksProtocol())('the page, the host and the helper together', () => {
+const available = speaksProtocol();
+if (process.env.ADECORE_REQUIRE_DATABASE_HELPER === '1' && !available) {
+    throw new Error('The database integration suite requires a release helper with the current protocol.');
+}
+
+describe.skipIf(!available)('the page, the host and the helper together', () => {
     test('a table made in the console reads back, edits and counts', async () => {
         const session = client.session(shop);
         const { results: created } = await session.execute(`

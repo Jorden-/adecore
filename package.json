@@ -14,6 +14,7 @@
     "lint": "oxlint --deny-warnings && bun scripts/check-design-conventions.ts",
     "check": "bun run typecheck && bun run lint",
     "test": "bun test",
+    "test:helper": "bun --config=helper.bunfig.toml test ./packages/database/src/helper.integration.test.ts",
     "format": "oxfmt --write \"packages/*/src/**/*.{ts,tsx}\" \"packages/*/scripts/**/*.ts\" \"docs/**/*.{ts,tsx}\" \"scripts/**/*.ts\"",
     "format:check": "oxfmt --check \"packages/*/src/**/*.{ts,tsx}\" \"packages/*/scripts/**/*.ts\" \"docs/**/*.{ts,tsx}\" \"scripts/**/*.ts\"",
     "test:pack": "bun scripts/validate-packages.ts",
