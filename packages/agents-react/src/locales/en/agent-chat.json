@@ -157,6 +157,7 @@
   "work": {
     "moreCharacters_one": "[{{count}} more character]",
     "moreCharacters_other": "[{{count}} more characters]",
+    "diffLabel": "Changes in {{path}}",
     "loadingDiff": "Loading diff",
     "runningFor": "running for {{elapsed}}",
     "forksAfter_one": "A fork goes on after this turn",

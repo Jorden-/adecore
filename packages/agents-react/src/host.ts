@@ -2,6 +2,7 @@ import type { ComponentProps, ComponentType, ReactNode, RefObject } from 'react'
 import type { Extension } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import type { Highlighter, ThemeRegistration } from 'shiki';
+import type { EditorEngine } from '@adecore/editor';
 import type {
     AgentKind,
     ChatCheckpointDiff,
@@ -248,6 +249,8 @@ export interface ChatHost {
         syntaxWorker?: () => Worker;
         /* Borrow the page highlighter for fallback; the host retains ownership. */
         highlighter?: () => Promise<Highlighter>;
+        /* Opt in to editor-rendered, bounded edit reviews; omitted, keep the legacy diff renderer. */
+        editor?: () => Promise<EditorEngine>;
     };
     /* How a reply appears while it streams: a word, a block or the whole of it at a time. */
     useStreaming(): 'words' | 'blocks' | 'whole';

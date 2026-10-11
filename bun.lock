@@ -129,6 +129,7 @@
       "dependencies": {
         "@adecore/agent-contracts": "workspace:*",
         "@adecore/editor": "workspace:*",
+        "@adecore/editor-react": "workspace:*",
         "@adecore/intelligent-ui": "workspace:*",
         "@adecore/merge": "workspace:*",
         "@codemirror/commands": "^6.11.1",

@@ -157,6 +157,7 @@
   "work": {
     "moreCharacters_one": "[nog {{count}} teken]",
     "moreCharacters_other": "[nog {{count}} tekens]",
+    "diffLabel": "Wijzigingen in {{path}}",
     "loadingDiff": "Diff laden",
     "runningFor": "loopt al {{elapsed}}",
     "forksAfter_one": "Een fork gaat verder na deze turn",

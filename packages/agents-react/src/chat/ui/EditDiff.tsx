@@ -1,12 +1,13 @@
-import { useMemo } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { canRenderEditorEdit } from './diff/editor-edit-model';
 import { MultiFileDiff } from '@pierre/diffs/react';
 import { chatHost } from '../../host';
 import { useDiffTheme } from './diff-theme';
 
 import type { FileChange } from '../logic/tools';
 
-/* One hunk of a file edit, highlighted in a worker. The header is ours, so the library's is off. */
-export default function EditDiff({ change }: { change: FileChange }) {
+function LegacyEditDiff({ change }: { change: FileChange }) {
     const resolved = chatHost().code.useMode();
     const theme = useDiffTheme();
     const oldFile = useMemo(() => ({ name: change.path, contents: change.before }), [change.path, change.before]);
@@ -26,5 +27,21 @@ export default function EditDiff({ change }: { change: FileChange }) {
         <div className="chat-diff select-text">
             <MultiFileDiff oldFile={oldFile} newFile={newFile} options={options} />
         </div>
+    );
+}
+
+const EditorEditDiff = lazy(() => import('./diff/EditorEditDiff'));
+
+export default function EditDiff({ change }: { change: FileChange }) {
+    const { t } = useTranslation('agent-chat');
+    const loadEngine = chatHost().code.editor;
+    const fallback = <LegacyEditDiff change={change} />;
+    if (loadEngine === undefined || !canRenderEditorEdit(change)) {
+        return fallback;
+    }
+    return (
+        <Suspense fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
+            <EditorEditDiff change={change} loadEngine={loadEngine} fallback={fallback} />
+        </Suspense>
     );
 }

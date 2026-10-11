@@ -1032,6 +1032,11 @@
             "source": "./src/chat/visual-viewport.ts",
             "types": "./dist/chat/visual-viewport.d.ts",
             "default": "./dist/chat/visual-viewport.js"
+        },
+        "./chat/ui/use-diff-source-tokens": {
+            "source": "./src/chat/ui/use-diff-source-tokens.ts",
+            "types": "./dist/chat/ui/use-diff-source-tokens.d.ts",
+            "default": "./dist/chat/ui/use-diff-source-tokens.js"
         }
     },
     "scripts": {
@@ -1062,7 +1067,8 @@
         "shiki": "^4.4.3",
         "simple-icons": "^16.32.0",
         "zod": "^4.6.5",
-        "zustand": "^5.0.15"
+        "zustand": "^5.0.15",
+        "@adecore/editor-react": "workspace:*"
     },
     "peerDependencies": {
         "@adecore/ui": "^0.15.0",
