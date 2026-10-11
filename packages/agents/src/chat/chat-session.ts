@@ -195,6 +195,10 @@ export class ChatSession {
     private naming = false;
     // Set while the host goes down: a CLI dying with it must not end the turn a restart takes up again.
     private frozen = false;
+    // Which CLI process (generation) announced each subagent of its own, by call id; only that one can stop it.
+    private readonly subagentOwners = new Map<string, number>();
+    // Subagents a stop_task went out for, as task id to call id, until their notification settles them.
+    private readonly stopping = new Map<string, string>();
     // Background subagents a load found running whose transcript did not show an end yet; no CLI here will report them.
     private readonly orphans = new Set<string>();
     private pendingPreambles: readonly string[];
@@ -1236,6 +1240,66 @@ export class ChatSession {
     }
 
     /*
+     * Stops one subagent of the CLI's own. The process that announced it ends it with `stop_task` and the
+     * parent goes on; a process that did not start it has nothing to address, so while a turn runs that
+     * is refused, and otherwise the row is only marked.
+     */
+    stopSubagent(toolUseId: string): 'stopping' | 'marked' {
+        const row = this.thread.find('subagent', (item) => item.toolUseId === toolUseId);
+        const agentId = row?.native?.agentId;
+        const owned = this.subagentOwners.get(toolUseId) === this.generation;
+        if (agentId !== undefined && owned && this.backend?.stopTask) {
+            this.stopping.set(agentId, toolUseId);
+            this.backend.stopTask(agentId);
+            return 'stopping';
+        }
+        if (agentId !== undefined && !owned && this.thread.info.activeTurnId !== null) {
+            throw new ChatError('subagent-stale', 'This sub-agent belongs to a process that has ended');
+        }
+        this.markSubagentStopped(toolUseId);
+        return 'marked';
+    }
+
+    private trackSubagentOwner(generation: number, event: BackendEvent): void {
+        if (event.type === 'task.started' && event.taskId) {
+            this.subagentOwners.set(event.ref, generation);
+        } else if (event.type === 'task.done') {
+            this.noteStopped(event);
+            if (event.ref !== null) {
+                this.subagentOwners.delete(event.ref);
+            }
+        } else if (event.type === 'exit') {
+            this.stopping.clear();
+        }
+    }
+
+    /* The line under a subagent that `stop_task` ended, once the CLI reported it settled. */
+    private noteStopped(event: Extract<BackendEvent, { type: 'task.done' }>): void {
+        const stopped = [...this.stopping].find(([agentId, toolUseId]) => agentId === event.taskId || toolUseId === event.ref);
+        if (stopped === undefined) {
+            return;
+        }
+        this.stopping.delete(stopped[0]);
+        const row = this.thread.find('subagent', (item) => item.toolUseId === stopped[1]);
+        if (!row) {
+            return;
+        }
+        const now = Date.now();
+        this.emit([
+            ...(row.status === 'running' ? [this.thread.upsert({ ...row, status: 'failed' as const, finishedAt: now })] : []),
+            this.thread.upsert({
+                id: `stopped-${row.toolUseId}`,
+                kind: 'note',
+                createdAt: now,
+                turnId: null,
+                level: 'info',
+                text: `"${row.description || row.subagentType || 'Sub-agent'}" was stopped.`
+            })
+        ]);
+        this.options.persist();
+    }
+
+    /*
      * Marks a subagent of the CLI's own as stopped: `failed` with a note that says what it means, since
      * no CLI stops one subagent on its own. Refused while a turn runs, which may still be waiting on it.
      */
@@ -1711,6 +1775,7 @@ export class ChatSession {
             this.awaitingBackgroundReport = true;
         }
         this.emit(projected);
+        this.trackSubagentOwner(generation, event);
         this.watchWorkflows(event);
         if (isMainAgentOutput(event)) {
             this.spokenTurnId = this.thread.info.activeTurnId;

@@ -640,8 +640,9 @@ export class ChatCore {
     }
 
     /*
-     * Stops one running sub-agent of the CLI's own. It cannot be stopped apart from its CLI, so its row
-     * is only marked, and only while no turn runs: stopping that turn is the composer's Stop.
+     * Stops one running sub-agent of the CLI's own. The process that started it ends it with `stop_task`
+     * and the parent keeps working. Without such a process the row is only marked, and only while no
+     * turn runs: stopping that turn is the composer's Stop.
      */
     async stopSubagent(chatId: string, toolUseId: string): Promise<void> {
         await this.loaded(chatId);
@@ -656,7 +657,7 @@ export class ChatCore {
         if (row.origin === 'ruimte') {
             throw new ChatError('chat-unsupported', 'This row stands for work the host runs; stop it there');
         }
-        session.markSubagentStopped(toolUseId);
+        session.stopSubagent(toolUseId);
     }
 
     /* Ends a command or a monitor a chat's CLI runs in the background, for a person who pressed Stop on it. */

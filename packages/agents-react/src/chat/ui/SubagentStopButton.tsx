@@ -30,7 +30,8 @@ export function SubagentStopButton({
     }
     const send = (): void => {
         void actions.stopSubagent(chatId, item.toolUseId).catch((e: unknown) => {
-            const description = e instanceof Error ? e.message : t('subagents.noAnswer');
+            const stale = e instanceof Error && 'code' in e && e.code === 'subagent-stale';
+            const description = stale ? t('subagents.stale') : e instanceof Error ? e.message : t('subagents.noAnswer');
             chatHost().notify({ kind: 'error', title: t('subagents.stopFailed'), description });
         });
     };

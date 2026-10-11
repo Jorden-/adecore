@@ -349,8 +349,10 @@
   "subagents": {
     "stop": {
       "task": "Stop this task",
+      "native": "Stop this sub-agent",
       "mark": "Mark as stopped. The CLI cannot stop one sub-agent, so it may keep working until the chat's process ends."
     },
+    "stale": "This sub-agent belongs to a process that has ended.",
     "title": "Sub-agents",
     "backToMain": "Back to the main agent",
     "loading": "Loading the conversation…",

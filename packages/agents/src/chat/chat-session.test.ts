@@ -1741,3 +1741,69 @@ describe('the source of a quote', () => {
         await run.session.dispose();
     });
 });
+
+describe('stopping one subagent of the CLI', () => {
+    const started = (ref: string, taskId: string | null): BackendEvent => ({
+        type: 'task.started',
+        ref,
+        taskId,
+        description: ref,
+        subagentType: 'general-purpose',
+        prompt: null,
+        background: false
+    });
+    const row = (session: ChatSession, toolUseId: string) => session.thread.find('subagent', (item) => item.toolUseId === toolUseId);
+
+    test('the process that started it gets one stop_task, and the row settles as failed with a note', async () => {
+        const run = rig();
+        const stopped: string[] = [];
+        run.backend.stopTask = (taskId) => {
+            stopped.push(taskId);
+        };
+        run.session.send('go');
+        await flush();
+        run.event(started('t1', 'a-one'));
+        run.event(started('t2', 'a-two'));
+        expect(run.session.stopSubagent('t1')).toBe('stopping');
+        expect(stopped).toEqual(['a-one']);
+        run.event({ type: 'task.done', ref: 't1', taskId: 'a-one', summary: 'Stopped', ok: false });
+        expect(row(run.session, 't1')).toMatchObject({ status: 'failed' });
+        expect(row(run.session, 't2')).toMatchObject({ status: 'running' });
+        expect(run.session.thread.get('stopped-t1')).toMatchObject({ kind: 'note', text: '"t1" was stopped.' });
+        expect(stopped).toEqual(['a-one']);
+        await run.session.dispose();
+    });
+
+    test('a process that did not start it refuses while a turn runs and marks it otherwise', async () => {
+        const run = rig();
+        const stopped: string[] = [];
+        run.backend.stopTask = (taskId) => {
+            stopped.push(taskId);
+        };
+        run.session.send('go');
+        await flush();
+        run.event(started('t1', 'a-one'));
+        run.event({ type: 'exit', exitCode: 1 });
+        run.session.send('again');
+        await flush();
+        expect(run.session.thread.info.activeTurnId).not.toBeNull();
+        expect(() => run.session.stopSubagent('t1')).toThrow('belongs to a process that has ended');
+        expect(stopped).toEqual([]);
+        run.event({ type: 'turn.done', state: 'done', costUsd: 0 });
+        expect(run.session.stopSubagent('t1')).toBe('marked');
+        expect(stopped).toEqual([]);
+        await run.session.dispose();
+    });
+
+    test('a row without a task id keeps the old mark and refusal', async () => {
+        const run = rig();
+        run.session.send('go');
+        await flush();
+        run.event(started('t1', null));
+        expect(() => run.session.stopSubagent('t1')).toThrow('A turn is running');
+        run.event({ type: 'turn.done', state: 'done', costUsd: 0 });
+        expect(run.session.stopSubagent('t1')).toBe('marked');
+        expect(row(run.session, 't1')).toMatchObject({ status: 'failed' });
+        await run.session.dispose();
+    });
+});

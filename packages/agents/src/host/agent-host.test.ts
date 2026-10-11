@@ -148,6 +148,25 @@ describe('AgentHost over a port', () => {
         expect(ok(await client.request('chat.list', {}))).toMatchObject({ chats: [{ chatId: 'chat-1', status: 'idle' }] });
     });
 
+    test('stops one sub-agent with stop_task while its parent and sibling go on', async () => {
+        ok(await client.request('chat.create', { chatId: 'chat-two', provider: 'claude', cwd: dataDir }));
+        ok(await client.request('chat.attach', { chatId: 'chat-two' }));
+        ok(await client.request('chat.send', { chatId: 'chat-two', text: 'two subagents' }));
+        const rows = () => [...client.items.values()].filter((item) => item.kind === 'subagent');
+        await client.until(() => rows().length === 2 && rows().every((item) => item.status === 'running'));
+        ok(await client.request('chat.stopSubagent', { chatId: 'chat-two', toolUseId: 'toolu_two_a' }));
+        await client.until(() => client.items.has('stopped-toolu_two_a'));
+        expect(rows().map((item) => [item.toolUseId, item.status])).toEqual([
+            ['toolu_two_a', 'failed'],
+            ['toolu_two_b', 'running']
+        ]);
+        expect(client.info?.activeTurnId).not.toBeNull();
+        claude.started[0]!.runLater();
+        await client.until(() => client.info?.activeTurnId === null);
+        expect(rows().map((item) => item.status)).toEqual(['failed', 'done']);
+        expect([...client.items.values()].some((item) => item.kind === 'assistant' && item.text === 'summarized B')).toBe(true);
+    });
+
     test('refuses what it cannot serve with a code, and a frame off the wire as a bad request', async () => {
         ok(await client.request('chat.create', { chatId: 'chat-2', provider: 'claude', cwd: dataDir }));
         expect(await client.request('chat.fork', { chatId: 'chat-2', turnId: 'turn-1' })).toMatchObject({ ok: false, error: { code: 'chat-unsupported' } });

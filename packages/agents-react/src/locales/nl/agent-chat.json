@@ -349,8 +349,10 @@
   "subagents": {
     "stop": {
       "task": "Deze taak stoppen",
+      "native": "Deze subagent stoppen",
       "mark": "Markeren als gestopt. De CLI kan een losse sub-agent niet stoppen, dus die werkt mogelijk door tot het proces van de chat eindigt."
     },
+    "stale": "Deze subagent hoort bij een proces dat al gestopt is.",
     "title": "Sub-agents",
     "backToMain": "Terug naar de main agent",
     "loading": "Gesprek laden…",

@@ -141,6 +141,13 @@ describe('stopping an active entry', () => {
         expect(stopOf(native, true)).toBeNull();
     });
 
+    test('a subagent whose CLI named its task id is ended on its own, turn or not', () => {
+        const named = subagent('c', { native: { agentId: 'a-one' } });
+        expect(stopOf(named, true)).toBe('native');
+        expect(stopOf(named, false)).toBe('native');
+        expect(stopOf({ ...named, status: 'done' }, false)).toBeNull();
+    });
+
     test('nothing is offered for a row that settled, or a task that names no node', () => {
         expect(stopOf(subagent('d', { status: 'done' }), false)).toBeNull();
         expect(stopOf(subagent('f', { status: 'failed', origin: 'ruimte', childId: 'node-1' }), false)).toBeNull();

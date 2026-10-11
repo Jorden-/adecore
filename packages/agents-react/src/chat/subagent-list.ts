@@ -116,11 +116,12 @@ export function entryTimeOf(item: ChatSubagentItem, task: SubagentTask | null, n
 }
 
 /*
- * What the Stop of an active entry does: a task stops the node working on it, and a subagent of the
- * CLI's own is only marked stopped, since no CLI stops one on its own. While the chat's turn runs that
- * turn may still wait on it, so stopping the turn (the composer's Stop) is the only offer then.
+ * What the Stop of an active entry does: a task stops the node working on it, and a subagent whose CLI
+ * named its task id (`native`) is ended on its own, turn or not. Any other subagent of the CLI's own is
+ * only marked stopped; while the chat's turn runs that turn may still wait on it, so stopping the turn
+ * (the composer's Stop) is the only offer then.
  */
-export type SubagentStop = 'task' | 'mark';
+export type SubagentStop = 'task' | 'native' | 'mark';
 
 export function stopOf(item: ChatSubagentItem, turnRunning: boolean): SubagentStop | null {
     if (item.status !== 'running') {
@@ -129,11 +130,14 @@ export function stopOf(item: ChatSubagentItem, turnRunning: boolean): SubagentSt
     if (item.origin === 'ruimte') {
         return item.childId === undefined ? null : 'task';
     }
+    if (item.native?.agentId) {
+        return 'native';
+    }
     return turnRunning ? null : 'mark';
 }
 
 export function stopLabel(stop: SubagentStop): string {
-    return stop === 'task' ? i18next.t('agent-chat:subagents.stop.task') : i18next.t('agent-chat:subagents.stop.mark');
+    return i18next.t(`agent-chat:subagents.stop.${stop}`);
 }
 
 /*

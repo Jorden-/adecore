@@ -146,6 +146,40 @@ export function fakeClaude(io: FakeIo): FakeProgram {
     // What a background agent asked; its answer comes in after the turn that launched it, whenever a person gives one.
     let backgroundAsk: { requestId: string; command: string } | null = null;
     let slow = false;
+    // The two foreground subagents of `two subagents` that have not settled; the turn stays open until both have.
+    const openTwo = new Set<string>();
+
+    const settleTwo = (name: 'a-one' | 'a-two', stopped: boolean): void => {
+        const toolUseId = name === 'a-one' ? 'toolu_two_a' : 'toolu_two_b';
+        if (!openTwo.delete(name)) {
+            return;
+        }
+        if (stopped) {
+            out({ type: 'system', subtype: 'task_updated', task_id: name, patch: { status: 'killed', end_time: 0 }, session_id: sessionId });
+            out({
+                type: 'system',
+                subtype: 'task_notification',
+                task_id: name,
+                tool_use_id: toolUseId,
+                status: 'stopped',
+                output_file: '',
+                summary: 'Stopped',
+                session_id: sessionId
+            });
+        }
+        out({
+            type: 'user',
+            message: {
+                role: 'user',
+                content: [{ type: 'tool_result', tool_use_id: toolUseId, content: stopped ? 'Stopped' : `${name} done`, is_error: stopped }]
+            },
+            session_id: sessionId
+        });
+        if (openTwo.size === 0) {
+            assistantText('summarized B');
+            result();
+        }
+    };
 
     // The rest of a background agent once its request was answered: its call's result, its report, and the turn the CLI opens about it.
     const finishBackgroundAgent = (command: string, allowed: boolean, message: string | undefined): void => {
@@ -191,6 +225,43 @@ export function fakeClaude(io: FakeIo): FakeProgram {
     const handleUser = (text: string): void => {
         if (text === 'crash') {
             io.exit(1);
+            return;
+        }
+        // Two foreground subagents beside each other; the turn ends once both settled: a-two when the test runs what is put off, a-one by a `stop_task`.
+        if (text === 'two subagents') {
+            openTwo.add('a-one').add('a-two');
+            for (const [name, toolUseId] of [
+                ['a-one', 'toolu_two_a'],
+                ['a-two', 'toolu_two_b']
+            ] as const) {
+                out({
+                    type: 'assistant',
+                    message: {
+                        id: `msg_${nonce}_${++messageCounter}`,
+                        model,
+                        role: 'assistant',
+                        content: [
+                            { type: 'tool_use', id: toolUseId, name: 'Agent', input: { description: name, subagent_type: 'general-purpose', prompt: name } }
+                        ],
+                        usage
+                    },
+                    session_id: sessionId
+                });
+                out({
+                    type: 'system',
+                    subtype: 'task_started',
+                    task_id: name,
+                    tool_use_id: toolUseId,
+                    description: name,
+                    subagent_type: 'general-purpose',
+                    is_backgrounded: false,
+                    spawn_depth: 1,
+                    task_type: 'local_agent',
+                    prompt: name,
+                    session_id: sessionId
+                });
+            }
+            io.later(() => settleTwo('a-two', false));
             return;
         }
         if (text === 'crash loudly') {
@@ -952,8 +1023,11 @@ export function fakeClaude(io: FakeIo): FakeProgram {
             } else if (frame.type === 'control_response') {
                 handleControlResponse(frame.response as Record<string, unknown>);
             } else if (frame.type === 'control_request') {
-                const request = frame.request as { subtype: string };
+                const request = frame.request as { subtype: string; task_id?: string };
                 out({ type: 'control_response', response: { subtype: 'success', request_id: frame.request_id, response: {} } });
+                if (request.subtype === 'stop_task' && (request.task_id === 'a-one' || request.task_id === 'a-two')) {
+                    settleTwo(request.task_id, true);
+                }
                 if (request.subtype === 'interrupt' && slow) {
                     slow = false;
                     assistantText('[interrupted]');

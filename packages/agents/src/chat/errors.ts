@@ -12,6 +12,8 @@ export type ChatErrorCode =
     | 'chat-unsupported'
     | 'invalid-attachments'
     | 'subagent-not-found'
+    // The sub-agent was started by a CLI process that has ended, so no process here can stop it.
+    | 'subagent-stale'
     | 'task-not-found'
     // What reading or forking a CLI's own conversation is refused with.
     | 'transcript-missing'
