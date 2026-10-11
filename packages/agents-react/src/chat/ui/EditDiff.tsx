@@ -35,7 +35,7 @@ export default function EditDiff({ change, allowEditor = true, maxHeight }: { ch
     return (
         <DiffFallbackBoundary fallback={fallback} resetKeys={[change.path, change.before, change.after, loadEngine]}>
             <Suspense fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
-                <EditorEditDiff change={change} loadEngine={loadEngine} fallback={fallback} maxHeight={maxHeight} />
+                <EditorEditDiff change={change} loadEngine={loadEngine} fallback={fallback} maxHeight={maxHeight} sourceChecked />
             </Suspense>
         </DiffFallbackBoundary>
     );

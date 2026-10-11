@@ -9,6 +9,7 @@ import { EditorDocumentDiff } from './EditorEditDiff';
 
 export default function EditorPatchDiff({
     change,
+    sourceChecked = false,
     contents,
     ignoreWhitespace,
     wrap,
@@ -19,6 +20,7 @@ export default function EditorPatchDiff({
     fallback
 }: {
     change: ChatFileChange;
+    sourceChecked?: boolean;
     contents?: DiffContents;
     ignoreWhitespace: boolean;
     wrap: boolean;
@@ -31,7 +33,7 @@ export default function EditorPatchDiff({
     const oldText = contents?.old;
     const newText = contents?.new;
     const document = useMemo(() => {
-        if (!diffSourceBudget(oldText ?? '', newText ?? '') || !patchSourceBudget(change.diff)) {
+        if (!sourceChecked && (!diffSourceBudget(oldText ?? '', newText ?? '') || !patchSourceBudget(change.diff))) {
             return undefined;
         }
         return diffDocument(
@@ -39,7 +41,7 @@ export default function EditorPatchDiff({
             oldText === undefined || newText === undefined ? undefined : { old: oldText, new: newText },
             ignoreWhitespace
         );
-    }, [change.diff, oldText, newText, ignoreWhitespace]);
+    }, [change.diff, oldText, newText, ignoreWhitespace, sourceChecked]);
     if (document === undefined) {
         return <DiffOmitted path={change.path} />;
     }

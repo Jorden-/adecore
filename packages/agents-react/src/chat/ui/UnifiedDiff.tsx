@@ -39,6 +39,7 @@ export default function UnifiedDiff(props: UnifiedDiffProps) {
             <Suspense fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
                 <EditorPatchDiff
                     change={change}
+                    sourceChecked
                     contents={contents}
                     ignoreWhitespace={ignoreWhitespace}
                     wrap={overflow === 'wrap'}

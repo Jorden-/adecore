@@ -120,19 +120,21 @@ export default function EditorEditDiff({
     change,
     loadEngine,
     fallback,
-    maxHeight
+    maxHeight,
+    sourceChecked = false
 }: {
     change: FileChange;
+    sourceChecked?: boolean;
     loadEngine: EngineLoader;
     fallback: ReactNode;
     maxHeight?: number;
 }) {
     const document = useMemo(
         () =>
-            diffSourceBudget(change.before, change.after)
+            sourceChecked || diffSourceBudget(change.before, change.after)
                 ? diffDocument(patchOf(change.before, change.after, 3, { maxWork: EDITOR_DIFF_WORK }), { old: change.before, new: change.after })
                 : undefined,
-        [change.before, change.after]
+        [change.before, change.after, sourceChecked]
     );
     if (document === undefined) {
         return <DiffOmitted path={change.path} />;

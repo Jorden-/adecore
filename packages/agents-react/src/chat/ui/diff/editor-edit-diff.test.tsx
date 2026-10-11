@@ -5,6 +5,7 @@ import { FakeEditorEngine } from '@adecore/editor/fake';
 import { createPage } from '@adecore/editor/testing';
 import type { EditorEngine } from '@adecore/editor';
 import * as merge from '@adecore/merge';
+import * as sourceBudget from './diff-source-budget';
 import { chatHost, setChatHost } from '../../../host';
 import EditDiff from '../EditDiff';
 import UnifiedDiff from '../UnifiedDiff';
@@ -410,5 +411,31 @@ test('reformatting 1100 lines stays in the editor instead of being omitted', asy
         expect(engine.last.getText().split('\n')).toHaveLength(1650);
         expect(page.host.querySelector('[data-diff-omitted]')).toBeNull();
         expect(engine.last.getText()).toContain('changed 1098');
+    });
+});
+
+test('the public edit and patch paths check complete sources once', async () => {
+    await mounted(async (_page, root) => {
+        const previous = chatHost();
+        const engine = new FakeEditorEngine();
+        const check = spyOn(sourceBudget, 'diffSourceBudget');
+        try {
+            setChatHost({ code: { ...previous.code, editor: async () => engine } });
+            await act(async () => root.render(createElement(EditDiff, { change: { path: 'a.ts', before: 'old', after: 'new' } })));
+            expect(check).toHaveBeenCalledTimes(1);
+            check.mockClear();
+            await act(async () =>
+                root.render(
+                    createElement(UnifiedDiff, {
+                        change: { path: 'a.ts', kind: 'update', diff: '@@ -1 +1 @@\n-old\n+new' },
+                        contents: { old: 'old', new: 'new' }
+                    })
+                )
+            );
+            expect(check).toHaveBeenCalledTimes(1);
+        } finally {
+            check.mockRestore();
+            setChatHost(previous);
+        }
     });
 });
