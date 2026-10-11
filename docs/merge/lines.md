@@ -56,6 +56,33 @@ These helpers preserve patch text rather than normalizing its line endings. Git 
 
 `patchFits` is a snapshot alignment check for ordinary single-file unified hunks, not a complete patch validator. It does not validate hunk counts, the final newline markers or combined/multi-file patch syntax. Do not use it to authorize applying an untrusted patch.
 
+
+## Parsed patches and diff rows
+
+`parsePatch(patch)` reads one file's unified patch into a `ParsedPatch`. File headers are optional. Each `Hunk` holds zero-based `oldStart` and `newStart` positions, counts, section text and `PatchLine` entries (`context`, `delete` or `insert`). A zero-count range is an insertion anchor. The parser retains carriage returns in source text and attaches `noNewline: true` to the line before a final newline marker.
+
+The parser preserves recognized lines when a hunk is truncated or malformed and sets `partial: true`. It also marks overlapping hunks and multi-file patches partial. It never throws for malformed patch text. An empty context line may omit its space prefix. It does not parse combined diffs, binary patches, rename metadata or quoted paths.
+
+```ts
+import { diffDocument, diffRows, parsePatch } from '@adecore/merge';
+
+const parsed = parsePatch('@@ -1 +1 @@\n-old\n+new\n');
+const document = diffDocument(parsed, { old: 'old\n', new: 'new\n' });
+const rows = diffRows(document, 'split');
+```
+
+`diffDocument(parsed, contents, ignoreWhitespace = false)` returns a `DiffDocument`. With valid snapshots it keeps every line from both files and their `TextShape`. Verification covers hunk counts, displayed text, final newline markers and unchanged gaps. With `ignoreWhitespace`, every column still reads its own snapshot text, including context that has different spacing on each side.
+
+When snapshots are absent or fail verification, the document contains compact arrays of recognized patch lines, sets `snapshots: false` and `partial: true`, and prevents unfolding. Each hunk has an entry in `offsets` identifying the start of its lines in the two arrays. A `DiffLineRef` separates the zero-based array `index` from the one-based original line `number`; these differ in a compact document. Consumers must use `index` to read text and `number` for the gutter.
+
+`diffRows(document, layout, unfolded?)` returns `DiffRow` entries in reading order. A `DiffLineRow` points at either or both sides and carries a `context`, `delete`, `insert` or `pair` change. Unified rows preserve patch order; split rows pair removals and additions in each changed block, leaving excess lines on their own. The optional `hunk` identifies the source hunk. A `noNewline` value identifies `old`, `new` or `both` sides.
+
+A `DiffGapRow` describes omitted lines with zero-based starts and separate counts for both sides. It has a stable `id` equal to the following hunk index, or the hunk count for the trailing gap. `unfoldable` is true only when verified snapshots contain that context.
+
+Pass a `ReadonlyMap<number, number>` as `unfolded` to expose lines beside hunks. The value is the number of lines to reveal at each edge adjoining a hunk; an interior gap reveals both edges. Values are cumulative, rounded down and clamped. `Infinity` reveals the entire gap. Exposed context rows retain side-specific text and final newline markers. A partially unfolded gap keeps its original id.
+
+The document and rows describe a view; they do not authorize applying a patch. Keep the original `ParsedPatch.text` available for a raw patch view when `partial` is set. Without snapshots, syntax highlighting must reset at each hunk because omitted context can change the grammar state.
+
 ## Limits
 
 The diff strips the lines both versions start and end with, then runs Myers' algorithm on the middle, which finds the shortest list of inserts and deletes. It gives up when that list would pass 4000 edits and answers the whole middle as one change instead. The result still rebuilds `other` exactly, but a three-way merge then shows the middle as one large conflict. The limit counts edits, not lines, and it cannot be configured.

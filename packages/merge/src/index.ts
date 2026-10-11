@@ -3,3 +3,5 @@ export { openBlocks, splitBlocks, type MergeBlock, type MergeBlockKind } from '.
 export { autoLines, bothLines, draftOf, fingerprint, sideLines, wandLines, type MergeDraft, type MergeSide, type MergeSpan } from './resolve.ts';
 export { joinLines, shapeOf, splitLines, type TextShape } from './text.ts';
 export { missingSides, patchFits } from './patch.ts';
+export { parsePatch, type Hunk, type ParsedPatch, type PatchLine } from './patch-parser.ts';
+export { diffDocument, diffRows, type DiffDocument, type DiffGapRow, type DiffLineRef, type DiffLineRow, type DiffRow } from './diff-document.ts';
