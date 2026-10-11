@@ -65,6 +65,7 @@ function rig() {
         createdAt: 1
     };
     const events: ChatEvent[] = [];
+    const frozen = Promise.withResolvers<void>();
     const session = new ChatSession({
         info,
         items: [item],
@@ -72,7 +73,12 @@ function rig() {
         provider: claudeProvider,
         command: ['unused'],
         env: () => ({}),
-        emit: (event) => events.push(event),
+        emit: (event) => {
+            events.push(event);
+            if (event.type === 'delta' && event.uiQueries) {
+                frozen.resolve();
+            }
+        },
         persist: () => {},
         persistSoon: () => {}
     });
@@ -86,6 +92,7 @@ function rig() {
         block,
         item,
         events,
+        frozen: frozen.promise,
         counts: () => ({ reads, captures }),
         revoke: () => {
             permitted = false;
@@ -167,9 +174,7 @@ describe('stored UI queries', () => {
     test('freezes the first values and fallback in metadata, without logging a second tree', async () => {
         const r = rig();
         r.queries.observe(r.session, r.item, true);
-        for (let i = 0; i < 40; i++) {
-            await Promise.resolve();
-        }
+        await r.frozen;
         const item = r.session.thread.get('reply') as ChatAssistantItem;
         expect(item.uiQueries!.blocks.block!.readings.$data!.value).toEqual({ count: 7 });
         expect(item.uiQueries!.blocks.block!.fallback).toContain('Count: 7');
@@ -181,9 +186,7 @@ describe('stored UI queries', () => {
 test('a frozen read id survives cache loss and schema defaults after restart', async () => {
     const r = rig();
     r.queries.observe(r.session, r.item, true);
-    for (let i = 0; i < 40; i++) {
-        await Promise.resolve();
-    }
+    await r.frozen;
     const item = r.session.thread.get('reply') as ChatAssistantItem;
     const reading = item.uiQueries!.blocks.block!.readings.$data!;
     r.queries.forget('chat');
@@ -191,9 +194,8 @@ test('a frozen read id survives cache loss and schema defaults after restart', a
     expect(values).toEqual({ $data: { count: 7 } });
     const count = r.events.length;
     r.queries.observe(r.session, item, true);
-    for (let i = 0; i < 40; i++) {
-        await Promise.resolve();
-    }
+    // The in-memory observer must get a chance to run before checking that it emits nothing.
+    await new Promise<void>((resolve) => setImmediate(resolve));
     expect(r.events).toHaveLength(count);
 });
 

@@ -41,22 +41,16 @@ function fakeProviders(onHost: (host: BackendHost) => void): ProviderRegistry {
     });
 }
 
-async function settle(): Promise<void> {
-    for (let i = 0; i < 40; i++) {
-        await new Promise((resolve) => setImmediate(resolve));
-    }
-}
-
 test('UI previews reach attached clients without a log sequence or observer side effects and reconnect without logging', async () => {
     const home = await mkdtemp(join(tmpdir(), 'adecore-ui-log-'));
-    let host: BackendHost | undefined;
+    const backendCreated = Promise.withResolvers<BackendHost>();
     const attachments = new AttachmentStore(home);
     const store = new ChatStore(home, { attachments });
     const manager = new ChatCore({
         attachments,
         store,
         providers: fakeProviders((backendHost) => {
-            host = backendHost;
+            backendCreated.resolve(backendHost);
         })
     });
     const clients: ChatEventEnvelope[] = [];
@@ -75,13 +69,7 @@ test('UI previews reach attached clients without a log sequence or observer side
         await manager.create({ chatId: 'chat', cwd: home });
         manager.attach('chat', 'client');
         await manager.send('chat', 'Show results');
-        for (let i = 0; i < 12; i++) {
-            await Promise.resolve();
-        }
-        expect(host).toBeDefined();
-        if (!host) {
-            throw new Error('Missing backend host');
-        }
+        const host = await backendCreated.promise;
         const text = '```ui\n<Summary>Streaming';
         host.onEvent({ type: 'text.delta', ref: 'answer', text });
         const preview = clients.find((payload) => payload.event.type === 'delta' && payload.event.ui !== undefined);
@@ -135,7 +123,7 @@ test('UI previews reach attached clients without a log sequence or observer side
 test('the writer’s captured UI access stays in the record and never reaches a client', async () => {
     const home = await mkdtemp(join(tmpdir(), 'adecore-ui-access-'));
     const secret = '/private/writer-root';
-    let host: BackendHost | undefined;
+    const backendCreated = Promise.withResolvers<BackendHost>();
     const intelligentUi: ChatUiHost = {
         capture: async () => ({ root: secret }),
         sources: {
@@ -159,25 +147,32 @@ test('the writer’s captured UI access stays in the record and never reaches a 
             store,
             intelligentUi,
             providers: fakeProviders((backendHost) => {
-                host = backendHost;
+                backendCreated.resolve(backendHost);
             })
         });
     const manager = open();
     const sent: unknown[] = [];
-    manager.subscribe('client', (event) => sent.push(event));
+    const queriesFrozen = Promise.withResolvers<void>();
+    manager.subscribe('client', (event) => {
+        sent.push(event);
+        if (event.event === 'chat.event' && event.payload.event.type === 'delta' && event.payload.event.uiQueries) {
+            queriesFrozen.resolve();
+        }
+    });
     let reopened: ChatCore | undefined;
     try {
         await manager.create({ chatId: 'chat', cwd: home });
         manager.attach('chat', 'client');
         await manager.send('chat', 'Show the count');
-        await settle();
-        host!.onEvent({
+        const host = await backendCreated.promise;
+        host.onEvent({
             type: 'text.done',
             ref: 'answer',
             text: '```ui\n$data = @Query("status", {})\n<Stats><Stat label="Count" value={$data.count}/></Stats>\n```',
             parentRef: null
         });
-        await settle();
+        await queriesFrozen.promise;
+        await manager.persisted('chat');
         const assistant = manager
             .get('chat')!
             .thread.list()

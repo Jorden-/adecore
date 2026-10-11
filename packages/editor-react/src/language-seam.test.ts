@@ -15,10 +15,9 @@ import { ChangeReview } from './ChangeReview.tsx';
 const uri = 'file:///work/src/example.ts';
 const position = { line: 0, character: 0 };
 const range = { start: position, end: { line: 0, character: 3 } };
+// The fake language service has no I/O; one event-loop turn drains its promise chains.
 async function settle(): Promise<void> {
-    for (let turn = 0; turn < 80; turn++) {
-        await Promise.resolve();
-    }
+    await new Promise<void>((resolve) => setImmediate(resolve));
 }
 function editor(text: string) {
     return new FakeEditorEngine().mount({} as HTMLElement, { text, theme: 'light' });

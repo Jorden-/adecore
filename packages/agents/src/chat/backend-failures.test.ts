@@ -9,10 +9,9 @@ import { ClaudeBackend } from './claude-backend.ts';
 import { CodexTransport } from './codex-transport.ts';
 import { inProcess, type FakeIo, type FakeCli } from './fake-cli.ts';
 
+// The in-process transport only reads memory streams; one event-loop turn drains their readers.
 async function flush(): Promise<void> {
-    for (let i = 0; i < 30; i++) {
-        await Promise.resolve();
-    }
+    await new Promise<void>((resolve) => setImmediate(resolve));
 }
 
 const launch: BackendLaunch = {

@@ -6,11 +6,6 @@ import { FileTree, Tree, UIProvider, useFileTree, type FileTreeModel } from '../
 
 const i18n = i18next.createInstance();
 await i18n.init({ lng: 'en', resources: {}, interpolation: { escapeValue: false } });
-const flush = async (): Promise<void> => {
-    for (let index = 0; index < 12; index++) {
-        await Promise.resolve();
-    }
-};
 
 function Harness({
     onActivate,
@@ -63,20 +58,17 @@ describe.skipIf(typeof document === 'undefined')('file tree interaction', () => 
     afterEach(async () => {
         await act(async () => {
             root.unmount();
-            await flush();
         });
         container.remove();
     });
     const mount = async (node: ReactNode): Promise<void> => {
         await act(async () => {
             root.render(<UIProvider i18n={i18n}>{node}</UIProvider>);
-            await flush();
         });
     };
     const change = async (run: () => void): Promise<void> => {
         await act(async () => {
             run();
-            await flush();
         });
     };
     const row = (path: string): HTMLElement => {
