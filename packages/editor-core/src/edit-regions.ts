@@ -10,6 +10,11 @@ export function phpLiteralAt(source: EditSource, offset: number): boolean {
     return context.mode === 'heredoc' || context.mode === 'quote' || (context.embedded !== undefined && context.mode === 'template');
 }
 
+export function phpTagAt(source: EditSource, offset: number): boolean {
+    const context = source.context(offset);
+    return context.mode === 'html' && (context.markup === 'tag' || context.markup === 'equals' || context.markup === 'value');
+}
+
 function firstContent(source: EditSource, line: number): number {
     const bounds = source.line(line);
     return bounds.start + bounds.text.length - bounds.text.trimStart().length;
@@ -56,11 +61,21 @@ export function editRegions(source: EditSource, language: string): EditRegions {
     if (id === 'php') {
         return (line, offset) => {
             const bounds = source.line(line);
-            if (offset === undefined && (phpLiteralAt(source, bounds.start) || phpLiteralAt(source, bounds.end) || mixedPhpLine(source, line))) {
+            if (
+                offset === undefined &&
+                (phpLiteralAt(source, bounds.start) ||
+                    phpLiteralAt(source, bounds.end) ||
+                    phpTagAt(source, bounds.start) ||
+                    phpTagAt(source, bounds.end) ||
+                    mixedPhpLine(source, line))
+            ) {
                 return 'mixed';
             }
             const at = offset ?? firstContent(source, line);
             const context = source.context(at);
+            if (phpTagAt(source, at)) {
+                return 'mixed';
+            }
             if (context.mode !== 'html' && context.embedded === undefined) {
                 return null;
             }
@@ -68,10 +83,10 @@ export function editRegions(source: EditSource, language: string): EditRegions {
                 return 'mixed';
             }
             if (context.markup === 'raw') {
-                const closing = /^<\/(script|style)(?=[\s/>]|$)/i.exec(source.slice(at, at + 9));
+                const closing = /^<\/(script|style|textarea|title)(?=[\s/>]|$)/i.exec(source.slice(at, at + 11));
                 // The closing tag belongs to markup, while the preceding raw text keeps its syntax.
                 if (closing?.[1]?.toLowerCase() !== context.element) {
-                    return context.element ?? 'template';
+                    return context.element === 'script' || context.element === 'style' ? context.element : 'mixed';
                 }
             }
             return 'template';

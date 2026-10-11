@@ -1,5 +1,5 @@
 import type { EditPlan, EditSource } from './edit-source.ts';
-import { editRegions, phpLiteralAt, type EditRegions } from './edit-regions.ts';
+import { editRegions, phpLiteralAt, phpTagAt, type EditRegions } from './edit-regions.ts';
 import { hasJsx } from './markup-regions.ts';
 import { type BlockComment, type CommentSyntax, commentSyntax } from './languages.ts';
 import { indentText, isBlank, rangeOf, whitespaceOf } from './line-text.ts';
@@ -375,6 +375,8 @@ export function planBlockComment(source: EditSource, selections: readonly Select
             if (
                 phpLiteralAt(source, from) ||
                 phpLiteralAt(source, to) ||
+                phpTagAt(source, from) ||
+                phpTagAt(source, to) ||
                 (mode !== endMode && !(mode === 'code' && endMode === 'line-comment')) ||
                 /<\?(?:php\b|=)/.test(text) ||
                 (mode !== 'html' && context.embedded === undefined && text.includes('?>'))

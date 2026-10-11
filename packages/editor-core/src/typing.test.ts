@@ -503,3 +503,12 @@ it('restores script context when a closing tag is removed, undone and redone', (
     model.typeText('(', { language: 'php' });
     expect(model.getLine(3).text).toBe('action()');
 });
+
+it('keeps tag-like text in PHP title and textarea contents literal', () => {
+    for (const tag of ['title', 'textarea']) {
+        type('<' + tag + '><a href=¦\n</' + tag + '>', '"', '<' + tag + '><a href="¦\n</' + tag + '>', { language: 'php' });
+        type('<' + tag + '><script>call¦\n</' + tag + '>', '(', '<' + tag + '><script>call(¦\n</' + tag + '>', { language: 'php' });
+        type('<' + tag + '><?= $value ?><a href=¦\n</' + tag + '>', '"', '<' + tag + '><?= $value ?><a href="¦\n</' + tag + '>', { language: 'php' });
+        type('<' + tag + '>text</' + tag + '><a href=¦>', '"', '<' + tag + '>text</' + tag + '><a href="¦">', { language: 'php' });
+    }
+});

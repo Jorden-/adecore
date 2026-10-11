@@ -601,3 +601,35 @@ test('comment commands leave multiline script templates unchanged', () => {
 test('a PHP closing-tag string in JavaScript does not disable script comments', () => {
     line('<script>\nconst value = "?>";¦\n</script>', '<script>\n// const value = "?>";\n</script>¦', { language: 'php' });
 });
+
+test('PHP comments leave multiline tag boundaries and attributes unchanged', () => {
+    const source = '<div\n    title="first\nsecond"\n>\ntext\n</div>';
+    for (let line = 0; line <= 3; line++) {
+        const model = new DocumentModel(source);
+        const bounds = model.getLine(line);
+        model.setSelections([{ anchor: bounds.start, head: bounds.end }]);
+        expect(model.execute('toggleLineComment', { language: 'php' })).toBe(false);
+        expect(model.getText()).toBe(source);
+    }
+    block('<div [title="x"]>', '<div [title="x"]>', { language: 'php' });
+    block('[<div title="x]">', '[<div title="x]">', { language: 'php' });
+    const model = new DocumentModel(source);
+    model.setSelections([{ anchor: 0, head: source.length }]);
+    model.execute('toggleLineComment', { language: 'php' });
+    expect(model.getText()).toBe('<div\n    title="first\nsecond"\n>\n<!-- text -->\n<!-- </div> -->');
+});
+
+test('PHP title and textarea contents stay literal under comment commands', () => {
+    for (const tag of ['title', 'textarea']) {
+        const source = '<' + tag + '>\n<p>literal</p>\n</' + tag + '>\n<p>markup</p>';
+        const model = new DocumentModel(source);
+        const bounds = model.getLine(1);
+        model.setSelections([{ anchor: bounds.start, head: bounds.end }]);
+        expect(model.execute('toggleLineComment', { language: 'php' })).toBe(false);
+        expect(model.execute('toggleBlockComment', { language: 'php' })).toBe(false);
+        const at = model.getLine(3).start;
+        model.setSelections([{ anchor: at, head: at }]);
+        model.execute('toggleLineComment', { language: 'php' });
+        expect(model.getLine(3).text).toBe('<!-- <p>markup</p> -->');
+    }
+});

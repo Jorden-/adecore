@@ -47,7 +47,7 @@ export interface TypingContext {
     /* PHP preserves these fields while code inside an attribute or raw block runs. */
     markup?: 'tag' | 'equals' | 'value' | 'comment' | 'raw';
     markupQuote?: '"' | "'";
-    element?: 'script' | 'style';
+    element?: 'script' | 'style' | 'textarea' | 'title';
     embed?: TypingContext;
     embedded?: 'javascript';
 }

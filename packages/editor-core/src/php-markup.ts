@@ -66,7 +66,7 @@ export function scanPhpMarkup(state: TypingContext, text: string, from: number, 
                 continue;
             }
             state.embed = undefined;
-            state.element = tag?.[1] !== '/' && (name === 'script' || name === 'style') ? name : undefined;
+            state.element = tag?.[1] !== '/' && (name === 'script' || name === 'style' || name === 'textarea' || name === 'title') ? name : undefined;
             state.markup = tag === null ? undefined : 'tag';
             state.markupQuote = undefined;
             if (tag !== null) {
