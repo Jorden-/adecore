@@ -1,25 +1,16 @@
-import type { ReactNode, Ref } from 'react';
+import type { Ref } from 'react';
 import { Select as BaseSelect } from '@base-ui-components/react/select';
 import clsx from 'clsx';
 import { ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Icon } from './Icon.tsx';
-import { MENU_LABEL, MenuCheck } from './menu/parts.tsx';
+import { MENU_LABEL } from './menu/parts.tsx';
 import { renderPositioner } from './popup-layer.ts';
+import { RowContent } from './select-row.tsx';
+import { isGroup, rowClassName, TRIGGER_DISABLED, TRIGGER_SIZE, TRIGGER_VARIANT, type SelectGroup, type SelectItem } from './select-shared.ts';
+import { SelectSearch } from './SelectSearch.tsx';
 
-export interface SelectItem<T extends string> {
-    value: T;
-    label: string;
-    /* A second line under the label, for what the choice does. */
-    description?: string;
-    icon?: ReactNode;
-    disabled?: boolean;
-}
-
-export interface SelectGroup<T extends string> {
-    label: string;
-    items: SelectItem<T>[];
-}
+export type { SelectGroup, SelectItem };
 
 export interface SelectProps<T extends string> {
     value: T | null;
@@ -34,43 +25,35 @@ export interface SelectProps<T extends string> {
     disabled?: boolean;
     align?: 'start' | 'end';
     truncateValue?: boolean;
+    /* A search field above the options: `true` always, a number once the list has at least that many options. */
+    searchable?: boolean | number;
+    /* What the search field says while it is empty, and its accessible name. */
+    searchPlaceholder?: string;
     className?: string;
     ref?: Ref<HTMLButtonElement>;
 }
 
-const isGroup = <T extends string>(entry: SelectItem<T> | SelectGroup<T>): entry is SelectGroup<T> => Array.isArray((entry as SelectGroup<T>).items);
-
-const TRIGGER_SIZE = {
-    sm: 'h-7 gap-1 px-2',
-    md: 'h-8 gap-1.5 px-2'
-} as const;
-
-const TRIGGER_VARIANT = {
-    outlined: 'max-w-56 rounded-lg border border-border bg-surface-raised text-text',
-    ghost: 'rounded-md text-text-muted hover:bg-surface-hover hover:text-text data-[popup-open]:bg-surface-active data-[popup-open]:text-text data-disabled:hover:bg-transparent data-disabled:hover:text-text-muted'
-} as const;
-
-/* The dimmed look `Switch` and `Button` wear when disabled, so a select that cannot open reads as such. */
-const TRIGGER_DISABLED = 'data-disabled:cursor-default data-disabled:opacity-50';
-
-/* A description makes the row two lines high; the box keeps the icon on the label's line. */
 function Row<T extends string>({ item, picked }: { item: SelectItem<T>; picked: boolean }) {
     return (
-        <BaseSelect.Item className={clsx('menu-item', item.description && 'items-start')} value={item.value} label={item.label} disabled={item.disabled}>
-            <MenuCheck kind="radio" checked={picked} />
-            {item.icon && <span className="flex h-lh shrink-0 items-center">{item.icon}</span>}
-            <span className="flex min-w-0 flex-col">
-                <BaseSelect.ItemText>{item.label}</BaseSelect.ItemText>
-                {item.description && <span className="text-xs text-text-faint">{item.description}</span>}
-            </span>
+        <BaseSelect.Item className={rowClassName(item)} value={item.value} label={item.label} disabled={item.disabled}>
+            <RowContent item={item} picked={picked} text={<BaseSelect.ItemText>{item.label}</BaseSelect.ItemText>} />
         </BaseSelect.Item>
     );
 }
 
 /* The one select. A Base UI `Select` in the popup style the menus use, so a settings field and a
    picker in a toolbar read the same. Base UI brings the keyboard along (arrows,
-   Home and End, typeahead, Enter, Escape), which a hand-rolled listbox would have to repeat. */
-export function Select<T extends string>({
+   Home and End, typeahead, Enter, Escape), which a hand-rolled listbox would have to repeat.
+   A long list can ask for a search field, which swaps in a combobox with the same trigger and rows. */
+export function Select<T extends string>(props: SelectProps<T>) {
+    const { searchable, items } = props;
+    const count = items.length > 0 && isGroup(items[0]!) ? (items as SelectGroup<T>[]).reduce((sum, group) => sum + group.items.length, 0) : items.length;
+    const search = searchable === true || (typeof searchable === 'number' && count >= searchable);
+
+    return search ? <SelectSearch {...props} /> : <PlainSelect {...props} />;
+}
+
+function PlainSelect<T extends string>({
     value,
     onValueChange,
     items,

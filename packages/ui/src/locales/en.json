@@ -34,6 +34,10 @@
             "largerFor": "{{label}}: larger"
         }
     },
+    "select": {
+        "search": "Search",
+        "noMatch": "No option matches “{{query}}”"
+    },
     "iconPicker": {
         "label": "Icon",
         "none": "No icon",

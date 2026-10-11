@@ -34,6 +34,10 @@
             "largerFor": "{{label}}: groter"
         }
     },
+    "select": {
+        "search": "Zoeken",
+        "noMatch": "Geen optie past bij “{{query}}”"
+    },
     "iconPicker": {
         "label": "Icoon",
         "none": "Geen icoon",
