@@ -25,7 +25,12 @@ function lineTokenizer(highlighter: Highlighter, language: string, theme: string
             return changed;
         },
         tokenizeLine(text, state) {
-            const options = { lang: language, theme, grammarState: (state ?? undefined) as GrammarState | undefined, includeExplanation: 'tokenType' } as TokenOptions;
+            const options = {
+                lang: language,
+                theme,
+                grammarState: (state ?? undefined) as GrammarState | undefined,
+                includeExplanation: 'tokenType'
+            } as TokenOptions;
             const lines = highlighter.codeToTokensBase(text, options);
             const tokens: LineToken[] = (lines[0] ?? []).map((token) => ({
                 length: token.content.length,
@@ -120,3 +125,5 @@ export function shikiScopeColors(highlighter: () => Promise<Highlighter>): Scope
         }
     };
 }
+
+export { shikiDocumentHighlighter } from './shiki-document.ts';

@@ -41,6 +41,21 @@ The adapter loads a language and a theme by their Shiki ids on first use. One Sh
 
 `loadGrammar(highlighter, grammar, text?)` and `documentLanguageOf(language)` from `@adecore/editor/shiki` are the steps the adapter takes, for a code viewer that colors the same way.
 
+## A viewer split into blocks
+
+`shikiDocumentHighlighter(getHighlighter, blocks, language, theme, transformers?)` from `@adecore/editor/shiki` returns a function `(index) => Promise<string>` for an immutable document split into blocks. Each block contains complete lines with no extra line separator at the end. The helper carries Shiki's grammar state between blocks, so a multiline comment, string or embedded language continues across a block boundary. It uses Shiki's HAST renderer and HTML serializer, including escaping and the supplied transformers.
+
+```ts
+import { shikiDocumentHighlighter } from '@adecore/editor/shiki';
+
+const highlightBlock = shikiDocumentHighlighter(getHighlighter, ['/* opening', 'still a comment */'], 'typescript', 'github-dark');
+const html = await highlightBlock(1);
+```
+
+A request for a later block first highlights its predecessors. Concurrent requests run in document order and completed blocks are cached. Between blocks the helper yields to the host, so a request deep into a file leaves room for input and painting. Creating the helper does not load Shiki or tokenize text. Unsupported languages render as plain text, while a failed load rejects the request and can be retried. An invalid index rejects with `RangeError`.
+
+The full document chooses the embedded languages to load, including languages named only in a later block. If another user of the highlighter rebuilds the grammar or replaces the theme, the next request discards its cached states and HTML. Create a new helper when the text, language, theme or transformers change. Register custom themes on the shared highlighter before returning it from `getHighlighter`.
+
 ## A tokenizer of your own
 
 A `TokenizerSource` is `(language, theme, text?) => Promise<LineTokenizer | null>`. A `LineTokenizer` colors one line at a time, from the state the line before it ended in:
