@@ -87,3 +87,5 @@ The work budget preserves exact hunks for displayable reformatting fixtures of 8
 ## Reviewing several changes
 
 Permission cards show one change at a time. The file toolbar selects the active review; repeated edits to the same file include their position. Arrow keys, Home and End move between its buttons. Mod+Enter in the read-only editor still invokes the card's primary action. Allow applies to the entire request. The collapsed preview is capped at 176 px and the expanded preview at 480 px.
+
+Tool reviews admit at most three diffs within a combined estimate of 2,000 rows and 2,000,000 UTF-16 characters. The first change retains its individual gates even if that estimate is larger. Additional editors enter one per animation frame. Other entries show their path and a Show diff button, which gives that change priority. The changed-files card shares this plan across its open files. Pending slots reserve a height capped at 480 px. These group limits supplement the source, display and syntax limits above.

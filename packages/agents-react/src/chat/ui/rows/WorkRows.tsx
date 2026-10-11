@@ -17,9 +17,11 @@ import { formatClockDuration, formatElapsedShort } from '@adecore/ui/format';
 import { Icon, Spinner, useTickingText } from '@adecore/ui';
 import { ROW_GUTTER, toolIcon } from '../icons';
 import { AnsiOutput } from '../AnsiOutput';
+import { DiffStack, ReviewStackView } from '../diff/DiffStack';
+import { reviewEntries } from '../diff/review-plan';
+import { useReviewStack } from '../diff/use-review-stack';
 
-// The diff renderers carry shiki; they only load once a thread shows a file change.
-const EditDiff = lazyNamed(() => import('../EditDiff'), 'default');
+// A checkpoint opens its renderer only when a file is expanded.
 const UnifiedDiff = lazyNamed(() => import('../UnifiedDiff'), 'default');
 
 const OUTPUT_LIMIT = 4000;
@@ -118,18 +120,8 @@ function ToolBody({ tool }: { tool: ChatToolItem }) {
     const changes = patches.length > 0 ? [] : fileChanges(tool.name, tool.input);
     return (
         <div className="mt-1.5 mb-2 ml-6 overflow-hidden rounded-md border border-border bg-surface-raised">
-            {patches.length > 0 ? (
-                <DiffSuspense>
-                    {patches.map((change, index) => (
-                        <UnifiedDiff key={index} change={change} />
-                    ))}
-                </DiffSuspense>
-            ) : changes.length > 0 ? (
-                <DiffSuspense>
-                    {changes.map((change, index) => (
-                        <EditDiff key={index} change={change} />
-                    ))}
-                </DiffSuspense>
+            {patches.length + changes.length > 0 ? (
+                <DiffStack entries={reviewEntries(patches, changes)} />
             ) : (
                 <pre className="max-h-64 overflow-auto px-3 py-2 font-mono text-code text-text-muted select-text">
                     {clip(JSON.stringify(tool.input, null, 2) ?? '')}
@@ -451,9 +443,11 @@ function ProviderChangedFiles({
             entryFor(change.path || tool.id).edits.push(change);
         }
     }
+    const reviews = [...byPath].map(([path, entry]) => ({ path, entry, reviews: reviewEntries(entry.patches, entry.edits) }));
+    const stack = useReviewStack(reviews.filter(({ path }) => open[path] === true).flatMap(({ reviews }) => reviews));
     return (
         <ChangedFilesCard count={byPath.size} revealNonce={revealNonce}>
-            {[...byPath].map(([path, entry]) => (
+            {reviews.map(({ path, entry, reviews }) => (
                 <ChangedFileLine
                     key={path}
                     path={path}
@@ -461,14 +455,7 @@ function ProviderChangedFiles({
                     onToggle={() => setOpen((o) => ({ ...o, [path]: !o[path] }))}
                     trailing={<span className="text-text-faint">{t('work.edits', { count: entry.edits.length + entry.patches.length })}</span>}
                 >
-                    <DiffSuspense>
-                        {entry.patches.map((change, index) => (
-                            <UnifiedDiff key={`patch-${index}`} change={change} />
-                        ))}
-                        {entry.edits.map((change, index) => (
-                            <EditDiff key={`edit-${index}`} change={change} />
-                        ))}
-                    </DiffSuspense>
+                    <ReviewStackView entries={reviews} stack={stack} />
                 </ChangedFileLine>
             ))}
         </ChangedFilesCard>

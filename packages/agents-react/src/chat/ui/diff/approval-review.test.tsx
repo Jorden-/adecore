@@ -11,11 +11,12 @@ import { reviewEntries } from './review-plan';
 
 async function mounted(run: (page: ReturnType<typeof createPage>, root: ReturnType<typeof createRoot>) => Promise<void>) {
     const page = createPage();
-    const names = ['window', 'HTMLElement', 'requestAnimationFrame', 'cancelAnimationFrame', 'IS_REACT_ACT_ENVIRONMENT'] as const;
+    const names = ['window', 'HTMLElement', 'customElements', 'requestAnimationFrame', 'cancelAnimationFrame', 'IS_REACT_ACT_ENVIRONMENT'] as const;
     const previous = names.map((name) => Object.getOwnPropertyDescriptor(globalThis, name));
     const host = chatHost();
     Object.defineProperty(globalThis, 'window', { value: page.window, configurable: true });
     Object.defineProperty(globalThis, 'HTMLElement', { value: page.window.HTMLElement, configurable: true });
+    Object.defineProperty(globalThis, 'customElements', { value: page.window.customElements, configurable: true });
     Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { value: true, configurable: true });
     const root = createRoot(page.host);
     try {
