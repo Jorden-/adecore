@@ -83,6 +83,24 @@ Pass a `ReadonlyMap<number, number>` as `unfolded` to expose lines beside hunks.
 
 The document and rows describe a view; they do not authorize applying a patch. Keep the original `ParsedPatch.text` available for a raw patch view when `partial` is set. Without snapshots, syntax highlighting must reset at each hunk because omitted context can change the grammar state.
 
+## Computed patches and word changes
+
+`patchOf(oldText, newText, context = 3)` returns a `ParsedPatch` for two complete texts. It uses `diffLines`, merges changes whose context overlaps or touches, and retains raw CRLF data and final newline markers in the serialized `text`. It moves a repeated blank from the end of a pure insertion or deletion to its beginning, so an added or removed function includes its leading separator. This alignment applies only to computed patches; `parsePatch` keeps a supplied patch's hunk boundaries.
+
+```ts
+import { diffDocument, diffRows, patchOf, wordChanges } from '@adecore/merge';
+
+const contents = { old: 'const oldName = 1;\n', new: 'const newName = 2;\n' };
+const patch = patchOf(contents.old, contents.new);
+const document = diffDocument(patch, contents);
+const rows = diffRows(document, 'split');
+const words = wordChanges(document.sides.old[0]!, document.sides.new[0]!);
+```
+
+An unchanged pair yields no hunks and empty patch text. An empty text is a file with zero lines; it does not imply a missing filename, so both `missing` fields stay false. Context must be a nonnegative safe integer; invalid values throw `RangeError`. A computed hunk containing a changed block larger than 4000 lines has `coarse: true`, allowing a renderer to skip word pairing for that block.
+
+`wordChanges(oldLine, newLine)` returns `{ old, new }` arrays of `DiffWordRange` entries. `from` and `to` are UTF-16 offsets with an exclusive end. Word segmentation retains combining characters and emoji sequences. Whitespace changes are included. Unchanged sides have no ranges. The function returns `null` above 20,000 combined UTF-16 code units or 2000 combined segments, bounding the work for long or minified lines.
+
 ## Limits
 
 The diff strips the lines both versions start and end with, then runs Myers' algorithm on the middle, which finds the shortest list of inserts and deletes. It gives up when that list would pass 4000 edits and answers the whole middle as one change instead. The result still rebuilds `other` exactly, but a three-way merge then shows the middle as one large conflict. The limit counts edits, not lines, and it cannot be configured.

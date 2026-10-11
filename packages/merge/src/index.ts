@@ -5,3 +5,5 @@ export { joinLines, shapeOf, splitLines, type TextShape } from './text.ts';
 export { missingSides, patchFits } from './patch.ts';
 export { parsePatch, type Hunk, type ParsedPatch, type PatchLine } from './patch-parser.ts';
 export { diffDocument, diffRows, type DiffDocument, type DiffGapRow, type DiffLineRef, type DiffLineRow, type DiffRow } from './diff-document.ts';
+export { patchOf } from './patch-of.ts';
+export { wordChanges, type DiffWordRange } from './word-changes.ts';

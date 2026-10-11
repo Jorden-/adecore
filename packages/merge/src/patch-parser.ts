@@ -10,6 +10,7 @@ export interface Hunk {
     readonly newStart: number;
     readonly newCount: number;
     readonly section: string;
+    readonly coarse?: true;
     readonly lines: readonly PatchLine[];
 }
 
@@ -114,5 +115,10 @@ export function parsePatch(patch: string): ParsedPatch {
         current.lines.push({ kind, text: line === '' ? '' : line.slice(1) });
     }
     finish();
-    return { text: patch, hunks, missing: { old: header.includes('--- /dev/null'), new: header.includes('+++ /dev/null') }, partial };
+    return {
+        text: patch,
+        hunks,
+        missing: { old: header.some((line) => /^--- \/dev\/null(?:\t|$)/.test(line)), new: header.some((line) => /^\+\+\+ \/dev\/null(?:\t|$)/.test(line)) },
+        partial
+    };
 }

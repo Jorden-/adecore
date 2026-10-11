@@ -2,6 +2,10 @@ import { describe, expect, test } from 'bun:test';
 import { parsePatch } from './index.ts';
 
 describe('parsePatch', () => {
+    test('reads timestamped dev-null headers without matching longer names', () => {
+        expect(parsePatch('--- /dev/null\t2026-10-11\n+++ b/x\n@@ -0,0 +1 @@\n+a\n').missing.old).toBe(true);
+        expect(parsePatch('--- /dev/null-other\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n').missing.old).toBe(false);
+    });
     test('reads optional file headers, section text and zero-based ranges', () => {
         const parsed = parsePatch('diff --git a/x b/x\nindex abc..def 100644\n--- a/x\n+++ b/x\n@@ -3,2 +3,3 @@ function hello()\n same\n-old\n+new\n+extra\n');
         expect(parsed.partial).toBe(false);
