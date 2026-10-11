@@ -1,6 +1,8 @@
 import { Suspense, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { lazyNamed } from '../../lazy';
+import { diffSourceBudget, legacyDiffBudget } from './diff/diff-source-budget';
+import { DiffOmitted } from './diff/DiffOmitted';
 import { DiffFallbackBoundary } from './diff/DiffFallbackBoundary';
 import { MultiFileDiff } from '@pierre/diffs/react';
 import { chatHost } from '../../host';
@@ -36,7 +38,13 @@ const EditorEditDiff = lazyNamed(() => import('./diff/EditorEditDiff'), 'default
 export default function EditDiff({ change, allowEditor = true, maxHeight }: { change: FileChange; allowEditor?: boolean; maxHeight?: number }) {
     const { t } = useTranslation('agent-chat');
     const loadEngine = chatHost().code.editor;
-    const fallback = <LegacyEditDiff change={change} maxHeight={maxHeight} />;
+    const sourceAllowed = useMemo(() => diffSourceBudget(change.before, change.after), [change.before, change.after]);
+    const legacyAllowed = useMemo(() => legacyDiffBudget(change.before, change.after), [change.before, change.after]);
+    const omitted = <DiffOmitted path={change.path} />;
+    const fallback = legacyAllowed ? <LegacyEditDiff change={change} maxHeight={maxHeight} /> : omitted;
+    if (!sourceAllowed) {
+        return omitted;
+    }
     if (!allowEditor || loadEngine === undefined) {
         return fallback;
     }

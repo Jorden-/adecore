@@ -1,9 +1,15 @@
-import { expect, test } from 'bun:test';
+import { expect, test, spyOn } from 'bun:test';
 import { act, createElement, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { FakeEditorEngine } from '@adecore/editor/fake';
 import { createPage } from '@adecore/editor/testing';
 import type { EditorEngine } from '@adecore/editor';
+import * as merge from '@adecore/merge';
+import { chatHost, setChatHost } from '../../../host';
+import EditDiff from '../EditDiff';
+import UnifiedDiff from '../UnifiedDiff';
+import { ApprovalBody } from '../../../prompts/ui/ApprovalBody';
+import type { ChatApprovalItem } from '@adecore/agent-contracts';
 import type { FileChange } from '../../logic/tools';
 import EditorEditDiff from './EditorEditDiff';
 import EditorPatchDiff from './EditorPatchDiff';
@@ -216,7 +222,7 @@ test('split patch reviews use two real side documents and preserve the shared lo
     });
 });
 
-test('a small edit in a large snapshot mounts while a large displayed edit stays on the fallback', async () => {
+test('a small edit in a large snapshot mounts while a large displayed edit shows the omission', async () => {
     await mounted(async (page, root) => {
         const engine = new FakeEditorEngine();
         const loadEngine = async () => engine;
@@ -234,7 +240,7 @@ test('a small edit in a large snapshot mounts while a large displayed edit stays
         expect(engine.last.getText().split('\n').length).toBeLessThan(20);
         expect(engine.last.getText()).toContain('changed');
         await act(async () => render('', 'added\n'.repeat(401)));
-        expect(page.host.textContent).toBe('Legacy');
+        expect(page.host.querySelector('[data-diff-omitted]')).not.toBeNull();
         expect(engine.editors).toHaveLength(1);
     });
 });
@@ -270,5 +276,77 @@ test('changing the preview cap preserves the mounted editor and its scroll posit
         expect(editor.getScrollTop()).toBe(220);
         await act(async () => render(176));
         expect(editor.getScrollTop()).toBe(220);
+    });
+});
+
+test('oversize edits, patches and approvals never calculate hunks or mount an engine', async () => {
+    await mounted(async (page, root) => {
+        const previous = chatHost();
+        const engine = new FakeEditorEngine();
+        let loads = 0;
+        const loadEngine = async () => {
+            loads++;
+            return engine;
+        };
+        const patch = spyOn(merge, 'patchOf');
+        const parse = spyOn(merge, 'parsePatch');
+        try {
+            setChatHost({ code: { ...previous.code, editor: loadEngine } });
+            const huge = 'x'.repeat(5000000);
+            const change = { path: 'large.ts', before: '', after: huge };
+            await act(async () => root.render(createElement(EditDiff, { change })));
+            expect(page.host.querySelector('[data-diff-omitted]')?.textContent).toContain('large.ts');
+            await act(async () => root.render(createElement(EditorEditDiff, { change, loadEngine, fallback: createElement('p', null, 'Legacy') })));
+            expect(page.host.querySelector('[data-diff-omitted]')).not.toBeNull();
+            const changePatch = { path: 'large.ts', kind: 'add' as const, diff: '@@ -0,0 +1 @@\n+' + huge };
+            await act(async () => root.render(createElement(UnifiedDiff, { change: changePatch })));
+            expect(page.host.querySelector('[data-diff-omitted]')).not.toBeNull();
+            await act(async () =>
+                root.render(
+                    createElement(EditorPatchDiff, {
+                        change: changePatch,
+                        loadEngine,
+                        fallback: createElement('p', null, 'Legacy'),
+                        ignoreWhitespace: false,
+                        wrap: true,
+                        fill: false
+                    })
+                )
+            );
+            expect(page.host.querySelector('[data-diff-omitted]')).not.toBeNull();
+            const item: ChatApprovalItem = {
+                kind: 'approval',
+                id: 'approval',
+                requestId: 'request',
+                turnId: null,
+                toolName: 'Write',
+                toolUseId: null,
+                description: null,
+                canAllowAlways: false,
+                decision: 'pending',
+                createdAt: 0,
+                input: { file_path: 'large.ts', content: huge }
+            };
+            await act(async () =>
+                root.render(
+                    createElement(ApprovalBody, {
+                        item,
+                        draft: { index: 0, answers: {}, reason: '', showReason: false },
+                        onDraft: () => {},
+                        denyReason: false,
+                        locked: false
+                    })
+                )
+            );
+            expect(page.host.querySelector('[data-diff-omitted]')).not.toBeNull();
+            expect(patch).not.toHaveBeenCalled();
+            expect(parse).not.toHaveBeenCalled();
+            expect(loads).toBe(0);
+            expect(engine.editors).toHaveLength(0);
+        } finally {
+            patch.mockRestore();
+            parse.mockRestore();
+            setChatHost(previous);
+        }
     });
 });

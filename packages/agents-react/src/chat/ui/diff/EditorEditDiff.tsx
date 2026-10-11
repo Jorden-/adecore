@@ -7,6 +7,8 @@ import { diffDocument, patchOf, type DiffDocument } from '@adecore/merge';
 import { chatHost } from '../../../host';
 import type { FileChange } from '../../logic/tools';
 import { useDiffSourceTokens } from '../use-diff-source-tokens';
+import { diffSourceBudget } from './diff-source-budget';
+import { DiffOmitted } from './DiffOmitted';
 import { canRenderEditorDiff, EDITOR_DIFF_LIMITS } from './editor-edit-model';
 
 type EngineLoader = () => Promise<EditorEngine>;
@@ -102,7 +104,7 @@ export function EditorDocumentDiff({
     }, [loadEngine, withinLimits]);
     const engine = loaded?.load === loadEngine ? loaded.engine : engines.get(loadEngine);
     if (!withinLimits) {
-        return fallback;
+        return <DiffOmitted path={path} />;
     }
     if (engine === undefined) {
         return <div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>;
@@ -126,8 +128,14 @@ export default function EditorEditDiff({
     maxHeight?: number;
 }) {
     const document = useMemo(
-        () => diffDocument(patchOf(change.before, change.after), { old: change.before, new: change.after }),
+        () =>
+            diffSourceBudget(change.before, change.after)
+                ? diffDocument(patchOf(change.before, change.after), { old: change.before, new: change.after })
+                : undefined,
         [change.before, change.after]
     );
+    if (document === undefined) {
+        return <DiffOmitted path={change.path} />;
+    }
     return <EditorDocumentDiff document={document} path={change.path} loadEngine={loadEngine} fallback={fallback} maxHeight={maxHeight} />;
 }

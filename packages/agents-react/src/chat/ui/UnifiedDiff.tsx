@@ -2,6 +2,8 @@ import { Suspense, useMemo } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { lazyNamed } from '../../lazy';
+import { diffSourceBudget, legacyDiffBudget, patchSourceBudget } from './diff/diff-source-budget';
+import { DiffOmitted } from './diff/DiffOmitted';
 import { DiffFallbackBoundary } from './diff/DiffFallbackBoundary';
 import { FileDiff, PatchDiff } from '@pierre/diffs/react';
 import type { ChatFileChange } from '@adecore/agent-contracts';
@@ -112,8 +114,14 @@ export default function UnifiedDiff(props: UnifiedDiffProps) {
     const { change, contents, allowEditor = true, ignoreWhitespace = false, overflow = 'wrap', diffStyle = 'unified', fill = false, maxHeight } = props;
     const loadEngine = chatHost().code.editor;
     const oldText = contents?.old ?? '';
-    const newText = contents?.new ?? change.diff;
-    const fallback = <LegacyUnifiedDiff {...props} />;
+    const newText = contents?.new ?? '';
+    const sourceAllowed = useMemo(() => diffSourceBudget(oldText, newText) && patchSourceBudget(change.diff), [oldText, newText, change.diff]);
+    const legacyAllowed = useMemo(() => legacyDiffBudget(oldText, newText, change.diff), [oldText, newText, change.diff]);
+    const omitted = <DiffOmitted path={change.path} />;
+    const fallback = legacyAllowed ? <LegacyUnifiedDiff {...props} /> : omitted;
+    if (!sourceAllowed) {
+        return omitted;
+    }
     if (!allowEditor || loadEngine === undefined || !/^@@/m.test(change.diff)) {
         return fallback;
     }

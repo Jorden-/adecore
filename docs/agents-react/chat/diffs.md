@@ -69,3 +69,8 @@ const tokens = diffSourceTokens(document, mapping);
 
 
 `EditDiff` and `UnifiedDiff` accept optional `maxHeight` in pixels. The editor defaults to 480 pixels; `fill` ignores this limit. With an explicit cap, the legacy fallback scrolls within the same height. A single-change approval removes its intermediate scroll container so only the review viewport and the surrounding prompt card scroll.
+
+
+Source preparation is bounded before diff calculation: each snapshot permits up to 20,000 source rows, 2,000,000 UTF-16 code units and 1,000,000 code units per line. A supplied patch permits up to 50,000 rows, 4,000,000 code units and 1,000,001 code units per line, including markers. Oversize sources show the path and a "Too large to show" status without calculating hunks, parsing the patch or loading an editor. The display budget is separate and still counts only visible rows.
+
+The Pierre fallback is limited to 400 combined lines, 100,000 combined code units and 10,000 code units per line, counting supplied snapshots and patch. This applies after an engine failure and when the host has no editor or requests `allowEditor={false}`. Larger fallback inputs show the same omission status. Public legacy entrypoints remain available.
