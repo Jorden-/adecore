@@ -35,7 +35,9 @@ export const ModelInfoSchema = z.object({
     badge: z.string().optional(),
     legacy: z.boolean(),
     isDefault: z.boolean(),
-    options: z.array(ModelOptionDescriptorSchema)
+    options: z.array(ModelOptionDescriptorSchema),
+    // The oldest CLI that offers this model; absent when no minimum is known.
+    minCliVersion: z.string().optional()
 });
 export type ModelInfo = z.infer<typeof ModelInfoSchema>;
 
@@ -61,7 +63,11 @@ export const ModelCatalogEntrySchema = z.object({
     badge: z.string().optional(),
     profile: z.string().min(1),
     aliases: z.array(z.string().min(1)).optional(),
-    legacy: z.boolean().optional()
+    legacy: z.boolean().optional(),
+    minCliVersion: z
+        .string()
+        .regex(/^\d+\.\d+(\.\d+)?$/, 'Expected a version such as 2.1 or 2.1.4')
+        .optional()
 });
 export type ModelCatalogEntry = z.infer<typeof ModelCatalogEntrySchema>;
 

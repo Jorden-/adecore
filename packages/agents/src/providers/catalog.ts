@@ -43,7 +43,8 @@ export class ModelCatalog {
             badge: model.badge,
             legacy: model.legacy === true,
             isDefault: model.slug === this.data.defaultModel,
-            options: this.profileOf(model.slug)?.options ?? []
+            options: this.profileOf(model.slug)?.options ?? [],
+            ...(model.minCliVersion === undefined ? {} : { minCliVersion: model.minCliVersion })
         }));
     }
 

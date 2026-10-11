@@ -42,6 +42,30 @@ describe('ModelCatalog', () => {
     });
 });
 
+describe('minimum CLI version', () => {
+    const shipped = ModelCatalogDataSchema.parse(claudeManifest);
+    const withMinimum = (minCliVersion: string): ModelCatalogData => ({
+        ...shipped,
+        models: shipped.models.map((model, i) => (i === 0 ? { ...model, minCliVersion } : model))
+    });
+
+    test('passes through list() and stays absent otherwise', () => {
+        const listed = new ModelCatalog(withMinimum('2.1.4')).list();
+        expect(listed[0]?.minCliVersion).toBe('2.1.4');
+        expect('minCliVersion' in (listed[1] ?? {})).toBe(false);
+    });
+
+    test('a malformed minimum fails the schema', () => {
+        expect(ModelCatalogDataSchema.safeParse(withMinimum('newer')).success).toBe(false);
+        expect(ModelCatalogDataSchema.safeParse(withMinimum('2.1')).success).toBe(true);
+    });
+
+    test('the shipped files parse', () => {
+        expect(ModelCatalogDataSchema.safeParse(claudeManifest).success).toBe(true);
+        expect(ModelCatalogDataSchema.safeParse(codexManifest).success).toBe(true);
+    });
+});
+
 describe('a catalog swapped in while the host runs', () => {
     const shipped = ModelCatalogDataSchema.parse(claudeManifest);
     const withModel = (updatedAt: string): ModelCatalogData => ({
