@@ -58,6 +58,12 @@ interface Rules {
 
 const PHP_HEREDOC = /^<<<[ \t]*(["']?)([A-Za-z_]\w*)\1[ \t]*$/;
 const PHP_OPEN = /<\?(?:php\b|=)/;
+const PHP_INITIAL_LINES = 64;
+const PHP_INITIAL_CHARACTERS = 64 * 1024;
+// Quoted PHP tags within a bare code fragment must not turn its prelude into output.
+const PHP_FRAGMENT_START =
+    /^(?:[$'"#]|\/[/*]|(?:abstract|class|const|declare|echo|enum|final|for|foreach|function|if|include(?:_once)?|interface|namespace|print|readonly|require(?:_once)?|return|switch|throw|trait|try|use|while)\b|[A-Za-z_]\w*\s*(?:\(|::))/;
+
 const controlWords = /^(for|for-await|if|while|switch|catch|with)$/;
 const blockWords = /^(else|try|finally|do)$/;
 
@@ -274,6 +280,7 @@ export class TypingContexts {
     private readonly line: (index: number) => DocumentLine;
     private states: TypingContext[] = [initial()];
     private language = '';
+    private decidingLine = 0;
 
     constructor(line: (index: number) => DocumentLine) {
         this.line = line;
@@ -281,16 +288,34 @@ export class TypingContexts {
 
     invalidate(line = 0): void {
         this.states.length = Math.min(this.states.length, Math.max(1, line + 1));
-        if (line === 0) {
+        if (line <= this.decidingLine) {
             this.language = '';
         }
     }
 
-    /* A PHP file that opens with markup, and not with a tag, starts outside the PHP. */
     private initialState(language: string): TypingContext {
         const state = initial();
-        if (language === 'php' && /^\s*<(?![?<])/.test(this.line(0).text)) {
-            state.mode = 'html';
+        this.decidingLine = 0;
+        if (language !== 'php') {
+            return state;
+        }
+        let remaining = PHP_INITIAL_CHARACTERS;
+        for (let line = 0; line < PHP_INITIAL_LINES && remaining > 0; line++) {
+            this.decidingLine = line;
+            const source = this.line(line);
+            const sample = source.text.slice(0, remaining);
+            remaining -= sample.length;
+            const text = sample.trimStart();
+            if (text !== '') {
+                const open = PHP_OPEN.exec(text);
+                if (/^<(?![?<])/.test(text) || (open !== null && open.index > 0 && !PHP_FRAGMENT_START.test(text))) {
+                    state.mode = 'html';
+                }
+                return state;
+            }
+            if (source.end === source.next) {
+                break;
+            }
         }
         return state;
     }
