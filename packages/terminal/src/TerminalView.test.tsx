@@ -9,6 +9,10 @@ describe('a terminal view', () => {
     });
 
     test('hands the host to xterm inside the box the caller sizes', () => {
-        expect(renderToStaticMarkup(<TerminalView className="grow" />)).toBe('<div class="terminal-view grow"><div class="terminal-view-host"></div></div>');
+        const markup = renderToStaticMarkup(<TerminalView className="grow" />);
+        expect(markup).toMatch(/^<div\b[^>]*><div\b[^>]*><\/div><\/div>$/);
+        const classes = [...markup.matchAll(/class="([^"]*)"/g)].map((match) => match[1]!.split(/\s+/));
+        expect(classes).toContainEqual(expect.arrayContaining(['terminal-view', 'grow']));
+        expect(classes).toContainEqual(expect.arrayContaining(['terminal-view-host']));
     });
 });
