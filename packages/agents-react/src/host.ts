@@ -244,6 +244,8 @@ export interface ChatHost {
         useThemes(): { light: string; dark: string };
         /* Themes the app ships itself, found by name; the rest Shiki looks up by id. */
         custom: ReadonlyArray<ThemeRegistration & { name: string }>;
+        /* One syntax worker shared by chat diffs and standalone review panes; omitted, tokenize on the page. */
+        syntaxWorker?: () => Worker;
     };
     /* How a reply appears while it streams: a word, a block or the whole of it at a time. */
     useStreaming(): 'words' | 'blocks' | 'whole';

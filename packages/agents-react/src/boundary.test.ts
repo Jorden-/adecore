@@ -31,10 +31,16 @@ describe('the boundary of @adecore/agents-react', () => {
         expect(reaching).toEqual([]);
     });
 
-    test('every source file is exported under its own path', () => {
+    // Existing per-file exports stay public; new renderer plumbing stays behind UnifiedDiff and EditDiff.
+    test('every public source file is exported under its own path', () => {
         const manifest = JSON.parse(readFileSync(join(HERE, '../package.json'), 'utf8')) as { exports: Record<string, { source: string }> };
         const exported = new Set(Object.values(manifest.exports).map((entry) => entry.source));
-        const missing = sources().filter((path) => !path.endsWith('.test.ts') && !exported.has(`./src/${path}`));
+        const missing = sources().filter((path) => !/\.test\.tsx?$/.test(path) && !path.startsWith('chat/ui/diff/') && !exported.has(`./src/${path}`));
         expect(missing).toEqual([]);
+    });
+
+    test('diff implementation files have no public entrypoints', () => {
+        const manifest = JSON.parse(readFileSync(join(HERE, '../package.json'), 'utf8')) as { exports: Record<string, { source: string }> };
+        expect(Object.values(manifest.exports).filter((entry) => entry.source.startsWith('./src/chat/ui/diff/'))).toEqual([]);
     });
 });

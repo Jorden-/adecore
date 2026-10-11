@@ -20,7 +20,7 @@ A patch replaces top-level fields only: to change one function of `code`, `promp
 | `ReadImage`                        | Nothing under a tool that read an image            | A component that draws the image at `path`.                                                            |
 | `intelligentUi`                    | Choices stay closed, live values and links stay as first read | `sendChoice`, `query`, `link`, `openLink`, `openUrl` and `subscribe` for [Intelligent UI](/intelligent-ui/guide/getting-started#draw-the-blocks) blocks. |
 | `fileLinks`                        | Paths in a reply stay text                         | `target(text, cwd, scopeId)` finds a `FileRef`; `open(cwd, ref, scopeId)` opens it on its rendering scope.                              |
-| `code`                             | Light, `github-light` and `github-dark`            | `useMode()` follows the app's light or dark, `useThemes()` names the Shiki themes, `custom` registers your own. |
+| `code`                             | Light, `github-light` and `github-dark`            | `useMode()` follows the app's light or dark, `useThemes()` names the Shiki themes, `custom` registers your own, `syntaxWorker?()` supplies the shared diff syntax runtime. |
 | `useStreaming()`                   | `words`                                            | How a reply appears while it streams: `words`, `blocks` or `whole`.                                    |
 | `useSendDelivery()` | `queue` | What Send does while a turn runs: `queue` waits for the turn to end, `steer` hands the message to the running turn as soon as the backend takes input. Option or Alt picks the other one. |
 | `useTimelineFind(options)`         | No find in a thread                                | Find in a thread: you get the rows and refs, you hand back a `TimelineFind` with the bar to draw.      |
@@ -127,3 +127,11 @@ The frame reads a page's bytes through `attachments.read`, since a stored page i
 ## Lazy modules
 
 The diff views and a few heavy parts load on first use. `setLazyPrefetch(register)` hands every such loader to a prefetcher of yours, the ones made so far and every later one. `onLazyOpenError(listener)` tells you when a loader fails during a render, and answers the function that stops listening; a failed prefetch does not reach it. `lazyNamed(load, name)` is the `React.lazy` they are made with, for a module that exports its component by name.
+
+## Diff syntax worker
+
+The optional `code.syntaxWorker` factory configures the shared diff syntax runtime. Create a bundler-owned worker entry that explicitly calls `serveDiffSyntax(self)` from `@adecore/editor/shiki-worker`, then return a new worker from this factory.
+
+The runtime creates one worker lazily for the page and sends the host's custom themes before token requests. If construction, message transport or worker execution fails, it terminates that worker and replays pending requests through the same Shiki service on the main thread. Later requests continue using that fallback. Cache misses resend the mounted document's definition; disposed generations ignore late responses.
+
+The factory is optional, so a host without it uses the main-thread service with yields between blocks. Keep `useMode`, `useThemes` and `custom` in the same `code` object when configuring this field; host patches replace a whole top-level field.

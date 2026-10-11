@@ -128,7 +128,9 @@
       "version": "0.0.0",
       "dependencies": {
         "@adecore/agent-contracts": "workspace:*",
+        "@adecore/editor": "workspace:*",
         "@adecore/intelligent-ui": "workspace:*",
+        "@adecore/merge": "workspace:*",
         "@codemirror/commands": "^6.11.1",
         "@codemirror/language": "^6.12.4",
         "@codemirror/state": "^6.7.6",
