@@ -26,6 +26,8 @@ export class TokenCache {
     private entries: (Entry | undefined)[] = [];
     /* Every line above it is colored for the text as it is now. */
     private frontier = 0;
+    /* Colors survive a rebuild, but the states below this boundary cannot settle recoloring. */
+    private staleFrom = Number.POSITIVE_INFINITY;
     /* The last line the edit touched; lines below it may be told right by their old state. */
     private reusableFrom = Number.POSITIVE_INFINITY;
     /* The state the last line of the edited stretch ended in before the edit; the same state now means the lines below are right. */
@@ -48,6 +50,7 @@ export class TokenCache {
         this.tokenizer = tokenizer;
         this.lines = this.source.getLineCount();
         this.entries = [];
+        this.staleFrom = Number.POSITIVE_INFINITY;
         this.frontier = 0;
         this.forgetPivot();
     }
@@ -90,6 +93,7 @@ export class TokenCache {
         const first = batches[0]?.[0];
         if (first === undefined) {
             this.entries = [];
+            this.staleFrom = Number.POSITIVE_INFINITY;
             this.frontier = 0;
             this.forgetPivot();
             return;
@@ -104,8 +108,20 @@ export class TokenCache {
         const lastNew = last === undefined ? -1 : lineOf(last.from + shift + last.insertedLength);
         const lastOld = lastNew - delta;
         this.frontier = Math.min(this.frontier, firstLine);
+        if (last === undefined && Number.isFinite(this.staleFrom)) {
+            // A history batch has no single mapping for the old grammar boundary.
+            this.staleFrom = 0;
+            this.frontier = 0;
+        } else if (this.staleFrom > lastOld) {
+            this.staleFrom += delta;
+        } else if (this.staleFrom > firstLine) {
+            this.staleFrom = firstLine;
+        }
         if (last === undefined || lastOld < firstLine || this.entries.length <= firstLine) {
             this.entries.length = Math.min(this.entries.length, firstLine);
+            if (this.staleFrom >= this.entries.length) {
+                this.staleFrom = Number.POSITIVE_INFINITY;
+            }
             this.forgetPivot();
             return;
         }
@@ -122,6 +138,7 @@ export class TokenCache {
             return false;
         }
         this.frontier = 0;
+        this.staleFrom = 0;
         this.forgetPivot();
         return true;
     }
@@ -155,11 +172,16 @@ export class TokenCache {
             }
             this.entries[line] = next;
             this.frontier = line + 1;
+            const fresh = line < this.staleFrom;
+            if (line === this.staleFrom) {
+                this.staleFrom = line + 1 >= this.entries.length ? Number.POSITIVE_INFINITY : line + 1;
+            }
             const settled =
-                (line === this.pivotLine && tokenizer.sameState(this.pivotState, next.state)) ||
-                (previous !== undefined && line >= this.reusableFrom && tokenizer.sameState(previous.state, next.state));
+                fresh &&
+                ((line === this.pivotLine && tokenizer.sameState(this.pivotState, next.state)) ||
+                    (previous !== undefined && line >= this.reusableFrom && tokenizer.sameState(previous.state, next.state)));
             if (settled) {
-                this.frontier = this.entries.length;
+                this.frontier = Math.min(this.entries.length, this.staleFrom);
                 this.forgetPivot();
                 break;
             }

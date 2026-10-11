@@ -172,3 +172,51 @@ test('revalidation keeps old colors and recolors all states from the top', () =>
     cache.advance(10, 1000);
     expect(counter.lines).toBe(3);
 });
+
+describe('grammar generations across partial recoloring', () => {
+    for (const insertion of ['', 'inserted\n', '\n\n']) {
+        test(`never settles onto old states after a near-top edit ${JSON.stringify(insertion)}`, () => {
+            const model = new DocumentModel(Array.from({ length: 366 }, (_, index) => `line ${index}`).join('\n'));
+            const cache = new TokenCache({ getLineCount: () => model.getLineCount(), getLineText: (line) => model.getLine(line).text });
+            let generation = 0;
+            let changed = false;
+            const seen = new Map<string, number>();
+            cache.setTokenizer({
+                tokenizeLine(text, state) {
+                    if (state !== null && state !== generation) {
+                        throw new Error('State belongs to an old grammar');
+                    }
+                    seen.set(text, generation);
+                    return { tokens: [{ length: text.length, color: `generation-${generation}`, fontStyle: 0 }], state: generation };
+                },
+                sameState: (left, right) => left === right,
+                stale() {
+                    const stale = changed;
+                    changed = false;
+                    return stale;
+                }
+            });
+            const subscription = model.subscribe((snapshot) => {
+                if (snapshot.changes !== undefined) {
+                    cache.edited(snapshot.changes, (offset) => model.positionAt(offset).line);
+                }
+            });
+            cache.advance(1000, 1000);
+            generation++;
+            changed = true;
+            expect(cache.revalidate()).toBe(true);
+            const oldColors = cache.tokensOf(300);
+            cache.advance(40, 1000);
+            model.applyEdits([{ from: model.getLine(3).start, to: model.getLine(3).start, text: insertion || 'x' }]);
+            cache.advance(40, 1000);
+            expect(cache.covers(365)).toBe(false);
+            expect(cache.tokensOf(300)?.[0]?.color).toBe(oldColors?.[0]?.color);
+            const target = model.getLine(300);
+            model.applyEdits([{ from: target.start, to: target.start, text: 'far-' }]);
+            expect(() => cache.advance(1000, 1000)).not.toThrow();
+            expect(seen.get(model.getLine(300).text)).toBe(1);
+            expect(cache.covers(model.getLineCount() - 1)).toBe(true);
+            subscription.dispose();
+        });
+    }
+});

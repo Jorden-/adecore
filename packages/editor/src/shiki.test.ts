@@ -1,6 +1,8 @@
 import { beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { createHighlighter, type Highlighter } from 'shiki';
 import { loadGrammar, shikiTokenizers } from './shiki.ts';
+import { DocumentModel } from '@adecore/editor-core';
+import { TokenCache } from './tokens.ts';
 
 const THEME = 'github-dark';
 /* The theme's plain text color; a token in it was not colored by a grammar. */
@@ -179,4 +181,43 @@ describe('embedded grammars added while editing', () => {
             fresh.dispose();
         }
     });
+});
+
+test('Markdown states stay valid after a rebuild, partial recolor and edits far apart', async () => {
+    const fresh = await createHighlighter({ themes: [THEME], langs: [] });
+    try {
+        const lines = ['# Doc', '', '```', 'x', '```', ''];
+        for (let index = 0; index < 60; index++) {
+            lines.push(`> quote ${index}`, `> more **${index}**`, '', `para ${index} line`, `second line *${index}*`, '');
+        }
+        const model = new DocumentModel(lines.join('\n'));
+        const tokenizer = (await shikiTokenizers(async () => fresh)('markdown', THEME, model.getText()))!;
+        const cache = new TokenCache({ getLineCount: () => model.getLineCount(), getLineText: (line) => model.getLine(line).text });
+        cache.setTokenizer(tokenizer);
+        const subscription = model.subscribe((snapshot) => {
+            if (snapshot.changes !== undefined) {
+                cache.edited(snapshot.changes, (offset) => model.positionAt(offset).line);
+            }
+        });
+        const insert = (line: number, text: string): void => {
+            const at = model.getLine(line).end;
+            model.applyEdits([{ from: at, to: at, text }]);
+        };
+        cache.advance(1000, 1000);
+        insert(2, 'rust');
+        expect(await tokenizer.prepare?.(model.getText())).toBe(true);
+        expect(cache.revalidate()).toBe(true);
+        cache.advance(40, 1000);
+        insert(3, 'y');
+        cache.advance(40, 1000);
+        expect(cache.covers(365)).toBe(false);
+        insert(300, '!');
+        expect(() => cache.advance(1000, 1000)).not.toThrow();
+        expect(cache.covers(365)).toBe(true);
+        const reference = tokenizer.tokenizeLine(model.getLine(0).text, null);
+        expect(cache.tokensOf(0)).toEqual(reference.tokens);
+        subscription.dispose();
+    } finally {
+        fresh.dispose();
+    }
 });
