@@ -174,7 +174,7 @@ describe('embedded grammars added while editing', () => {
         try {
             const tokenizer = (await shikiTokenizers(async () => fresh)('typescript', THEME, ''))!;
             const load = spyOn(fresh, 'loadLanguage');
-            expect(await tokenizer.prepare?.('```scss')).toBe(false);
+            expect(tokenizer.prepare).toBeUndefined();
             expect(load).not.toHaveBeenCalled();
             load.mockRestore();
         } finally {

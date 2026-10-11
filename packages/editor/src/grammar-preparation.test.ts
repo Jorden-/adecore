@@ -43,6 +43,40 @@ function setup(text = 'head\nbody') {
 }
 
 describe('grammar preparation', () => {
+    for (const language of ['cpp', 'rust', 'jsonc', 'tsx', 'javascript', 'csharp']) {
+        test(`prepares only the final language name while typing ${language}`, async () => {
+            const fixture = setup('');
+            for (const character of '```' + language) {
+                fixture.edit(character);
+            }
+            await fixture.flush();
+            expect(fixture.prepare).toHaveBeenCalledTimes(1);
+            expect(fixture.prepare.mock.calls[0]![0]).toBe('```' + language);
+            fixture.dispose();
+        });
+    }
+
+    test('does not prepare a pasted declaration undone before the debounce', async () => {
+        const fixture = setup('');
+        fixture.edit('```ts');
+        fixture.model.undo();
+        await fixture.flush();
+        expect(fixture.prepare).toHaveBeenCalledTimes(1);
+        expect(fixture.prepare.mock.calls[0]![0]).toBe('');
+        fixture.dispose();
+    });
+
+    test('resetting preparation cannot replace a stale buffer entry', async () => {
+        const fixture = setup('');
+        fixture.edit('```c');
+        fixture.preparation.begin();
+        fixture.preparation.ready(fixture.tokenizer);
+        fixture.edit('pp');
+        await fixture.flush();
+        expect(fixture.prepare).toHaveBeenCalledWith('```cpp');
+        fixture.dispose();
+    });
+
     test('debounces rapid edits and collects complete post-edit lines', async () => {
         const fixture = setup();
         for (const character of '\n```ts') {

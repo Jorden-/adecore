@@ -14,6 +14,7 @@ export class GrammarPreparation {
     private generation = 0;
     private pending: string[] = [];
     private size = 0;
+    private lastLine = -1;
     private full = false;
     private running = false;
     private due = false;
@@ -48,6 +49,7 @@ export class GrammarPreparation {
         }
         if (this.tokenizer === null || batches.length !== 1) {
             this.full = true;
+            this.lastLine = -1;
         } else if (this.tokenizer.prepare === undefined) {
             return;
         } else if (!this.full) {
@@ -59,13 +61,19 @@ export class GrammarPreparation {
                 shift += change.insertedLength - (change.to - change.from);
                 for (let line = Math.max(first, through + 1); line <= last; line++) {
                     const text = this.model.getLine(line).text;
+                    const replacing = batches[0]!.length === 1 && first === last && line === this.lastLine;
+                    if (replacing) {
+                        this.size -= this.pending.pop()!.length + 1;
+                    }
                     this.size += text.length + 1;
                     if (this.size > MAX_BUFFER) {
                         this.full = true;
                         this.pending = [];
+                        this.lastLine = -1;
                         break;
                     }
                     this.pending.push(text);
+                    this.lastLine = line;
                 }
                 through = last;
                 if (this.full) {
@@ -101,6 +109,7 @@ export class GrammarPreparation {
         this.cancelTimer = null;
         this.pending = [];
         this.size = 0;
+        this.lastLine = -1;
         this.full = false;
         this.due = false;
     }
@@ -127,6 +136,7 @@ export class GrammarPreparation {
         const text = this.full ? this.model.getText() : this.pending.join('\n');
         this.pending = [];
         this.size = 0;
+        this.lastLine = -1;
         this.full = false;
         this.due = false;
         this.running = true;

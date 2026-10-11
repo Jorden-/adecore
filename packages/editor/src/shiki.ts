@@ -18,9 +18,7 @@ const PLAIN_TEXT = new Set(['', 'text', 'txt', 'plain', 'plaintext']);
 function lineTokenizer(highlighter: Highlighter, language: string, theme: string, embedded: EmbeddedIndex): LineTokenizer {
     let grammar = highlighter.getLanguage(language);
     return {
-        prepare(text) {
-            return loadEmbedded(highlighter, embedded, text);
-        },
+        prepare: embedded.matcher === null ? undefined : (text) => loadEmbedded(highlighter, embedded, text),
         stale() {
             const current = highlighter.getLanguage(language);
             const changed = current !== grammar;
@@ -62,7 +60,7 @@ interface EmbeddedIndex {
 const languageLoads = new WeakMap<Highlighter, Map<string, Promise<void>>>();
 const embeddedIndexes = new Map<string, Promise<EmbeddedIndex>>();
 
-/* A second registration rebuilds the host grammar, so concurrent documents share the load. */
+/* Concurrent documents await one load, so each learns the grammar was rebuilt. */
 function loadOnce(highlighter: Highlighter, id: string): Promise<void> {
     if (highlighter.getLoadedLanguages().includes(id)) {
         return Promise.resolve();
