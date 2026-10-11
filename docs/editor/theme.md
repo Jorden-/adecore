@@ -53,4 +53,4 @@ The editor colors the lines on screen plus a margin, in slices, and recolors fro
 
 ## Semantic colors
 
-`setSemanticTokens` takes ranges with TextMate scopes, and `scopeColors(theme)` decides what the theme draws each scope stack in. A scope the theme says nothing about keeps the grammar's color. [`@adecore/editor-react`](/editor-react/hover#semantic-tokens-inlay-hints-and-folds) decodes a language server's semantic tokens into these.
+`setSemanticTokens` takes ranges with TextMate scopes, and `scopeColors(theme)` decides what the theme draws each scope stack in. A scope the theme says nothing about keeps the grammar's color. A tokenizer may set a `kind` on a `LineToken`, a `LineTokenKind` of `comment`, `string` or `regex`; the Shiki tokenizer does, and a semantic token with `within` applies only over tokens of that kind. [`@adecore/editor-react`](/editor-react/hover#semantic-tokens-inlay-hints-and-folds) decodes a language server's semantic tokens into these.

@@ -28,7 +28,7 @@ The editor draws no message card of its own. [`@adecore/editor-react`](/editor-r
 
 ## Semantic colors
 
-`setSemanticTokens(tokens)` colors ranges by what a language server knows, over what the grammar made of them. Each `EditorSemanticToken` has a `line`, `character`, `length` and the TextMate `scopes` it stands for; the theme decides the color. That needs `scopeColors` on the engine, usually `shikiScopeColors`; without it the tokens are ignored. `null` removes them. See [Theme and syntax](/editor/theme#semantic-colors).
+`setSemanticTokens(tokens)` colors ranges by what a language server knows, over what the grammar made of them. Each `EditorSemanticToken` has a `line`, `character`, `length` and the TextMate `scopes` it stands for; the theme decides the color. A token with `within: 'string'` (or `comment`, `regex`) colors only the text the grammar classed that way, such as the SQL a server finds inside a string. That needs `scopeColors` on the engine, usually `shikiScopeColors`; without it the tokens are ignored. `null` removes them. See [Theme and syntax](/editor/theme#semantic-colors).
 
 ## Change marks
 

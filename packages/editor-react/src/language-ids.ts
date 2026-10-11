@@ -16,7 +16,8 @@ const LSP_IDS: Record<string, string> = {
     python: 'python',
     shellscript: 'shellscript',
     docker: 'dockerfile',
-    twig: 'twig'
+    twig: 'twig',
+    sql: 'sql'
 };
 
 /* The LSP language id of a file, or null when no language server here knows its language. */
@@ -47,7 +48,8 @@ const PATH_IDS: Record<string, string> = {
     scss: 'scss',
     html: 'html',
     md: 'markdown',
-    twig: 'twig'
+    twig: 'twig',
+    sql: 'sql'
 };
 
 /* The highlighter id for the code of a file we only know by its path, such as a place another file refers to. */

@@ -336,7 +336,7 @@ class SmartEditor implements Editor {
                 ? null
                 : tokens.map((token) => {
                       const from = this.offsetAt({ line: token.line, character: token.character });
-                      return { from, to: from + token.length, scopes: token.scopes };
+                      return { from, to: from + token.length, scopes: token.scopes, within: token.within };
                   })
         );
     }

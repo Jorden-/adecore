@@ -52,6 +52,18 @@ export function scopesOf(type: string, modifiers: ReadonlySet<string>, scoped = 
     }
 }
 
+/*
+ * What a server sends for the language it reads inside a string (SQL in a PHP string). Outside a string the grammar
+ * colors these better, so they only apply where the grammar says it is a string.
+ */
+const EMBEDDED_SCOPES: Record<string, string[] | undefined> = {
+    keyword: ['keyword'],
+    string: ['string'],
+    number: ['constant.numeric'],
+    comment: ['comment'],
+    operator: ['keyword.operator']
+};
+
 /* The encoded data of `textDocument/semanticTokens` as one token per classified range, the ones the theme has nothing to say about left out. */
 export function decodeSemanticTokens(tokens: SemanticTokens, legend: SemanticTokensLegend): EditorSemanticToken[] {
     const result: EditorSemanticToken[] = [];
@@ -72,6 +84,11 @@ export function decodeSemanticTokens(tokens: SemanticTokens, legend: SemanticTok
         const scopes = scopesOf(type, modifiers, scoped);
         if (scopes !== null) {
             result.push({ line, character, length: data[at + 2]!, scopes });
+            continue;
+        }
+        const embedded = EMBEDDED_SCOPES[type];
+        if (embedded !== undefined) {
+            result.push({ line, character, length: data[at + 2]!, scopes: embedded, within: 'string' });
         }
     }
     return result;

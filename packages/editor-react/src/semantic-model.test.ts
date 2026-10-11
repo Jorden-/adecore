@@ -6,13 +6,17 @@ const legend = { tokenTypes: ['class', 'function', 'variable', 'keyword'], token
 
 describe('decodeSemanticTokens', () => {
     test('reads positions relative to the token before, and leaves out what the grammar does better', () => {
-        // line 0: `class` at 6 (declaration), a keyword at 0, then line 2: a call at 4, a readonly variable at 12.
-        const data = [0, 0, 5, 3, 0, 0, 6, 3, 0, 1, 2, 4, 4, 1, 0, 0, 8, 6, 2, 2];
+        // line 0: `class` at 6 (declaration), then line 2: a call at 4, a readonly variable at 12.
+        const data = [0, 6, 3, 0, 1, 2, 4, 4, 1, 0, 0, 8, 6, 2, 2];
         expect(decodeSemanticTokens({ data }, legend)).toEqual([
             { line: 0, character: 6, length: 3, scopes: ['entity.name.type.class'] },
             { line: 2, character: 4, length: 4, scopes: ['entity.name.function.call'] },
             { line: 2, character: 12, length: 6, scopes: ['variable.other.constant'] }
         ]);
+    });
+
+    test('colors a keyword only where the grammar sees a string', () => {
+        expect(decodeSemanticTokens({ data: [0, 2, 6, 3, 0] }, legend)).toEqual([{ line: 0, character: 2, length: 6, scopes: ['keyword'], within: 'string' }]);
     });
 
     test('ignores a type the legend does not have', () => {

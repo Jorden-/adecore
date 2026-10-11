@@ -51,6 +51,7 @@ import type {
     EditorRect,
     EditorSmartKeys,
     LineToken,
+    LineTokenKind,
     LineTokenizer,
     ScopeColors
 } from './types.ts';
@@ -142,6 +143,7 @@ export interface ViewSemanticToken {
     from: number;
     to: number;
     scopes: readonly string[];
+    within?: LineTokenKind;
 }
 
 /* A problem the host marked, anchored to offsets that follow the text through edits. */
@@ -450,7 +452,7 @@ export class EditorView {
         if (spans === undefined) {
             return base;
         }
-        const signature = spans.map((span) => `${span.from}:${span.to}:${span.color}:${span.fontStyle}`).join('|');
+        const signature = spans.map((span) => `${span.from}:${span.to}:${span.color}:${span.fontStyle}:${span.within ?? ''}`).join('|');
         const cached = this.semanticLines.get(line);
         if (cached?.base === base && cached.signature === signature) {
             return cached.result;
@@ -482,7 +484,7 @@ export class EditorView {
                 continue;
             }
             const list = lines.get(line) ?? [];
-            list.push({ from: token.from - start, to: token.to - start, color: style.color, fontStyle: style.fontStyle });
+            list.push({ from: token.from - start, to: token.to - start, color: style.color, fontStyle: style.fontStyle, within: token.within });
             lines.set(line, list);
         }
         for (const list of lines.values()) {

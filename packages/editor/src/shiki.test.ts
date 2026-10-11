@@ -102,6 +102,14 @@ describe('a PHP file', () => {
         expect(mixed.tokens.length).toBeGreaterThan(3);
     });
 
+    test('marks the text of a string as a string', async () => {
+        const highlighter = await createHighlighter({ themes: [THEME], langs: [] });
+        const tokenizer = (await shikiTokenizers(async () => highlighter)('php', THEME, ''))!;
+        const { tokens } = tokenizer.tokenizeLine('<?php $q = "SELECT 1";', null);
+        expect(tokens.some((token) => token.kind === 'string')).toBe(true);
+        expect(tokens[0]!.kind).toBeUndefined();
+    });
+
     test('keeps the code between the tags a PHP grammar colors', async () => {
         const colors = await colorsOf('php', '<?php\n\nnamespace App;\n\necho "hi";\n?>\n<p>text</p>');
         expectColored(colors, ['namespace', 'echo', '"hi"', 'p']);

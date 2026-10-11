@@ -33,4 +33,10 @@ describe('overlayTokens', () => {
     test('leaves a line without spans as it was', () => {
         expect(overlayTokens([token(3, '#a')], [])).toEqual([token(3, '#a')]);
     });
+
+    test('colors a span with a kind only over the tokens of that kind', () => {
+        const base = [{ ...token(4, '#a'), kind: 'string' as const }, token(4, '#b'), { ...token(4, '#c'), kind: 'string' as const }];
+        const result = overlayTokens(base, [{ from: 2, to: 10, color: '#f00', fontStyle: 0, within: 'string' }]);
+        expect(result.map((entry) => [entry.length, entry.color])).toEqual([[2, '#a'], [2, '#f00'], [4, '#b'], [2, '#f00'], [2, '#c']]);
+    });
 });

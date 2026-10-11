@@ -1,4 +1,4 @@
-import type { LineToken } from './types.ts';
+import type { LineToken, LineTokenKind } from './types.ts';
 
 /* A stretch of one line, in characters from its start, that a language server colors. */
 export interface SemanticSpan {
@@ -6,6 +6,8 @@ export interface SemanticSpan {
     readonly to: number;
     readonly color: string;
     readonly fontStyle: number;
+    /* The span applies only over base tokens of this kind. */
+    readonly within?: LineTokenKind;
 }
 
 /*
@@ -44,7 +46,11 @@ export function overlayTokens(base: readonly LineToken[], spans: readonly Semant
                 at = current.from;
             } else {
                 const stop = Math.min(end, current.to);
-                push(stop - at, current.color, current.fontStyle);
+                if (current.within === undefined || token.kind === current.within) {
+                    push(stop - at, current.color, current.fontStyle);
+                } else {
+                    push(stop - at, token.color, token.fontStyle);
+                }
                 at = stop;
             }
         }

@@ -362,6 +362,8 @@ export interface EditorSemanticToken {
     readonly length: number;
     /* Outermost first, as a grammar would have reported them. */
     readonly scopes: readonly string[];
+    /* Colors only the stretches of text the grammar classed as this kind, such as a server's SQL tokens inside a string. */
+    readonly within?: LineTokenKind;
 }
 
 /* How a theme draws a piece of code. The font style is Shiki's flags: 1 italic, 2 bold, 4 underline, 8 strikethrough. */
@@ -639,7 +641,12 @@ export interface LineToken {
     readonly color: string;
     /* Bit flags as Shiki writes them: 1 italic, 2 bold, 4 underline, 8 strikethrough. */
     readonly fontStyle: number;
+    /* What the grammar says the stretch is, when it says so; absent for plain code. */
+    readonly kind?: LineTokenKind;
 }
+
+/* The classes of text a grammar tells apart from code. */
+export type LineTokenKind = 'comment' | 'string' | 'regex';
 
 export interface TokenizedLine {
     readonly tokens: readonly LineToken[];

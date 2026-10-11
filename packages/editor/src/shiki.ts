@@ -1,13 +1,16 @@
 import type { GrammarState, Highlighter } from 'shiki';
 import { documentLanguageOf, loadDocumentLanguage } from './php-html.ts';
 import { scopeColorsOf, type ThemeRule } from './theme-scopes.ts';
-import type { LineToken, LineTokenizer, ScopeColorSource, TokenizerSource } from './types.ts';
+import type { LineToken, LineTokenKind, LineTokenizer, ScopeColorSource, TokenizerSource } from './types.ts';
 
 type LanguageId = Parameters<Highlighter['loadLanguage']>[0];
 type ThemeId = Parameters<Highlighter['loadTheme']>[0];
 type TokenOptions = Parameters<Highlighter['codeToTokensBase']>[1];
 
 export { documentLanguageOf };
+
+/* The standard token types of TextMate: 1 comment, 2 string, 3 regex. */
+const KINDS: Record<number, LineTokenKind | undefined> = { 1: 'comment', 2: 'string', 3: 'regex' };
 
 const PLAIN_TEXT = new Set(['', 'text', 'txt', 'plain', 'plaintext']);
 
@@ -22,12 +25,13 @@ function lineTokenizer(highlighter: Highlighter, language: string, theme: string
             return changed;
         },
         tokenizeLine(text, state) {
-            const options = { lang: language, theme, grammarState: (state ?? undefined) as GrammarState | undefined } as TokenOptions;
+            const options = { lang: language, theme, grammarState: (state ?? undefined) as GrammarState | undefined, includeExplanation: 'tokenType' } as TokenOptions;
             const lines = highlighter.codeToTokensBase(text, options);
             const tokens: LineToken[] = (lines[0] ?? []).map((token) => ({
                 length: token.content.length,
                 color: token.color ?? '',
-                fontStyle: token.fontStyle ?? 0
+                fontStyle: token.fontStyle ?? 0,
+                kind: KINDS[token.type ?? 0]
             }));
             return { tokens, state: highlighter.getLastGrammarState(lines) };
         },
