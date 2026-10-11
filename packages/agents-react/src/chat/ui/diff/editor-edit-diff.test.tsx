@@ -396,3 +396,19 @@ test('edits within the work budget render exact source rows', async () => {
         }
     });
 });
+
+test('reformatting 1100 lines stays in the editor instead of being omitted', async () => {
+    await mounted(async (page, root) => {
+        const engine = new FakeEditorEngine();
+        const lines = Array.from({ length: 1100 }, (_, index) => `line ${index}`);
+        const change = {
+            path: 'formatted.txt',
+            before: lines.join('\n'),
+            after: lines.map((line, index) => (index % 2 === 0 ? `changed ${index}` : line)).join('\n')
+        };
+        await act(async () => root.render(createElement(EditorEditDiff, { change, loadEngine: async () => engine, fallback: 'Legacy' })));
+        expect(engine.last.getText().split('\n')).toHaveLength(1650);
+        expect(page.host.querySelector('[data-diff-omitted]')).toBeNull();
+        expect(engine.last.getText()).toContain('changed 1098');
+    });
+});

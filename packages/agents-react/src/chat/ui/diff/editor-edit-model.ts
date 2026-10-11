@@ -1,7 +1,7 @@
 import { diffRows, type DiffDocument } from '@adecore/merge';
 
 // Larger rendering tiers need native production measurements before this gate expands.
-export const EDITOR_DIFF_WORK = 2_000_000;
+export const EDITOR_DIFF_WORK = 4_000_000;
 export const EDITOR_DIFF_LIMITS = { rows: 2000, characters: 2000000, lineLength: 10000 };
 
 export function canRenderEditorDiff(document: DiffDocument): boolean {
