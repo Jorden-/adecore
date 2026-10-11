@@ -261,6 +261,54 @@ describe('setLineHighlights', () => {
     });
 });
 
+describe('line emphasis', () => {
+    const boxes = (host: HTMLElement): HTMLElement[] => [...host.querySelectorAll('.se-line-emphasis')] as HTMLElement[];
+
+    test('follows characters through insertions and removes a replaced word', () => {
+        const { editor, host } = setup({ text: 'one two three' });
+        editor.setLineHighlights([{ startLine: 1, endLine: 1, color: '--editor-added', sign: '+', emphasis: [[[4, 7]]] }]);
+        const before = parseFloat(boxes(host)[0]!.style.left);
+        expect(boxes(host)[0]!.style.background).toContain('var(--editor-added) 22%');
+        editor.applyEdits([{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }, text: 'new ' }]);
+        expect(parseFloat(boxes(host)[0]!.style.left)).toBeGreaterThan(before);
+        editor.applyEdits([{ range: { start: { line: 0, character: 8 }, end: { line: 0, character: 11 } }, text: '' }]);
+        expect(boxes(host)).toEqual([]);
+        expect(host.querySelector('.se-line-sign')!.textContent).toBe('+');
+    });
+
+    test('splits emphasis at a newly inserted newline and removes it with its highlight', () => {
+        const { editor, host } = setup({ text: 'one word end' });
+        editor.setLineHighlights([{ startLine: 1, endLine: 1, color: '--editor-added', emphasis: [[[4, 8]]] }]);
+        editor.applyEdits([{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 6 } }, text: '\n' }]);
+        expect(boxes(host).map((box) => box.style.top)).toEqual(['0px', '20px']);
+        editor.setLineHighlights([]);
+        expect(boxes(host)).toEqual([]);
+    });
+
+    test('uses tab geometry and UTF-16 ranges, and lets a later highlight replace emphasis', () => {
+        const { editor, host } = setup({ text: '\t😀word', indentation: { tabSize: 4, insertSpaces: false } });
+        editor.setLineHighlights([{ startLine: 1, endLine: 1, color: '--editor-added', emphasis: [[[3, 7]]] }]);
+        const left = parseFloat(boxes(host)[0]!.style.left);
+        expect(left).toBeGreaterThan(4 * 7.8);
+        expect(parseFloat(boxes(host)[0]!.style.width)).toBeCloseTo(4 * 7.8);
+        editor.setLineHighlights([
+            { startLine: 1, endLine: 1, color: '--editor-added', emphasis: [[[3, 7]]] },
+            { startLine: 1, endLine: 1, color: '--editor-deleted' }
+        ]);
+        expect(boxes(host)).toEqual([]);
+    });
+
+    test('draws an emphasized range on each wrapped row it reaches', () => {
+        const { editor, host, viewport } = setup({ text: 'word '.repeat(80) });
+        Object.defineProperty(viewport, 'clientWidth', { value: 400 });
+        editor.setWrap(true);
+        editor.setLineHighlights([{ startLine: 1, endLine: 1, color: '--editor-added', emphasis: [[[0, 400]]] }]);
+        expect(boxes(host).length).toBeGreaterThan(1);
+        expect(new Set(boxes(host).map((box) => box.style.top)).size).toBe(boxes(host).length);
+        expect(boxes(host).every((box) => parseFloat(box.style.width) > 0)).toBe(true);
+    });
+});
+
 describe('renderCode', () => {
     const tokenizer: LineTokenizer = {
         tokenizeLine: (text) => ({
@@ -272,6 +320,32 @@ describe('renderCode', () => {
         }),
         sameState: () => true
     };
+
+    test('reuses prepared document tokens on every widget render without local tokenization', async () => {
+        const tokenizeLine = jest.fn(tokenizer.tokenizeLine);
+        const { editor, host } = setup({ language: 'typescript', text: 'source' }, { tokenizer: async () => ({ ...tokenizer, tokenizeLine }) });
+        await settle();
+        tokenizeLine.mockClear();
+        for (let i = 0; i < 2; i++) {
+            const container = host.ownerDocument.createElement('div');
+            editor.renderCode(container, 'inside comment\r\nstill inside', {
+                tokens: [[{ length: 14, color: '#336699', fontStyle: 1, kind: 'comment' }], [{ length: 12, color: '#336699', fontStyle: 1, kind: 'comment' }]],
+                color: '--editor-deleted',
+                emphasis: [[[7, 14]]]
+            });
+            expect([...container.querySelectorAll('.se-code-text')].map((line) => line.textContent)).toEqual(['inside comment', 'still inside']);
+            expect(container.querySelector('.se-code-emphasis')!.textContent).toBe('comment');
+            expect((container.querySelector('.se-code-emphasis') as HTMLElement).style.fontStyle).toBe('italic');
+            expect((container.querySelector('.se-code-emphasis') as HTMLElement).style.color).toBe('#336699');
+        }
+        expect(tokenizeLine).not.toHaveBeenCalled();
+        const plain = host.ownerDocument.createElement('div');
+        editor.renderCode(plain, 'plain', { tokens: null });
+        expect(plain.querySelector('.se-code-text')!.textContent).toBe('plain');
+        expect(plain.querySelector('.se-code-text span')).toBeNull();
+        expect(tokenizeLine).not.toHaveBeenCalled();
+        editor.dispose();
+    });
 
     test('draws lines in the editor colors with a gutter column, numbers, a sign and a tinted bar', async () => {
         const { editor, host } = setup({ language: 'typescript' }, { tokenizer: async () => tokenizer });

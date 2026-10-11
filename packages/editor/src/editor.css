@@ -337,8 +337,12 @@
     font-size: max(12px, calc(var(--code-font-size, 13px) - 2px));
     line-height: 1;
 }
-.se-line-highlight {
+.se-line-highlight,
+.se-line-emphasis {
     position: absolute;
+}
+.se-line-emphasis {
+    border-radius: 2px;
 }
 
 /* Code a host draws in a widget row: the editor's face, with the gutter column the document has. */

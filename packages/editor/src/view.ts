@@ -46,6 +46,7 @@ import type {
     EditorFindQuery,
     EditorFindState,
     EditorHighlightKind,
+    EditorLineHighlight,
     EditorMarkerSeverity,
     EditorMessages,
     EditorRect,
@@ -2056,7 +2057,7 @@ export class EditorView {
     }
 
     /* Lines the host tinted, which follow their text through edits until it sets them again. */
-    setLineHighlights(highlights: readonly { startLine: number; endLine: number; color: string; sign?: string; fill?: string }[]): void {
+    setLineHighlights(highlights: readonly EditorLineHighlight[]): void {
         this.highlights.set(
             highlights.map((highlight) => ({ id: '', ...highlight })),
             this.model.getLineCount(),
@@ -2082,6 +2083,7 @@ export class EditorView {
     ): { className: string; rects: LayoutRect[]; background: string }[] {
         const byBackground = new Map<string, LayoutRect[]>();
         const width = Math.max(this.layout.width, this.viewportWidth);
+        const emphasisByColor = new Map<string, LayoutRect[]>();
         for (const row of rows) {
             const highlight = row.kind === 'text' ? lines.get(row.line) : undefined;
             if (highlight !== undefined) {
@@ -2089,14 +2091,32 @@ export class EditorView {
                 const rects = byBackground.get(background) ?? [];
                 rects.push({ x: 0, y: row.top, width, height: row.height });
                 byBackground.set(background, rects);
+                if (row.kind === 'text' && highlight.emphasis !== undefined) {
+                    const bounds = this.model.getLine(row.line);
+                    const emphasisBackground = `color-mix(in srgb, ${colorValue(highlight.color)} 22%, transparent)`;
+                    const emphasized = emphasisByColor.get(emphasisBackground) ?? [];
+                    for (const range of highlight.emphasis) {
+                        emphasized.push(...this.layout.rectangles(Math.max(bounds.start, range.from), Math.min(bounds.end, range.to), [row]));
+                    }
+                    emphasisByColor.set(emphasisBackground, emphasized);
+                }
             }
         }
-        return [...byBackground].map(([background, rects]) => ({ className: 'se-line-highlight', rects, background }));
+        return [
+            ...[...byBackground].map(([background, rects]) => ({ className: 'se-line-highlight', rects, background })),
+            ...[...emphasisByColor].map(([background, rects]) => ({ className: 'se-line-emphasis', rects, background }))
+        ];
     }
 
     /* Code that is not in the document, drawn in the editor's own face and colors. */
     renderCode(container: HTMLElement, text: string, options: EditorCodeBlockOptions): void {
-        renderCodeBlock(container, text, this.tokens.tokenizeText(text.split(/\r?\n/)), this.settings.tabSize, options);
+        renderCodeBlock(
+            container,
+            text,
+            options.tokens === undefined ? this.tokens.tokenizeText(text.split(/\r?\n/)) : options.tokens,
+            this.settings.tabSize,
+            options
+        );
     }
 
     private attributedLines(first: number, last: number): Map<number, AttributedLines> {

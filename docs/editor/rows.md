@@ -30,17 +30,20 @@ The editor makes the container again whenever the row scrolls back into view and
 
 `renderCode(container, text, options?)` fills an element with lines in the editor's font and colors, behind a gutter as wide as the editor's, so they line up with the document. It is meant for a widget's `render`: the lines an agent removed, or the other side of a conflict.
 
-| `EditorCodeBlockOptions` | Meaning                                                                         |
-| ------------------------ | ------------------------------------------------------------------------------- |
-| `firstLine`              | The one-based number of the first line; without it there are no numbers        |
-| `sign`                   | A character in the gutter of each line, such as `-`                             |
-| `color`                  | Tints the rows and draws a bar beside them                                      |
-| `emphasis`               | Per line, `[from, to]` character ranges in a stronger tint, such as changed words |
-| `faded`                  | Draws the text faded, as lines that are gone                                    |
+| `EditorCodeBlockOptions` | Meaning                                                                                                                |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `tokens`                 | Tokens per line prepared from the original document; `null` draws plain text, and omission tokenizes the block locally |
+| `firstLine`              | The one-based number of the first line; without it there are no numbers                                                |
+| `sign`                   | A character in the gutter of each line, such as `-`                                                                    |
+| `color`                  | Tints the rows and draws a bar beside them                                                                             |
+| `emphasis`               | Per line, `[from, to]` character ranges in a stronger tint, such as changed words                                      |
+| `faded`                  | Draws the text faded, as lines that are gone                                                                           |
 
 ## Line highlights
 
-`setLineHighlights(highlights)` tints lines behind the text: one-based, inclusive `startLine` and `endLine`, a `color`, an optional `sign` in the gutter, and an optional `fill` that paints the rows in that color as it is instead of a light tint. A widget row between two tinted lines stays clear. The highlights follow their text through edits.
+`setLineHighlights(highlights)` tints lines behind the text: one-based, inclusive `startLine` and `endLine`, a `color`, an optional `sign` in the gutter, and an optional `fill` that paints the rows in that color as it is instead of a light tint. A widget row between two tinted lines stays clear. The highlights follow their text through edits. Optional `emphasis` lists UTF-16 `[from, to]` character ranges per line, starting at `startLine`, in a stronger tint of `color`. These ranges follow edits too.
+
+Pass prepared `tokens` to `renderCode` when a block starts inside a multiline comment or string. Local tokenization starts with a fresh grammar state, while document tokens keep the surrounding syntax. Prepared tokens also avoid tokenizing the same widget again when it returns to view.
 
 A color here, and in `renderCode` and the [agent marks](/editor/agents), is the name of a custom property such as `--editor-added` or `--agent-1`, or any CSS color.
 

@@ -193,10 +193,14 @@ export interface EditorLineHighlight {
     readonly fill?: EditorMarkColor;
     /* A character in the gutter of each line, such as `+`, in the same color. */
     readonly sign?: string;
+    /* Per line from `startLine`, UTF-16 character ranges with a stronger tint; they follow their text through edits. */
+    readonly emphasis?: ReadonlyArray<ReadonlyArray<readonly [number, number]>>;
 }
 
 /* How `renderCode` draws lines that are not part of the document. */
 export interface EditorCodeBlockOptions {
+    /* Prepared in the source document's grammar state. Omit to tokenize here; null draws plain text. */
+    readonly tokens?: ReadonlyArray<readonly LineToken[]> | null;
     /* One-based number of the first line, shown in the gutter column; without it the lines have none. */
     readonly firstLine?: number;
     /* A character in the gutter of each line, such as `-`. */

@@ -47,6 +47,38 @@ describe('AttributionRuns', () => {
         expect([...runs.linesIn(0, 99, 0, bounds(99).end, lineOf).keys()]).toEqual([9, 10, 11]);
     });
 
+    test('bounds emphasis to the marked lines and ignores empty or invalid ranges', () => {
+        const runs = new AttributionRuns();
+        runs.set(
+            [
+                {
+                    id: 'a',
+                    startLine: 2,
+                    endLine: 2,
+                    color: '--editor-added',
+                    emphasis: [
+                        [
+                            [2, 100],
+                            [-5, 1],
+                            [4, 2],
+                            [0, Infinity]
+                        ],
+                        [[0, 3]]
+                    ]
+                }
+            ],
+            200,
+            bounds
+        );
+        const values = runs.linesIn(0, 4, 0, bounds(4).end, lineOf);
+        expect(values.size).toBe(1);
+        expect(values.get(1)!.emphasis).toEqual([
+            { from: bounds(1).start + 2, to: bounds(1).end },
+            { from: bounds(1).start, to: bounds(1).start + 1 }
+        ]);
+        expect(runs.linesIn(2, 4, bounds(2).start, bounds(4).end, lineOf).size).toBe(0);
+    });
+
     test('names a custom property as a var() and passes any other color through', () => {
         expect(colorValue('--agent-3')).toBe('var(--agent-3)');
         expect(colorValue('#c4602f')).toBe('#c4602f');
