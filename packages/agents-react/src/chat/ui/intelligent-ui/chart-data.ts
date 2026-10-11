@@ -64,11 +64,15 @@ export function uiChartValues(data: UiProps<'Chart'>['data']): UiChartValues {
     return valuesOf(data, numericKeys(data));
 }
 
-/* The rounded ends of a value axis, or null when they lie beyond what a number can hold. */
+/*
+ * The rounded ends of a value axis, or null when no drawing can scale to them: the span has to be
+ * finite and above zero, and so does one over it, which rules out a subnormal span as well.
+ */
 export function uiChartRange(min: number, max: number): { low: number; high: number } | null {
     const low = min < 0 ? -niceCeiling(-min) : 0;
     const high = max > 0 ? niceCeiling(max) : low === 0 ? 1 : 0;
-    return Number.isFinite(high - low) ? { low, high } : null;
+    const span = high - low;
+    return span > 0 && Number.isFinite(span) && Number.isFinite(1 / span) ? { low, high } : null;
 }
 
 /*
