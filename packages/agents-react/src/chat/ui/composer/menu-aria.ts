@@ -7,6 +7,11 @@ export interface ComposerMenuAriaInput {
     count: number;
 }
 
+/* The index that still points at an option once the list has shrunk under a stale one. */
+export function clampMenuIndex(index: number, count: number): number {
+    return Math.min(index, Math.max(count - 1, 0));
+}
+
 export function optionIdOf(listId: string, index: number): string {
     return `${listId}-${index}`;
 }

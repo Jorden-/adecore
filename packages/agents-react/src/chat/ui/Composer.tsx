@@ -56,7 +56,7 @@ import { jumpToTimelineItem, pageTimeline, scrollTimelineToEnd, subscribeTimelin
 import { ChatActivity } from './ChatActivity';
 import { ChatReferenceChip } from './ChatReferenceChip';
 import { chipDecorations } from './composer/chips';
-import { composerMenuAria, optionIdOf } from './composer/menu-aria';
+import { clampMenuIndex, composerMenuAria, optionIdOf } from './composer/menu-aria';
 import { enterAction, inCode, inFenceBody, inOpenFence, listItemAt, recallDirection, tabSpaces } from './composer/keys';
 import { ComposerInput, type ComposerInputHandle } from './ComposerInput';
 import { holdLiftsIn, type HoldRelease } from '../prompt-hold';
@@ -444,18 +444,21 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
     const listId = useId();
     const mentionsLabelId = `${listId}-chats`;
     const filesLabelId = `${listId}-files`;
+    const filesLabelShown = mention !== null && (mention.query === '' || chatMatches.length > 0);
     const menuOpen = commandMenuOpen || skillMenuOpen || mentionMenuOpen;
     const menuCount = commandMenuOpen ? commands.length : skillMenuOpen ? skillMatches.length : mentionCount;
+    // The list can shrink under a stale index; every reader takes the one that still points at an option.
+    const activeIndex = clampMenuIndex(menuIndex, menuCount);
     const inputAria = useMemo(
         () =>
             composerMenuAria({
                 label: t('composer.inputLabel'),
                 listId,
                 open: menuOpen,
-                activeIndex: Math.min(menuIndex, Math.max(menuCount - 1, 0)),
+                activeIndex,
                 count: menuCount
             }),
-        [t, listId, menuOpen, menuIndex, menuCount]
+        [t, listId, menuOpen, activeIndex, menuCount]
     );
     const editorExtensions = useMemo(
         () => [chipDecorations({ mentions: draft.mentions, skills: draft.skills }), LEAVE_DROPS_TO_THE_CARD],
@@ -693,7 +696,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
             return;
         }
         hold.release('send');
-        const chosen = commands[menuIndex];
+        const chosen = commands[activeIndex];
         if (commandQuery !== null && chosen?.local && runCommand(chosen.name)) {
             clearDraft();
             return;
@@ -887,7 +890,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                 return true;
             }
             if (e.key === 'Tab') {
-                const chosen = commands[menuIndex]!;
+                const chosen = commands[activeIndex]!;
                 if (chosen.skill) {
                     chooseSkill(chosen.name);
                 } else {
@@ -901,7 +904,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                 return true;
             }
             if (e.key === 'Tab' || e.key === 'Enter') {
-                chooseSkill((skillMatches[menuIndex] ?? skillMatches[0]!).name);
+                chooseSkill((skillMatches[activeIndex] ?? skillMatches[0]!).name);
                 return true;
             }
         }
@@ -910,7 +913,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                 return true;
             }
             if (e.key === 'Tab' || e.key === 'Enter') {
-                chooseMentionAt(menuIndex);
+                chooseMentionAt(activeIndex);
                 return true;
             }
         }
@@ -1100,9 +1103,9 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                                     key={command.name}
                                     id={optionIdOf(listId, index)}
                                     role="option"
-                                    aria-selected={index === menuIndex}
+                                    aria-selected={index === activeIndex}
                                     tabIndex={-1}
-                                    data-active={index === menuIndex}
+                                    data-active={index === activeIndex}
                                     className="cursor-row flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-text-muted"
                                     onMouseEnter={() => setMenuIndex(index)}
                                     onMouseDown={(e) => e.preventDefault()}
@@ -1134,9 +1137,9 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                                     key={skill.name}
                                     id={optionIdOf(listId, index)}
                                     role="option"
-                                    aria-selected={index === menuIndex}
+                                    aria-selected={index === activeIndex}
                                     tabIndex={-1}
-                                    data-active={index === menuIndex}
+                                    data-active={index === activeIndex}
                                     className="cursor-row flex w-full items-start gap-2 rounded-md px-2 py-1 text-left text-xs text-text-muted"
                                     onMouseEnter={() => setMenuIndex(index)}
                                     onMouseDown={(e) => e.preventDefault()}
@@ -1163,9 +1166,9 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                                                     key={chat.id}
                                                     id={optionIdOf(listId, index)}
                                                     role="option"
-                                                    aria-selected={index === menuIndex}
+                                                    aria-selected={index === activeIndex}
                                                     tabIndex={-1}
-                                                    data-active={index === menuIndex}
+                                                    data-active={index === activeIndex}
                                                     className="cursor-row flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-text-muted"
                                                     onMouseEnter={() => setMenuIndex(index)}
                                                     onMouseDown={(e) => e.preventDefault()}
@@ -1178,8 +1181,8 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                                         </div>
                                     )}
                                     {files.length > 0 && (
-                                        <div role="group" aria-labelledby={filesLabelId}>
-                                            {(mention.query === '' || chatMatches.length > 0) && (
+                                        <div role="group" {...(filesLabelShown ? { 'aria-labelledby': filesLabelId } : { 'aria-label': t('composer.mentions.files') })}>
+                                            {filesLabelShown && (
                                                 <Menu.Label id={filesLabelId}>
                                                     {mention.query === '' ? t('composer.mentions.here') : t('composer.mentions.files')}
                                                 </Menu.Label>
@@ -1191,9 +1194,9 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                                                         key={path}
                                                         id={optionIdOf(listId, chatMatches.length + index)}
                                                         role="option"
-                                                        aria-selected={chatMatches.length + index === menuIndex}
+                                                        aria-selected={chatMatches.length + index === activeIndex}
                                                         tabIndex={-1}
-                                                        data-active={chatMatches.length + index === menuIndex}
+                                                        data-active={chatMatches.length + index === activeIndex}
                                                         className="cursor-row flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-text-muted"
                                                         onMouseEnter={() => setMenuIndex(chatMatches.length + index)}
                                                         onMouseDown={(e) => e.preventDefault()}

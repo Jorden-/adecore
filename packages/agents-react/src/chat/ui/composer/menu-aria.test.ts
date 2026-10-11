@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { composerMenuAria, optionIdOf } from './menu-aria';
+import { clampMenuIndex, composerMenuAria, optionIdOf } from './menu-aria';
 
 const base = { label: 'Message', listId: 'list', activeIndex: 2, count: 3 };
 
@@ -17,4 +17,10 @@ test('an open menu points at the option the ids name', () => {
     const aria = composerMenuAria({ ...base, open: true });
     expect(aria['aria-controls']).toBe('list');
     expect(aria['aria-activedescendant']).toBe(optionIdOf('list', 2));
+});
+
+test('a stale index is held on the last option, and an empty list on zero', () => {
+    expect(clampMenuIndex(5, 3)).toBe(2);
+    expect(clampMenuIndex(1, 3)).toBe(1);
+    expect(clampMenuIndex(4, 0)).toBe(0);
 });
