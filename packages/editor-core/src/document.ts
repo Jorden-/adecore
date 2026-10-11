@@ -613,10 +613,19 @@ export class DocumentModel {
     replaceMatches(matches: readonly FindMatch[], replacement: string, options: ReplaceOptions = {}): number {
         const revision = this.revision;
         if (
+            matches.length === 0 ||
             (options.expectedRevision !== undefined && options.expectedRevision !== revision) ||
             matches.some((match) => match.revision !== revision || this.slice(match.from, match.to) !== match.text)
         ) {
             return 0;
+        }
+        const ranges = new Set<string>();
+        for (const match of matches) {
+            const key = `${match.from}:${match.to}`;
+            if (ranges.has(key)) {
+                throw new RangeError('Search matches must have unique ranges.');
+            }
+            ranges.add(key);
         }
         const text = this.getText();
         const edits = matches.map((match) => ({
@@ -985,7 +994,7 @@ export class DocumentModel {
     /* Whether the bracket just typed at `offset` would find its closer in the text that already follows it. */
     private hasMatch(offset: number, opener: string, language: string, context?: TypingContext): boolean {
         if (context?.embedded === 'javascript' && context.embedStart !== undefined) {
-            const source = this.scriptSource(context.embedStart, matchScanLimit)?.text;
+            const source = this.scriptSource(context.embedStart, matchScanLimit).text;
             if (source === undefined) {
                 return false;
             }

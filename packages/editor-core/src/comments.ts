@@ -380,8 +380,7 @@ export function planBlockComment(source: EditSource, selections: readonly Select
                 phpTagAt(source, from) ||
                 phpTagAt(source, to) ||
                 (mode !== endMode && !endsLineComment) ||
-                context.embedded !== endContext.embedded ||
-                (context.embedded !== undefined && /<\/script(?=[\s/>]|$)/i.test(text)) ||
+                context.embedStart !== endContext.embedStart ||
                 /<\?(?:php\b|=)/.test(text) ||
                 (mode !== 'html' && context.embedded === undefined && text.includes('?>'))
             ) {

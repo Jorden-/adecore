@@ -4,15 +4,15 @@ Everything comes from the package root, `@adecore/editor-core`.
 
 ## DocumentModel
 
-| Group       | Members                                                                                                             |
-| ----------- | ------------------------------------------------------------------------------------------------------------------- |
-| Text        | `getText`, `getLength`, `getLineCount`, `getLine`, `slice`, `positionAt`, `offsetAt`                                |
-| Selections  | `getSelections`, `getSelectionCount`, `getPrimary`, `setSelections`, `expandSelectionTo`, `occurrencesExhausted`    |
-| Edits       | `applyEdits`, `setText`, `undo`, `redo`, `getRevision`                                                              |
-| State       | `getSnapshot`, `subscribe`                                                                                          |
-| Commands    | `typeText`, `paste`, `execute`, `wordSelectionAt`, `wordStartBefore`, `wordEndAfter`                                |
-| Search      | `find`, `findNext`, `replace`, `replaceAll`, `replaceMatches`                                                                         |
-| Folding     | `getFoldingRanges`                                                                                                  |
+| Group      | Members                                                                                                          |
+| ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| Text       | `getText`, `getLength`, `getLineCount`, `getLine`, `slice`, `positionAt`, `offsetAt`                             |
+| Selections | `getSelections`, `getSelectionCount`, `getPrimary`, `setSelections`, `expandSelectionTo`, `occurrencesExhausted` |
+| Edits      | `applyEdits`, `setText`, `undo`, `redo`, `getRevision`                                                           |
+| State      | `getSnapshot`, `subscribe`                                                                                       |
+| Commands   | `typeText`, `paste`, `execute`, `wordSelectionAt`, `wordStartBefore`, `wordEndAfter`                             |
+| Search     | `find`, `findNext`, `replace`, `replaceAll`, `replaceMatches`                                                    |
+| Folding    | `getFoldingRanges`                                                                                               |
 
 See [Documents and edits](/editor-core/documents), [Typing and commands](/editor-core/commands) and [Search and folding](/editor-core/search-folding).
 

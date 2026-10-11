@@ -177,3 +177,11 @@ describe('lexical and indentation folds', () => {
         expect(model.getFoldingRanges({ indentation: true })[0]!.startLine).toBe(1);
     });
 });
+
+it('refuses duplicate retained match ranges before counting or applying replacements', () => {
+    const model = new DocumentModel('cat');
+    const match = model.find('cat')[0]!;
+    expect(() => model.replaceMatches([match, { ...match }], 'entry')).toThrow(RangeError);
+    expect(model.getText()).toBe('cat');
+    expect(model.getSnapshot().canUndo).toBe(false);
+});
