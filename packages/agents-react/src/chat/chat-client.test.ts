@@ -446,6 +446,13 @@ describe('ChatClient', () => {
         expect(client.isMounted('a')).toBe(false);
     });
 
+    test('send carries the chosen delivery', async () => {
+        const { transport, client } = setup();
+        await client.open('a', {});
+        await client.send('a', 'hello', { delivery: 'steer' });
+        expect(transport.of('chat.send')[0]?.payload).toEqual({ chatId: 'a', text: 'hello', delivery: 'steer' });
+    });
+
     test('a status event lands in the store for a chat this window never attached', async () => {
         const { transport, sink } = setup();
         transport.emit('chat.status', { chatId: 'elsewhere', info: { ...info('elsewhere'), status: 'needs-you' } });

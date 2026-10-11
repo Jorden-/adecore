@@ -170,6 +170,7 @@ export class ChatClient {
         return this.transport.request('chat.send', {
             chatId,
             text,
+            delivery: extras.delivery,
             mentions: extras.mentions,
             skills: extras.skills,
             chats: extras.chats,
