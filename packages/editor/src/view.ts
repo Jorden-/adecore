@@ -17,7 +17,7 @@ import { createMetrics, type EditorFont, readEditorFont } from './metrics.ts';
 import { type AttributedLines, AttributionRuns, colorValue, tintValue } from './attribution.ts';
 import { renderCodeBlock } from './code-block.ts';
 import { emit, subscribe } from './listeners.ts';
-import { mapOffset } from './offsets.ts';
+import { mapOffset, offsetMapper } from './offsets.ts';
 import { mapTrackedRange } from './tracked-range.ts';
 import { type ScrollKind, scrollPosition } from './scroll.ts';
 import { easeOut, scrollDuration } from './scroll-animation.ts';
@@ -61,18 +61,18 @@ function sameRect(left: EditorRect, right: EditorRect): boolean {
     return left.left === right.left && left.top === right.top && left.right === right.right && left.bottom === right.bottom;
 }
 
-function mapRange<Range extends { from: number; to: number }>(range: Range, changes: readonly DocumentChange[]): Range {
-    return { ...range, from: mapOffset(range.from, changes), to: mapOffset(range.to, changes) };
+function mapRange<Range extends { from: number; to: number }>(range: Range, map: (offset: number) => number): Range {
+    return { ...range, from: map(range.from), to: map(range.to) };
 }
 
-function mapFoldHints(hints: FoldHints, changes: readonly DocumentChange[]): FoldHints {
+function mapFoldHints(hints: FoldHints, map: (offset: number) => number): FoldHints {
     return {
-        symbols: hints.symbols?.map((hint) => mapRange(hint, changes)) ?? [],
+        symbols: hints.symbols?.map((hint) => mapRange(hint, map)) ?? [],
         ranges:
             hints.ranges?.map((hint) => ({
-                ...mapRange(hint, changes),
-                ...(hint.head === undefined ? {} : { head: mapOffset(hint.head, changes) }),
-                ...(hint.tail === undefined ? {} : { tail: mapOffset(hint.tail, changes) })
+                ...mapRange(hint, map),
+                ...(hint.head === undefined ? {} : { head: map(hint.head) }),
+                ...(hint.tail === undefined ? {} : { tail: map(hint.tail) })
             })) ?? []
     };
 }
@@ -646,34 +646,35 @@ export class EditorView {
 
     /* Moves everything anchored to an offset along with one batch of changes. */
     private followEdit(changes: readonly DocumentChange[]): void {
-        this.inlays = this.inlays.map((inlay) => ({ ...inlay, at: mapOffset(inlay.at, changes) }));
+        const map = offsetMapper(changes);
+        this.inlays = this.inlays.map((inlay) => ({ ...inlay, at: map(inlay.at) }));
         for (const [owner, blocks] of this.blocks) {
             this.blocks.set(
                 owner,
-                blocks.map((block) => ({ ...block, at: mapOffset(block.at, changes) }))
+                blocks.map((block) => ({ ...block, at: map(block.at) }))
             );
         }
-        this.lenses = this.lenses.map((lens) => ({ ...lens, at: mapOffset(lens.at, changes) }));
-        this.collapsed = new Set([...this.collapsed].map((anchor) => mapOffset(anchor, changes)));
-        this.settled = new Set([...this.settled].map((anchor) => mapOffset(anchor, changes)));
+        this.lenses = this.lenses.map((lens) => ({ ...lens, at: map(lens.at) }));
+        this.collapsed = new Set([...this.collapsed].map((anchor) => map(anchor)));
+        this.settled = new Set([...this.settled].map((anchor) => map(anchor)));
         if (this.foldHints !== null) {
-            this.foldHints = mapFoldHints(this.foldHints, changes);
+            this.foldHints = mapFoldHints(this.foldHints, map);
         }
-        this.customFolds = this.customFolds.map((fold) => mapRange(fold, changes));
+        this.customFolds = this.customFolds.map((fold) => mapRange(fold, map));
         this.find.mapBounds(changes);
-        this.changeMarks = this.changeMarks.map((mark) => mapRange(mark, changes));
-        this.markers = this.markers.map((marker) => mapRange(marker, changes));
+        this.changeMarks = this.changeMarks.map((mark) => mapRange(mark, map));
+        this.markers = this.markers.map((marker) => mapRange(marker, map));
         this.mapTracked(changes);
-        this.attribution.map(changes);
-        this.highlights.map(changes);
-        this.remoteCarets = this.remoteCarets.map((caret) => ({ ...caret, at: mapOffset(caret.at, changes) }));
+        this.attribution.map(changes, map);
+        this.highlights.map(changes, map);
+        this.remoteCarets = this.remoteCarets.map((caret) => ({ ...caret, at: map(caret.at) }));
         for (const [owner, entries] of this.lineActions) {
             this.lineActions.set(
                 owner,
-                entries.map((entry) => ({ ...entry, at: mapOffset(entry.at, changes) }))
+                entries.map((entry) => ({ ...entry, at: map(entry.at) }))
             );
         }
-        this.semantic = this.semantic.map((token) => mapRange(token, changes));
+        this.semantic = this.semantic.map((token) => mapRange(token, map));
     }
 
     private mapTracked(changes: readonly DocumentChange[]): void {
@@ -704,13 +705,14 @@ export class EditorView {
 
     /* The ranges follow the text until the next read of the document, so a fold above an edit stays closed meanwhile. */
     private mappedFolds(batches: readonly (readonly DocumentChange[])[]): ViewFold[] {
+        const mappers = batches.map(offsetMapper);
         const mapped: ViewFold[] = [];
         for (const range of this.foldRanges) {
             let from = range.from;
             let to = range.to;
-            for (const changes of batches) {
-                from = mapOffset(from, changes);
-                to = mapOffset(to, changes);
+            for (const map of mappers) {
+                from = map(from);
+                to = map(to);
             }
             const startLine = this.model.positionAt(from).line;
             const endLine = this.model.positionAt(to).line;

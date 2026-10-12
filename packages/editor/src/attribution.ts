@@ -1,5 +1,5 @@
 import type { DocumentChange } from '@adecore/editor-core';
-import { mapOffset } from './offsets.ts';
+import { offsetMapper } from './offsets.ts';
 import type { EditorLineHighlight } from './types.ts';
 
 /* The custom properties of the agent palette, defined in `editor.css` for both themes. */
@@ -71,13 +71,11 @@ export class AttributionRuns {
         this.runs = [];
     }
 
-    map(changes: readonly DocumentChange[]): void {
+    map(changes: readonly DocumentChange[], map = offsetMapper(changes)): void {
         for (const run of this.runs) {
-            run.from = mapOffset(run.from, changes);
-            run.to = mapOffset(run.to, changes);
-            run.emphasis = run.emphasis
-                .map((range) => ({ from: mapOffset(range.from, changes), to: mapOffset(range.to, changes) }))
-                .filter((range) => range.to > range.from);
+            run.from = map(run.from);
+            run.to = map(run.to);
+            run.emphasis = run.emphasis.map((range) => ({ from: map(range.from), to: map(range.to) })).filter((range) => range.to > range.from);
         }
     }
 

@@ -1,5 +1,5 @@
 import type { DocumentChange, FoldingRange } from '@adecore/editor-core';
-import { mapOffset } from './offsets.ts';
+import { offsetMapper } from './offsets.ts';
 import type { EditorBlock } from './types.ts';
 
 /* A block with a header line, in zero-based lines and both ends inclusive. */
@@ -168,13 +168,14 @@ export class Outline {
     }
 
     edited(batches: readonly (readonly DocumentChange[])[]): void {
+        const mappers = batches.map(offsetMapper);
         const move = (entries: OutlineEntry[]): OutlineEntry[] =>
             entries.map((entry) => {
                 let from = entry.from;
                 let to = entry.to;
-                for (const changes of batches) {
-                    from = mapOffset(from, changes);
-                    to = mapOffset(to, changes);
+                for (const map of mappers) {
+                    from = map(from);
+                    to = map(to);
                 }
                 return { ...entry, from, to };
             });
