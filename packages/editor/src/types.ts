@@ -617,7 +617,8 @@ export interface Editor {
     /* Changes what it does as a person types; the keys left out stay as they are. */
     setSmartKeys(keys: Partial<EditorSmartKeys>): void;
     setGuides(guides: boolean): void;
-    setStickyScroll(sticky: boolean): void;
+    /* Optional so an editor from before it still fits. */
+    setStickyScroll?(sticky: boolean): void;
     setWhitespace(whitespace: boolean): void;
     /* The column to draw a line at; null takes it away. */
     setRightMargin(column: number | null): void;
