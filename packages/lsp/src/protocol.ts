@@ -427,6 +427,9 @@ export interface ProviderOptions {
     resolveProvider?: boolean;
     prepareProvider?: boolean;
     triggerCharacters?: string[];
+    /* Of on type formatting: the first character that asks, and the others that do. */
+    firstTriggerCharacter?: string;
+    moreTriggerCharacter?: string[];
     retriggerCharacters?: string[];
     commands?: string[];
     watchers?: FileSystemWatcher[];
@@ -472,6 +475,7 @@ export interface ServerCapabilities {
     semanticTokensProvider?: ProviderOptions & { legend: SemanticTokensLegend };
     inlayHintProvider?: boolean | ProviderOptions;
     callHierarchyProvider?: boolean | ProviderOptions;
+    documentOnTypeFormattingProvider?: ProviderOptions;
     diagnosticProvider?: ProviderOptions;
     [capability: string]: unknown;
 }

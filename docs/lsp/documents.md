@@ -24,11 +24,13 @@ Opening, changes, requests, saving and closing go out in the order they were mad
 | Call hierarchy        | `prepareCallHierarchy`, `incomingCalls`, `outgoingCalls`                                         |
 | Rename                | `prepareRename`, `rename`                                                                        |
 | Actions               | `codeActions`, `resolveCodeAction`                                                               |
-| Formatting            | `formatting`, `rangeFormatting`                                                                  |
+| Formatting            | `formatting`, `rangeFormatting`, `onTypeFormatting`                                              |
 | Colors and hints      | `semanticTokens`, `semanticTokensDelta`, `semanticTokensRange`, `inlayHints`, `resolveInlayHint` |
 | Diagnostics           | `diagnostics`, the pull model                                                                    |
 
 `incomingCalls(item)` and `outgoingCalls(item)` take a `CallHierarchyItem` that `prepareCallHierarchy(position)` returned, with its `data` untouched, and answer the calls with their `fromRanges`. They run side by side by default, so opening two nodes of a tree does not cancel the first; pass `cancelPrevious: true` to change that. A server answers all three through `callHierarchyProvider`, and the session advertises `callHierarchy` with `dynamicRegistration: false`.
+
+`onTypeFormatting(position, ch, formatting)` is asked after the character `ch` was typed, with the caret at `position`; the characters that ask are `firstTriggerCharacter` and `moreTriggerCharacter` in the options of `documentOnTypeFormattingProvider`, which `providerOptions` returns. A new request of it cancels the one before, which is what typing wants.
 
 `request(method, params, options?)` sends any other method of a document, with the same guards.
 

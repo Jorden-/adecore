@@ -203,6 +203,16 @@ export class FakeLanguageService implements LanguageService {
         return this.request<TextEdit[] | null>('textDocument/rangeFormatting', uri, { range, options: formatting }, options);
     }
 
+    onTypeFormatting(
+        uri: string,
+        position: Position,
+        ch: string,
+        formatting: FormattingOptions,
+        options: LanguageRequestOptions = {}
+    ): Promise<TextEdit[] | null> {
+        return this.request<TextEdit[] | null>('textDocument/onTypeFormatting', uri, { position, ch, options: formatting }, options);
+    }
+
     semanticTokens(uri: string, options: LanguageRequestOptions = {}): Promise<SemanticTokens | null> {
         return this.request<SemanticTokens | null>('textDocument/semanticTokens/full', uri, {}, options);
     }

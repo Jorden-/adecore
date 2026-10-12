@@ -304,4 +304,37 @@ describe('versioned language documents', () => {
         await expect(other.incomingCalls(item)).rejects.toMatchObject({ code: -32601 });
         await bare.shutdown();
     });
+
+    it('asks for on type formatting at the caret with the typed character and the options', async () => {
+        const { session, transport } = await sessionWith({
+            documentOnTypeFormattingProvider: { firstTriggerCharacter: '}', moreTriggerCharacter: [';', '\n'] }
+        });
+        const initialize = transport.request('initialize').params as { capabilities: { textDocument: { onTypeFormatting: unknown } } };
+        expect(initialize.capabilities.textDocument.onTypeFormatting).toEqual({ dynamicRegistration: true });
+        expect(session.providerOptions('textDocument/onTypeFormatting')).toEqual({ firstTriggerCharacter: '}', moreTriggerCharacter: [';', '\n'] });
+        const document = session.openDocument({ uri: 'file:///main.ts', languageId: 'typescript', text: 'x' });
+        const position = { line: 0, character: 1 };
+        const edits = document.onTypeFormatting(position, ';', { tabSize: 4, insertSpaces: true });
+        await flush();
+        expect(transport.request('textDocument/onTypeFormatting').params).toEqual({
+            textDocument: { uri: document.uri },
+            position,
+            ch: ';',
+            options: { tabSize: 4, insertSpaces: true }
+        });
+        const result = [{ range: { start: origin, end: origin }, newText: '  ' }];
+        transport.respond('textDocument/onTypeFormatting', result);
+        expect(await edits).toEqual(result);
+        const stale = rejecting(document.onTypeFormatting(position, ';', { tabSize: 4, insertSpaces: true }), (error) =>
+            expect(error).toBeInstanceOf(StaleResultError)
+        );
+        await flush();
+        await document.updateText('xy');
+        await stale;
+        await session.shutdown();
+        const { session: bare } = await sessionWith({});
+        const other = bare.openDocument({ uri: 'file:///main.ts', languageId: 'typescript', text: 'x' });
+        await expect(other.onTypeFormatting(position, ';', { tabSize: 4, insertSpaces: true })).rejects.toMatchObject({ code: -32601 });
+        await bare.shutdown();
+    });
 });

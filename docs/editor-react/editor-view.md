@@ -32,7 +32,7 @@ A change of `engine`, `options`, `project`, `uri`, `languageId` or `onMount` mou
 
 ## EditorLanguage
 
-`new EditorLanguage(project, editor, uri, languageId, timers?)` attaches every feature to an editor that the app mounted itself. It acquires the document from the project and holds the features as fields: `completion`, `signature`, `snippets`, `hover`, `diagnostics`, `highlights`, `navigation`, `peek`, `callHierarchy`, `pick`, `symbolPicker`, `rename`, `codeActions`, `contextMenu`, `history`, `definitionLink`, `symbols` and `codeVision`. Semantic tokens, inlay hints, folds and selection ranges run without a field.
+`new EditorLanguage(project, editor, uri, languageId, timers?)` attaches every feature to an editor that the app mounted itself. It acquires the document from the project and holds the features as fields: `completion`, `signature`, `snippets`, `hover`, `diagnostics`, `highlights`, `navigation`, `peek`, `callHierarchy`, `pick`, `symbolPicker`, `rename`, `codeActions`, `contextMenu`, `history`, `definitionLink`, `symbols`, `codeVision` and `formatOnType`. Semantic tokens, inlay hints, folds and selection ranges run without a field.
 
 ```ts
 const editor = engine.mount(element, options);

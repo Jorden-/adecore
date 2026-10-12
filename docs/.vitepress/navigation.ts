@@ -349,6 +349,7 @@ export const sidebar: DefaultTheme.SidebarMulti = {
             ['Navigation', '/editor-react/navigation'],
             ['Call hierarchy', '/editor-react/call-hierarchy'],
             ['Rename and code actions', '/editor-react/rename'],
+            ['Format on type', '/editor-react/format-on-type'],
             ['FindReplace', '/editor-react/find-replace'],
             ['Reviews and agents', '/editor-react/change-review'],
             ['Code vision', '/editor-react/code-vision']

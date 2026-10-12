@@ -9,6 +9,7 @@ import { ContextMenuFeature } from './context-menu.ts';
 import { DefinitionLinkFeature } from './definition-link.ts';
 import { DiagnosticsFeature } from './diagnostics.ts';
 import { FoldingFeature } from './folding.ts';
+import { FormatOnTypeFeature } from './format-on-type.ts';
 import { HighlightsFeature } from './highlights.ts';
 import { HistoryFeature } from './history.ts';
 import { HoverFeature } from './hover.ts';
@@ -61,6 +62,7 @@ export class EditorLanguage {
     readonly definitionLink: DefinitionLinkFeature;
     readonly symbols: SymbolsFeature;
     readonly codeVision: CodeVisionFeature;
+    readonly formatOnType: FormatOnTypeFeature;
     private readonly disposers: Array<() => void> = [];
     private disposed = false;
 
@@ -93,6 +95,7 @@ export class EditorLanguage {
         this.history = new HistoryFeature(this);
         this.definitionLink = new DefinitionLinkFeature(this);
         this.codeVision = new CodeVisionFeature(this, (listener) => this.symbols.onResult(listener), timers);
+        this.formatOnType = new FormatOnTypeFeature(this);
         new FoldingFeature(this, (listener) => this.symbols.onResult(listener), timers);
         this.placeOpenedCaret(editor.getCaret());
         this.onDispose(editor.onCaret((position) => this.placeOpenedCaret(position)));

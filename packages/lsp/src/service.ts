@@ -99,6 +99,8 @@ export interface LanguageService {
     executeCommand(uri: string, command: Command, options?: LanguageRequestOptions): Promise<unknown>;
     formatting(uri: string, formatting: FormattingOptions, options?: LanguageRequestOptions): Promise<TextEdit[] | null>;
     rangeFormatting(uri: string, range: Range, formatting: FormattingOptions, options?: LanguageRequestOptions): Promise<TextEdit[] | null>;
+    /* Optional so a service from before it still fits; `providerOptions('textDocument/onTypeFormatting', uri)` has the trigger characters. */
+    onTypeFormatting?(uri: string, position: Position, ch: string, formatting: FormattingOptions, options?: LanguageRequestOptions): Promise<TextEdit[] | null>;
     semanticTokens(uri: string, options?: LanguageRequestOptions): Promise<SemanticTokens | null>;
     semanticTokensDelta(uri: string, previousResultId: string, options?: LanguageRequestOptions): Promise<SemanticTokens | SemanticTokensDelta | null>;
     semanticTokensRange(uri: string, range: Range, options?: LanguageRequestOptions): Promise<SemanticTokens | null>;

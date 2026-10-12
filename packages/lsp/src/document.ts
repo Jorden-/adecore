@@ -213,6 +213,11 @@ export class LspDocument {
         return this.feature('textDocument/rangeFormatting', { range, options: formatting }, options);
     }
 
+    /* `ch` is the character that was typed; `position` is where the caret is after it. */
+    onTypeFormatting(position: Position, ch: string, formatting: FormattingOptions, options?: DocumentRequestOptions): Promise<TextEdit[] | null> {
+        return this.feature('textDocument/onTypeFormatting', { position, ch, options: formatting }, options);
+    }
+
     foldingRanges(options?: DocumentRequestOptions): Promise<FoldingRange[] | null> {
         return this.feature('textDocument/foldingRange', {}, options);
     }

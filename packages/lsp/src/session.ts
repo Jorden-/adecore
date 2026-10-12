@@ -76,6 +76,7 @@ const PROVIDERS: Record<string, keyof ServerCapabilities> = {
     'workspace/executeCommand': 'executeCommandProvider',
     'textDocument/formatting': 'documentFormattingProvider',
     'textDocument/rangeFormatting': 'documentRangeFormattingProvider',
+    'textDocument/onTypeFormatting': 'documentOnTypeFormattingProvider',
     'textDocument/foldingRange': 'foldingRangeProvider',
     'textDocument/selectionRange': 'selectionRangeProvider',
     'textDocument/semanticTokens/full': 'semanticTokensProvider',
@@ -578,6 +579,7 @@ function clientCapabilities(options: LspSessionOptions): object {
             codeLens: dynamic,
             formatting: dynamic,
             rangeFormatting: dynamic,
+            onTypeFormatting: dynamic,
             foldingRange: { ...dynamic, lineFoldingOnly: false, foldingRange: { collapsedText: false } },
             selectionRange: dynamic,
             semanticTokens: {
