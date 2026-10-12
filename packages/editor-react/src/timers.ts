@@ -43,3 +43,8 @@ export class ManualTimers implements Timers {
         return this.pending.size;
     }
 }
+
+/* Scrolls a row the editor opened under the caret line into view, which may sit at the bottom of the view with the row below the fold. The element is in the page a turn later. */
+export function revealRow(timers: Timers, container: HTMLElement): void {
+    timers.set(() => container.scrollIntoView?.({ block: 'nearest' }), 0);
+}

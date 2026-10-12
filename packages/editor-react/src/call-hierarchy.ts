@@ -18,7 +18,7 @@ import { PEEK_HEIGHT } from './peek.ts';
 import { snippetOf } from './peek-model.ts';
 import { isShortcut } from './shortcut-keys.ts';
 import { messageOf } from './error-message.ts';
-import { realTimers, type Timers } from './timers.ts';
+import { realTimers, revealRow, type Timers } from './timers.ts';
 
 const TOAST_ID = 'language-call-hierarchy';
 const PREPARE = 'textDocument/prepareCallHierarchy';
@@ -262,8 +262,7 @@ export class CallHierarchyFeature {
         const view = this.language.popups.getState().callHierarchy ?? null;
         if (view !== null && view.container !== container) {
             this.language.popups.setState({ callHierarchy: { ...view, container } });
-            // The row opens under the caret line, which may sit at the bottom of the view with the tree below the fold. The element is in the page a turn later.
-            this.timers.set(() => container.scrollIntoView?.({ block: 'nearest' }), 0);
+            revealRow(this.timers, container);
         }
     }
 

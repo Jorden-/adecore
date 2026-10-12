@@ -6,6 +6,7 @@ import { PEEK_READ_FILES, definitionSnippetOf, peekFilesOf, snippetOf, type Peek
 import type { PeekView } from './popups.ts';
 import { isShortcut } from './shortcut-keys.ts';
 import { messageOf } from './error-message.ts';
+import { realTimers, revealRow, type Timers } from './timers.ts';
 
 const TOAST_ID = 'language-peek';
 /* The block as the panel draws it: a hatched band, the header, eight lines of code and a hatched band, until the editor has measured it. */
@@ -29,6 +30,7 @@ function placeKey(location: Location): string {
  */
 export class PeekFeature {
     private readonly language: EditorLanguage;
+    private readonly timers: Timers;
     private kind: PeekKind = 'references';
     /* The whole declaration of each place of a definition peek, where the server gave it. */
     private targets = new Map<string, Range>();
@@ -38,8 +40,9 @@ export class PeekFeature {
     private line = 0;
     private token = 0;
 
-    constructor(language: EditorLanguage) {
+    constructor(language: EditorLanguage, timers: Timers = realTimers) {
         this.language = language;
+        this.timers = timers;
         const { editor } = language;
         const offs = [
             editor.onKeyDown((event) => {
@@ -201,6 +204,7 @@ export class PeekFeature {
         const view = this.language.popups.getState().peek;
         if (view !== null && view.container !== container) {
             this.language.popups.setState({ peek: { ...view, container } });
+            revealRow(this.timers, container);
         }
     }
 
