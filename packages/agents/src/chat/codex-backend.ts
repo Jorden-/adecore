@@ -51,6 +51,7 @@ export class CodexBackend implements ChatBackend {
     private readonly protocol: CodexProtocol;
     private readonly client: CodexClientInfo;
     private promptId: string | null = null;
+    private nativePrompt: { turnId: string; promptId: string } | null = null;
     private imageWrites: Promise<void> | null = null;
     private transport: CodexTransport | null = null;
     private threadId = '';
@@ -382,13 +383,23 @@ export class CodexBackend implements ChatBackend {
         if (frame.id !== undefined && events.length === 0 && (typeof frame.id === 'number' || typeof frame.id === 'string')) {
             transport.respondError(frame.id, -32601, `${this.client.title} does not handle ${String(frame.method)}`);
         }
-        if (frame.method === 'turn/started' && this.protocol.turnId !== null) {
+        const nativeTurnId = frame.method === 'turn/started' && isRecord(frame.params) && frame.params.threadId === this.threadId ? this.protocol.turnId : null;
+        if (nativeTurnId !== null) {
+            if (this.turnUnnamed && this.promptId !== null) {
+                this.nativePrompt = { turnId: nativeTurnId, promptId: this.promptId };
+            }
             this.acceptPrompt(this.promptId ?? undefined);
         }
         for (const event of events) {
-            this.emit(event);
+            if (event.type === 'turn.done' && this.nativePrompt !== null && event.native?.turnId === this.nativePrompt.turnId) {
+                const promptId = this.nativePrompt.promptId;
+                this.nativePrompt = null;
+                this.emit({ ...event, promptId });
+            } else {
+                this.emit(event);
+            }
         }
-        if (this.turnUnnamed && this.protocol.turnId !== null) {
+        if (this.turnUnnamed && nativeTurnId !== null) {
             this.turnUnnamed = false;
             if (this.interruptOwed) {
                 this.interruptOwed = false;
@@ -407,11 +418,12 @@ export class CodexBackend implements ChatBackend {
     }
 
     private emit(event: BackendEvent): void {
-        // A turn that ended or never started leaves no stop for the next one to take.
-        if (event.type === 'turn.done' || event.type === 'failed' || event.type === 'exit') {
+        // An older autonomous turn can finish while the next prompt still waits for its own turn/started.
+        if ((event.type === 'turn.done' && (!this.turnUnnamed || event.promptId !== undefined)) || event.type === 'failed' || event.type === 'exit') {
             this.turnUnnamed = false;
             this.interruptOwed = false;
             this.promptId = null;
+            this.nativePrompt = null;
         }
         if (event.type === 'image.generated' || this.imageWrites !== null) {
             const pending = (this.imageWrites ?? Promise.resolve()).then(async () => {
