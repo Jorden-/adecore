@@ -285,3 +285,10 @@ test('precomputed variable values render in occurrence order and require the mat
     expect(() => template.render(() => 'a', [])).toThrow(RangeError);
     expect(() => template.render(() => 'a', ['x', 'y', 'z'])).toThrow(RangeError);
 });
+
+test('indentation keeps a trailing empty child inside its parent', () => {
+    const parsed = indentSnippet(parseSnippet('${1:foo\n$2}'), '  ');
+    expect(parsed.fields!.find((field) => field.index === 1)!.ranges[0]).toMatchObject({ start: 0, end: 6 });
+    expect(parsed.fields!.find((field) => field.index === 2)!.ranges[0]).toMatchObject({ start: 6, end: 6, parents: [1] });
+    expect(parsed.stops.find((stop) => stop.index === 1)).toMatchObject({ start: 0, end: 6 });
+});

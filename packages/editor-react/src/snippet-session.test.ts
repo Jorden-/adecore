@@ -698,3 +698,17 @@ test('an aborted incomplete refresh cannot close its newer refresh', async () =>
     replies[0]!();
     replies[1]!();
 });
+
+test('replacing an indented parent removes its trailing empty child', async () => {
+    const mounted = await completion('  fo', '${1:foo\n$2}', false, 2);
+    mounted.editor.setCaret({ line: 0, character: 4 });
+    mounted.language.completion.invoke();
+    mounted.timers.advance(1);
+    await new Promise<void>((done) => setImmediate(done));
+    expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('foo\n  ');
+    mounted.type('new');
+    mounted.press('Tab');
+    expect(mounted.editor.getText()).toBe('  new');
+    expect(mounted.language.snippets.isActive).toBe(false);
+    expect(mounted.editor.getCaret()).toEqual({ line: 0, character: 5 });
+});

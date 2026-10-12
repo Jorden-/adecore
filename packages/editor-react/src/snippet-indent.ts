@@ -26,22 +26,33 @@ export function indentSnippet(parsed: ParsedSnippet, before: string): ParsedSnip
         }
         return offset + low * prefix.length;
     };
-    const range = <Range extends SnippetRange>(range: Range): Range => ({
+    const childStarts = new Map<number, Set<number>>();
+    for (const field of parsed.fields ?? []) {
+        for (const child of [...field.ranges, ...(field.linked ?? [])]) {
+            for (const parent of child.parents ?? []) {
+                const starts = childStarts.get(parent) ?? new Set<number>();
+                starts.add(child.start);
+                childStarts.set(parent, starts);
+            }
+        }
+    }
+    const range = <Range extends SnippetRange>(range: Range, index?: number): Range => ({
         ...range,
         start: shift(range.start),
-        end: shift(range.end, range.start === range.end)
+        // A child at the newline must remain contained even though other ranges exclude the next prefix.
+        end: shift(range.end, range.start === range.end || (index !== undefined && childStarts.get(index)?.has(range.end) === true))
     });
     return {
         text: parsed.text.replace(/\n/g, '\n' + prefix),
-        stops: parsed.stops.map(range),
-        ...(parsed.transforms === undefined ? {} : { transforms: parsed.transforms.map(range) }),
+        stops: parsed.stops.map((stop) => range(stop, stop.index)),
+        ...(parsed.transforms === undefined ? {} : { transforms: parsed.transforms.map((transform) => range(transform)) }),
         ...(parsed.fields === undefined
             ? {}
             : {
                   fields: parsed.fields.map((field) => ({
                       ...field,
-                      ranges: field.ranges.map(range),
-                      ...(field.linked === undefined ? {} : { linked: field.linked.map(range) })
+                      ranges: field.ranges.map((child) => range(child, field.index)),
+                      ...(field.linked === undefined ? {} : { linked: field.linked.map((child) => range(child, field.index)) })
                   }))
               })
     };
