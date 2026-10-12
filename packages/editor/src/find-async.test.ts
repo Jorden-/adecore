@@ -170,7 +170,7 @@ test('preview waits for marks and retains only the captures of the current match
     expect(host.find.currentMatch).toBeNull();
     host.fire(50);
     await flush();
-    expect(host.captures[1]!.range).toEqual({ from: 5, to: 9 });
+    expect(host.captures[1]!.range).toMatchObject({ from: 5, to: 9 });
     host.captures[1]!.result.resolve(null);
     await flush();
     host.find.dispose();
@@ -236,7 +236,7 @@ test('large documents require an explicit step, while medium documents debounce'
     await flush();
     large.reply([]);
     await flush();
-    expect(large.find.state).toEqual({ count: 0, current: null, large: true });
+    expect(large.find.state).toEqual({ count: 0, current: null });
     large.find.dispose();
 });
 
@@ -333,8 +333,85 @@ test('a capture timeout is visible and does not trigger an automatic retry', asy
     await flush();
     host.captures[0]!.result.reject(new EditorSearchError('timeout', 'capture deadline'));
     expect(await capture).toBeNull();
-    expect(host.find.state.failed).toBe('timeout');
+    expect(host.find.state.failed).toBeUndefined();
+    expect(host.find.state.captureFailed).toBe('timeout');
+    host.find.step(1);
+    expect(host.find.state.current).toBe(1);
+    expect(host.searches).toHaveLength(1);
     host.find.setPreview(true);
     expect(host.timers.filter((timer) => !timer.cancelled)).toHaveLength(0);
     host.find.dispose();
+});
+
+test('repeated explicit steps wait for the same search and keep the latest direction', async () => {
+    const host = setup();
+    host.model.setSelections([{ anchor: 5, head: 5 }]);
+    host.find.set(query);
+    host.fire(0);
+    await flush();
+    host.find.step(1);
+    host.find.step(-1);
+    host.find.step(-1);
+    expect(host.searches).toHaveLength(1);
+    expect(host.timers.filter((timer) => !timer.cancelled)).toHaveLength(0);
+    host.reply();
+    await flush();
+    expect(host.find.state.current).toBe(0);
+    expect(host.counts().cancelled).toBe(0);
+    host.find.dispose();
+});
+
+test('a command cannot be displaced by live queries or preview lookups', async () => {
+    const host = setup();
+    const queue = new FindSearchQueue(host.options);
+    const command = deferred<number>();
+    const order: string[] = [];
+    const first = queue.request(async () => {
+        order.push('command');
+        return command.promise;
+    }, 'command');
+    await flush();
+    const preview = queue
+        .request(async () => {
+            order.push('preview');
+            return 2;
+        }, 'preview')
+        .catch((error: EditorSearchError) => error.kind);
+    const live = queue.request(async () => {
+        order.push('live');
+        return 3;
+    }, 'live');
+    expect(await preview).toBe('superseded');
+    expect(host.timers.filter((timer) => !timer.cancelled)).toHaveLength(0);
+    command.resolve(1);
+    expect(await first).toBe(1);
+    expect(await live).toBe(3);
+    expect(order).toEqual(['command', 'live']);
+    queue.dispose();
+});
+
+test('release rejects an active multi-page job and prevents its later client calls', async () => {
+    const host = setup();
+    const queue = new FindSearchQueue(host.options);
+    const betweenPages = deferred<void>();
+    let currentAfterRelease = true;
+    const result = queue
+        .request(async (client, isCurrent) => {
+            await client.search({ revision: 0, text: 'word' }, query);
+            await betweenPages.promise;
+            currentAfterRelease = isCurrent();
+            await client.search({ revision: 0, text: 'word' }, query);
+            return 1;
+        }, 'command')
+        .catch((error: EditorSearchError) => error.kind);
+    await flush();
+    host.reply([0, 4]);
+    await flush();
+    queue.release();
+    expect(await result).toBe('superseded');
+    betweenPages.resolve();
+    await flush();
+    expect(currentAfterRelease).toBe(false);
+    expect(host.searches).toHaveLength(1);
+    queue.dispose();
 });

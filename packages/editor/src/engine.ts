@@ -1,4 +1,4 @@
-import { changedSpans, DocumentModel, type EditorSnapshot, type FoldHints, replacementText } from '@adecore/editor-core';
+import { changedSpans, DocumentModel, type EditorSnapshot, type FoldHints } from '@adecore/editor-core';
 import { GrammarPreparation } from './grammar-preparation.ts';
 import { InputController } from './controller.ts';
 import { resolveSmartKeys } from './smart-keys.ts';
@@ -423,7 +423,7 @@ class SmartEditor implements Editor {
         }
         try {
             // The next match is looked for after what was written, or a replacement that holds the query would find itself again.
-            find.pendingAnchor = match.from + replacementText(this.model.getText(), match, replacement, false, replaceOptions.preserveCase).length;
+            find.pendingAnchor = match.to;
             if (!this.model.replace(match, replacement, { preserveCase: replaceOptions.preserveCase })) {
                 find.pendingAnchor = undefined;
                 return false;

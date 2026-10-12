@@ -6,10 +6,14 @@ export interface FindSearchOptions {
     readonly now?: () => number;
 }
 
+type SearchKind = 'live' | 'preview' | 'command';
+
 interface SearchJob {
-    readonly run: (client: EditorSearchClient) => Promise<unknown>;
+    readonly kind: SearchKind;
+    readonly run: (client: EditorSearchClient, isCurrent: () => boolean) => Promise<unknown>;
     readonly resolve: (value: unknown) => void;
     readonly reject: (error: unknown) => void;
+    cancelled: boolean;
 }
 
 export function scheduleFind(callback: () => void, delay: number): () => void {
@@ -17,11 +21,15 @@ export function scheduleFind(callback: () => void, delay: number): () => void {
     return () => clearTimeout(timer);
 }
 
-/* Short requests finish on the existing worker; only a long obsolete request is terminated. */
+function superseded(): EditorSearchError {
+    return new EditorSearchError('superseded', 'The find operation is no longer current.');
+}
+
+/* Commands finish atomically; short background requests reuse the worker before newer work starts. */
 export class FindSearchQueue {
     private client: EditorSearchClient | null | undefined;
     private active: SearchJob | undefined;
-    private pending: SearchJob | undefined;
+    private pending: SearchJob[] = [];
     private cancelTimer: (() => void) | undefined;
     private started = 0;
     private disposed = false;
@@ -32,55 +40,83 @@ export class FindSearchQueue {
         this.options = options;
     }
 
-    request<Result>(run: (client: EditorSearchClient) => Promise<Result>): Promise<Result> {
+    request<Result>(run: (client: EditorSearchClient, isCurrent: () => boolean) => Promise<Result>, kind: SearchKind = 'live'): Promise<Result> {
         if (this.disposed) {
             return Promise.reject(new EditorSearchError('disposed', 'The find session was disposed.'));
         }
         return new Promise((resolve, reject) => {
-            this.pending?.reject(new EditorSearchError('superseded', 'A newer find operation is waiting.'));
-            this.pending = { run, resolve: (value) => resolve(value as Result), reject };
+            this.pending = this.pending.filter((job) => {
+                if (job.kind !== 'command' && (job.kind === kind || (kind !== 'preview' && job.kind === 'preview'))) {
+                    job.cancelled = true;
+                    job.reject(superseded());
+                    return false;
+                }
+                return true;
+            });
+            this.pending.push({ kind, run, resolve: (value) => resolve(value as Result), reject, cancelled: false });
+            this.pending.sort((left, right) => priority(left.kind) - priority(right.kind));
             if (this.active === undefined) {
                 this.pump();
-            } else if (this.cancelTimer === undefined) {
-                const elapsed = this.now() - this.started;
+            } else if (kind !== 'preview' && this.active.kind !== 'command' && this.cancelTimer === undefined) {
                 this.cancelTimer = (this.options.schedule ?? scheduleFind)(
                     () => {
                         this.cancelTimer = undefined;
-                        if (this.pending !== undefined) {
+                        if (this.pending.length > 0 && this.active !== undefined && this.active.kind !== 'command') {
+                            this.active.cancelled = true;
+                            this.active.reject(superseded());
                             this.client?.cancel();
                         }
                     },
-                    Math.max(0, 200 - elapsed)
+                    Math.max(0, 200 - (this.now() - this.started))
                 );
             }
         });
     }
 
     private now(): number {
-        return (this.options.now ?? (() => performance.now()))();
+        return this.options.now?.() ?? performance.now();
     }
 
     private pump(): void {
-        const job = this.pending;
-        if (job === undefined || this.disposed || this.active !== undefined) {
+        if (this.disposed || this.active !== undefined) {
             return;
         }
-        this.pending = undefined;
+        const job = this.pending.shift();
+        if (job === undefined) {
+            return;
+        }
         this.active = job;
         this.started = this.now();
         const epoch = this.epoch;
+        const isCurrent = (): boolean => !this.disposed && epoch === this.epoch && !job.cancelled;
         void Promise.resolve()
             .then(() => {
-                if (epoch !== this.epoch || this.disposed) {
-                    throw new EditorSearchError('superseded', 'The find session ended before this request started.');
+                if (!isCurrent()) {
+                    throw superseded();
                 }
                 this.client ??= this.options.createClient();
                 if (this.client === null) {
                     throw new EditorSearchError('unavailable', 'Regex search needs a search worker.');
                 }
-                return job.run(this.client);
+                const client = this.client;
+                const guarded: EditorSearchClient = {
+                    search: (...args) => (isCurrent() ? client.search(...args) : Promise.reject(superseded())),
+                    match: (...args) => (isCurrent() ? client.match(...args) : Promise.reject(superseded())),
+                    next: (...args) => (isCurrent() ? client.next(...args) : Promise.reject(superseded())),
+                    replacements: (...args) => (isCurrent() ? client.replacements(...args) : Promise.reject(superseded())),
+                    cancel: () => client.cancel(),
+                    release: () => client.release(),
+                    dispose: () => client.dispose()
+                };
+                return job.run(guarded, isCurrent);
             })
-            .then(job.resolve, job.reject)
+            .then((value) => {
+                if (isCurrent()) {
+                    job.resolve(value);
+                } else {
+                    job.reject(superseded());
+                }
+            }, job.reject)
             .finally(() => {
                 this.active = undefined;
                 this.cancelTimer?.();
@@ -91,8 +127,12 @@ export class FindSearchQueue {
 
     release(): void {
         this.epoch++;
-        this.pending?.reject(new EditorSearchError('superseded', 'The find session ended.'));
-        this.pending = undefined;
+        this.active?.reject(superseded());
+        for (const job of this.pending) {
+            job.cancelled = true;
+            job.reject(superseded());
+        }
+        this.pending = [];
         this.cancelTimer?.();
         this.cancelTimer = undefined;
         this.client?.release();
@@ -104,4 +144,8 @@ export class FindSearchQueue {
         this.client?.dispose();
         this.client = undefined;
     }
+}
+
+function priority(kind: SearchKind): number {
+    return kind === 'command' ? 0 : kind === 'live' ? 1 : 2;
 }

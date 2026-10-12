@@ -41,6 +41,8 @@ export class FindController {
     private epoch = 0;
     private searching = false;
     private failed: EditorFindState['failed'];
+    private captureFailed: EditorFindState['captureFailed'];
+    private pendingStep: 1 | -1 | undefined;
     private cancelSearch: (() => void) | undefined;
     private cancelMatch: (() => void) | undefined;
     private preview = false;
@@ -75,7 +77,8 @@ export class FindController {
             ...(this.cache?.complete === false || (this.failed === undefined && this.regexCache?.complete === false) ? { limited: true } : {}),
             ...(this.searching ? { searching: true } : {}),
             ...(this.failed === undefined ? {} : { failed: this.failed }),
-            ...(this.search !== undefined && this.query?.regex && this.model.getLength() > LIVE_REGEX_LIMIT ? { large: true } : {}),
+            ...(this.captureFailed === undefined ? {} : { captureFailed: this.captureFailed }),
+            ...(this.search !== undefined && this.query?.regex && this.model.getLength() > LIVE_REGEX_LIMIT && !this.freshRegex ? { large: true } : {}),
             ...(this.query?.inSelection === true && this.bounds === null ? { noSelection: true } : {})
         };
     }
@@ -146,6 +149,7 @@ export class FindController {
 
     /* A new query, or null to end the find. */
     set(query: EditorFindQuery | null): void {
+        const oldKey = this.cacheKey();
         const wasInSelection = this.query?.inSelection === true;
         this.query = query === null || query.text === '' ? null : { ...query };
         if (this.query?.inSelection !== true) {
@@ -157,11 +161,18 @@ export class FindController {
                     ? null
                     : { from: Math.min(selection.anchor, selection.head), to: Math.max(selection.anchor, selection.head) };
         }
+        if (this.cacheKey() !== oldKey) {
+            this.pendingAnchor = undefined;
+            this.pendingStep = undefined;
+        }
         this.refresh();
     }
 
     /* The text of a search in the selection moved with an edit. */
     mapBounds(changes: readonly DocumentChange[]): void {
+        if (this.pendingAnchor !== undefined) {
+            this.pendingAnchor = mapOffset(this.pendingAnchor, changes);
+        }
         if (this.bounds !== null) {
             this.bounds = { from: mapOffset(this.bounds.from, changes), to: mapOffset(this.bounds.to, changes) };
         }
@@ -217,7 +228,10 @@ export class FindController {
 
     step(direction: 1 | -1): void {
         if (this.search !== undefined && this.query?.regex && !this.freshRegex) {
-            this.startRegex(true);
+            this.pendingStep = direction;
+            if (!this.searching) {
+                this.startRegex(true);
+            }
             return;
         }
         const count = this.marks.length;
@@ -245,6 +259,7 @@ export class FindController {
         this.retained = null;
         this.searching = false;
         this.failed = undefined;
+        this.captureFailed = undefined;
         if (release) {
             this.search?.release();
         }
@@ -291,12 +306,15 @@ export class FindController {
             () => {
                 this.cancelSearch = undefined;
                 const snapshot = this.snapshot();
-                void this.search!.request((client) => {
-                    if (epoch !== this.epoch || this.disposed) {
-                        throw new EditorSearchError('superseded', 'The find query changed.');
-                    }
-                    return client.search(snapshot, query, { ...this.scope, maxResults: FIND_LIMIT });
-                })
+                void this.search!.request(
+                    (client) => {
+                        if (epoch !== this.epoch || this.disposed) {
+                            throw new EditorSearchError('superseded', 'The find query changed.');
+                        }
+                        return client.search(snapshot, query, { ...this.scope, maxResults: FIND_LIMIT, ...(explicit ? { deadline: 10000 } : {}) });
+                    },
+                    explicit ? 'command' : 'live'
+                )
                     .then((result) => {
                         if (epoch !== this.epoch || revision !== this.model.getRevision() || this.disposed) {
                             return;
@@ -310,22 +328,33 @@ export class FindController {
                         const selection = this.model.getPrimary();
                         const anchor = this.pendingAnchor ?? Math.min(selection.anchor, selection.head);
                         this.pendingAnchor = undefined;
+                        const direction = this.pendingStep;
+                        this.pendingStep = undefined;
                         this.index =
                             marks.length === 0
                                 ? null
-                                : Math.max(
-                                      0,
-                                      marks.findIndex((mark) => mark.from >= anchor)
-                                  );
+                                : direction === -1
+                                  ? (marks.findLastIndex((mark) => mark.from < anchor) + marks.length) % marks.length
+                                  : Math.max(
+                                        0,
+                                        marks.findIndex((mark) => mark.from >= anchor)
+                                    );
                         this.searching = false;
                         this.options?.changed();
                         this.preparePreview();
                     })
                     .catch((error) => {
-                        if (epoch !== this.epoch || this.disposed || (error instanceof EditorSearchError && error.kind === 'superseded')) {
+                        if (epoch !== this.epoch || this.disposed) {
                             return;
                         }
                         this.searching = false;
+                        if (error instanceof EditorSearchError && error.kind === 'superseded') {
+                            this.options?.changed();
+                            this.startRegex(this.pendingStep !== undefined);
+                            return;
+                        }
+                        this.pendingAnchor = undefined;
+                        this.pendingStep = undefined;
                         this.failed =
                             error instanceof EditorSearchError
                                 ? error.kind === 'syntax'
@@ -358,7 +387,14 @@ export class FindController {
     private preparePreview(): void {
         this.cancelMatch?.();
         this.cancelMatch = undefined;
-        if (this.preview && this.search !== undefined && this.query?.regex && this.freshRegex && this.currentMatch === null) {
+        if (
+            this.preview &&
+            this.search !== undefined &&
+            this.query?.regex &&
+            this.freshRegex &&
+            this.currentMatch === null &&
+            this.captureFailed === undefined
+        ) {
             this.cancelMatch = (this.options?.schedule ?? scheduleFind)(() => {
                 this.cancelMatch = undefined;
                 void this.ensureMatch().catch(() => {});
@@ -388,17 +424,18 @@ export class FindController {
                 if (!current()) {
                     throw new EditorSearchError('superseded', 'The current find match changed.');
                 }
-                return client.match(snapshot, query, mark);
-            });
+                return client.match(snapshot, query, { ...mark, deadline: 10000 });
+            }, 'preview');
             if (!current()) {
                 return null;
             }
             this.retained = found;
+            this.captureFailed = undefined;
             this.options?.changed();
             return found;
         } catch (error) {
             if (current() && !(error instanceof EditorSearchError && error.kind === 'superseded')) {
-                this.failed = error instanceof EditorSearchError && (error.kind === 'timeout' || error.kind === 'unavailable') ? error.kind : 'error';
+                this.captureFailed = error instanceof EditorSearchError && (error.kind === 'timeout' || error.kind === 'unavailable') ? error.kind : 'error';
                 this.options?.changed();
             }
             return null;

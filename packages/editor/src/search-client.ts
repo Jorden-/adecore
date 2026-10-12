@@ -37,7 +37,11 @@ export interface EditorSearchClientOptions {
 export interface EditorSearchClient {
     /* One document per client; a revision must identify the same immutable text for its lifetime. */
     search(snapshot: EditorSearchSnapshot, query: EditorFindQuery, options?: EditorSearchOptions): Promise<EditorSearchResult>;
-    match(snapshot: EditorSearchSnapshot, query: EditorFindQuery, range: { readonly from: number; readonly to: number }): Promise<FindMatch | null>;
+    match(
+        snapshot: EditorSearchSnapshot,
+        query: EditorFindQuery,
+        range: { readonly from: number; readonly to: number; readonly deadline?: number }
+    ): Promise<FindMatch | null>;
     next(snapshot: EditorSearchSnapshot, query: EditorFindQuery, offset: number, options?: EditorSearchNextOptions): Promise<EditorSearchRange | null>;
     replacements(
         snapshot: EditorSearchSnapshot,
@@ -54,6 +58,7 @@ export interface EditorSearchClient {
 type SearchReply = Exclude<EditorSearchOutput, { type: 'ready' | 'error' }>;
 
 interface Request {
+    readonly deadline: number;
     readonly message: EditorSearchInput;
     readonly resolve: (result: SearchReply) => void;
     readonly reject: (error: EditorSearchError) => void;
@@ -78,6 +83,9 @@ function validateSearch(snapshot: EditorSearchSnapshot, query: EditorFindQuery, 
     }
     if (!Number.isInteger(maximum) || maximum < 0 || maximum > SEARCH_LIMIT) {
         throw new EditorSearchError('range', `Search results must be limited to ${SEARCH_LIMIT} matches or fewer.`);
+    }
+    if (options.deadline !== undefined && (!Number.isFinite(options.deadline) || options.deadline <= 0 || options.deadline > 2147483647)) {
+        throw new EditorSearchError('range', 'A request deadline must fit a positive browser timer.');
     }
     if (query.regex) {
         try {
@@ -214,7 +222,7 @@ export function createSearchClient(options: EditorSearchClientOptions): EditorSe
         active = request;
         try {
             const target = startWorker();
-            cancelTimer = schedule(() => fail(request, new EditorSearchError('timeout', 'The search exceeded its time limit.')), deadline);
+            cancelTimer = schedule(() => fail(request, new EditorSearchError('timeout', 'The search exceeded its time limit.')), request.deadline);
             const { text, ...input } = request.message;
             const message: EditorSearchInput = { ...input, ...(revision !== input.revision ? { text } : {}) };
             revision = input.revision;
@@ -255,6 +263,7 @@ export function createSearchClient(options: EditorSearchClientOptions): EditorSe
         return new Promise((resolve, reject) => {
             pending = {
                 message: input(++nextId),
+                deadline: bounds.deadline ?? deadline,
                 reject,
                 resolve(reply) {
                     try {
@@ -300,7 +309,7 @@ export function createSearchClient(options: EditorSearchClientOptions): EditorSe
             return run(
                 snapshot,
                 query,
-                { from, to, maxResults: 1 },
+                { from, to, maxResults: 1, deadline: range.deadline },
                 (id) => ({ type: 'match', id, revision: snapshot.revision, text, query: { ...query }, from, to }),
                 (reply) => {
                     if (reply.type !== 'match') {
@@ -320,7 +329,7 @@ export function createSearchClient(options: EditorSearchClientOptions): EditorSe
             return run(
                 snapshot,
                 query,
-                { from: bounds.from, to: bounds.to, maxResults: 1 },
+                { from: bounds.from, to: bounds.to, maxResults: 1, deadline: bounds.deadline },
                 (id) => ({ type: 'next', id, revision: snapshot.revision, text: snapshot.text, query: { ...query }, offset, ...bounds }),
                 (reply) => {
                     if (reply.type !== 'next') {
@@ -350,7 +359,7 @@ export function createSearchClient(options: EditorSearchClientOptions): EditorSe
             return run(
                 snapshot,
                 query,
-                { from, to, maxResults: 1 },
+                { from, to, maxResults: 1, deadline: options.deadline },
                 (id) => ({
                     type: 'replacements',
                     id,
@@ -373,13 +382,22 @@ export function createSearchClient(options: EditorSearchClientOptions): EditorSe
                     }
                     let characters = 0;
                     let previous = from ?? 0;
+                    let previousEmpty = false;
                     for (let index = 0; index < reply.ranges.length; index += 3) {
                         const start = reply.ranges[index]!,
                             end = reply.ranges[index + 1]!;
-                        if (start < previous || end < start || end > (to ?? snapshot.text.length)) {
+                        if (
+                            start < previous ||
+                            (previousEmpty && start === previous) ||
+                            end < start ||
+                            end > (to ?? snapshot.text.length) ||
+                            splitsSurrogate(snapshot.text, start) ||
+                            splitsSurrogate(snapshot.text, end)
+                        ) {
                             throw new EditorSearchError('error', 'The worker returned invalid replacement bounds.');
                         }
                         previous = end;
+                        previousEmpty = start === end;
                         characters += reply.ranges[index + 2]!;
                     }
                     if (characters !== reply.text.length) {

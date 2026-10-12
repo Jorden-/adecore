@@ -475,3 +475,21 @@ for (const range of [
         host.client.dispose();
     });
 }
+
+test('an explicit request can override the default deadline without changing later searches', async () => {
+    const host = setup();
+    const first = host.client.search(snapshot, query, { deadline: 10000 });
+    await Promise.resolve();
+    expect(host.timers[0]!.delay).toBe(10000);
+    host.result();
+    await first;
+    const next = host.client.search(snapshot, query);
+    await Promise.resolve();
+    expect(host.timers[1]!.delay).toBe(1500);
+    host.result();
+    await next;
+    for (const deadline of [0, -1, Infinity, 2147483648]) {
+        expect((await caught(host.client.search(snapshot, query, { deadline }))).kind).toBe('range');
+    }
+    host.client.dispose();
+});

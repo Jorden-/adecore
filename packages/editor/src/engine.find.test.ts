@@ -283,3 +283,16 @@ test('limited replace-all performs one full run while an empty selection replace
         search.mockRestore();
     }
 });
+
+test('the replacement anchor maps once and does not skip an adjacent match', () => {
+    const { editor } = setup({ text: 'a a' });
+    let state: EditorFindState = { count: 0, current: null };
+    editor.onFind((value) => {
+        state = value;
+    });
+    editor.find({ text: 'a', caseSensitive: false, wholeWord: false, regex: false });
+    expect(editor.replace('aaa')).toBe(true);
+    expect(editor.getText()).toBe('aaa a');
+    expect(state.current).toBe(3);
+    editor.dispose();
+});

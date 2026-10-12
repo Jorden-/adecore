@@ -455,6 +455,7 @@ export interface EditorFindState {
     readonly limited?: boolean;
     readonly searching?: boolean;
     readonly failed?: 'invalid' | 'timeout' | 'unavailable' | 'error';
+    readonly captureFailed?: 'timeout' | 'unavailable' | 'error';
     /* Regex searches in large documents start only on an explicit step. */
     readonly large?: boolean;
 }

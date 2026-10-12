@@ -11,6 +11,8 @@ export interface EditorSearchSnapshot {
 }
 
 export interface EditorSearchOptions {
+    /* Milliseconds including startup and snapshot posting; overrides the client deadline. */
+    readonly deadline?: number;
     readonly from?: number;
     readonly to?: number;
     readonly maxResults?: number;
@@ -29,6 +31,7 @@ export interface EditorSearchRange {
 }
 
 export interface EditorSearchNextOptions {
+    readonly deadline?: number;
     readonly from?: number;
     readonly to?: number;
     readonly backwards?: boolean;
@@ -36,6 +39,7 @@ export interface EditorSearchNextOptions {
 }
 
 export interface EditorSearchReplacementOptions {
+    readonly deadline?: number;
     readonly from?: number;
     readonly to?: number;
     readonly preserveCase?: boolean;
