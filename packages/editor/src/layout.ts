@@ -1,5 +1,7 @@
 import type { DocumentChange, Position } from '@adecore/editor-core';
 
+import { offsetOfStop, rowOfStop, stopAtOffset, stopCount, xOfStop } from './geometry-stops.ts';
+import { uniformGeometry } from './uniform-geometry.ts';
 import { lineChangeMapper } from './layout-changes.ts';
 
 export type Affinity = 'before' | 'after';
@@ -126,7 +128,7 @@ export interface LineGeometry {
     end: number;
     next: number;
     text: string;
-    /* UTF-16 offsets into the line at which a character begins, then the line's length. */
+    /* Uniform ASCII rows share x prefixes instead of allocating these four arrays per character. */
     offsets: number[];
     /* The x of each stop before and after the inlays that sit on it. */
     before: number[];
@@ -137,6 +139,9 @@ export interface LineGeometry {
     rowStarts: number[];
     /* The x each visual line ends at. */
     rowEnds: number[];
+    /* The furthest stop a greedy wrap decision read, including its lookahead. */
+    rowTriggers: number[];
+    uniform?: { first: readonly number[]; continuation: readonly number[] };
     runs: TextRun[];
     inlays: InlineBox[];
     subRows: number;
@@ -162,20 +167,6 @@ const GEOMETRY_CACHE_SIZE = 400;
 const PLAIN = /^[\x20-\x7e\t]*$/;
 const GRAPHEME_LIMIT = 20000;
 const SEGMENTER = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
-
-function lowerBound(values: readonly number[], value: number): number {
-    let low = 0;
-    let high = values.length;
-    while (low < high) {
-        const middle = (low + high) >>> 1;
-        if (values[middle]! < value) {
-            low = middle + 1;
-        } else {
-            high = middle;
-        }
-    }
-    return low;
-}
 
 /* Where each character starts, with the length last. A very long line is cut by code unit, since splitting it by grapheme would cost more than it shows. */
 function characterOffsets(text: string): number[] {
@@ -221,20 +212,22 @@ export function wrapIndent(text: string, metrics: LayoutMetrics, limit: number):
  * The stops at which a wrapped line starts a new visual line, after the space a word ends in when
  * there is one on the visual line and in the middle of a word when there is not.
  */
-export function wrapStops(text: string, offsets: readonly number[], metrics: LayoutMetrics, limit: number): number[] {
+function wrapRows(text: string, offsets: readonly number[] | null, metrics: LayoutMetrics, limit: number): { breaks: number[]; triggers: number[] } {
     const indent = wrapIndent(text, metrics, limit);
     const breaks: number[] = [];
-    const count = offsets.length - 1;
+    const triggers: number[] = [];
+    const count = offsets === null ? text.length : offsets.length - 1;
     let rowStart = 0;
     let opportunity = -1;
     let x = 0;
     let index = 0;
     while (index < count) {
-        const character = text.slice(offsets[index]!, offsets[index + 1]!);
+        const character = offsets === null ? text[index]! : text.slice(offsets[index]!, offsets[index + 1]!);
         const width = characterWidth(metrics, character, x);
         if (index > rowStart && x + width > limit && !isSpace(character)) {
             const target = opportunity > rowStart ? opportunity : index;
             breaks.push(target);
+            triggers.push(index);
             rowStart = target;
             opportunity = -1;
             x = indent;
@@ -242,16 +235,21 @@ export function wrapStops(text: string, offsets: readonly number[], metrics: Lay
             continue;
         }
         x += width;
-        if (isSpace(character) && index + 1 < count && !isSpace(text[offsets[index + 1]!])) {
+        if (isSpace(character) && index + 1 < count && !isSpace(text[offsets === null ? index + 1 : offsets[index + 1]!])) {
             opportunity = index + 1;
         }
         index++;
     }
-    return breaks;
+    triggers.push(count);
+    return { breaks, triggers };
+}
+
+export function wrapStops(text: string, offsets: readonly number[], metrics: LayoutMetrics, limit: number): number[] {
+    return wrapRows(text, offsets, metrics, limit).breaks;
 }
 
 /* A line of text laid out against its metrics; wrapped at `limit` pixels unless that is null. */
-export function scanLine(
+export function scanDenseLine(
     line: { start: number; end: number; text: string; next?: number },
     metrics: LayoutMetrics,
     limit: number | null,
@@ -259,7 +257,8 @@ export function scanLine(
 ): LineGeometry {
     const text = line.text;
     const offsets = characterOffsets(text);
-    const breakStops = limit === null ? [] : wrapStops(text, offsets, metrics, limit);
+    const wrapped = limit === null ? { breaks: [], triggers: [offsets.length - 1] } : wrapRows(text, offsets, metrics, limit);
+    const breakStops = wrapped.breaks;
     const indent = limit === null ? 0 : wrapIndent(text, metrics, limit);
     const geometry: LineGeometry = {
         start: line.start,
@@ -272,6 +271,7 @@ export function scanLine(
         rowOf: [],
         rowStarts: [0],
         rowEnds: [],
+        rowTriggers: wrapped.triggers,
         runs: [],
         inlays: [],
         subRows: breakStops.length + 1,
@@ -328,6 +328,22 @@ export function scanLine(
         geometry.width = Math.max(geometry.width, end);
     }
     return geometry;
+}
+
+export function scanLine(
+    line: { start: number; end: number; text: string; next?: number },
+    metrics: LayoutMetrics,
+    limit: number | null,
+    lineInlays: readonly Inlay[]
+): LineGeometry {
+    if (limit !== null && line.text.length > GRAPHEME_LIMIT && lineInlays.length === 0 && /^[\x20-\x7e]*$/.test(line.text)) {
+        const wrapped = wrapRows(line.text, null, metrics, limit);
+        const geometry = uniformGeometry(line, metrics, wrapped.breaks, wrapped.triggers, wrapIndent(line.text, metrics, limit));
+        if (geometry !== null) {
+            return geometry;
+        }
+    }
+    return scanDenseLine(line, metrics, limit, lineInlays);
 }
 
 export interface LayoutConfig {
@@ -631,7 +647,7 @@ export class EditorLayout {
         while (stop < geometry.text.length && isSpace(geometry.text[stop])) {
             stop++;
         }
-        return TEXT_PADDING + geometry.before[Math.min(stop, geometry.before.length - 1)]!;
+        return TEXT_PADDING + xOfStop(geometry, Math.min(stop, stopCount(geometry) - 1));
     }
 
     rowForLine(line: number): LayoutRow {
@@ -687,11 +703,11 @@ export class EditorLayout {
     }
 
     private stopOf(geometry: LineGeometry, offset: number): number {
-        return Math.min(geometry.offsets.length - 1, lowerBound(geometry.offsets, Math.max(0, offset - geometry.start)));
+        return stopAtOffset(geometry, Math.max(0, offset - geometry.start));
     }
 
     xAt(geometry: LineGeometry, offset: number, affinity: Affinity = 'after'): number {
-        return TEXT_PADDING + geometry[affinity][this.stopOf(geometry, offset)]!;
+        return TEXT_PADDING + xOfStop(geometry, this.stopOf(geometry, offset), affinity);
     }
 
     /*
@@ -706,20 +722,20 @@ export class EditorLayout {
             }
         }
         const first = geometry.rowStarts[subRow] ?? 0;
-        const last = subRow + 1 < geometry.rowStarts.length ? geometry.rowStarts[subRow + 1]! : geometry.offsets.length - 1;
+        const last = subRow + 1 < geometry.rowStarts.length ? geometry.rowStarts[subRow + 1]! : stopCount(geometry) - 1;
         const wrapped = subRow + 1 < geometry.rowStarts.length;
         let best = first;
-        let distance = Math.abs(local - geometry.before[first]!);
+        let distance = Math.abs(local - xOfStop(geometry, first));
         // The stop that starts the next visual line stands in for the end of this one.
         for (let stop = first + 1; stop <= last; stop++) {
-            const edge = stop === last && wrapped ? geometry.rowEnds[subRow]! : geometry.before[stop]!;
+            const edge = stop === last && wrapped ? geometry.rowEnds[subRow]! : xOfStop(geometry, stop);
             const candidate = Math.abs(local - edge);
             if (candidate < distance) {
                 distance = candidate;
                 best = stop;
             }
         }
-        return { offset: geometry.start + geometry.offsets[best]!, rowEnd: wrapped && best === last };
+        return { offset: geometry.start + offsetOfStop(geometry, best), rowEnd: wrapped && best === last };
     }
 
     /* With `rowEnd`, an offset a wrap starts a visual line at is drawn at the end of the line before it. */
@@ -731,7 +747,7 @@ export class EditorLayout {
         }
         const geometry = this.geometry(row);
         const stop = this.stopOf(geometry, offset);
-        const subRow = geometry.rowOf[stop]!;
+        const subRow = rowOfStop(geometry, stop);
         if (rowEnd && subRow > 0 && geometry.rowStarts[subRow] === stop) {
             return {
                 x: TEXT_PADDING + geometry.rowEnds[subRow - 1]!,
@@ -740,7 +756,12 @@ export class EditorLayout {
                 height: this.metrics.lineHeight
             };
         }
-        return { x: TEXT_PADDING + geometry[affinity][stop]!, y: row.top + subRow * this.metrics.lineHeight, width: 1, height: this.metrics.lineHeight };
+        return {
+            x: TEXT_PADDING + xOfStop(geometry, stop, affinity),
+            y: row.top + subRow * this.metrics.lineHeight,
+            width: 1,
+            height: this.metrics.lineHeight
+        };
     }
 
     /* A height snapped up to the top of the visual line it is in, so a page scrolls to whole lines. */
@@ -767,10 +788,10 @@ export class EditorLayout {
         const geometry = this.geometry(row);
         const lastLine = this.document.getLine(row.lastLine);
         const hidden = position.line > row.line;
-        const subRow = hidden ? geometry.subRows - 1 : geometry.rowOf[this.stopOf(geometry, offset)]!;
+        const subRow = hidden ? geometry.subRows - 1 : rowOfStop(geometry, this.stopOf(geometry, offset));
         const last = subRow + 1 >= geometry.subRows;
-        const start = line.start + geometry.offsets[geometry.rowStarts[subRow]!]!;
-        const end = last ? lastLine.end : line.start + geometry.offsets[geometry.rowStarts[subRow + 1]!]!;
+        const start = line.start + offsetOfStop(geometry, geometry.rowStarts[subRow]!);
+        const end = last ? lastLine.end : line.start + offsetOfStop(geometry, geometry.rowStarts[subRow + 1]!);
         return { start, end, next: last ? lastLine.next : end, y: row.top + subRow * this.metrics.lineHeight };
     }
 
@@ -800,7 +821,7 @@ export class EditorLayout {
             if (from === to || from > geometry.end || to <= geometry.start) {
                 continue;
             }
-            const lastStop = geometry.offsets.length - 1;
+            const lastStop = stopCount(geometry) - 1;
             const fromStop = this.stopOf(geometry, Math.max(from, geometry.start));
             const toStop = this.stopOf(geometry, Math.min(to, geometry.end));
             const band = window === undefined ? { first: 0, last: geometry.subRows - 1 } : subRowBand(row.top, geometry.subRows, lineHeight, window);
@@ -814,8 +835,8 @@ export class EditorLayout {
                 if (first >= stop && !newline) {
                     continue;
                 }
-                const startX = first === fromStop ? geometry.after[first]! : geometry.before[first]!;
-                const endX = stop < rowEnd || last ? geometry.before[stop]! : geometry.rowEnds[subRow]!;
+                const startX = first === fromStop ? xOfStop(geometry, first, 'after') : xOfStop(geometry, first);
+                const endX = stop < rowEnd || last ? xOfStop(geometry, stop) : geometry.rowEnds[subRow]!;
                 result.push({
                     x: TEXT_PADDING + startX,
                     y: row.top + subRow * lineHeight,
@@ -859,8 +880,8 @@ export class EditorLayout {
             const geometry = this.geometry(row);
             const stop = this.stopOf(geometry, offset);
             const next = stop + direction;
-            if (next >= 0 && next < geometry.offsets.length && offset >= geometry.start && offset <= geometry.end) {
-                return geometry.start + geometry.offsets[next]!;
+            if (next >= 0 && next < stopCount(geometry) && offset >= geometry.start && offset <= geometry.end) {
+                return geometry.start + offsetOfStop(geometry, next);
             }
         }
         for (let index = row.index + direction; index >= 0 && index < this.rows.length; index += direction) {

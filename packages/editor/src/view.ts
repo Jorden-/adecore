@@ -1,3 +1,4 @@
+import { offsetOfStop, xOfStop } from './geometry-stops.ts';
 import {
     type DocumentChange,
     type DocumentModel,
@@ -1380,8 +1381,11 @@ export class EditorView {
         const geometry = this.layout.geometry(row);
         const band = subRowBand(row.top, geometry.subRows, this.layout.metrics.lineHeight, this.paintWindow);
         return {
-            from: geometry.start + geometry.offsets[geometry.rowStarts[band.first]!]!,
-            to: band.last + 1 === geometry.subRows ? this.model.getLine(row.line).next : geometry.start + geometry.offsets[geometry.rowStarts[band.last + 1]!]!
+            from: geometry.start + offsetOfStop(geometry, geometry.rowStarts[band.first]!),
+            to:
+                band.last + 1 === geometry.subRows
+                    ? this.model.getLine(row.line).next
+                    : geometry.start + offsetOfStop(geometry, geometry.rowStarts[band.last + 1]!)
         };
     }
 
@@ -1405,7 +1409,7 @@ export class EditorView {
                     signs.push({ x, y, width: this.viewportWidth - x });
                 }
                 if (subRow > 0) {
-                    signs.push({ x: 0, y, width: geometry.before[geometry.rowStarts[subRow]!]! });
+                    signs.push({ x: 0, y, width: xOfStop(geometry, geometry.rowStarts[subRow]!) });
                 }
             }
         }

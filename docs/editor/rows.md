@@ -78,3 +78,6 @@ Long wrapped lines keep their full layout and text for selection, copying and hi
 Edits retain the geometry and measured wrap height of untouched lines, including when earlier edits move a line. A changed line is measured again; lines with inlays, folded partial lines and metric or wrap-width changes take the full measurement path. Each retained line includes its CRLF ending when checking whether an edit touches it. Layout still rebuilds the document's row list, and an edit inside a long line still measures that full line.
 
 Measured wrap heights are kept for at most 400 lines in insertion order. Unwrapped lines keep no height entries. After eviction a line uses its height estimate until drawn again, so a long scroll history cannot increase the work of mapping cached measurements on each edit.
+
+
+Wrapped printable ASCII lines over 20,000 UTF-16 units, without tabs or inlays, use compact geometry. Only row boundaries, wrap triggers and text runs grow with the document. X positions share two short prefixes, preserving floating-point addition exactly. Rows longer than 4,096 characters, non-ASCII text, unwrapped lines and IME inlays use the existing dense geometry. Editing an eligible line still scans its text, but no longer builds four character arrays. Caret placement, hit testing and selection read both representations through the same geometry accessors.

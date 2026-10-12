@@ -1,3 +1,4 @@
+import { offsetOfStop, rowOfStop, stopCount, xOfStop } from './geometry-stops.ts';
 import { type AttributedLines, colorValue } from './attribution.ts';
 import {
     type BlockWidget,
@@ -609,20 +610,23 @@ export function arrowSign(document: Document, width: number, lineHeight: number,
 
 /* An arrow over each tab of a line. */
 function appendTabSigns(element: HTMLElement, geometry: LineGeometry, lineHeight: number, band: SubRowBand): void {
+    if (geometry.uniform !== undefined) {
+        return;
+    }
     const document = element.ownerDocument;
-    const end = geometry.rowStarts[band.last + 1] ?? geometry.offsets.length - 1;
+    const end = geometry.rowStarts[band.last + 1] ?? stopCount(geometry) - 1;
     for (let stop = geometry.rowStarts[band.first]!; stop < end; stop++) {
-        if (geometry.text[geometry.offsets[stop]!] !== '\t') {
+        if (geometry.text[offsetOfStop(geometry, stop)] !== '\t') {
             continue;
         }
-        const left = geometry.before[stop]!;
-        const right = geometry.rowOf[stop + 1] === geometry.rowOf[stop] ? geometry.before[stop + 1]! : geometry.rowEnds[geometry.rowOf[stop]!]!;
+        const left = xOfStop(geometry, stop);
+        const right = rowOfStop(geometry, stop + 1) === rowOfStop(geometry, stop) ? xOfStop(geometry, stop + 1) : geometry.rowEnds[rowOfStop(geometry, stop)]!;
         if (right - left < 3) {
             continue;
         }
         const sign = arrowSign(document, right - left - 2, lineHeight, 'se-tab-sign');
         sign.style.left = `${left + 1}px`;
-        sign.style.top = `${geometry.rowOf[stop]! * lineHeight}px`;
+        sign.style.top = `${rowOfStop(geometry, stop) * lineHeight}px`;
         element.append(sign);
     }
 }

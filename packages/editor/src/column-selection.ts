@@ -1,3 +1,4 @@
+import { stopCount, xOfStop } from './geometry-stops.ts';
 import type { Selection } from '@adecore/editor-core';
 import { type EditorLayout, TEXT_PADDING } from './layout.ts';
 
@@ -33,7 +34,7 @@ export function columnSelections(layout: EditorLayout, from: ContentPoint, to: C
             continue;
         }
         const geometry = layout.geometry(row);
-        const endX = geometry.rowStarts.length > 1 ? geometry.rowEnds[0]! : geometry.before[geometry.before.length - 1]!;
+        const endX = geometry.rowStarts.length > 1 ? geometry.rowEnds[0]! : xOfStop(geometry, stopCount(geometry) - 1);
         const offsetAt = (cell: number): number => layout.offsetAtX(geometry, 0, TEXT_PADDING + cell * charWidth).offset;
         if (cellAt(layout, endX + TEXT_PADDING) < left) {
             if (left === right) {
