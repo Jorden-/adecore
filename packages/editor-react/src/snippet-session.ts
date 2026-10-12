@@ -10,28 +10,39 @@ export function positionInInsertion(start: EditorPosition, text: string, offset:
         : { line: start.line + lines.length - 1, character: lines[lines.length - 1]!.length };
 }
 
+interface SessionRange extends EditorRange {
+    readonly parents?: readonly number[];
+}
+
 interface Field {
     index: number;
-    ranges: EditorRange[];
+    ranges: SessionRange[];
     primary: number;
-    parents: readonly number[];
 }
 interface Instance {
     fields: Field[];
     hull: EditorRange;
+    selected: SessionRange[];
 }
 
-function mapRange(range: EditorRange, changes: readonly EditorContentChange[], grow: boolean): EditorRange {
+function mapRange<Range extends EditorRange>(
+    range: Range,
+    changes: readonly EditorContentChange[],
+    grow: boolean | ((change: EditorContentChange) => boolean)
+): Range {
     let { start, end } = range;
     for (const change of changes) {
+        const grows = typeof grow === 'boolean' ? grow : grow(change);
+        const empty = comparePositions(start, end) === 0;
+        const insertAtEnd = comparePositions(change.range.start, change.range.end) === 0 && comparePositions(end, change.range.start) === 0;
         // Active fields and their parents include text inserted at their left edge.
-        start = grow && comparePositions(start, change.range.start) === 0 ? change.range.start : shiftPosition(start, change);
-        end = shiftPosition(end, change);
+        start = grows && comparePositions(start, change.range.start) === 0 ? change.range.start : shiftPosition(start, change);
+        end = !grows && !empty && insertAtEnd ? end : shiftPosition(end, change);
     }
-    return { start, end };
+    return { ...range, start, end };
 }
 
-function selectionsOf(field: Field): EditorRange[] {
+function selectionsOf(field: Field): SessionRange[] {
     const primary = field.ranges[field.primary]!;
     const sorted = [...field.ranges].sort((left, right) => comparePositions(left.start, right.start));
     // The editor merges touching selections; keep these mirrors static instead of editing their union.
@@ -47,7 +58,6 @@ export class SnippetFeature {
     private order: number[] = [];
     private current = 0;
     private expectedSelections = 0;
-    private selected: EditorRange[] = [];
     private visiting = false;
     private generation = 0;
 
@@ -68,23 +78,29 @@ export class SnippetFeature {
     }
 
     begin(start: EditorPosition | readonly EditorPosition[], text: string, stops: readonly SnippetStop[], fields?: readonly SnippetField[]): void {
+        const starts = Array.isArray(start) ? start : [start as EditorPosition];
+        this.beginInstances(starts.map((start) => ({ start, text, stops, fields })));
+    }
+
+    beginInstances(insertions: readonly { start: EditorPosition; text: string; stops: readonly SnippetStop[]; fields?: readonly SnippetField[] }[]): void {
         this.end();
-        if (stops.length === 0) {
+        const primary = insertions.at(-1);
+        if (primary === undefined || primary.stops.length === 0) {
             return;
         }
-        const starts = Array.isArray(start) ? start : [start as EditorPosition];
-        this.order = stops.map((stop) => stop.index);
-        this.instances = starts.map((at): Instance => ({
+        this.order = primary.stops.map((stop) => stop.index);
+        this.instances = insertions.map(({ start: at, text, stops, fields }): Instance => ({
             hull: { start: at, end: positionInInsertion(at, text, text.length) },
+            selected: [],
             fields: stops.map((stop): Field => {
                 const field = fields?.find((field) => field.index === stop.index);
                 return {
                     index: stop.index,
                     primary: field?.primary ?? 0,
-                    parents: field?.parents ?? [],
                     ranges: [...(field?.ranges ?? [stop]), ...(field?.linked ?? [])].map((range) => ({
                         start: positionInInsertion(at, text, range.start),
-                        end: positionInInsertion(at, text, range.end)
+                        end: positionInInsertion(at, text, range.end),
+                        ...(range.parents === undefined ? {} : { parents: range.parents })
                     }))
                 };
             })
@@ -96,7 +112,6 @@ export class SnippetFeature {
         this.generation++;
         this.instances = [];
         this.order = [];
-        this.selected = [];
         this.current = 0;
     }
 
@@ -106,17 +121,20 @@ export class SnippetFeature {
         const stop = this.order[index]!;
         const selections = this.instances.flatMap((instance) => {
             const field = instance.fields.find((field) => field.index === stop);
-            if (field === undefined) {
-                return [];
-            }
-            return stop === 0 ? [field.ranges[field.primary]!] : selectionsOf(field);
+            instance.selected = field === undefined ? [] : stop === 0 ? [field.ranges[field.primary]!] : selectionsOf(field);
+            return instance.selected;
         });
         const sorted = [...selections].sort((left, right) => comparePositions(left.start, right.start));
         const touching = sorted.some((range, index) => index > 0 && comparePositions(sorted[index - 1]!.end, range.start) >= 0);
         this.visiting = true;
         try {
-            this.selected = touching ? [selections.at(-1)!] : selections;
-            editor.setSelections(this.selected);
+            if (touching) {
+                const primary = selections.at(-1)!;
+                for (const instance of this.instances) {
+                    instance.selected = instance.selected.includes(primary) ? [primary] : [];
+                }
+            }
+            editor.setSelections(touching ? [selections.at(-1)!] : selections);
             this.expectedSelections = editor.getSelections().length;
         } finally {
             this.visiting = false;
@@ -154,37 +172,57 @@ export class SnippetFeature {
             this.end();
             return;
         }
-        const selected = this.selected;
-        this.selected = this.selected.map((range) => mapRange(range, change.changes, true));
-        const values = this.selected.map((range) => this.language.editor.textInRange(range));
-        // Distributed paste or contextual smart typing can give synthetic carets different text.
-        if (values.some((value) => value !== values[0])) {
-            const caret = this.language.editor.getCaret();
-            this.end();
-            this.language.editor.setCaret(caret);
-            return;
-        }
         const index = this.order[this.current]!;
-        const parents = this.instances.at(-1)?.fields.find((field) => field.index === index)?.parents ?? [];
         for (const instance of this.instances) {
+            const selected = instance.selected;
+            const active = instance.fields.find((field) => field.index === index)?.ranges ?? [];
+            instance.selected = selected.map((range) => mapRange(range, change.changes, true));
+            const values = instance.selected.map((range) => this.language.editor.textInRange(range));
+            // Per-caret variables may differ between instances; mirrors within each must agree.
+            if (values.some((value) => value !== values[0])) {
+                const caret = this.language.editor.getCaret();
+                this.end();
+                this.language.editor.setCaret(caret);
+                return;
+            }
             instance.hull = mapRange(instance.hull, change.changes, true);
             for (const field of instance.fields) {
-                if (!field.parents.includes(index)) {
-                    continue;
-                }
                 const primary = field.ranges[field.primary];
-                field.ranges = field.ranges.filter((range) => !selected.some((parent) => rangeHolds(parent, range.start) && rangeHolds(parent, range.end)));
+                field.ranges = field.ranges.filter(
+                    (range) =>
+                        !range.parents?.includes(index) ||
+                        !change.changes.some(
+                            (edit) =>
+                                comparePositions(edit.range.start, edit.range.end) < 0 &&
+                                (comparePositions(range.start, range.end) === 0
+                                    ? rangeHolds(edit.range, range.start)
+                                    : comparePositions(edit.range.start, range.end) < 0 && comparePositions(range.start, edit.range.end) < 0)
+                        )
+                );
                 field.primary = Math.max(
                     0,
                     field.ranges.findIndex((range) => range === primary)
                 );
+                field.ranges = field.ranges.map((range) => {
+                    const grows = new Set(
+                        change.changes.filter((edit) =>
+                            field.index === index
+                                ? rangeHolds(range, edit.range.start) && rangeHolds(range, edit.range.end)
+                                : active.some(
+                                      (child) =>
+                                          child.parents?.includes(field.index) &&
+                                          rangeHolds(range, child.start) &&
+                                          rangeHolds(range, child.end) &&
+                                          rangeHolds(child, edit.range.start)
+                                  )
+                        )
+                    );
+                    return mapRange(range, change.changes, (edit) => grows.has(edit));
+                });
             }
             instance.fields = instance.fields.filter((field) => field.ranges.length > 0);
             if (!instance.fields.some((field) => field.index === 0)) {
-                instance.fields.push({ index: 0, primary: 0, parents: [], ranges: [{ start: instance.hull.end, end: instance.hull.end }] });
-            }
-            for (const field of instance.fields) {
-                field.ranges = field.ranges.map((range) => mapRange(range, change.changes, field.index === index || parents.includes(field.index)));
+                instance.fields.push({ index: 0, primary: 0, ranges: [{ start: instance.hull.end, end: instance.hull.end }] });
             }
         }
         this.order = this.order.filter((index) => this.instances.at(-1)?.fields.some((field) => field.index === index));

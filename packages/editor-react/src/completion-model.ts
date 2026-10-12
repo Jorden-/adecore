@@ -3,7 +3,8 @@ import type { CompletionItem, CompletionList, CompletionResult, MarkupContent } 
 import { comparePositions } from './diagnostics-model.ts';
 import { escapeMarkdown, isEmptyHover, splitSignatures, type HoverText } from './hover-content.ts';
 import type { CompletionDocs } from './popups.ts';
-import { parseSnippet, tabOrder, type SnippetField, type SnippetStop } from './snippet.ts';
+import { compileSnippet, parseSnippet, tabOrder, type SnippetField, type SnippetStop, type SnippetTemplate, type SnippetVariableResolver } from './snippet.ts';
+import { indentSnippet } from './snippet-indent.ts';
 
 const IDENTIFIER_CHARACTER = /[\p{L}\p{N}\p{M}_$]/u;
 
@@ -167,6 +168,9 @@ export function itemsOf(result: CompletionResult): { items: CompletionItem[]; in
             if (defaults.insertTextFormat !== undefined && next.insertTextFormat === undefined) {
                 next.insertTextFormat = defaults.insertTextFormat;
             }
+            if (defaults.insertTextMode !== undefined && next.insertTextMode === undefined) {
+                next.insertTextMode = defaults.insertTextMode;
+            }
             if (defaults.commitCharacters !== undefined && next.commitCharacters === undefined) {
                 next.commitCharacters = defaults.commitCharacters;
             }
@@ -298,11 +302,23 @@ export interface Insertion {
     readonly fields?: readonly SnippetField[];
 }
 
+export interface SnippetInsertionOptions {
+    readonly resolve?: SnippetVariableResolver;
+    readonly template?: SnippetTemplate;
+}
+
 /*
  * What goes into the text for an item and the range it takes the place of, given the caret. `lineAfter` is
  * the rest of the line after the caret: an item that would add a call does not when a parenthesis follows.
  */
-export function insertionOf(item: CompletionItem, caret: EditorPosition, lineBefore: string, replace: boolean, lineAfter = ''): Insertion {
+export function insertionOf(
+    item: CompletionItem,
+    caret: EditorPosition,
+    lineBefore: string,
+    replace: boolean,
+    lineAfter = '',
+    options: SnippetInsertionOptions = {}
+): Insertion {
     const raw = item.textEdit?.newText ?? item.insertText ?? item.label;
     const edit = editRangeOf(item, replace);
     const range =
@@ -311,10 +327,15 @@ export function insertionOf(item: CompletionItem, caret: EditorPosition, lineBef
             : // The word grew since the answer came, so what was typed since belongs to what is replaced.
               { start: edit.start, end: comparePositions(edit.end, caret) < 0 && edit.end.line === caret.line ? caret : edit.end };
     if (item.insertTextFormat !== SNIPPET_FORMAT) {
-        return { range, text: raw, stops: [] };
+        const adjusted =
+            item.insertTextMode === 2 ? indentSnippet({ text: raw, stops: [] }, lineBefore.slice(0, range.start.character)) : { text: raw, stops: [] };
+        return { range, text: adjusted.text, stops: [] };
     }
     const followed = range.end.line === caret.line && lineAfter.slice(Math.max(0, range.end.character - caret.character)).startsWith('(');
-    const parsed = parseSnippet(followed && isCallableKind(item.kind) ? withoutCall(raw) : raw);
+    const source = followed && isCallableKind(item.kind) ? withoutCall(raw) : raw;
+    const template = options.template?.source === source ? options.template : compileSnippet(source);
+    const rendered = template.render(options.resolve);
+    const parsed = item.insertTextMode === 2 ? indentSnippet(rendered, lineBefore.slice(0, range.start.character)) : rendered;
     return { range, text: parsed.text, stops: tabOrder(parsed), fields: parsed.fields };
 }
 
@@ -327,7 +348,8 @@ export function mirroredInsertions(
     primary: EditorRange,
     caret: EditorPosition,
     text: (range: EditorRange) => string,
-    insertion: Insertion
+    insertion: Insertion,
+    textAt?: (position: EditorPosition, range: EditorRange) => string
 ): EditorContentChange[] {
     const before = insertion.range.start.line === caret.line ? caret.character - insertion.range.start.character : -1;
     const after = insertion.range.end.line === caret.line ? insertion.range.end.character - caret.character : -1;
@@ -348,7 +370,7 @@ export function mirroredInsertions(
         const preceding = range.start.character > 0 ? text({ start: { line: at.line, character: range.start.character - 1 }, end: range.start }) : '';
         const startsWord = preceding === '' || !isIdentifierCharacter(preceding);
         const matches = startsWord && text({ start: range.start, end: at }) === typed && text({ start: at, end: range.end }) === replaced;
-        return matches ? [{ range, text: insertion.text }] : [];
+        return matches ? [{ range, text: textAt?.(at, range) ?? insertion.text }] : [];
     });
 }
 

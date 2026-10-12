@@ -1,7 +1,15 @@
 export { EditorLanguage } from './editor-language.ts';
 export { ProjectLanguage } from './project-language.ts';
 export type { LanguageDocumentHandle } from './project-language.ts';
-export type { LanguageHost, DiskText, GitBlameCommit, GitBlameResult, EditorNotification, RenameSuggestionsRequest } from './host-types.ts';
+export type {
+    SnippetVariableContext,
+    LanguageHost,
+    DiskText,
+    GitBlameCommit,
+    GitBlameResult,
+    EditorNotification,
+    RenameSuggestionsRequest
+} from './host-types.ts';
 export { EditorView } from './EditorView.tsx';
 export { createHolder } from './holder.ts';
 export type { EditorViewProps } from './EditorView.tsx';

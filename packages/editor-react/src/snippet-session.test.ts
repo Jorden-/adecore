@@ -127,7 +127,7 @@ test('IME previews once and commits all mirrors atomically', () => {
     expect(editor.getText()).toBe('foo foo');
 });
 
-async function completion(text: string, source: string, imports = false) {
+async function completion(text: string, source: string, imports = false, insertTextMode: 1 | 2 = 1) {
     const mounted = mountEditor({ text, language: 'typescript' });
     const service = new FakeLanguageService();
     service.respond('textDocument/completion', () => [
@@ -135,6 +135,7 @@ async function completion(text: string, source: string, imports = false) {
             label: 'for',
             insertText: source,
             insertTextFormat: 2,
+            insertTextMode,
             ...(imports
                 ? { additionalTextEdits: [{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }, newText: 'import x;\n' }] }
                 : {})
@@ -271,4 +272,54 @@ test('a refused completion edit does not start a snippet on unchanged text', asy
     await language.completion.accept(false);
     expect(editor.getText()).toBe('fo');
     expect(language.snippets.isActive).toBe(false);
+});
+
+test('completion renders line variables and indentation independently at each caret', async () => {
+    const { editor, language, timers, type, press } = await completion('  fo\n\tfo', '${1:$TM_LINE_NUMBER} $1\n${2:$CURSOR_NUMBER}$0', true, 2);
+    editor.setSelections([
+        { start: { line: 0, character: 4 }, end: { line: 0, character: 4 } },
+        { start: { line: 1, character: 3 }, end: { line: 1, character: 3 } }
+    ]);
+    language.completion.invoke();
+    timers.advance(1);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await language.completion.accept(false);
+    expect(editor.getText()).toBe('import x;\n  1 1\n  1\n\t2 2\n\t2');
+    expect(editor.getSelections().map((range) => editor.textInRange(range))).toEqual(['1', '1', '2', '2']);
+    editor.setSelections(editor.getSelections().map((range) => ({ start: range.end, end: range.end })));
+    type('x');
+    expect(language.snippets.isActive).toBe(true);
+    expect(editor.getText()).toBe('import x;\n  1x 1x\n  1\n\t2x 2x\n\t2');
+    press('Tab');
+    expect(editor.getSelections().map((range) => editor.textInRange(range))).toEqual(['1', '2']);
+    press('Tab');
+    expect(language.snippets.isActive).toBe(false);
+    expect(editor.getSelections()).toHaveLength(2);
+});
+
+test('typing behind a parent does not remove child stops', () => {
+    const { editor, type, press } = snippet('${1:a ${2:b}}');
+    press('End');
+    type('x');
+    press('Tab');
+    expect(editor.textInRange(editor.getSelection())).toBe('b');
+});
+
+test('an independent empty occurrence on a parent boundary survives replacement', () => {
+    const { editor, type, press } = snippet('${1:x${2}}$2');
+    type('new');
+    press('Tab');
+    expect(editor.getCaret().character).toBe(3);
+    type('child');
+    expect(editor.getText()).toBe('newchild');
+});
+
+test('only edits in a parents own child grow that parents left edge', () => {
+    const { editor, type, press } = snippet('${2:x}${1:a${2}}');
+    press('Tab');
+    editor.setSelections(editor.getSelections().map((range) => ({ start: range.end, end: range.end })));
+    type('q');
+    press('Tab', { shiftKey: true });
+    expect(editor.textInRange(editor.getSelection())).toBe('axq');
+    expect(editor.getText()).toBe('xqaxq');
 });

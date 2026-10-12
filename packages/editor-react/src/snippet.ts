@@ -1,7 +1,10 @@
+import { SNIPPET_VARIABLES } from './snippet-variable-names.ts';
+
 /* UTF-16 offsets into the inserted text; equal for an empty stop. */
 export interface SnippetRange {
     readonly start: number;
     readonly end: number;
+    readonly parents?: readonly number[];
 }
 
 export interface SnippetStop extends SnippetRange {
@@ -26,12 +29,22 @@ export interface ParsedSnippet {
     readonly fields?: readonly SnippetField[];
 }
 
-type Node = { kind: 'text'; text: string } | { kind: 'field'; index: number; body?: Node[]; choices?: string[] } | { kind: 'variable'; body?: Node[] };
+type Node =
+    | { kind: 'text'; text: string }
+    | { kind: 'field'; index: number; body?: Node[]; choices?: string[] }
+    | { kind: 'variable'; name: string; body?: Node[] };
+
+export type SnippetVariableResolver = (name: string) => string | undefined;
+export interface SnippetTemplate {
+    readonly source: string;
+    render(resolve?: SnippetVariableResolver): ParsedSnippet;
+}
 type FieldNode = Extract<Node, { kind: 'field' }>;
 
-const MAX_SNIPPET_TEXT = 100_000;
+export const MAX_SNIPPET_TEXT = 100_000;
 const MAX_SNIPPET_NODES = 10_000;
 const MAX_SNIPPET_WORK = 50_000;
+const MAX_SNIPPET_RANGES = 1_000;
 const MAX_SNIPPET_DEPTH = 64;
 
 class SnippetLimitError extends Error {}
@@ -113,12 +126,12 @@ class SnippetParser {
         this.at += name.length;
         const field = (): FieldNode => ({ kind: 'field', index: index! });
         if (!brace) {
-            return index === null ? { kind: 'variable' } : field();
+            return index === null ? { kind: 'variable', name } : field();
         }
         const next = this.source[this.at];
         if (next === '}') {
             this.at++;
-            return index === null ? { kind: 'variable' } : field();
+            return index === null ? { kind: 'variable', name } : field();
         }
         if (next === ':') {
             this.at++;
@@ -126,7 +139,7 @@ class SnippetParser {
             if (this.source[this.at] === '}') {
                 this.at++;
             }
-            return index === null ? { kind: 'variable', body } : { ...field(), body };
+            return index === null ? { kind: 'variable', name, body } : { ...field(), body };
         }
         if (next === '|' && index !== null) {
             this.at++;
@@ -135,7 +148,7 @@ class SnippetParser {
         if (next === '/' && index === null) {
             this.at = start;
             this.skipBraces();
-            return { kind: 'variable' };
+            return { kind: 'variable', name };
         }
         this.at = start + 1;
         return null;
@@ -200,6 +213,7 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
     const stops: SnippetStop[] = [];
     let text = '';
     let work = 0;
+    let ranges = 0;
     const append = (value: string): void => {
         if (text.length + value.length > MAX_SNIPPET_TEXT) {
             throw new SnippetLimitError();
@@ -222,6 +236,9 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
                 render(node.body ?? [], linked, parents, visiting);
                 continue;
             }
+            if (++ranges > MAX_SNIPPET_RANGES) {
+                throw new SnippetLimitError();
+            }
             const definition = definitions.get(node.index)!;
             const from = text.length;
             if (!visiting.has(node.index)) {
@@ -231,7 +248,7 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
                     render(definition.body ?? [], linked || node !== definition, [...parents, node.index], new Set([...visiting, node.index]));
                 }
             }
-            const range = { start: from, end: text.length };
+            const range: SnippetRange = { start: from, end: text.length, ...(parents.length === 0 ? {} : { parents: [...parents] }) };
             const field = fields.get(node.index) ?? {
                 index: node.index,
                 ranges: [],
@@ -248,7 +265,7 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
                     field.primary = field.ranges.length;
                 }
                 field.ranges.push(range);
-                stops.push({ index: node.index, ...range });
+                stops.push({ index: node.index, start: range.start, end: range.end });
             }
             fields.set(node.index, field);
         }
@@ -271,19 +288,120 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
     };
 }
 
-export function parseSnippet(snippet: string): ParsedSnippet {
-    if (snippet.length > MAX_SNIPPET_TEXT) {
-        return { text: snippet, stops: [] };
-    }
-    try {
-        return renderSnippet(new SnippetParser(snippet).parse());
-    } catch (error) {
-        if (!(error instanceof SnippetLimitError)) {
-            throw error;
+function resolveVariables(nodes: readonly Node[], resolve?: SnippetVariableResolver): Node[] {
+    let highest = 0;
+    const unknown = new Map<string, { index: number; body: Node[]; defaulted: boolean; definition: Node }>();
+    const values = new Map<string, string | undefined>();
+    const scan = (nodes: readonly Node[]): void => {
+        for (const node of nodes) {
+            if (node.kind === 'field') {
+                highest = Math.max(highest, node.index);
+            }
+            if (node.kind !== 'text' && node.body !== undefined) {
+                scan(node.body);
+            }
         }
-        // Language-server snippets may expand exponentially; retain the original text without a session.
-        return { text: snippet, stops: [] };
+    };
+    scan(nodes);
+    const valueOf = (name: string): string | undefined => {
+        if (!values.has(name)) {
+            values.set(name, resolve?.(name));
+        }
+        return values.get(name);
+    };
+    const collect = (nodes: readonly Node[]): void => {
+        for (const node of nodes) {
+            if (node.kind === 'variable' && valueOf(node.name) === undefined && !SNIPPET_VARIABLES.has(node.name)) {
+                const previous = unknown.get(node.name);
+                if (previous === undefined) {
+                    if (!Number.isSafeInteger(++highest)) {
+                        throw new SnippetLimitError();
+                    }
+                    unknown.set(node.name, {
+                        index: highest,
+                        body: node.body ?? [{ kind: 'text', text: node.name }],
+                        defaulted: node.body !== undefined,
+                        definition: node
+                    });
+                } else if (node.body !== undefined && !previous.defaulted) {
+                    previous.body = node.body;
+                    previous.defaulted = true;
+                    previous.definition = node;
+                }
+            }
+            if (node.kind !== 'text' && node.body !== undefined) {
+                collect(node.body);
+            }
+        }
+    };
+    collect(nodes);
+    // Resolved empty variables retain their defaults without adding a navigable field.
+    let work = 0;
+    const normalize = (nodes: readonly Node[], visiting: ReadonlySet<string>, depth = 0): Node[] => {
+        if (depth > MAX_SNIPPET_DEPTH) {
+            throw new SnippetLimitError();
+        }
+        return nodes.flatMap((node): Node[] => {
+            if (++work > MAX_SNIPPET_WORK) {
+                throw new SnippetLimitError();
+            }
+            if (node.kind === 'variable' && !unknown.has(node.name)) {
+                const value = valueOf(node.name);
+                return value !== undefined && value !== '' ? [{ kind: 'text', text: value }] : normalize(node.body ?? [], visiting, depth + 1);
+            }
+            if (node.kind === 'field') {
+                return [{ ...node, ...(node.body === undefined ? {} : { body: normalize(node.body, visiting, depth + 1) }) }];
+            }
+            if (node.kind === 'variable') {
+                const field = unknown.get(node.name)!;
+                return [
+                    {
+                        kind: 'field',
+                        index: field.index,
+                        ...(node !== field.definition
+                            ? {}
+                            : { body: visiting.has(node.name) ? [] : normalize(field.body, new Set([...visiting, node.name]), depth + 1) })
+                    }
+                ];
+            }
+            return [node];
+        });
+    };
+    return normalize(nodes, new Set());
+}
+
+export function compileSnippet(source: string): SnippetTemplate {
+    let nodes: Node[] | null = null;
+    if (source.length <= MAX_SNIPPET_TEXT) {
+        try {
+            nodes = new SnippetParser(source).parse();
+        } catch (error) {
+            if (!(error instanceof SnippetLimitError)) {
+                throw error;
+            }
+        }
     }
+    return {
+        source,
+        render: (resolve) => {
+            if (nodes === null) {
+                return { text: source, stops: [] };
+            }
+            try {
+                return renderSnippet(resolveVariables(nodes, resolve));
+            } catch (error) {
+                if (!(error instanceof SnippetLimitError)) {
+                    throw error;
+                }
+                // Language-server snippets may expand exponentially; retain the original text without a session.
+                return { text: source, stops: [] };
+            }
+        }
+    };
+}
+
+export function parseSnippet(snippet: string, resolve?: SnippetVariableResolver): ParsedSnippet {
+    return compileSnippet(snippet).render(resolve);
 }
 
 /* One defining occurrence per index, then $0 or the end of the inserted text. */
@@ -297,7 +415,7 @@ export function tabOrder(parsed: ParsedSnippet): SnippetStop[] {
     for (const field of parsed.fields ?? []) {
         const range = field.ranges[field.primary];
         if (range !== undefined) {
-            first.set(field.index, { index: field.index, ...range });
+            first.set(field.index, { index: field.index, start: range.start, end: range.end });
         }
     }
     const visited = [...first.values()].filter((stop) => stop.index > 0).sort((left, right) => left.index - right.index);

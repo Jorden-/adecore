@@ -1,3 +1,4 @@
+import type { EditorPosition, EditorRange } from '@adecore/editor';
 import type { i18n } from 'i18next';
 import type { Keymap } from '@adecore/editor/keymap';
 import type { ProjectFiles } from './workspace-edit.ts';
@@ -37,6 +38,20 @@ export interface RenameSuggestionsRequest {
     uses: readonly string[];
 }
 
+export interface SnippetVariableContext {
+    readonly uri: string;
+    readonly languageId: string;
+    readonly position: EditorPosition;
+    readonly selection: EditorRange;
+    readonly selectedText: string;
+    readonly currentLine: string;
+    readonly currentWord: string;
+    readonly cursorIndex: number;
+    readonly cursorCount: number;
+    readonly folder?: string;
+    readonly path?: string;
+}
+
 export interface LanguageHost {
     /* The instance the app hands `UIProvider`, which the features read their words from too; the default instance without one. */
     readonly i18n?: i18n;
@@ -48,5 +63,7 @@ export interface LanguageHost {
     pathOfUri?(uri: string): string | null;
     serverNames?(uri: string): readonly string[];
     notify?(notification: EditorNotification): void;
+    /* Synchronous overrides; undefined delegates to built-ins or an editable unknown-variable placeholder. */
+    resolveSnippetVariable?(name: string, context: SnippetVariableContext): string | undefined;
     suggestNames?(request: RenameSuggestionsRequest, signal: AbortSignal): Promise<readonly string[]>;
 }

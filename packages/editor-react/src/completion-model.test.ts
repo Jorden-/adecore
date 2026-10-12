@@ -257,7 +257,7 @@ describe('mirroredInsertions', () => {
 describe('snippetToText', () => {
     test('drops tab stops, keeps placeholders and choices, and undoes escapes', () => {
         expect(snippetToText('for (const ${1:item} of ${2|items,list|}) {\n\t$0\n}')).toBe('for (const item of items) {\n\t\n}');
-        expect(snippetToText('cost: \\$5 \\} $TM_FILENAME ${name}')).toBe('cost: $5 }  ');
+        expect(snippetToText('cost: \\$5 \\} $TM_FILENAME ${name}')).toBe('cost: $5 }  name');
     });
 });
 
@@ -346,4 +346,17 @@ describe('rowWindow', () => {
         expect(rowWindow(0, 0, 3, 24, 8, 6, 4)).toEqual({ first: 0, last: 3 });
         expect(rowWindow(0, 0, 0, 24, 8, 6, 4)).toEqual({ first: 0, last: 0 });
     });
+});
+
+test('completion list indentation defaults apply unless an item overrides them', () => {
+    const { items } = itemsOf({
+        isIncomplete: false,
+        itemDefaults: { insertTextMode: 2 },
+        items: [
+            { label: 'block', insertText: 'a\nb' },
+            { label: 'plain', insertText: 'a\nb', insertTextMode: 1 }
+        ]
+    });
+    expect(insertionOf(items[0]!, { line: 0, character: 4 }, '  bl', false).text).toBe('a\n  b');
+    expect(insertionOf(items[1]!, { line: 0, character: 4 }, '  pl', false).text).toBe('a\nb');
 });

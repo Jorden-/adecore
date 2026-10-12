@@ -1,6 +1,6 @@
 import './test-setup.ts';
 import { describe, expect, test } from 'bun:test';
-import { parseSnippet, tabOrder } from './snippet.ts';
+import { compileSnippet, parseSnippet, tabOrder } from './snippet.ts';
 
 describe('parseSnippet', () => {
     test('turns placeholders, choices and bare stops into text and stops', () => {
@@ -14,7 +14,7 @@ describe('parseSnippet', () => {
     });
 
     test('undoes escapes and drops variables, keeping the default of one that has it', () => {
-        expect(parseSnippet('cost: \\$5 \\} $TM_FILENAME ${name} ${LINE:7}').text).toBe('cost: $5 }   7');
+        expect(parseSnippet('cost: \\$5 \\} $TM_FILENAME ${name} ${LINE:7}').text).toBe('cost: $5 }  name 7');
         expect(parseSnippet('${TM_SELECTED_TEXT/(a)/$1/g}x').text).toBe('x');
     });
 
@@ -102,9 +102,9 @@ test('nested fields occur once, with linked projections into parent mirrors', ()
     expect(parsed.stops.filter((stop) => stop.index === 2)).toEqual([{ index: 2, start: 2, end: 3 }]);
     expect(parsed.fields?.find((field) => field.index === 2)).toEqual({
         index: 2,
-        ranges: [{ start: 2, end: 3 }],
+        ranges: [{ start: 2, end: 3, parents: [1] }],
         primary: 0,
-        linked: [{ start: 6, end: 7 }],
+        linked: [{ start: 6, end: 7, parents: [1] }],
         parents: [1]
     });
 });
@@ -127,4 +127,42 @@ test('deeply nested and oversized snippets fall back without recursion or partia
     for (const source of ['${1:'.repeat(2000) + 'x' + '}'.repeat(2000), '$1 '.repeat(40_000), 'x '.repeat(50_001)]) {
         expect(parseSnippet(source)).toEqual({ text: source, stops: [] });
     }
+});
+
+test('unknown variables share an editable field after numbered stops', () => {
+    const parsed = parseSnippet('${2:value} $MISSING ${MISSING:default} $0');
+    expect(parsed.text).toBe('value default default ');
+    expect(tabOrder(parsed).map((stop) => stop.index)).toEqual([2, 3, 0]);
+    expect(parsed.fields?.find((field) => field.index === 3)?.ranges).toHaveLength(2);
+    expect(parsed.fields?.find((field) => field.index === 3)?.primary).toBe(1);
+});
+
+test('variable values are literal, memoized per render and isolated between template renders', () => {
+    const template = compileSnippet('$TM_LINE_NUMBER ${1:$CUSTOM} $1 $CUSTOM');
+    let calls = 0;
+    const first = template.render((name) => {
+        calls++;
+        return name === 'TM_LINE_NUMBER' ? '3' : '$literal';
+    });
+    expect(first.text).toBe('3 $literal $literal $literal');
+    expect(calls).toBe(2);
+    expect(template.render((name) => (name === 'TM_LINE_NUMBER' ? '8' : 'other')).text).toBe('8 other other other');
+    expect(first.text).toBe('3 $literal $literal $literal');
+});
+
+test('an empty known variable uses its default and exposes nested numbered stops', () => {
+    const parsed = parseSnippet('${TM_SELECTED_TEXT:${1:fallback}}', () => '');
+    expect(parsed.text).toBe('fallback');
+    expect(tabOrder(parsed).map((stop) => stop.index)).toEqual([1, 0]);
+});
+
+test('unknown-variable chains and huge resolved values respect expansion budgets', () => {
+    const source =
+        '${A:x}' +
+        Array.from(
+            { length: 25 },
+            (_, index) => '${V' + index + ':$' + (index === 0 ? 'A' : 'V' + (index - 1)) + '$' + (index === 0 ? 'A' : 'V' + (index - 1)) + '}'
+        ).join('');
+    expect(parseSnippet(source)).toEqual({ text: source, stops: [] });
+    expect(parseSnippet('$TM_CURRENT_LINE', () => 'x'.repeat(100001))).toEqual({ text: '$TM_CURRENT_LINE', stops: [] });
 });

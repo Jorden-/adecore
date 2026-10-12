@@ -16,6 +16,7 @@ The `host` is what the app allows the features to do. Every field is optional.
 | `pathOfUri(uri)`                | The path to show for a URI, or `null`; without it, `file:` URIs under `folder` are made relative   |
 | `serverNames(uri)`              | The names of the servers of a document, for the cards                                              |
 | `notify(notification)`          | Shows a short `success` or `error` message with an `id` and a `title`, such as a toast             |
+| `resolveSnippetVariable(name, context)` | Synchronous snippet overrides; `undefined` delegates to built-ins or an editable unknown-variable placeholder. The `SnippetVariableContext` describes one caret before insertion. |
 | `suggestNames(request, signal)` | Suggests new names during a rename, from any source the app picks                                  |
 
 `openPlace` only asks. The app opens the file, and when the editor of that file puts its caret on the line, the feature moves it to the right column (`takeCaret`). `jumpTo(place)` does the same from outside an editor, such as a problems panel, and records the last caret in the history.

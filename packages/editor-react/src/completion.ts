@@ -1,4 +1,4 @@
-import { StaleResultError, type CompletionContext, type CompletionItem } from '@adecore/lsp';
+import { fileUriToPath, StaleResultError, type CompletionContext, type CompletionItem } from '@adecore/lsp';
 import type { EditorContentChange, EditorPosition, EditorRange, EditorTextChange } from '@adecore/editor';
 import { comparePositions, shiftPosition } from './diagnostics-model.ts';
 import type { EditorLanguage } from './editor-language.ts';
@@ -18,6 +18,9 @@ import {
     type Ranked
 } from './completion-model.ts';
 import { PARAMETER_HINTS_COMMAND, isCallItem, planCall, withParentheses, type CallPlan } from './completion-call.ts';
+import { compileSnippet } from './snippet.ts';
+import { createSnippetResolver } from './snippet-variables.ts';
+import { wordRangeAt } from './rename-model.ts';
 import { RecentChoices, recentChoicesOf } from './recent-choices.ts';
 import { shikiLanguageOf } from './language-ids.ts';
 import { textBeforeOf } from './line-text.ts';
@@ -120,15 +123,59 @@ export class CompletionFeature {
         const caret = editor.getCaret();
         const lineBefore = textBeforeOf(editor, caret);
         const lineAfter = editor.textInRange({ start: caret, end: { line: caret.line, character: Number.MAX_SAFE_INTEGER } });
-        // A character that commits is typed after the name, so a call is not added before it.
-        const planned = insertionOf(item, caret, lineBefore, replace, commit === undefined ? lineAfter : '(');
+        const carets = editor.getSelections();
+        const now = new Date();
+        const template = item.insertTextFormat === 2 ? compileSnippet(item.textEdit?.newText ?? item.insertText ?? item.label) : undefined;
+        const renderAt = (position: EditorPosition, selection: EditorRange): Insertion => {
+            const line = editor.textInRange({ start: { line: position.line, character: 0 }, end: { line: position.line, character: Number.MAX_SAFE_INTEGER } });
+            const word = wordRangeAt(line, position);
+            const resolver = createSnippetResolver(
+                {
+                    uri,
+                    languageId: this.language.languageId,
+                    position,
+                    selection,
+                    selectedText: editor.textInRange(selection),
+                    currentLine: line,
+                    currentWord: word === null ? '' : editor.textInRange(word),
+                    cursorIndex: Math.max(
+                        0,
+                        carets.findIndex((range) => comparePositions(range.start, selection.start) === 0 && comparePositions(range.end, selection.end) === 0)
+                    ),
+                    cursorCount: carets.length,
+                    folder: project.host.folder,
+                    path: fileUriToPath(uri) ?? project.host.pathOfUri?.(uri) ?? undefined
+                },
+                project.host.resolveSnippetVariable?.bind(project.host),
+                { now }
+            );
+            const atItem = position === caret || item.textEdit === undefined ? item : { ...item, textEdit: undefined };
+            // A commit character follows the name, so accepting must not also add a call.
+            return insertionOf(atItem, position, line.slice(0, position.character), replace, commit === undefined ? line.slice(position.character) : '(', {
+                template,
+                resolve: resolver
+            });
+        };
+        const planned = renderAt(caret, editor.getSelection());
         const { before, rest } = this.surroundings(planned, caret, lineAfter);
         const plan: CallPlan =
             commit === undefined ? planCall({ item, languageId: this.language.languageId, insertion: planned, before, rest, replace }) : { action: 'none' };
         const main = plan.action === 'add' ? withParentheses(planned, plan.inside) : planned;
         const extras = (item.additionalTextEdits ?? []).map((edit): EditorContentChange => ({ range: edit.range, text: edit.newText }));
-        const carets = editor.getSelections();
-        const mirrored = mirroredInsertions(carets, editor.getSelection(), caret, (range) => editor.textInRange(range), main);
+        const instances = new Map<EditorContentChange, Insertion>();
+        const mirrored = mirroredInsertions(carets, editor.getSelection(), caret, (range) => editor.textInRange(range), main).map((insertion) => {
+            const position = carets.find(
+                (range) =>
+                    range.start.line === insertion.range.start.line &&
+                    range.start.character >= insertion.range.start.character &&
+                    range.start.character <= insertion.range.end.character
+            )!.start;
+            const own = renderAt(position, { start: position, end: position });
+            const rendered = plan.action === 'add' ? withParentheses(own, plan.inside) : own;
+            const edit = { ...insertion, text: rendered.text };
+            instances.set(edit, { ...rendered, range: insertion.range });
+            return edit;
+        });
         const primary = { range: main.range, text: main.text };
         const changes = [primary, ...mirrored, ...extras];
         // Imports and earlier carets move each insertion independently; the primary instance stays last.
@@ -143,7 +190,12 @@ export class CompletionFeature {
         }
         const landed = editor.getSelections();
         if (commit === undefined) {
-            this.language.snippets.begin(starts, main.text, main.stops, main.fields);
+            this.language.snippets.beginInstances(
+                [...mirrored, primary].map((insertion, index) => {
+                    const rendered = insertion === primary ? main : instances.get(insertion)!;
+                    return { start: starts[index]!, text: rendered.text, stops: rendered.stops, fields: rendered.fields };
+                })
+            );
             if (plan.action === 'add' && plan.inside && mirrored.length > 0 && main.fields === undefined) {
                 this.placeMirroredCarets(carets, mirrored, landed);
             }
