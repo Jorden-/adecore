@@ -65,3 +65,5 @@ scanBrackets('call(items[0]').pairs; // Map { 10 => 12, 12 => 10 }
 | `FindOptions`, `FindNextOptions`, `FindMatch`, `ReplaceOptions`, `ReplaceAllOptions`         | Search                                                                  |
 | `FoldingOptions`, `FoldingRange`, `FoldRole`, `FoldHints`, `FoldSymbolHint`, `FoldRangeHint` | Folding                                                                 |
 | `TextSpan`, `BracketIndex`, `WordText`                                                       | Helper results and inputs                                               |
+
+Large dense edit batches rebuild the rope in one pass and emit one `contentEdits` stretch covering the changed region. Small or sparse batches retain separate content edits and share unchanged rope branches. In both cases the snapshot keeps the individual offset changes for annotations, maps selections with their existing affinity, and records one undo step.

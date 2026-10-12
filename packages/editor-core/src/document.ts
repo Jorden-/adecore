@@ -3,7 +3,7 @@ import { CloserTracker } from './closer-tracker.ts';
 import { planBlockComment, planLineComments } from './comments.ts';
 import { planEnter } from './enter.ts';
 import { planAutoIndent, planJoinLines, planToggleCase, properIndent, spacingBetween } from './line-commands.ts';
-import { mapOffset } from './offsets.ts';
+import { mapOffset, offsetMapper } from './offsets.ts';
 import { planPaste } from './paste.ts';
 import type { EnterOptions, EnterPlan } from './enter.ts';
 import type { EditPlan, EditSource } from './edit-source.ts';
@@ -16,7 +16,7 @@ import { isQuote, replacesComparison, surround, swapQuotes } from './typing-hand
 import { scanBrackets } from './brackets.ts';
 import type { BracketIndex } from './brackets.ts';
 import { hasSmartSemicolon, isPhp } from './lexical.ts';
-import { clampInteger, TextRope } from './rope.ts';
+import { clampInteger, TextRope, ROPE_CHUNK_SIZE } from './rope.ts';
 import type { DocumentLine } from './rope.ts';
 import { findMatches, findMatchFrom, replacementText, splitsSurrogate } from './search.ts';
 import type { FindMatch, FindNextOptions, FindOptions } from './search.ts';
@@ -483,14 +483,17 @@ export class DocumentModel {
         }
         const unique = this.validateEdits(edits);
         const changed = unique.filter((edit) => changesText(this.rope, edit));
-        let next = this.rope;
-        for (let index = changed.length - 1; index >= 0; index--) {
-            const edit = changed[index]!;
-            next = next.replace(edit.from, edit.to, edit.text);
+        // Sparse edits keep structural sharing; dense edits avoid rescanning a leaf for each replacement.
+        const rebuild = changed.length >= 256 && changed.length * ROPE_CHUNK_SIZE >= this.rope.length;
+        let next = rebuild ? this.rope.rebuild(changed) : this.rope;
+        if (!rebuild) {
+            for (let index = changed.length - 1; index >= 0; index--) {
+                const edit = changed[index]!;
+                next = next.replace(edit.from, edit.to, edit.text);
+            }
         }
-        const nextSelections =
-            options.selections ??
-            this.selections.map((selection) => ({ anchor: mapOffset(selection.anchor, unique), head: mapOffset(selection.head, unique) }));
+        const map = offsetMapper(unique);
+        const nextSelections = options.selections ?? this.selections.map((selection) => ({ anchor: map(selection.anchor), head: map(selection.head) }));
         // Several edits can cancel each other out, like moving a character and moving it back.
         const unchanged =
             next === this.rope || (changed.length > 1 && next.length === this.rope.length && next.equalsRange(this.rope, changed[0]!.from, changed.at(-1)!.to));
@@ -531,7 +534,7 @@ export class DocumentModel {
         }
         this.groupOpen = Boolean(options.historyGroup);
         this.redoStack = [];
-        this.emit([changes], options.source ?? 'external', () => editsOf(previous, changed));
+        this.emit([changes], options.source ?? 'external', () => (rebuild ? stretchEdits(previous, next, [changes]) : editsOf(previous, changed)));
         return true;
     }
 

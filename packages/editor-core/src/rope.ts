@@ -7,14 +7,14 @@ export interface DocumentLine {
 }
 
 /*
- * A persistent AVL tree of text chunks of at most `chunkSize` UTF-16 code units. Every node knows
+ * A persistent AVL tree of text chunks of at most `ROPE_CHUNK_SIZE` UTF-16 code units. Every node knows
  * its length and its LF count, a leaf also where its LFs are, so offsets and line numbers resolve
  * without scanning.
  */
 type Leaf = { readonly text: string; readonly breaks: readonly number[]; readonly length: number; readonly lines: number; readonly height: number };
 type Branch = { readonly left: Node; readonly right: Node; readonly length: number; readonly lines: number; readonly height: number };
 type Node = Leaf | Branch;
-const chunkSize = 2048;
+export const ROPE_CHUNK_SIZE = 2048;
 
 function leaf(text: string): Leaf | null {
     if (!text.length) {
@@ -56,7 +56,7 @@ function join(left: Node | null, right: Node | null): Node | null {
     if (!right) {
         return left;
     }
-    if ('text' in left && 'text' in right && left.length + right.length <= chunkSize) {
+    if ('text' in left && 'text' in right && left.length + right.length <= ROPE_CHUNK_SIZE) {
         return leaf(left.text + right.text);
     }
     if (left.height > right.height + 1 && 'left' in left) {
@@ -88,8 +88,8 @@ function split(node: Node | null, offset: number): [Node | null, Node | null] {
 
 function build(text: string): Node | null {
     const leaves: Node[] = [];
-    for (let offset = 0; offset < text.length; offset += chunkSize) {
-        leaves.push(leaf(text.slice(offset, offset + chunkSize))!);
+    for (let offset = 0; offset < text.length; offset += ROPE_CHUNK_SIZE) {
+        leaves.push(leaf(text.slice(offset, offset + ROPE_CHUNK_SIZE))!);
     }
     const tree = (from: number, to: number): Node | null => {
         if (from === to) {
@@ -185,6 +185,36 @@ export class TextRope {
         const [before, rest] = split(this.root, from);
         const [, after] = split(rest, to - from);
         return new TextRope(join(join(before, build(text)), after));
+    }
+
+    /* Dense validated batches rebuild once, rather than repeatedly splitting and rescanning leaves. */
+    rebuild(edits: readonly { from: number; to: number; text: string }[]): TextRope {
+        const chunks = chunksOf(this.root, 0, this.length);
+        let chunk = chunks.next();
+        let column = 0;
+        let offset = 0;
+        const pieces: string[] = [];
+        const advance = (end: number, keep: boolean): void => {
+            while (offset < end && !chunk.done) {
+                const count = Math.min(end - offset, chunk.value.length - column);
+                if (keep) {
+                    pieces.push(chunk.value.slice(column, column + count));
+                }
+                offset += count;
+                column += count;
+                if (column === chunk.value.length) {
+                    chunk = chunks.next();
+                    column = 0;
+                }
+            }
+        };
+        for (const edit of edits) {
+            advance(edit.from, true);
+            pieces.push(edit.text);
+            advance(edit.to, false);
+        }
+        advance(this.length, true);
+        return TextRope.from(pieces.join(''));
     }
 
     /* Whether both ropes hold the same text in `[from, to)`, which has to be the same range of both. */
