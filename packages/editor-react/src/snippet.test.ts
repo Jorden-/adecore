@@ -292,3 +292,12 @@ test('indentation keeps a trailing empty child inside its parent', () => {
     expect(parsed.fields!.find((field) => field.index === 2)!.ranges[0]).toMatchObject({ start: 6, end: 6, parents: [1] });
     expect(parsed.stops.find((stop) => stop.index === 1)).toMatchObject({ start: 0, end: 6 });
 });
+
+test('indentation also contains an empty resolved variable transform at the parent edge', () => {
+    const parsed = indentSnippet(
+        parseSnippet('${1:foo\n${TM_FILENAME/a/x/}}', () => ''),
+        '  '
+    );
+    expect(parsed.fields![0]!.ranges[0]).toMatchObject({ start: 0, end: 6 });
+    expect(parsed.transforms![0]).toMatchObject({ start: 6, end: 6, parents: [1] });
+});

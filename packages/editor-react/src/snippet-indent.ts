@@ -27,13 +27,12 @@ export function indentSnippet(parsed: ParsedSnippet, before: string): ParsedSnip
         return offset + low * prefix.length;
     };
     const childStarts = new Map<number, Set<number>>();
-    for (const field of parsed.fields ?? []) {
-        for (const child of [...field.ranges, ...(field.linked ?? [])]) {
-            for (const parent of child.parents ?? []) {
-                const starts = childStarts.get(parent) ?? new Set<number>();
-                starts.add(child.start);
-                childStarts.set(parent, starts);
-            }
+    const children = [...(parsed.fields ?? []).flatMap((field) => [...field.ranges, ...(field.linked ?? [])]), ...(parsed.transforms ?? [])];
+    for (const child of children) {
+        for (const parent of child.parents ?? []) {
+            const starts = childStarts.get(parent) ?? new Set<number>();
+            starts.add(child.start);
+            childStarts.set(parent, starts);
         }
     }
     const range = <Range extends SnippetRange>(range: Range, index?: number): Range => ({
