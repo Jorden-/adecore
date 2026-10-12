@@ -162,21 +162,22 @@ export function decoratePatch(editor: Editor, options: PatchDecorationOptions = 
         announce();
     };
     const schedule = (): void => {
-        if (pending) {
-            return;
-        }
-        pending = true;
         if (length < immediateBelow) {
+            if (pending) {
+                return;
+            }
+            pending = true;
             queueMicrotask(() => {
                 decorate();
                 after(announce);
             });
-        } else {
-            after(() => {
-                decorate();
-                announce();
-            });
+            return;
         }
+        pending = true;
+        after(() => {
+            decorate();
+            announce();
+        });
     };
     const stop = editor.onTextChange(schedule);
     read();

@@ -943,7 +943,7 @@ export class EditorLayout {
         while (row.kind === 'block' || (row.replacement !== undefined && row.replacement.enterable !== true)) {
             const next = this.rows[row.index + direction];
             if (!next) {
-                return offset;
+                return direction < 0 ? 0 : this.document.getLine(this.document.getLineCount() - 1).end;
             }
             row = next;
             y = direction < 0 ? row.top + row.height - 1 : row.top;

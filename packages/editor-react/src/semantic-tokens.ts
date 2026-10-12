@@ -1,5 +1,5 @@
 import type { EditorRange, EditorSemanticToken } from '@adecore/editor';
-import type { SemanticTokens, SemanticTokensDelta, SemanticTokensLegend } from '@adecore/lsp';
+import { StaleResultError, type SemanticTokens, type SemanticTokensDelta, type SemanticTokensLegend } from '@adecore/lsp';
 import type { EditorLanguage } from './editor-language.ts';
 import { covers, withMargin } from './inlay-hints.ts';
 import { lineTextOf } from './line-text.ts';
@@ -69,6 +69,8 @@ export class SemanticTokensFeature {
             }
         });
         const providers = language.onProvidersChanged(() => {
+            this.epoch++;
+            this.scrolled.cancel();
             this.forget();
             this.refresher.now();
         });
@@ -150,7 +152,13 @@ export class SemanticTokensFeature {
         const { uri } = this.language;
         const base = this.held;
         if (base !== null && service.supports(DELTA, uri)) {
-            const answer = await service.semanticTokensDelta(uri, base.resultId, { signal });
+            const answer = await service.semanticTokensDelta(uri, base.resultId, { signal }).catch((error: unknown) => {
+                if (signal.aborted || error instanceof StaleResultError) {
+                    throw error;
+                }
+                // A server that no longer knows our result id is asked in full instead, once.
+                return null;
+            });
             signal.throwIfAborted();
             if (answer !== null && this.held === base) {
                 const tokens = this.fromDelta(base, answer);
@@ -203,6 +211,9 @@ export class SemanticTokensFeature {
             };
         }
         editor.setSemanticTokens(this.drawn);
+        if (!this.complete && this.covered !== null && !covers(this.covered, editor.getVisibleRange())) {
+            this.scrolled.later();
+        }
     }
 
     private async fillViewport(signal: AbortSignal): Promise<void> {

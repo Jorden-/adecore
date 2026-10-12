@@ -40,7 +40,7 @@ All three inlay methods are optional on `Editor`, so an editor from before them 
 
 ## Change marks
 
-`setChangeMarks(marks, layer?)` draws how the text differs from the version the app compares against, in the gutter and in the scroll track. An `EditorChangeMark` has a `kind` of `added`, `modified` or `deleted` and one-based, inclusive `startLine` and `endLine`. A `deleted` mark sits above the line the removed lines were above, so its two lines are the same. Each layer (the unnamed one by default) holds its own marks and the editor draws their union, so a host's Git marks and a patch decoration never overwrite each other; an empty list removes the layer. Where two layers mark the same line the later one wins, in the order the layers last became non-empty, and a `deleted` mark never covers an `added` or `modified` line.
+`setChangeMarks(marks, layer?)` draws how the text differs from the version the app compares against, in the gutter and in the scroll track. An `EditorChangeMark` has a `kind` of `added`, `modified` or `deleted` and one-based, inclusive `startLine` and `endLine`. A `deleted` mark sits above the line the removed lines were above, so its two lines are the same. Each layer (the unnamed one by default) holds its own marks and the editor draws their union, so a host's Git marks and a patch decoration never overwrite each other; an empty list removes the layer. Where two layers mark the same line the later one wins for every kind, in the order the layers last became non-empty, in the gutter and in the scroll track alike. Inside one layer a `deleted` mark never covers an `added` or `modified` line, since it sits on the line after the removed text.
 
 ## Gutter buttons
 

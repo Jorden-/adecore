@@ -252,4 +252,25 @@ describe('interactive inlay hints in the real editor', () => {
         await settle();
         expect(calls(COMMAND)).toHaveLength(1);
     });
+
+    test('waits out the double click interval for a command when the edits only show after resolving', async () => {
+        const command = { title: 'Do it', command: 'hint.do' };
+        const edits = [{ range: { start: at(4), end: at(4) }, newText: 'name: ' }];
+        const resolve = (hint: InlayHint): InlayHint => ({ ...hint, textEdits: edits });
+        const single = await setup([{ position: at(4), label: [label('name:', { command })] }], { resolve });
+        single.pressHint(single.part(0, 0));
+        await settle();
+        expect(single.calls(COMMAND)).toHaveLength(0);
+        single.timers.advance(1000);
+        await settle();
+        expect(single.calls(COMMAND)).toHaveLength(1);
+        const double = await setup([{ position: at(4), label: [label('name:', { command })] }], { resolve });
+        double.pressHint(double.part(0, 0));
+        double.pressHint(double.part(0, 0));
+        await settle();
+        double.timers.advance(1000);
+        await settle();
+        expect(double.editor.getText()).toBe('run(name: a, b)\nsecond line');
+        expect(double.calls(COMMAND)).toHaveLength(0);
+    });
 });

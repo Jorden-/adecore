@@ -124,6 +124,25 @@ describe('decoratePatch', () => {
         expect(page.host.querySelectorAll('.se-line-bar-solid')).toHaveLength(2);
     });
 
+    test('starts the wait for a patch past the threshold again with every edit', async () => {
+        const { editor, type } = mountEditor({ text: PATCH });
+        const timer = fakeTimer();
+        const delays: Array<number | undefined> = [];
+        const set = timer.set;
+        timer.set = (callback, delay) => {
+            delays.push(delay);
+            return set(callback, delay);
+        };
+        decoratePatch(editor, { timer, immediateBelow: 10, delay: 40 });
+        editor.setCaret({ line: 7, character: 0 });
+        type('+');
+        await settle();
+        type('+');
+        await settle();
+        expect(delays).toEqual([40, 40]);
+        expect(timer.pending()).toBe(1);
+    });
+
     test('draws its change marks in a layer of its own and leaves the host marks when disposed', () => {
         const { editor, page } = mountEditor({ text: PATCH });
         editor.setChangeMarks([{ kind: 'modified', startLine: 1, endLine: 1 }]);

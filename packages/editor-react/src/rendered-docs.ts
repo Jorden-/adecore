@@ -75,7 +75,7 @@ export class RenderedDocsFeature {
     private readonly markerLines = new Map<string, number>();
     private readonly parsed = new Map<string, ParsedDocComment>();
     private indexes = new Map<DocComment, number>();
-    /* Comments a reveal showed as source until the caret has settled where it was going. */
+    /* Comments a reveal showed as source until the caret has settled where it was going, or the comment has scrolled out of view if the caret never moves. */
     private readonly revealed = new Set<DocComment>();
     private readonly listeners = new Set<() => void>();
     private version = 0;
@@ -114,7 +114,10 @@ export class RenderedDocsFeature {
             editor.onKeyDown((event) => {
                 return isShortcut(this.language.shortcuts.toggleRenderedDocs, event) && this.toggle();
             }),
-            editor.onViewChange(() => this.sweep())
+            editor.onViewChange(() => {
+                this.sweep();
+                this.releaseRevealed();
+            })
         ];
         language.onDispose(() => {
             this.disposed = true;
@@ -277,6 +280,18 @@ export class RenderedDocsFeature {
     private reveal(comment: DocComment): void {
         this.revealed.add(comment);
         this.publish();
+    }
+
+    private releaseRevealed(): void {
+        if (this.revealed.size === 0) {
+            return;
+        }
+        const { start, end } = this.language.editor.getVisibleRange();
+        const away = [...this.revealed].filter((comment) => comment.endLine < start.line || comment.startLine > end.line);
+        if (away.length > 0) {
+            away.forEach((comment) => this.revealed.delete(comment));
+            this.publish();
+        }
     }
 
     private clearOverrides(): void {

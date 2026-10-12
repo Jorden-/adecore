@@ -255,6 +255,34 @@ describe('change marks', () => {
         expect(marked()).toEqual(['2:added', '3:added']);
     });
 
+    test('let the later layer win a shared line for every kind, in the gutter and in the scroll track', () => {
+        const { host, view } = mount(text);
+        const marked = (): string[] =>
+            [...host.querySelectorAll('.se-line-number')].flatMap((item) => {
+                const mark = item.querySelector('.se-change');
+                return mark ? [`${item.textContent}:${mark.className.replace('se-change se-change-', '')}`] : [];
+            });
+        const ticks = (): string[] => [...new Set([...host.querySelectorAll('.se-tick')].map((tick) => tick.className.replace('se-tick se-tick-', '')))];
+        view.setChangeMarks([{ kind: 'added', startLine: 2, endLine: 3 }]);
+        view.setChangeMarks([{ kind: 'deleted', startLine: 3, endLine: 3 }], 'patch');
+        expect(marked()).toEqual(['2:added', '3:deleted']);
+        view.setChangeMarks([], 'patch');
+        view.setChangeMarks([{ kind: 'added', startLine: 10, endLine: 12 }], 'base');
+        view.setChangeMarks([{ kind: 'modified', startLine: 10, endLine: 12 }], 'patch');
+        expect(marked()).toEqual(['2:added', '3:added', '10:modified', '11:modified', '12:modified']);
+        expect(ticks()).toEqual(['added', 'modified']);
+    });
+
+    test('keep a removal below an added line of the same layer', () => {
+        const { host, view } = mount(text);
+        view.setChangeMarks([
+            { kind: 'added', startLine: 4, endLine: 4 },
+            { kind: 'deleted', startLine: 4, endLine: 4 }
+        ]);
+        const marked = [...host.querySelectorAll('.se-line-number')].flatMap((item) => (item.querySelector('.se-change-added') ? [item.textContent] : []));
+        expect(marked).toEqual(['4']);
+    });
+
     test('and the find matches are ticks in the scroll track', () => {
         const { host, view } = mount(text);
         view.setChangeMarks([{ kind: 'added', startLine: 10, endLine: 12 }]);

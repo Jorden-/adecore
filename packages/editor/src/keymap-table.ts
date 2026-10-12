@@ -166,3 +166,40 @@ export function parseChord(text: string): KeyChord {
     }
     return chord;
 }
+
+const BASE_PUNCTUATION: Readonly<Record<string, string>> = {
+    Comma: ',',
+    Period: '.',
+    Slash: '/',
+    Semicolon: ';',
+    Quote: "'",
+    Backquote: '`',
+    Backslash: '\\',
+    BracketLeft: '[',
+    BracketRight: ']',
+    Minus: '-',
+    Equal: '='
+};
+
+/* The character a physical key has with no layer on it, null for a key that has none, such as an arrow or Enter. */
+function baseCharacter(code: string): string | null {
+    const letter = /^Key([A-Z])$/.exec(code);
+    if (letter !== null) {
+        return letter[1].toLowerCase();
+    }
+    const digit = /^(?:Digit|Numpad)([0-9])$/.exec(code);
+    return digit !== null ? digit[1] : (BASE_PUNCTUATION[code] ?? null);
+}
+
+/*
+ * Whether Ctrl and Alt together type a character instead of pressing a chord. AltGr reports both, on Windows even
+ * for the left Ctrl and Alt, and a browser may report AltGraph for Option, so the state is no evidence: the character is.
+ * Never on Apple platforms, where Option types with no Ctrl.
+ */
+export function typesInsteadOfChord(event: { key: string; code?: string; ctrlKey: boolean; altKey: boolean }, apple: boolean): boolean {
+    if (apple || !event.ctrlKey || !event.altKey || event.code === undefined || [...event.key].length !== 1) {
+        return false;
+    }
+    const base = baseCharacter(event.code);
+    return base !== null && event.key.toLowerCase() !== base;
+}

@@ -1,5 +1,5 @@
 import type { EditorCommand } from '@adecore/editor-core';
-import { chordOf, KEYMAP, KEYMAP_IDS, type Keymap, type KeymapId, parseChord } from './keymap-table.ts';
+import { chordOf, KEYMAP, KEYMAP_IDS, type Keymap, type KeymapId, parseChord, typesInsteadOfChord } from './keymap-table.ts';
 import type { EditorViewCommand, KeyChord } from './types.ts';
 
 export interface KeyLike {
@@ -128,14 +128,9 @@ function keyMatches(chordKey: string, event: KeyLike): boolean {
     return event.key === chordKey;
 }
 
-/* AltGr reports Ctrl and Alt together, so it is never the Ctrl+Alt of a chord: on the layouts that have it, it types a character. */
-export function isAltGraph(event: Pick<KeyLike, 'ctrlKey' | 'altKey' | 'getModifierState'>): boolean {
-    return event.ctrlKey && event.altKey && event.getModifierState?.('AltGraph') === true;
-}
-
 /* Whether an event is a chord, with `mod` as Cmd on macOS and Ctrl elsewhere and every modifier the chord does not name up. */
 export function chordMatches(chord: KeyChord, event: KeyLike, apple: boolean): boolean {
-    if (isAltGraph(event)) {
+    if (typesInsteadOfChord(event, apple)) {
         return false;
     }
     const wantsMeta = chord.meta || (chord.mod && apple);

@@ -171,6 +171,15 @@ describe('movement', () => {
         expect(layout.verticalOffset(14, 1, 40)).toBe(16);
     });
 
+    test('go to the ends of the document when a rendered row is all that lies beyond the caret', () => {
+        const first = layoutOf('/** a */\nab\ncd');
+        first.layout.configure({ replacements: [{ id: 'r', from: 0, to: 8, render: () => undefined }] });
+        expect(first.layout.verticalOffset(10, -1, 10)).toBe(0);
+        const last = layoutOf('ab\ncd\n/** a */');
+        last.layout.configure({ replacements: [{ id: 'r', from: 6, to: 14, render: () => undefined }] });
+        expect(last.layout.verticalOffset(4, 1, 10)).toBe(14);
+    });
+
     test('walk over a widget between two lines', () => {
         const { layout } = layoutOf('ab\ncd');
         layout.configure({ blocks: [{ id: 'w', at: 3, placement: 'above', height: 30 }] });

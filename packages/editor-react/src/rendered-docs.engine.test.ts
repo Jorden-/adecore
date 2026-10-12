@@ -281,6 +281,17 @@ describe('rendered documentation comments', () => {
         expect(drawn()).toContain('The input.');
     });
 
+    test('draws a comment a reveal showed as source formatted again once it has scrolled out of view', () => {
+        const { docs, editor, blocks } = setup(`${TEXT}\n${Array.from({ length: 200 }, (_, i) => `const filler${i} = ${i};`).join('\n')}`);
+        docs.configure({ renderDocComments: true });
+        editor.setCaret({ line: 10, character: 0 });
+        editor.find({ text: 'First function', regex: false, caseSensitive: false, wholeWord: false } as never);
+        expect(blocks()).toHaveLength(1);
+        editor.getVisibleRange = () => ({ start: { line: 40, character: 0 }, end: { line: 60, character: 0 } });
+        editor.setScrollTop(5000);
+        expect(docs.all.map((comment) => docs.isRendered(comment))).toEqual([true, true]);
+    });
+
     test('moves only the carets in the comment when it gets drawn as text', () => {
         const { docs, editor, blocks } = setup();
         editor.setSelections([

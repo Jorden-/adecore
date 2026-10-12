@@ -181,6 +181,20 @@ describe('semantic tokens by delta', () => {
         expect(calls).toBe(0);
     });
 
+    test('falls back to a full request once when the server rejects a delta', async () => {
+        let fulls = 0;
+        const world = await setup({
+            full: () => ({ resultId: String(++fulls), data: classOn(0) }),
+            delta: () => {
+                throw new Error('unknown previousResultId');
+            }
+        });
+        await world.type();
+        expect(world.calls(DELTA)).toHaveLength(1);
+        expect(world.calls(FULL)).toHaveLength(2);
+        expect(world.lastLines()).toEqual([0]);
+    });
+
     test('keeps asking in full when the server has no delta', async () => {
         const world = await setup({ full: () => ({ resultId: '1', data: classOn(0) }) });
         await world.type();
@@ -269,6 +283,59 @@ describe('semantic tokens by range', () => {
         world.timers.advance(100);
         await settle();
         expect(world.lastLines()).toEqual([0, visible.end.line + 10]);
+    });
+
+    test('fills the lines in view when the view moved while a range was in flight', async () => {
+        const long = Array.from({ length: 400 }, (_, i) => `line ${i}`).join('\n');
+        let release: () => void = () => undefined;
+        const gate = new Promise<void>((resolve) => (release = resolve));
+        let round = 0;
+        const world = await setup({
+            text: long,
+            range: async (call) => {
+                if (++round === 2) {
+                    await gate;
+                }
+                return { data: classOn((call.params as { range: EditorRange }).range.start.line) };
+            }
+        });
+        await world.type();
+        world.editor.getVisibleRange = () => ({ start: { line: 300, character: 0 }, end: { line: 310, character: 0 } });
+        world.editor.setScrollTop(9999);
+        world.timers.advance(100);
+        await settle();
+        release();
+        await settle();
+        world.timers.advance(100);
+        await settle();
+        expect(world.lastLines()).toContain(240);
+    });
+
+    test('drops a range that was in flight when the provider options changed', async () => {
+        const long = Array.from({ length: 400 }, (_, i) => `line ${i}`).join('\n');
+        let release: () => void = () => undefined;
+        const gate = new Promise<void>((resolve) => (release = resolve));
+        let round = 0;
+        const world = await setup({
+            text: long,
+            range: async (call) => {
+                const start = (call.params as { range: EditorRange }).range.start.line;
+                if (++round === 2) {
+                    await gate;
+                    return { data: classOn(start, 7) };
+                }
+                return { data: classOn(start) };
+            }
+        });
+        world.editor.getVisibleRange = () => ({ start: { line: 300, character: 0 }, end: { line: 310, character: 0 } });
+        world.editor.setScrollTop(9999);
+        world.timers.advance(100);
+        await settle();
+        world.service.refresh(uri);
+        release();
+        await settle();
+        const characters = world.painted.flatMap((tokens) => (tokens ?? []).map((token) => token.character));
+        expect(characters).not.toContain(7);
     });
 
     test('does not ask for ranges on scroll once the full answer is drawn', async () => {

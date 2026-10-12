@@ -18,11 +18,35 @@ const chord = (name: string, modifiers: Partial<KeyChord> = {}): KeyChord => ({
 });
 
 describe('chordMatches', () => {
-    test('never reads AltGr as the Ctrl and Alt of a chord', () => {
+    describe('Ctrl and Alt together', () => {
         const altGraph = (name: string): boolean => name === 'AltGraph';
-        const event = key('@', { ctrlKey: true, altKey: true, code: 'KeyQ', getModifierState: altGraph });
-        expect(chordMatches(chord('Q', { ctrl: true, alt: true }), event, false)).toBe(false);
-        expect(chordMatches(chord('Q', { ctrl: true, alt: true }), { ...event, getModifierState: () => false }, false)).toBe(true);
+        const both = { ctrlKey: true, altKey: true };
+
+        test('leaves AltGr+Q to a layout that types an at sign with it', () => {
+            const event = key('@', { ...both, code: 'KeyQ', getModifierState: altGraph });
+            expect(chordMatches(chord('Q', { ctrl: true, alt: true }), event, false)).toBe(false);
+        });
+
+        test('matches Ctrl+Alt+H although the platform reports AltGraph for it', () => {
+            const event = key('h', { ...both, code: 'KeyH', getModifierState: altGraph });
+            expect(chordMatches(chord('H', { ctrl: true, alt: true }), event, false)).toBe(true);
+        });
+
+        test('matches the keys that type nothing although the platform reports AltGraph', () => {
+            const event = key('ArrowLeft', { ...both, code: 'ArrowLeft', getModifierState: altGraph });
+            expect(chordMatches(chord('ArrowLeft', { ctrl: true, alt: true }), event, false)).toBe(true);
+        });
+
+        test('reads punctuation and digits by the physical key', () => {
+            expect(chordMatches(chord('[', { ctrl: true, alt: true }), key('[', { ...both, code: 'BracketLeft' }), false)).toBe(true);
+            expect(chordMatches(chord('[', { ctrl: true, alt: true }), key('{', { ...both, code: 'BracketLeft' }), false)).toBe(false);
+            expect(chordMatches(chord('7', { ctrl: true, alt: true }), key('{', { ...both, code: 'Digit7' }), false)).toBe(false);
+        });
+
+        test('never applies on Apple platforms', () => {
+            const event = key('œ', { ...both, code: 'KeyQ', getModifierState: altGraph });
+            expect(chordMatches(chord('Q', { ctrl: true, alt: true }), event, true)).toBe(true);
+        });
     });
 
     test('reads the built-in chord of a command a host keymap leaves out', () => {

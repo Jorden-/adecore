@@ -41,6 +41,12 @@ export class Refresher {
         });
     }
 
+    /* Drops the wait and the ask in flight, and keeps the refresher usable. */
+    cancel(): void {
+        this.timers.clear(this.timer);
+        this.controller?.abort();
+    }
+
     dispose(): void {
         this.disposed = true;
         this.timers.clear(this.timer);

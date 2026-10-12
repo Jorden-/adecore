@@ -244,6 +244,11 @@ export class EditorView {
     private scopeKey = '';
     private readonly changeLayers = new Map<string, { kind: EditorChangeKind; from: number; to: number }[]>();
     private changeVersion = 0;
+    private changeCache: {
+        version: number;
+        lines: Map<number, EditorChangeKind>;
+        runs: { kind: EditorChangeKind; start: number; end: number }[];
+    } | null = null;
     private readonly attribution = new AttributionRuns();
     private readonly highlights = new AttributionRuns();
     private remoteCarets: { id: string; name: string; color: string; at: number }[] = [];
@@ -2268,30 +2273,58 @@ export class EditorView {
         this.render();
     }
 
-    private get changeMarks(): { kind: EditorChangeKind; from: number; to: number }[] {
-        return [...this.changeLayers.values()].flat();
-    }
-
-    private markedLines(mark: { kind: EditorChangeKind; from: number; to: number }): { start: number; end: number } {
-        const start = this.model.positionAt(mark.from).line;
-        return { start, end: mark.kind === 'deleted' ? start : this.model.positionAt(Math.max(mark.from, mark.to)).line };
-    }
-
-    /* How each line on screen differs, a removal never covering a line that was added or changed. */
-    private changedLines(rows: readonly LayoutRow[]): Map<number, EditorChangeKind> {
+    /*
+     * How every marked line differs. The layer that last became non-empty wins a shared line for every kind; inside one
+     * layer a removal never covers a line that was added or changed, as its mark sits on the line after the removed text.
+     */
+    private resolvedChanges(): { lines: Map<number, EditorChangeKind>; runs: { kind: EditorChangeKind; start: number; end: number }[] } {
+        if (this.changeCache?.version === this.changeVersion) {
+            return this.changeCache;
+        }
         const lines = new Map<number, EditorChangeKind>();
+        for (const marks of this.changeLayers.values()) {
+            const layer = new Map<number, EditorChangeKind>();
+            for (const mark of marks) {
+                const start = this.model.positionAt(mark.from).line;
+                const end = mark.kind === 'deleted' ? start : this.model.positionAt(Math.max(mark.from, mark.to)).line;
+                for (let line = start; line <= end; line++) {
+                    if (mark.kind !== 'deleted' || !layer.has(line)) {
+                        layer.set(line, mark.kind);
+                    }
+                }
+            }
+            for (const [line, kind] of layer) {
+                lines.set(line, kind);
+            }
+        }
+        const runs: { kind: EditorChangeKind; start: number; end: number }[] = [];
+        for (const line of [...lines.keys()].sort((left, right) => left - right)) {
+            const kind = lines.get(line)!;
+            const run = runs.at(-1);
+            if (run !== undefined && kind !== 'deleted' && run.kind === kind && run.end === line - 1) {
+                run.end = line;
+            } else {
+                runs.push({ kind, start: line, end: line });
+            }
+        }
+        this.changeCache = { version: this.changeVersion, lines, runs };
+        return this.changeCache;
+    }
+
+    /* How each line on screen differs. */
+    private changedLines(rows: readonly LayoutRow[]): Map<number, EditorChangeKind> {
+        const { lines } = this.resolvedChanges();
         const first = rows[0]?.line ?? 0;
         const lastRow = rows.at(-1);
         const last = lastRow?.kind === 'text' ? lastRow.lastLine : (lastRow?.line ?? 0);
-        for (const mark of this.changeMarks) {
-            const { start, end } = this.markedLines(mark);
-            for (let line = Math.max(start, first); line <= Math.min(end, last); line++) {
-                if (mark.kind !== 'deleted' || !lines.has(line)) {
-                    lines.set(line, mark.kind);
-                }
+        const visible = new Map<number, EditorChangeKind>();
+        for (let line = first; line <= last; line++) {
+            const kind = lines.get(line);
+            if (kind !== undefined) {
+                visible.set(line, kind);
             }
         }
-        return lines;
+        return visible;
     }
 
     /* The carets of agents, each at an offset that follows its text through edits until the host sets them again. */
@@ -2563,9 +2596,8 @@ export class EditorView {
             const row = this.layout.rowForLine(line);
             return row.top + row.height;
         };
-        for (const mark of this.changeMarks) {
-            const { start, end } = this.markedLines(mark);
-            spans.push({ kind: mark.kind, top: rowTop(start), bottom: mark.kind === 'deleted' ? rowTop(start) : rowBottom(end) });
+        for (const { kind, start, end } of this.resolvedChanges().runs) {
+            spans.push({ kind, top: rowTop(start), bottom: kind === 'deleted' ? rowTop(start) : rowBottom(end) });
         }
         for (const marker of this.markers) {
             if (marker.severity !== 'hint' && marker.to > marker.from) {

@@ -172,6 +172,8 @@ export class InlayHintsFeature {
     private showTimer: unknown;
     /* The command of a click that may still become a double click. */
     private commandTimer: unknown;
+    /* Counts presses, so one that waited for a resolve gives way to a later one. */
+    private pressCount = 0;
     /* Counts what the pointer does, so a tooltip that was waited for is dropped once the pointer has moved on. */
     private request = 0;
 
@@ -392,6 +394,21 @@ export class InlayHintsFeature {
         if (click.alt || click.shift) {
             return false;
         }
+        this.timers.clear(this.commandTimer);
+        const press = ++this.pressCount;
+        if (this.resolvable(entry) && (click.clicks === 2 || actionOf(entry.hint, click) !== null)) {
+            // The server may still add edits, which would make this the first press of a double click.
+            void this.resolve(entry).then(() => {
+                if (press === this.pressCount) {
+                    this.press(entry, click);
+                }
+            });
+            return true;
+        }
+        return this.press(entry, click);
+    }
+
+    private press(entry: Entry, click: EditorInlayClick): boolean {
         this.timers.clear(this.commandTimer);
         const action = actionOf(entry.hint, click);
         const insertable = entry.hint.textEdits !== undefined && entry.hint.textEdits.length > 0;

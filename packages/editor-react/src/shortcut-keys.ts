@@ -1,4 +1,4 @@
-import { chordOf, KEYMAP_IDS, parseChord, type Keymap } from '@adecore/editor/keymap';
+import { chordOf, KEYMAP_IDS, parseChord, type Keymap, typesInsteadOfChord } from '@adecore/editor/keymap';
 import type { KeyChord } from '@adecore/editor';
 import { matchesShortcut } from '@adecore/ui';
 
@@ -16,9 +16,9 @@ export function shortcutsOf(keymap: Keymap, apple: boolean) {
     return { ...shortcuts, rename: shortcuts.renameSymbol };
 }
 
-/* AltGr reports Ctrl and Alt together and types a character on the layouts that have it, so it is no Ctrl+Alt shortcut. */
+/* Ctrl and Alt together that type a character, as AltGr does on some layouts, are no shortcut. */
 export function isShortcut(target: LanguageShortcut | null, event: KeyboardEvent): boolean {
-    if (target === null || (event.ctrlKey && event.altKey && event.getModifierState?.('AltGraph') === true)) {
+    if (target === null || typesInsteadOfChord(event, target.apple)) {
         return false;
     }
     return matchesShortcut(target, event, target.apple);
