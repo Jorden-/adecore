@@ -32,7 +32,9 @@ export function SelectSearch<T extends string>({
     const flat = groups ? groups.flatMap((group) => group.items) : (items as SelectItem<T>[]);
     const byValue = new Map(flat.map((item) => [item.value, item]));
     const selected = value === null ? null : (byValue.get(value) ?? null);
-    const comboboxItems = groups ? groups.map((group) => ({ value: group.label, items: group.items.map((item) => item.value) })) : flat.map((item) => item.value);
+    const comboboxItems = groups
+        ? groups.map((group) => ({ value: group.label, items: group.items.map((item) => item.value) }))
+        : flat.map((item) => item.value);
     const searchLabel = searchPlaceholder ?? t('select.search');
 
     const renderRow = (itemValue: T) => {
@@ -66,7 +68,13 @@ export function SelectSearch<T extends string>({
             <Combobox.Trigger
                 ref={ref}
                 aria-label={label}
-                className={clsx('flex shrink-0 items-center whitespace-nowrap text-xs', TRIGGER_SIZE[size], TRIGGER_VARIANT[variant], TRIGGER_DISABLED, className)}
+                className={clsx(
+                    'flex shrink-0 items-center whitespace-nowrap text-xs',
+                    TRIGGER_SIZE[size],
+                    TRIGGER_VARIANT[variant],
+                    TRIGGER_DISABLED,
+                    className
+                )}
             >
                 {selected?.icon}
                 <span className={clsx(truncateValue && 'truncate')}>{selected?.label ?? placeholder ?? t('action.select')}</span>

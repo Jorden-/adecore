@@ -27,7 +27,10 @@ describe('a select', () => {
     test('searches from a number of options on, counting the options of every group', () => {
         expect(render(<Select {...base} searchable={4} />)).toContain('aria-haspopup="listbox"');
         expect(render(<Select {...base} searchable={3} />)).toContain('aria-haspopup="dialog"');
-        const groups = [{ label: 'A', items: items.slice(0, 2) }, { label: 'B', items: items.slice(2) }];
+        const groups = [
+            { label: 'A', items: items.slice(0, 2) },
+            { label: 'B', items: items.slice(2) }
+        ];
         expect(render(<Select {...base} items={groups} searchable={3} />)).toContain('aria-haspopup="dialog"');
     });
 });
