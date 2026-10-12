@@ -117,3 +117,32 @@ test('the tree names its rows, levels and open state, and the editor points at t
         expect(editor.inputPopup).toBeNull();
     });
 });
+
+test('the bottom edge resizes the body by keyboard and reports where it ended', async () => {
+    await inPage(async (page, root) => {
+        const editor = new FakeEditor(page.host, { text: 'run()' } as never);
+        const sizes: number[] = [];
+        const language = {
+            editor,
+            project: { folder: '/work', panelBodyHeight: 180, resizePanelBody: (height: number) => sizes.push(height) },
+            callHierarchy: {}
+        } as unknown as EditorLanguage;
+        const container = page.document.createElement('div');
+        page.document.body.append(container);
+        const view = { direction: 'incoming', container, name: 'run', rows: [], active: '', site: 0, sites: 0, preview: null } as CallHierarchyView;
+        await act(async () => root.render(createElement(CallHierarchyPanel, { language, view })));
+        const handle = page.document.querySelector('[role="separator"]') as HTMLElement;
+        expect(handle.getAttribute('aria-orientation')).toBe('horizontal');
+        expect(handle.getAttribute('aria-valuenow')).toBe('180');
+        const body = () => page.document.querySelector('[role="tree"]')!.parentElement as HTMLElement;
+        expect(body().style.height).toBe('180px');
+        const press = (key: string) => handle.dispatchEvent(Object.assign(new page.window.Event('keydown', { bubbles: true }), { key }));
+        await act(async () => press('ArrowDown'));
+        expect(body().style.height).toBe('202px');
+        await act(async () => press('Home'));
+        expect(body().style.height).toBe('88px');
+        await act(async () => press('ArrowUp'));
+        expect(body().style.height).toBe('88px');
+        expect(sizes).toEqual([202, 88, 88]);
+    });
+});

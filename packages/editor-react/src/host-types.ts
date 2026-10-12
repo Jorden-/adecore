@@ -61,6 +61,10 @@ export interface LanguageHost {
     readonly files?: ProjectFiles;
     readonly apple?: boolean;
     readonly keymap?: Keymap;
+    /* The height in pixels of the list-and-preview area of the peek and the call hierarchy, so a person's drag outlives the panel; 180 without one. */
+    readonly panelBodyHeight?: number;
+    /* A person finished resizing a peek or call hierarchy panel; the height is already within what the editor allows. */
+    onPanelResize?(height: number): void;
     openPlace?(place: Place): void;
     pathOfUri?(uri: string): string | null;
     serverNames?(uri: string): readonly string[];

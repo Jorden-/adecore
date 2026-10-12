@@ -82,6 +82,9 @@
                 "symbol": "Matches"
             }
         },
+        "panel": {
+            "resize": "Resize panel"
+        },
         "peek": {
             "unavailable": "No language server finds references in this file",
             "none": "No references found",

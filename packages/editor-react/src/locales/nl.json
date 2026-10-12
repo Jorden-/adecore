@@ -82,6 +82,9 @@
                 "symbol": "Overeenkomsten"
             }
         },
+        "panel": {
+            "resize": "Paneel vergroten of verkleinen"
+        },
         "peek": {
             "unavailable": "Geen language server vindt referenties in dit bestand",
             "none": "Geen referenties gevonden",

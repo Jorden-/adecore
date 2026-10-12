@@ -7,6 +7,7 @@ import { ProjectProblems } from './project-problems.ts';
 import { applyWorkspaceEdit, type ProjectFiles } from './workspace-edit.ts';
 import type { LanguageHost } from './host-types.ts';
 import { relativeTo } from './paths.ts';
+import { PANEL_BODY_HEIGHT } from './panel-size.ts';
 
 export interface LanguageDocumentHandle {
     readonly uri: string;
@@ -98,6 +99,8 @@ export class ProjectLanguage {
     readonly history = new NavigationHistory();
     private readonly holders = new Map<string, Holder>();
     private readonly files: ProjectFiles | null;
+    /* The body height of the peek and call hierarchy panels, shared by the editors of the project. */
+    panelBodyHeight: number;
     private pendingCaret: Place | null = null;
     private lastPlace: Place | null = null;
     private disposed = false;
@@ -108,7 +111,13 @@ export class ProjectLanguage {
         this.i18n = host.i18n ?? i18next;
         this.folder = host.folder ?? '';
         this.files = host.files ?? null;
+        this.panelBodyHeight = host.panelBodyHeight ?? PANEL_BODY_HEIGHT;
         this.problems = new ProjectProblems(service, (uri) => this.pathOfLocation(uri) ?? uri);
+    }
+
+    resizePanelBody(height: number): void {
+        this.panelBodyHeight = height;
+        this.host.onPanelResize?.(height);
     }
 
     pathOfLocation(uri: string): string | null {

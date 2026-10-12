@@ -10,7 +10,7 @@
 
 ## Peek
 
-`language.peek.open(position?)` shows the references of a name in a panel between the lines of the editor, grouped by file, with the code of the selected one. `peek.openDefinition(position?)` does the same for definitions. The arrow keys pick a place, Enter goes there and Escape closes the panel. The code of other files is read through the project's [`files`](/editor-react/project#workspace-edits); a peek reads at most 30 files (`PEEK_READ_FILES`).
+`language.peek.open(position?)` shows the references of a name in a panel between the lines of the editor, grouped by file, with the code of the selected one. `peek.openDefinition(position?)` does the same for definitions. The arrow keys pick a place, Enter goes there and Escape closes the panel. The code of other files is read through the project's [`files`](/editor-react/project#workspace-edits); a peek reads at most 30 files (`PEEK_READ_FILES`). Dragging the panel's bottom edge, or pressing the arrow keys, Home or End on it, resizes it; the host's `panelBodyHeight` and `onPanelResize` let the app remember the height (see [projects](/editor-react/project#languagehost)). The call hierarchy shares that height.
 
 `PeekPanel` is the panel. It renders into an editor widget row, so it scrolls with the text.
 

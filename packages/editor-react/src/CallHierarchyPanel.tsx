@@ -6,6 +6,9 @@ import { fileUriToPath } from '@adecore/lsp';
 import { Icon, IconButton, Segmented, Spinner, Tooltip } from '@adecore/ui';
 import { formatNumber } from '@adecore/ui/format';
 import { CALL_HIERARCHY_HEIGHT } from './call-hierarchy.ts';
+import { PanelResizeHandle } from './PanelResizeHandle.tsx';
+import { usePanelBody } from './use-panel-body.ts';
+import { PANEL_BODY_HEIGHT } from './panel-size.ts';
 import { CALL_LEVEL_LIMIT, type CallDirection, type CallRow } from './call-hierarchy-model.ts';
 import type { EditorLanguage } from './editor-language.ts';
 import { basenameOf, relativeTo } from './paths.ts';
@@ -178,6 +181,7 @@ function StatusText({ row, direction }: { row: Extract<CallRow, { kind: 'status'
  */
 export function CallHierarchyPanel({ language, view }: { language: EditorLanguage; view: CallHierarchyView }) {
     const { t } = useTranslation('editor');
+    const body = usePanelBody(language);
     if (view.container === null) {
         return null;
     }
@@ -187,7 +191,7 @@ export function CallHierarchyPanel({ language, view }: { language: EditorLanguag
     return createPortal(
         <div
             className="flex flex-col bg-surface pt-[2px] font-sans text-xs text-text"
-            style={{ height: CALL_HIERARCHY_HEIGHT }}
+            style={{ height: CALL_HIERARCHY_HEIGHT - PANEL_BODY_HEIGHT + body.height }}
             onPointerDown={(event) => event.preventDefault()}
         >
             <div className="peek-hatch h-[14px]" />
@@ -227,11 +231,13 @@ export function CallHierarchyPanel({ language, view }: { language: EditorLanguag
                     <IconButton icon={X} size="xs" label={t('language.callHierarchy.close')} onClick={() => language.callHierarchy.close()} />
                 </div>
             </div>
-            <div className="flex h-[180px] shrink-0">
+            <div className="flex shrink-0" style={{ height: body.height }}>
                 <Tree language={language} view={view} />
                 <Preview preview={view.preview} />
             </div>
-            <div className="peek-hatch h-[14px]" />
+            <div className="peek-hatch relative h-[14px]">
+                <PanelResizeHandle container={view.container} height={body.height} onHeight={body.set} onCommit={body.commit} />
+            </div>
         </div>,
         view.container
     );

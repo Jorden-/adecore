@@ -9,6 +9,9 @@ import { basenameOf, relativeTo } from './paths.ts';
 import type { EditorLanguage } from './editor-language.ts';
 import { shikiLanguageOfPath } from './language-ids.ts';
 import { PathText } from './PathText.tsx';
+import { PanelResizeHandle } from './PanelResizeHandle.tsx';
+import { usePanelBody } from './use-panel-body.ts';
+import { PANEL_BODY_HEIGHT } from './panel-size.ts';
 import { PEEK_HEIGHT } from './peek.ts';
 import { distinguishingFolders, visualColumnOf, type NameRange, type PeekPlace } from './peek-model.ts';
 import type { PeekView } from './popups.ts';
@@ -179,13 +182,14 @@ export function PeekPanel({ language, view }: { language: EditorLanguage; view: 
     const path = active === undefined ? null : fileUriToPath(active.location.uri);
     const folder = language.project.folder;
     const shown = path === null ? '' : folderOf(relativeTo(path, folder));
+    const body = usePanelBody(language);
     if (view.container === null) {
         return null;
     }
     return createPortal(
         <div
             className="flex flex-col bg-surface pt-[2px] font-sans text-xs text-text"
-            style={{ height: PEEK_HEIGHT }}
+            style={{ height: PEEK_HEIGHT - PANEL_BODY_HEIGHT + body.height }}
             onPointerDown={(event) => event.preventDefault()}
         >
             <div className="peek-hatch h-[14px]" />
@@ -202,11 +206,13 @@ export function PeekPanel({ language, view }: { language: EditorLanguage; view: 
                     <IconButton icon={X} size="xs" label={t('language.peek.close')} onClick={() => language.peek.close()} />
                 </div>
             </div>
-            <div className="flex h-[180px] shrink-0">
+            <div className="flex shrink-0" style={{ height: body.height }}>
                 <Preview preview={view.preview} />
                 <Places language={language} view={view} />
             </div>
-            <div className="peek-hatch h-[14px]" />
+            <div className="peek-hatch relative h-[14px]">
+                <PanelResizeHandle container={view.container} height={body.height} onHeight={body.set} onCommit={body.commit} />
+            </div>
         </div>,
         view.container
     );
