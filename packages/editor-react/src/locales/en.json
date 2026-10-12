@@ -195,6 +195,27 @@
         "fold": {
             "fold": "Fold lines {{start}} to {{end}}",
             "unfold": "Unfold lines {{start}} to {{end}}"
+        },
+        "docs": {
+            "label": "Rendered documentation",
+            "render": "Show rendered documentation",
+            "showSource": "Show documentation source",
+            "tags": {
+                "deprecated": "Deprecated",
+                "template": "Type parameters",
+                "param": "Parameters",
+                "property": "Properties",
+                "type": "Type",
+                "var": "Variable",
+                "return": "Returns",
+                "yield": "Yields",
+                "throws": "Throws",
+                "see": "See also",
+                "example": "Example",
+                "since": "Since",
+                "version": "Version",
+                "author": "Author"
+            }
         }
     },
     "commands": {

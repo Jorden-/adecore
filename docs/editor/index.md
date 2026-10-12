@@ -70,6 +70,6 @@ A pen behaves like a mouse. Selection handles to extend a selection with a finge
 - Folding ranges and the marks of a selection's other occurrences are skipped in a document over 2 million characters.
 - Search and folding read the whole document synchronously, and a regular expression has no time limit; see the [limits of the model](/editor-core/#limits).
 - Wrapped lines break at spaces, or inside a word that does not fit, and continue at the line's indentation plus two columns.
-- Documentation comments are drawn as text, not rendered.
+- Documentation comments are drawn as text unless the host renders them with [`setReplacements`](/editor/rows#replacing-lines); the rendering itself is in [`@adecore/editor-react`](/editor-react/rendered-documentation). A replaced row has no caret of its own, so find marks and selections inside it are not drawn until the lines are shown as text.
 
 The package is FSL-1.1-MIT.

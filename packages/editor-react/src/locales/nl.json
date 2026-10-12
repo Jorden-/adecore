@@ -195,6 +195,27 @@
         "fold": {
             "fold": "Regels {{start}} tot {{end}} invouwen",
             "unfold": "Regels {{start}} tot {{end}} uitvouwen"
+        },
+        "docs": {
+            "label": "Weergegeven documentatie",
+            "render": "Toon weergegeven documentatie",
+            "showSource": "Toon bron van documentatie",
+            "tags": {
+                "deprecated": "Verouderd",
+                "template": "Typeparameters",
+                "param": "Parameters",
+                "property": "Eigenschappen",
+                "type": "Type",
+                "var": "Variabele",
+                "return": "Geeft terug",
+                "yield": "Levert op",
+                "throws": "Gooit",
+                "see": "Zie ook",
+                "example": "Voorbeeld",
+                "since": "Sinds",
+                "version": "Versie",
+                "author": "Auteur"
+            }
         }
     },
     "commands": {

@@ -71,3 +71,7 @@ Large dense edit batches rebuild the rope in one pass and emit one `contentEdits
 `replacementText` accepts an optional sixth `maxCharacters` argument, after `preserveCase`. It throws `RangeError` before concatenating expanded output above that limit. Without the argument its existing expansion behavior remains unchanged.
 
 `DocumentEditOptions.selectionPositions` supplies anchor/head positions in the resulting text. They are resolved against the new rope and recorded in the same undo state. Columns are clamped to their line, and a line outside the resulting text throws (the editor engine reports that as `false`). They are ignored when the edits leave the text unchanged. Explicit offset `selections` take precedence when both are supplied. Without either, selections keep their usual mapping.
+
+## Documentation comments
+
+`findDocComments(text, languageId, limit?)` returns the documentation comments of a text that have their lines to themselves, as `DocComment`s: `from` and `to` offsets, zero-based inclusive `startLine` and `endLine`, the `indent` in front of the opener and the `body` with the delimiters and margin stars taken off. Only languages that write block comments with a slash and a star have any, a Vue file has them in its script, and past `MAX_DOC_COMMENTS` (500, or `limit`) comments the rest are left out. [`@adecore/editor-react`](/editor-react/rendered-documentation) draws them as formatted text.

@@ -18,6 +18,7 @@ import { PeekFeature } from './peek.ts';
 import { PickFeature } from './pick.ts';
 import { SymbolPickerFeature } from './symbol-picker.ts';
 import { RenameFeature } from './rename.ts';
+import { RenderedDocsFeature } from './rendered-docs.ts';
 import { shortcutsOf } from './shortcut-keys.ts';
 import { createPopupStore } from './popups.ts';
 import { realTimers, type Timers } from './timers.ts';
@@ -64,6 +65,7 @@ export class EditorLanguage {
     readonly symbols: SymbolsFeature;
     readonly codeVision: CodeVisionFeature;
     readonly formatOnType: FormatOnTypeFeature;
+    readonly renderedDocs: RenderedDocsFeature;
     private readonly disposers: Array<() => void> = [];
     private disposed = false;
 
@@ -97,6 +99,7 @@ export class EditorLanguage {
         this.definitionLink = new DefinitionLinkFeature(this);
         this.codeVision = new CodeVisionFeature(this, (listener) => this.symbols.onResult(listener), timers);
         this.formatOnType = new FormatOnTypeFeature(this);
+        this.renderedDocs = new RenderedDocsFeature(this, timers);
         new FoldingFeature(this, (listener) => this.symbols.onResult(listener), timers);
         this.placeOpenedCaret(editor.getCaret());
         this.onDispose(editor.onCaret((position) => this.placeOpenedCaret(position)));

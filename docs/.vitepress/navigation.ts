@@ -353,7 +353,8 @@ export const sidebar: DefaultTheme.SidebarMulti = {
             ['FindReplace', '/editor-react/find-replace'],
             ['Reviews and agents', '/editor-react/change-review'],
             ['Patch files', '/editor-react/patch-files'],
-            ['Code vision', '/editor-react/code-vision']
+            ['Code vision', '/editor-react/code-vision'],
+            ['Rendered documentation', '/editor-react/rendered-documentation']
         ]),
         group('Reference', [
             ['Models', '/editor-react/models'],

@@ -343,6 +343,14 @@
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z'/%3E%3C/svg%3E")
         center / contain no-repeat;
 }
+.se-gutter-marker[aria-pressed='true'] {
+    color: var(--accent);
+}
+/* Lucide's book-open. */
+.se-gutter-marker[data-icon='book-open']::before {
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 7v14'/%3E%3Cpath d='M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z'/%3E%3C/svg%3E")
+        center / contain no-repeat;
+}
 .se-change {
     position: absolute;
     top: 0;
@@ -769,6 +777,13 @@
     line-height: var(--text-xs--line-height);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+}
+/* Lines the host drew in place of the text: a row in the text column that scrolls with the code, selectable as the page's own text is. */
+.se-block.se-replacement {
+    padding: 0;
+    color: var(--text);
+    white-space: normal;
+    user-select: text;
 }
 /* The host's own row runs the width of the editor over the gutter and under the pinned headers, so the code layer has no stacking of its own. */
 .se-block.se-widget {

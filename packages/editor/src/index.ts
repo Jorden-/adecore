@@ -1,5 +1,6 @@
 export { MAX_REPLACEMENT_PAGE, MAX_REPLACEMENT_CHARACTERS } from './search-protocol.ts';
 export { AGENT_COLORS } from './attribution.ts';
+export { findDocComments, MAX_DOC_COMMENTS, type DocComment } from '@adecore/editor-core';
 export { createSmartEditorEngine } from './engine.ts';
 export { DEFAULT_SMART_KEYS } from './smart-keys.ts';
 export { shikiScopeColors, shikiTokenizers } from './shiki.ts';
@@ -29,7 +30,9 @@ export type {
     EditorFindState,
     EditorReplaceOptions,
     EditorGutterAction,
+    EditorGutterIcon,
     EditorGutterMarker,
+    EditorReplacement,
     EditorIndentation,
     EditorContentChange,
     EditorHighlight,

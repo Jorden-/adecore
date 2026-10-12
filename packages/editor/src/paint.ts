@@ -1,6 +1,7 @@
 import { offsetOfStop, rowOfStop, stopAtOffset, stopCount, xOfStop } from './geometry-stops.ts';
 import { type AttributedLines, colorValue, tintValue } from './attribution.ts';
 import {
+    type BlockReplacement,
     type BlockWidget,
     type EditorLayout,
     type LayoutRect,
@@ -12,7 +13,7 @@ import {
     type VerticalWindow,
     type TextRow
 } from './layout.ts';
-import type { EditorChangeKind, LineToken } from './types.ts';
+import type { EditorChangeKind, EditorGutterIcon, LineToken } from './types.ts';
 import { BIDI_CONTROLS, BIDI_PATTERN, visibleBidi } from './bidi.ts';
 
 const ITALIC = 1;
@@ -215,7 +216,9 @@ export class RowPainter {
         }
         let measured = false;
         for (const row of rows) {
-            if (row.kind === 'text') {
+            if (row.kind === 'text' && row.replacement !== undefined) {
+                measured = this.paintReplacement(row, row.replacement, paint) || measured;
+            } else if (row.kind === 'text') {
                 this.paintText(row, paint);
             } else {
                 measured = this.paintBlock(row, paint) || measured;
@@ -323,6 +326,38 @@ export class RowPainter {
         appendBidiSigns(element, geometry, this.layout.metrics.lineHeight, { first: 0, last: 0 }, left, (header.subRows - 1) * this.layout.metrics.lineHeight);
     }
 
+    /* The lines the host draws itself: an element of its own, indented as the first line is and as tall as its content. */
+    private paintReplacement(row: TextRow, replacement: BlockReplacement, paint: RowPaint): boolean {
+        const revision = replacement.revision ?? 0;
+        let entry = this.rows.get(row.key);
+        if (!entry) {
+            const element = this.code.ownerDocument.createElement('div');
+            element.className = 'se-block se-replacement';
+            element.dataset.rowKey = row.key;
+            element.dataset.replacementId = replacement.id;
+            element.setAttribute('role', 'group');
+            if (replacement.label !== undefined) {
+                element.setAttribute('aria-label', replacement.label);
+            }
+            replacement.render(element);
+            this.code.append(element);
+            entry = { element, text: '', tokens: null, layoutVersion: 0, whitespace: false, folded: false, tail: '', tailTokens: null, revision };
+            this.rows.set(row.key, entry);
+        } else if (entry.revision !== revision) {
+            entry.element.replaceChildren();
+            replacement.render(entry.element);
+            entry.revision = revision;
+        }
+        const indent = this.layout.indentX(row.line);
+        entry.element.style.top = `${row.top}px`;
+        entry.element.style.left = `${indent}px`;
+        entry.element.style.width = `${Math.max(80, paint.viewportWidth - indent)}px`;
+        entry.element.style.height = '';
+        this.observer?.observe(entry.element);
+        const height = entry.element.getBoundingClientRect?.().height ?? 0;
+        return height > 0 && this.layout.setMeasuredHeight(row.key, height);
+    }
+
     private paintBlock(row: Extract<LayoutRow, { kind: 'block' }>, paint: RowPaint): boolean {
         const { widget } = row;
         const revision = widget.revision ?? 0;
@@ -402,7 +437,7 @@ export interface GutterPaint {
     /* The line that carries the host's button, and what it is called. */
     action: { line: number; label: string } | null;
     /* The host's markers by line. */
-    markers: ReadonlyMap<number, { id: string; label: string }>;
+    markers: ReadonlyMap<number, { id: string; label: string; icon?: EditorGutterIcon; pressed?: boolean }>;
 }
 
 function gutterButton(document: Document, className: string, label: string): HTMLButtonElement {
@@ -462,6 +497,12 @@ export function paintGutter(container: HTMLElement, layout: EditorLayout, rows: 
         if (marker !== undefined) {
             const button = gutterButton(document, 'se-gutter-marker', marker.label);
             button.dataset.gutterMarker = marker.id;
+            if (marker.icon !== undefined) {
+                button.dataset.icon = marker.icon;
+            }
+            if (marker.pressed !== undefined) {
+                button.setAttribute('aria-pressed', String(marker.pressed));
+            }
             item.append(button);
         }
         const sign = paint.highlights.get(row.line)?.sign;

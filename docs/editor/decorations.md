@@ -45,7 +45,7 @@ All three inlay methods are optional on `Editor`, so an editor from before them 
 ## Gutter buttons
 
 - `setGutterAction(action)` puts one button in the gutter, `{ line, label }`, such as a lightbulb for code actions. `onGutterAction` reports a press with the zero-based line. `null` removes it.
-- `setGutterMarkers(markers, owner?)` puts small buttons on lines, `{ id, line, label }`, such as the mark of a saved inline edit. Each owner has its own set and `default` is the owner without one. `onGutterMarker` reports a press with the id.
+- `setGutterMarkers(markers, owner?)` puts small buttons on lines, `{ id, line, label, icon?, pressed? }`, such as the mark of a saved inline edit. The `icon` is `sparkles` by default or `book-open`, and `pressed` draws a toggle as switched on and sets `aria-pressed`. Each owner has its own set and `default` is the owner without one. `onGutterMarker` reports a press with the id.
 
 ## Lines, from one or from zero
 

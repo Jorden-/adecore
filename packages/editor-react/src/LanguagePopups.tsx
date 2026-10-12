@@ -10,6 +10,7 @@ import { HoverCard } from './HoverCard.tsx';
 import { PeekPanel } from './PeekPanel.tsx';
 import { PickPopup } from './PickPopup.tsx';
 import { RenameCard } from './RenameCard.tsx';
+import { RenderedDocs } from './RenderedDocs.tsx';
 import { SymbolPicker } from './SymbolPicker.tsx';
 import { SignatureCard } from './SignatureCard.tsx';
 
@@ -41,6 +42,7 @@ export function LanguagePopups({ language, contextMenuItems }: { language: Edito
     const renameEnd = rename === null ? null : language.editor.rectAt(rename.range.end);
     return (
         <>
+            <RenderedDocs language={language} />
             {hover !== null && hoverRect !== null && (
                 <AnchoredPopup rect={hoverRect} onPointerEnter={() => language.hover.holdCard(true)} onPointerLeave={() => language.hover.holdCard(false)}>
                     <HoverCard language={language} problems={hover.problems} info={hover.info} anchor={hover.anchor} position={hover.position} />

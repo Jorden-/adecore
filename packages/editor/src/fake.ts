@@ -5,6 +5,7 @@ import type {
     EditorBlock,
     EditorCodeBlockOptions,
     EditorLineAction,
+    EditorReplacement,
     EditorLineHighlight,
     LineToken,
     EditorChangeMark,
@@ -415,6 +416,16 @@ export class FakeEditor implements Editor {
             }
         }
         this.drawnWidgets.set(owner, new Set(widgets.map((widget) => widget.id)));
+    }
+
+    readonly replacementsByOwner = new Map<string, readonly EditorReplacement[]>();
+
+    setReplacements(replacements: readonly EditorReplacement[], owner = 'default'): void {
+        if (replacements.length === 0) {
+            this.replacementsByOwner.delete(owner);
+        } else {
+            this.replacementsByOwner.set(owner, replacements);
+        }
     }
 
     readonly lineActionsByOwner = new Map<string, readonly EditorLineAction[]>();

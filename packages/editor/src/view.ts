@@ -16,6 +16,7 @@ import {
 import { createSearchClient, type EditorSearchClientOptions } from './search-client.ts';
 import { FindController } from './find.ts';
 import {
+    type BlockReplacement,
     type BlockWidget,
     EditorLayout,
     type FoldState,
@@ -62,6 +63,7 @@ import type {
     EditorHighlightKind,
     EditorInputPopup,
     EditorLineHighlight,
+    EditorGutterIcon,
     EditorMarkerSeverity,
     EditorMessages,
     EditorRect,
@@ -165,6 +167,14 @@ export interface ViewSemanticToken {
 }
 
 /* A problem the host marked, anchored to offsets that follow the text through edits. */
+export interface GutterMarker {
+    id: string;
+    line: number;
+    label: string;
+    icon?: EditorGutterIcon;
+    pressed?: boolean;
+}
+
 export interface ViewMarker {
     severity: EditorMarkerSeverity;
     from: number;
@@ -213,7 +223,7 @@ export class EditorView {
     private readonly gutterActionListeners = new Set<(line: number) => void>();
     private gutterAction: { line: number; label: string } | null = null;
     private readonly gutterMarkerListeners = new Set<(id: string) => void>();
-    private readonly gutterMarkers = new Map<string, readonly { id: string; line: number; label: string }[]>();
+    private readonly gutterMarkers = new Map<string, readonly GutterMarker[]>();
     private lineTokenProvider: ((line: number) => readonly LineToken[] | null | undefined) | null = null;
     private lineNumberProvider: ((line: number) => string | null) | null = null;
     private lineNumberLabels: (string | null)[] = [];
@@ -265,6 +275,7 @@ export class EditorView {
     /* The host's widgets by owner, so one owner setting its rows never takes another's away. */
     private readonly blocks = new Map<string, BlockWidget[]>();
     private lenses: BlockWidget[] = [];
+    private readonly replacements = new Map<string, BlockReplacement[]>();
     private occurrences: Occurrence[] = [];
     private replacePreview: { text: string; preserveCase: boolean } | null = null;
     private dropCaret: number | null = null;
@@ -482,6 +493,24 @@ export class EditorView {
         }
         this.anchorScroll(() => this.layout.configure({ blocks: this.allBlocks() }));
         this.render();
+    }
+
+    /* Lines the host draws as a row of its own, by owner; where two owners claim the same line the owner that sorts first keeps it. */
+    setReplacements(owner: string, replacements: readonly BlockReplacement[]): void {
+        if (replacements.length === 0 && !this.replacements.has(owner)) {
+            return;
+        }
+        if (replacements.length === 0) {
+            this.replacements.delete(owner);
+        } else {
+            this.replacements.set(owner, [...replacements]);
+        }
+        this.anchorScroll(() => this.layout.configure({ replacements: this.allReplacements() }));
+        this.render();
+    }
+
+    private allReplacements(): BlockReplacement[] {
+        return [...this.replacements.keys()].sort().flatMap((owner) => this.replacements.get(owner)!);
     }
 
     /* The quiet rows above declarations: kept apart from the host's widgets, so setting one kind never takes the other away. */
@@ -715,7 +744,14 @@ export class EditorView {
             this.outline.edited(batches);
             this.changeVersion++;
             this.tokens.edited(batches, (offset) => this.model.positionAt(offset).line);
-            this.layout.configure({ textChanged: true, changes: batches, inlays: this.displayedInlays(), blocks: this.allBlocks(), folds: this.foldStates() });
+            this.layout.configure({
+                textChanged: true,
+                changes: batches,
+                inlays: this.displayedInlays(),
+                blocks: this.allBlocks(),
+                folds: this.foldStates(),
+                replacements: this.allReplacements()
+            });
             if (anchor && this.viewport.scrollTop > 0) {
                 let offset = anchor.offset;
                 for (const changes of batches) {
@@ -745,6 +781,12 @@ export class EditorView {
             );
         }
         this.lenses = this.lenses.map((lens) => ({ ...lens, at: map(lens.at) }));
+        for (const [owner, entries] of this.replacements) {
+            this.replacements.set(
+                owner,
+                entries.map((entry) => ({ ...entry, from: map(entry.from), to: map(entry.to) }))
+            );
+        }
         this.collapsed = new Set([...this.collapsed].map((anchor) => map(anchor)));
         this.settled = new Set([...this.settled].map((anchor) => map(anchor)));
         if (this.foldHints !== null) {
@@ -2617,11 +2659,18 @@ export class EditorView {
         return subscribe(this.gutterActionListeners, listener);
     }
 
-    setGutterMarkers(owner: string, markers: readonly { id: string; line: number; label: string }[]): void {
+    setGutterMarkers(owner: string, markers: readonly GutterMarker[]): void {
         const before = this.gutterMarkers.get(owner) ?? [];
         if (
             before.length === markers.length &&
-            before.every((marker, index) => marker.id === markers[index]!.id && marker.line === markers[index]!.line && marker.label === markers[index]!.label)
+            before.every(
+                (marker, index) =>
+                    marker.id === markers[index]!.id &&
+                    marker.line === markers[index]!.line &&
+                    marker.label === markers[index]!.label &&
+                    marker.icon === markers[index]!.icon &&
+                    marker.pressed === markers[index]!.pressed
+            )
         ) {
             return;
         }
@@ -2648,12 +2697,12 @@ export class EditorView {
     }
 
     /* One marker per line: where two owners mark the same line, the owner that sorts first stays. */
-    private markersByLine(): ReadonlyMap<number, { id: string; label: string }> {
-        const byLine = new Map<number, { id: string; label: string }>();
+    private markersByLine(): ReadonlyMap<number, GutterMarker> {
+        const byLine = new Map<number, GutterMarker>();
         for (const owner of [...this.gutterMarkers.keys()].sort()) {
             for (const marker of this.gutterMarkers.get(owner)!) {
                 if (!byLine.has(marker.line)) {
-                    byLine.set(marker.line, { id: marker.id, label: marker.label });
+                    byLine.set(marker.line, marker);
                 }
             }
         }

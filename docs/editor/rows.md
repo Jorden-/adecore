@@ -26,6 +26,12 @@ editor.setWidgets(
 
 The editor makes the container again whenever the row scrolls back into view and calls `render` again, so keep state outside the container. A widget stays on its line until its owner sets the widgets again. To render React into rows, use [`RowHost`](/editor-react/change-review#rows-and-actions-in-react).
 
+## Replacing lines
+
+`setReplacements(replacements, owner?)` draws lines of the document as a row of the host's own DOM, such as a documentation comment drawn as formatted text. An `EditorReplacement` has an `id`, the zero-based, inclusive `startLine` and `endLine`, an estimated `height`, an optional `label` for assistive technology and `render(container)`. The row is as tall as its content, measured like a widget, and stands at the indentation of the first line.
+
+The lines stay in the document, so the text, the undo history and the language servers do not change. The row follows its lines through edits until its owner sets the replacements again. Owners do not take each other's rows away; where two claim the same first line, the owner that sorts first keeps it. A row has no caret: the caret stays on the first line, and a host that wants the lines edited takes the replacement away when the caret comes near, as [rendered documentation](/editor-react/rendered-documentation) does. A collapsed fold on the first line draws its own placeholder instead. The container has `role="group"` and the `label`, and it is not hidden from assistive technology. Press, drag and selection in the row never reach the editor's text.
+
 ## Code that is not in the document
 
 `renderCode(container, text, options?)` fills an element with lines in the editor's font and colors, behind a gutter as wide as the editor's, so they line up with the document. It is meant for a widget's `render`: the lines an agent removed, or the other side of a conflict.
@@ -71,13 +77,10 @@ The row is one code line high and stands at the declaration's indentation. It ke
 
 A widget with `fixed: true` uses its `height` as exact pixels and is never measured. This keeps spacer and gap rows identical across linked layouts. Omitted height uses the normal initial widget height.
 
-
 Long wrapped lines keep their full layout and text for selection, copying and hit testing. The text DOM draws a band of visual rows around the viewport, in blocks of 64 rows. Selection, find marks and wrap signs are clipped to the same viewport and overscan. This bounds painting; measuring a line still reads its full text.
-
 
 Edits retain the geometry and measured wrap height of untouched lines, including when earlier edits move a line. A changed line is measured again; lines with inlays, folded partial lines and metric or wrap-width changes take the full measurement path. Each retained line includes its CRLF ending when checking whether an edit touches it. Layout still rebuilds the document's row list, and an edit inside a long line still measures that full line.
 
 Measured wrap heights are kept for at most 400 lines in insertion order. Unwrapped lines keep no height entries. After eviction a line uses its height estimate until drawn again, so a long scroll history cannot increase the work of mapping cached measurements on each edit.
-
 
 Wrapped printable ASCII lines over 20,000 UTF-16 units, without tabs or inlays, use compact geometry. Only row boundaries, wrap triggers and text runs grow with the document. X positions share two short prefixes, preserving floating-point addition exactly. Rows longer than 4,096 characters, non-ASCII text, unwrapped lines and IME inlays use the existing dense geometry. Editing an eligible line still scans its text, but no longer builds four character arrays. Caret placement, hit testing and selection read both representations through the same geometry accessors.

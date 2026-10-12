@@ -72,6 +72,21 @@ export interface BlockWidget {
     fixed?: boolean;
 }
 
+/* The lines from `from` through `to` drawn as a row of the host's own DOM, as tall as the host makes it, while the text stays in the document. */
+export interface BlockReplacement {
+    id: string;
+    /* Offsets inside the first and the last line it stands for. */
+    from: number;
+    to: number;
+    render: (container: HTMLElement) => void;
+    /* The height until the row has been measured. */
+    height?: number;
+    /* Drawn again in the element it already has when this changes, which `render` alone never is. */
+    revision?: number;
+    /* What assistive technology calls the row. */
+    label?: string;
+}
+
 /* Collapsed, it hides the lines after `startLine` through `endLine`. */
 export interface FoldState {
     startLine: number;
@@ -102,6 +117,8 @@ export interface TextRow extends RowBase {
     head: number | null;
     /* Visual lines, which is more than one for a wrapped line. */
     subRows: number;
+    /* Set when the host draws the lines `line` through `lastLine` itself; the row is then as tall as its content. */
+    replacement?: BlockReplacement;
 }
 
 export interface BlockRow extends RowBase {
@@ -369,6 +386,7 @@ export interface LayoutConfig {
     inlays?: readonly Inlay[];
     blocks?: readonly BlockWidget[];
     folds?: readonly FoldState[];
+    replacements?: readonly BlockReplacement[];
 }
 
 /*
@@ -390,6 +408,7 @@ export class EditorLayout {
     private inlays: readonly Inlay[] = [];
     private blocks: readonly BlockWidget[] = [];
     private folds: readonly FoldState[] = [];
+    private replacements: readonly BlockReplacement[] = [];
     private wrapWidth: number | null = null;
 
     readonly document: LayoutDocument;
@@ -424,6 +443,10 @@ export class EditorLayout {
         }
         if (config.folds) {
             this.folds = config.folds;
+            this.lineHeightsVersion++;
+        }
+        if (config.replacements) {
+            this.replacements = config.replacements;
             this.lineHeightsVersion++;
         }
         if (measureAgain || (config.textChanged && !config.changes?.length)) {
@@ -524,6 +547,15 @@ export class EditorLayout {
                 folds.set(fold.startLine, fold);
             }
         }
+        const replaced = new Map<number, { replacement: BlockReplacement; endLine: number }>();
+        for (const replacement of this.replacements) {
+            const startLine = this.document.positionAt(replacement.from).line;
+            const endLine = Math.max(startLine, this.document.positionAt(replacement.to).line);
+            // A fold the person collapsed shows its own placeholder, so folding a replaced comment keeps working.
+            if (!folds.has(startLine) && !replaced.has(startLine)) {
+                replaced.set(startLine, { replacement, endLine });
+            }
+        }
         const count = this.document.getLineCount();
         this.rows = [];
         this.lineRows = new Array<number>(count);
@@ -546,6 +578,33 @@ export class EditorLayout {
         for (let line = 0; line < count; line++) {
             for (const block of above.get(line) ?? []) {
                 addBlock(block, line);
+            }
+            const standIn = replaced.get(line);
+            if (standIn !== undefined) {
+                const last = Math.min(count - 1, standIn.endLine);
+                const key = `replaced:${standIn.replacement.id}`;
+                const index = this.rows.length;
+                this.rows.push({
+                    key,
+                    kind: 'text',
+                    index,
+                    line,
+                    lastLine: last,
+                    tail: null,
+                    head: null,
+                    subRows: 1,
+                    top: 0,
+                    height: this.measuredHeights.get(key) ?? standIn.replacement.height ?? DEFAULT_BLOCK_HEIGHT,
+                    replacement: standIn.replacement
+                });
+                for (let covered = line; covered <= last; covered++) {
+                    this.lineRows[covered] = index;
+                }
+                for (const block of below.get(last) ?? []) {
+                    addBlock(block, last);
+                }
+                line = last;
+                continue;
             }
             const fold = folds.get(line);
             const last = Math.max(line, Math.min(count - 1, fold?.endLine ?? line));
@@ -609,7 +668,7 @@ export class EditorLayout {
     syncRows(rows: readonly LayoutRow[]): boolean {
         let changed = false;
         for (const row of rows) {
-            if (row.kind !== 'text') {
+            if (row.kind !== 'text' || row.replacement !== undefined) {
                 continue;
             }
             const geometry = this.geometry(row);
@@ -827,7 +886,11 @@ export class EditorLayout {
         const result: LayoutRect[] = [];
         const lineHeight = this.metrics.lineHeight;
         for (const row of rows) {
-            if (row.kind !== 'text' || (window !== undefined && (row.top >= window.bottom || row.top + row.height <= window.top))) {
+            if (
+                row.kind !== 'text' ||
+                row.replacement !== undefined ||
+                (window !== undefined && (row.top >= window.bottom || row.top + row.height <= window.top))
+            ) {
                 continue;
             }
             const geometry = this.geometry(row);

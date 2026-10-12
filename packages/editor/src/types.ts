@@ -349,6 +349,26 @@ export interface EditorWidget {
 }
 
 /*
+ * Lines of the text drawn as a row of the host's own DOM instead, such as a documentation comment drawn
+ * as formatted text. The lines stay in the document: copying, searching and the undo history see them as
+ * they are, and the row is as tall as its content. Put the caret on one of the lines, or fold them,
+ * and the editor draws the text again; it is for the host to take the row away at that moment when it
+ * wants the lines edited.
+ */
+export interface EditorReplacement {
+    readonly id: string;
+    /* Zero-based and inclusive; the row follows its lines through edits until its owner sets its replacements again. */
+    readonly startLine: number;
+    readonly endLine: number;
+    /* The height the row has until it has been measured. */
+    readonly height?: number;
+    /* What assistive technology calls the row. */
+    readonly label?: string;
+    /* Fills the element the row is drawn in, which the editor makes again whenever the row scrolls back into view. */
+    render(container: HTMLElement): void;
+}
+
+/*
  * The host's own DOM after the last character of a line of the text, such as the buttons of a change
  * under review. It is not part of the document and not part of the row, so it takes no height and
  * moves nothing.
@@ -472,6 +492,9 @@ export interface EditorGutterAction {
     readonly label: string;
 }
 
+/* The glyphs a gutter marker can have. */
+export type EditorGutterIcon = 'sparkles' | 'book-open';
+
 /* A small button in the gutter on one line that the host keeps apart from the code action, such as the mark of a saved inline edit. */
 export interface EditorGutterMarker {
     /* What `onGutterMarker` says when it is pressed. */
@@ -479,6 +502,10 @@ export interface EditorGutterMarker {
     /* Zero-based; it stays on this line until the host sets its markers again. */
     readonly line: number;
     readonly label: string;
+    /* The glyph; the sparkles without one. */
+    readonly icon?: EditorGutterIcon;
+    /* Drawn as switched on, for a marker that toggles something. */
+    readonly pressed?: boolean;
 }
 
 /*
@@ -702,6 +729,12 @@ export interface Editor {
      * set its rows last. An empty list takes the owner's rows away.
      */
     setWidgets(widgets: readonly EditorWidget[], owner?: string): void;
+    /*
+     * Lines drawn as rows of the host's own DOM, replacing the ones the same owner set before; other
+     * owners keep theirs. Where two owners claim the same first line the owner that sorts first keeps
+     * it, and a line the person folded draws its fold instead. Optional so an editor from before it still fits.
+     */
+    setReplacements?(replacements: readonly EditorReplacement[], owner?: string): void;
     /* The actions of one owner (`default` without one), replacing the ones it set before and leaving every other owner's alone. A line that a fold hides has none. */
     setLineActions(actions: readonly EditorLineAction[], owner?: string): void;
     /* The code vision rows above declarations, replacing the ones set before. Separate from the widgets, which they never displace. */

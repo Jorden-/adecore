@@ -28,6 +28,7 @@ import type {
     EditorReplaceOptions,
     EditorGutterAction,
     EditorGutterMarker,
+    EditorReplacement,
     EditorHighlight,
     EditorHover,
     EditorGhostText,
@@ -694,6 +695,23 @@ class SmartEditor implements Editor {
                 render: (container: HTMLElement) => {
                     container.classList.add('se-widget');
                     widget.render(container);
+                }
+            }))
+        );
+    }
+
+    setReplacements(replacements: readonly EditorReplacement[], owner: string = DEFAULT_WIDGET_OWNER): void {
+        this.view.setReplacements(
+            owner,
+            replacements.map((replacement) => ({
+                id: `replacement:${owner}:${replacement.id}`,
+                from: this.offsetAt({ line: replacement.startLine, character: 0 }),
+                to: this.model.getLine(Math.max(0, Math.min(replacement.endLine, this.model.getLineCount() - 1))).end,
+                height: replacement.height,
+                label: replacement.label,
+                render: (container: HTMLElement) => {
+                    container.classList.add('se-widget-replacement');
+                    replacement.render(container);
                 }
             }))
         );
