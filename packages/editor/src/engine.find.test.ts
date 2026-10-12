@@ -379,3 +379,15 @@ test('replacement output refusal leaves the text and undo history untouched', as
     expect(editor.runCommand('undo')).toBe(false);
     editor.dispose();
 });
+
+test('a backward step queued during a limited regex search chooses the true predecessor past the cache', async () => {
+    const { editor } = setup({ text: 'e '.repeat(10001) });
+    editor.setCaret({ line: 0, character: 20002 });
+    const done = findAsync(editor, { text: 'e', regex: true, caseSensitive: true, wholeWord: false });
+    editor.findStep(-1);
+    const state = await done;
+    expect(state).toMatchObject({ count: 10000, current: null, limited: true });
+    editor.endFind();
+    expect(editor.getCaret().character).toBe(20001);
+    editor.dispose();
+});

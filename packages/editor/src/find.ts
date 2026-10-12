@@ -53,6 +53,8 @@ export class FindController {
     private cancelMatch: (() => void) | undefined;
     private preview = false;
     private disposed = false;
+    private revision = -1;
+    private cursorRequests = 0;
 
     constructor(model: DocumentModel, options?: FindControllerOptions) {
         this.model = model;
@@ -203,13 +205,17 @@ export class FindController {
      * previous one was, or from the cursor, so each letter typed keeps the place instead of starting over.
      */
     refresh(): void {
+        if (this.revision !== this.model.getRevision()) {
+            this.revision = this.model.getRevision();
+            this.replaced = undefined;
+        }
         const previous = this.currentMark;
         const query = this.query;
         if (this.search !== undefined && query?.regex) {
             this.refreshRegex(previous);
             return;
         }
-        this.resetRegex(true);
+        this.resetRegex(query === null);
 
         if (query === null) {
             this.marks = [];
@@ -246,6 +252,7 @@ export class FindController {
     }
 
     step(direction: 1 | -1): void {
+        this.replaced = undefined;
         if (this.seeking) {
             this.pendingStep = direction;
             return;
@@ -494,7 +501,7 @@ export class FindController {
             return;
         }
         const next = direction === 1 ? this.marks.findIndex((mark) => mark.from >= anchor) : this.marks.findLastIndex((mark) => mark.from < anchor);
-        if (next === -1 && limited && this.search !== undefined) {
+        if (limited && this.search !== undefined && (next === -1 || (direction === -1 && next === this.marks.length - 1))) {
             this.index = null;
             this.seek(anchor, direction);
         } else {
@@ -552,6 +559,7 @@ export class FindController {
         const snapshot = this.snapshot();
         const epoch = this.epoch;
         const valid = (): boolean => !this.disposed && epoch === this.epoch && snapshot.revision === this.model.getRevision();
+        this.cursorRequests++;
         try {
             const range = await this.search.request(
                 (client) => client.next(snapshot, query, offset, { backwards: direction === -1, wrap: true, deadline: 10000 }),
@@ -565,6 +573,11 @@ export class FindController {
                 this.options?.changed();
             }
             return null;
+        } finally {
+            this.cursorRequests--;
+            if (this.query === null && this.cursorRequests === 0) {
+                this.search.release();
+            }
         }
     }
 
@@ -621,7 +634,9 @@ export class FindController {
                 source: 'command',
                 expectedRevision: snapshot.revision
             });
-            this.reportReplaced(changed ? 1 : 0);
+            if (!changed) {
+                this.pendingAnchor = undefined;
+            }
             return changed;
         } catch (error) {
             if (valid()) {

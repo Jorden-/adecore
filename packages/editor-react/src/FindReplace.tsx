@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@adecore/ui';
 import { formatNumber } from '@adecore/ui/format';
-import type { Editor, EditorFindState } from '@adecore/editor';
+import { MAX_REPLACEMENT_PAGE, MAX_REPLACEMENT_CHARACTERS, type Editor, type EditorFindState } from '@adecore/editor';
 import { compileFind, EMPTY_FIND_QUERY, type FindQuery } from './find-query.ts';
 
 export function FindReplace({ editor, className, onClose }: { editor: Editor; className?: string; onClose?(): void }) {
@@ -31,7 +31,10 @@ export function FindReplace({ editor, className, onClose }: { editor: Editor; cl
         compiled.kind === 'invalid'
             ? t('find.invalid')
             : state.replaceFailed !== undefined
-              ? t(`find.replace.failed.${state.replaceFailed}`, { edits: formatNumber(10000), characters: formatNumber(4000000) })
+              ? t(`find.replace.failed.${state.replaceFailed}`, {
+                    edits: formatNumber(MAX_REPLACEMENT_PAGE),
+                    characters: formatNumber(MAX_REPLACEMENT_CHARACTERS)
+                })
               : failure !== undefined
                 ? t(`find.failed.${failure}`)
                 : state.searching

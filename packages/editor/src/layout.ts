@@ -319,7 +319,9 @@ export function scanLine(
     }
     flushRun(text.length);
     geometry.rowEnds.push(x);
-    geometry.width = Math.max(...geometry.rowEnds);
+    for (const end of geometry.rowEnds) {
+        geometry.width = Math.max(geometry.width, end);
+    }
     return geometry;
 }
 

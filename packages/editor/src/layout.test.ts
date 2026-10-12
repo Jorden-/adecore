@@ -311,3 +311,10 @@ describe('visible range geometry', () => {
         expect(layout.rectangles(202, 231, layout.rows, window)).toEqual(all.filter((rect) => rect.y < window.bottom && rect.y + rect.height > window.top));
     });
 });
+
+test('a narrow wrapped line with more subrows than a function argument limit keeps its width', () => {
+    const text = 'x'.repeat(150000);
+    const geometry = scanLine({ start: 0, end: text.length, text }, METRICS, 20, []);
+    expect(geometry.subRows).toBeGreaterThan(100000);
+    expect(geometry.width).toBe(20);
+});

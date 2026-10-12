@@ -1,3 +1,4 @@
+export { MAX_REPLACEMENT_PAGE, MAX_REPLACEMENT_CHARACTERS } from './search-protocol.ts';
 export { AGENT_COLORS } from './attribution.ts';
 export { createSmartEditorEngine } from './engine.ts';
 export { DEFAULT_SMART_KEYS } from './smart-keys.ts';

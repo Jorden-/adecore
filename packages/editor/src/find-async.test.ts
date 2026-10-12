@@ -440,3 +440,64 @@ test('an obsolete explicit command yields to the latest live query', async () =>
     expect((await live).revision).toBe(1);
     queue.dispose();
 });
+
+test('single replacement does not leave a pending anchor or a bulk status when the text is unchanged', async () => {
+    const host = setup();
+    host.find.set(query);
+    host.fire(0);
+    await flush();
+    host.reply();
+    await flush();
+    host.client.replacements = async () => ({ revision: host.model.getRevision(), ranges: Uint32Array.from([0, 4, 4]), text: 'word', next: null });
+    expect(await host.find.replaceOne('word', false, () => true)).toBe(false);
+    expect(host.find.pendingAnchor).toBeUndefined();
+    expect(host.find.state.replaced).toBeUndefined();
+    host.find.dispose();
+});
+
+test('bulk replacement status expires on stepping or a later edit', () => {
+    const host = setup();
+    host.find.set({ ...query, regex: false });
+    host.find.reportReplaced(2);
+    host.find.step(1);
+    expect(host.find.state.replaced).toBeUndefined();
+    host.find.reportReplaced(2);
+    host.model.applyEdits([{ from: 0, to: 0, text: 'x' }]);
+    host.find.refresh();
+    expect(host.find.state.replaced).toBeUndefined();
+    host.find.dispose();
+});
+
+test('literal refresh retains its worker but a closed cursor search releases its snapshot', async () => {
+    const host = setup();
+    host.find.set({ ...query, regex: false });
+    expect(host.counts().released).toBe(0);
+    host.model.applyEdits([{ from: 0, to: 0, text: 'x' }]);
+    host.find.refresh();
+    expect(host.counts().released).toBe(0);
+    host.find.set(null);
+    const before = host.counts().released;
+    host.client.next = async () => ({ from: 1, to: 5 });
+    expect(await host.find.nextFromCursor(query, 0, 1)).toEqual({ from: 1, to: 5 });
+    expect(host.counts().released).toBe(before + 1);
+    host.find.dispose();
+});
+
+test('a closed cursor search releases only after queued cursor commands finish', async () => {
+    const host = setup();
+    const first = deferred<{ from: number; to: number } | null>();
+    const second = deferred<{ from: number; to: number } | null>();
+    let calls = 0;
+    host.client.next = () => (++calls === 1 ? first.promise : second.promise);
+    const one = host.find.nextFromCursor(query, 0, 1);
+    const two = host.find.nextFromCursor(query, 5, 1);
+    await flush();
+    first.resolve({ from: 0, to: 4 });
+    expect(await one).toEqual({ from: 0, to: 4 });
+    expect(host.counts().released).toBe(0);
+    await flush();
+    second.resolve({ from: 5, to: 9 });
+    expect(await two).toEqual({ from: 5, to: 9 });
+    expect(host.counts().released).toBe(1);
+    host.find.dispose();
+});

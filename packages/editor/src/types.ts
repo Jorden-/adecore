@@ -506,9 +506,9 @@ export interface Editor {
      */
     find(query: EditorFindQuery | null): void;
     findStep(direction: 1 | -1): void;
-    /* Replaces the match the find is on, with `$1` and the like expanded for a regular expression, and moves to the next one. False when there is none or the editor is read only. */
+    /* Replaces the match the find is on, with `$1` and the like expanded for a regular expression, and moves to the next one. Regex returns true when the worker operation starts; false when there is no match or the editor is read only. */
     replace(replacement: string, options?: EditorReplaceOptions): boolean;
-    /* Replaces every match in one undo step, and says how many there were. */
+    /* Complete literal results return the number replaced; otherwise starts asynchronous replacement, returns zero and reports through onFind. */
     replaceAll(replacement: string, options?: EditorReplaceOptions): number;
     /* Atomic, one undo step; excessive output or matches are refused through onFind. */
     replaceAllAsync(replacement: string, options?: EditorReplaceOptions): Promise<number>;
@@ -516,7 +516,7 @@ export interface Editor {
     setReplacePreview(replacement: string | null, options?: EditorReplaceOptions): void;
     /* Ends the find with a caret on every match, the one the find was on last, and says how many there were. */
     selectFindMatches(): number;
-    /* Selects the next match of a query from the cursor, or the one before, going round at the ends, without a find bar. False when there is none. */
+    /* Selects the next match of a query from the cursor, or the one before, going round at the ends, without a find bar. Regex returns true when the worker request starts; literal returns whether a match was selected. */
     findFromCursor(query: EditorFindQuery, direction: 1 | -1): boolean;
     onFind(listener: (state: EditorFindState) => void): () => void;
     /* Takes the marks away and selects the match the find was on, so the cursor is where it stopped. */
