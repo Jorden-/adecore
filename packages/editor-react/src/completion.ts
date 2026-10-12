@@ -127,19 +127,22 @@ export class CompletionFeature {
             commit === undefined ? planCall({ item, languageId: this.language.languageId, insertion: planned, before, rest, replace }) : { action: 'none' };
         const main = plan.action === 'add' ? withParentheses(planned, plan.inside) : planned;
         const extras = (item.additionalTextEdits ?? []).map((edit): EditorContentChange => ({ range: edit.range, text: edit.newText }));
-        // An import above the insertion moves it, and the tab stops are measured from where it ends up.
-        const start = extras
-            .filter((extra) => comparePositions(extra.range.end, main.range.start) <= 0)
-            .sort((left, right) => comparePositions(right.range.start, left.range.start))
-            .reduce((place, extra) => shiftPosition(place, extra), main.range.start);
-        // A name typed at several carets is completed at all of them, and the other carets end behind what was put in.
         const carets = editor.getSelections();
         const mirrored = mirroredInsertions(carets, editor.getSelection(), caret, (range) => editor.textInRange(range), main);
-        editor.applyEdits([{ range: main.range, text: main.text }, ...mirrored, ...extras]);
+        const primary = { range: main.range, text: main.text };
+        const changes = [primary, ...mirrored, ...extras];
+        // Imports and earlier carets move each insertion independently; the primary instance stays last.
+        const starts = [...mirrored, primary].map((insertion) =>
+            changes
+                .filter((change) => change !== insertion && comparePositions(change.range.end, insertion.range.start) <= 0)
+                .sort((left, right) => comparePositions(right.range.start, left.range.start))
+                .reduce((place, change) => shiftPosition(place, change), insertion.range.start)
+        );
+        editor.applyEdits(changes);
         const landed = editor.getSelections();
         if (commit === undefined) {
-            this.language.snippets.begin(start, main.text, main.stops);
-            if (plan.action === 'add' && plan.inside && mirrored.length > 0) {
+            this.language.snippets.begin(starts, main.text, main.stops, main.fields);
+            if (plan.action === 'add' && plan.inside && mirrored.length > 0 && main.fields === undefined) {
                 this.placeMirroredCarets(carets, mirrored, landed);
             }
             if (plan.action === 'enter') {

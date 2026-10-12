@@ -1,28 +1,35 @@
-/* A tab stop of a snippet: its index, and where it stands in the text the snippet inserts. */
-export interface SnippetStop {
-    readonly index: number;
-    /* UTF-16 offsets into the inserted text; equal for a stop that holds no text. */
+export interface SnippetRange {
     readonly start: number;
     readonly end: number;
 }
 
-export interface ParsedSnippet {
-    readonly text: string;
-    /* In text order, a stop of the same index again being a mirror, which is not edited along. */
-    readonly stops: readonly SnippetStop[];
+/* UTF-16 offsets into the inserted text; equal for an empty stop. */
+export interface SnippetStop extends SnippetRange {
+    readonly index: number;
 }
 
-const NAME = '[A-Za-z_]\\w*';
-const TABSTOP = new RegExp(`^\\$(\\d+)|^\\$\\{(\\d+)\\}`);
-const PLACEHOLDER = /^\$\{(\d+):/;
-const CHOICE = /^\$\{(\d+)\|/;
-const DEFAULT_VARIABLE = new RegExp(`^\\$\\{${NAME}:`);
-const TRANSFORMED_VARIABLE = new RegExp(`^\\$\\{${NAME}/`);
-const BARE_VARIABLE = new RegExp(`^\\$${NAME}|^\\$\\{${NAME}\\}`);
+export interface SnippetField {
+    readonly index: number;
+    readonly ranges: readonly SnippetRange[];
+    /* Index into ranges of the occurrence that defines the default. */
+    readonly primary: number;
+    /* Child positions projected into copies of a parent, not additional syntactic tab stops. */
+    readonly linked?: readonly SnippetRange[];
+    readonly parents?: readonly number[];
+    readonly choices?: readonly string[];
+}
+
+export interface ParsedSnippet {
+    readonly text: string;
+    readonly stops: readonly SnippetStop[];
+    /* Optional so callers that construct the older text/stops shape remain valid. */
+    readonly fields?: readonly SnippetField[];
+}
+
+type Node = { kind: 'text'; text: string } | { kind: 'field'; index: number; body?: Node[]; choices?: string[] } | { kind: 'variable'; body?: Node[] };
+type FieldNode = Extract<Node, { kind: 'field' }>;
 
 class SnippetParser {
-    text = '';
-    readonly stops: SnippetStop[] = [];
     private at = 0;
     private readonly source: string;
 
@@ -30,90 +37,104 @@ class SnippetParser {
         this.source = source;
     }
 
-    parse(): ParsedSnippet {
-        this.sequence(false);
-        return { text: this.text, stops: this.stops };
+    parse(): Node[] {
+        return this.sequence(false);
     }
 
-    /* Text up to the `}` that closes the placeholder this is in, which is left for the caller. */
-    private sequence(nested: boolean): void {
-        while (this.at < this.source.length) {
-            const character = this.source[this.at]!;
-            if (character === '}' && nested) {
-                return;
+    private sequence(nested: boolean): Node[] {
+        const nodes: Node[] = [];
+        let text = '';
+        const flush = (): void => {
+            if (text !== '') {
+                nodes.push({ kind: 'text', text });
+                text = '';
             }
+        };
+        while (this.at < this.source.length && !(nested && this.source[this.at] === '}')) {
+            const character = this.source[this.at]!;
             if (character === '\\' && /[\\$}]/.test(this.source[this.at + 1] ?? '')) {
-                this.text += this.source[this.at + 1];
+                text += this.source[this.at + 1];
                 this.at += 2;
             } else if (character === '$') {
-                this.dollar();
-            } else {
-                this.text += character;
-                this.at++;
-            }
-        }
-    }
-
-    private dollar(): void {
-        const rest = this.source.slice(this.at);
-        const tabstop = TABSTOP.exec(rest);
-        const placeholder = PLACEHOLDER.exec(rest);
-        const choice = CHOICE.exec(rest);
-        if (tabstop !== null) {
-            this.at += tabstop[0].length;
-            this.stops.push({ index: Number(tabstop[1] ?? tabstop[2]), start: this.text.length, end: this.text.length });
-        } else if (placeholder !== null) {
-            this.at += placeholder[0].length;
-            const start = this.text.length;
-            this.sequence(true);
-            this.closeBrace();
-            this.stops.push({ index: Number(placeholder[1]), start, end: this.text.length });
-        } else if (choice !== null) {
-            this.at += choice[0].length;
-            const start = this.text.length;
-            this.firstChoice();
-            this.stops.push({ index: Number(choice[1]), start, end: this.text.length });
-        } else if (DEFAULT_VARIABLE.test(rest)) {
-            this.at += rest.indexOf(':') + 1;
-            this.sequence(true);
-            this.closeBrace();
-        } else if (TRANSFORMED_VARIABLE.test(rest)) {
-            this.skipBraces();
-        } else if (BARE_VARIABLE.test(rest)) {
-            this.at += BARE_VARIABLE.exec(rest)![0].length;
-        } else {
-            this.text += '$';
-            this.at++;
-        }
-    }
-
-    private closeBrace(): void {
-        if (this.source[this.at] === '}') {
-            this.at++;
-        }
-    }
-
-    /* The first of `a,b,c|}`, and the rest dropped. */
-    private firstChoice(): void {
-        let first = true;
-        while (this.at < this.source.length && !(this.source[this.at] === '|' && this.source[this.at + 1] === '}')) {
-            const character = this.source[this.at]!;
-            if (character === '\\' && /[\\,|]/.test(this.source[this.at + 1] ?? '')) {
-                this.at++;
-                if (first) {
-                    this.text += this.source[this.at];
+                const node = this.dollar();
+                if (node === null) {
+                    text += '$';
+                } else {
+                    flush();
+                    nodes.push(node);
                 }
-            } else if (character === ',') {
-                first = false;
-            } else if (first) {
-                this.text += character;
+            } else {
+                text += character;
+                this.at++;
             }
-            this.at++;
         }
-        this.at += 2;
+        flush();
+        return nodes;
     }
 
-    /* Past the `}` that closes a `${name/regex/format/}` variable, which inserts nothing here. */
+    private dollar(): Node | null {
+        const start = this.at++;
+        const brace = this.source[this.at] === '{';
+        if (brace) {
+            this.at++;
+        }
+        const name = /^(?:\d+|[A-Za-z_]\w*)/.exec(this.source.slice(this.at))?.[0];
+        if (name === undefined) {
+            this.at = start + 1;
+            return null;
+        }
+        const index = /^\d+$/.test(name) ? Number(name) : null;
+        if (index !== null && !Number.isSafeInteger(index)) {
+            this.at = start + 1;
+            return null;
+        }
+        this.at += name.length;
+        const field = (): FieldNode => ({ kind: 'field', index: index! });
+        if (!brace) {
+            return index === null ? { kind: 'variable' } : field();
+        }
+        const next = this.source[this.at];
+        if (next === '}') {
+            this.at++;
+            return index === null ? { kind: 'variable' } : field();
+        }
+        if (next === ':') {
+            this.at++;
+            const body = this.sequence(true);
+            if (this.source[this.at] === '}') {
+                this.at++;
+            }
+            return index === null ? { kind: 'variable', body } : { ...field(), body };
+        }
+        if (next === '|' && index !== null) {
+            this.at++;
+            return { ...field(), choices: this.choices() };
+        }
+        if (next === '/' && index === null) {
+            this.at = start;
+            this.skipBraces();
+            return { kind: 'variable' };
+        }
+        this.at = start + 1;
+        return null;
+    }
+
+    private choices(): string[] {
+        const values = [''];
+        while (this.at < this.source.length && !(this.source[this.at] === '|' && this.source[this.at + 1] === '}')) {
+            const character = this.source[this.at++]!;
+            if (character === '\\' && /[\\,|]/.test(this.source[this.at] ?? '')) {
+                values[values.length - 1] += this.source[this.at++]!;
+            } else if (character === ',') {
+                values.push('');
+            } else {
+                values[values.length - 1] += character;
+            }
+        }
+        this.at = Math.min(this.source.length, this.at + 2);
+        return values;
+    }
+
     private skipBraces(): void {
         let depth = 0;
         while (this.at < this.source.length) {
@@ -128,20 +149,108 @@ class SnippetParser {
     }
 }
 
-export function parseSnippet(snippet: string): ParsedSnippet {
-    return new SnippetParser(snippet).parse();
+function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
+    const definitions = new Map<number, FieldNode>();
+    const collect = (nodes: readonly Node[]): void => {
+        for (const node of nodes) {
+            if (node.kind === 'field') {
+                const known = definitions.get(node.index);
+                if (
+                    known === undefined ||
+                    (known.body === undefined && known.choices === undefined && (node.body !== undefined || node.choices !== undefined))
+                ) {
+                    definitions.set(node.index, node);
+                }
+            }
+            if (node.kind !== 'text' && node.body !== undefined) {
+                collect(node.body);
+            }
+        }
+    };
+    collect(nodes);
+    const fields = new Map<
+        number,
+        { index: number; ranges: SnippetRange[]; linked: SnippetRange[]; primary: number; parents: Set<number>; choices?: string[] }
+    >();
+    const stops: SnippetStop[] = [];
+    let text = '';
+    const render = (nodes: readonly Node[], linked: boolean, parents: readonly number[], visiting: ReadonlySet<number>): void => {
+        for (const node of nodes) {
+            if (node.kind === 'text') {
+                text += node.text;
+                continue;
+            }
+            if (node.kind === 'variable') {
+                render(node.body ?? [], linked, parents, visiting);
+                continue;
+            }
+            const definition = definitions.get(node.index)!;
+            const from = text.length;
+            if (!visiting.has(node.index)) {
+                if (definition.choices !== undefined) {
+                    text += definition.choices[0] ?? '';
+                } else {
+                    render(definition.body ?? [], linked || node !== definition, [...parents, node.index], new Set([...visiting, node.index]));
+                }
+            }
+            const range = { start: from, end: text.length };
+            const field = fields.get(node.index) ?? {
+                index: node.index,
+                ranges: [],
+                linked: [],
+                primary: 0,
+                parents: new Set<number>(),
+                choices: definition.choices
+            };
+            parents.filter((parent) => parent !== node.index).forEach((parent) => field.parents.add(parent));
+            if (linked) {
+                field.linked.push(range);
+            } else {
+                if (node === definition) {
+                    field.primary = field.ranges.length;
+                }
+                field.ranges.push(range);
+                stops.push({ index: node.index, ...range });
+            }
+            fields.set(node.index, field);
+        }
+    };
+    render(nodes, false, [], new Set());
+    stops.sort((left, right) => left.start - right.start || right.end - left.end);
+    return {
+        text,
+        stops,
+        fields: [...fields.values()]
+            .filter((field) => field.ranges.length > 0)
+            .map((field) => ({
+                index: field.index,
+                ranges: field.ranges,
+                primary: field.primary,
+                ...(field.linked.length === 0 ? {} : { linked: field.linked }),
+                ...(field.parents.size === 0 ? {} : { parents: [...field.parents] }),
+                ...(field.choices === undefined ? {} : { choices: field.choices })
+            }))
+    };
 }
 
-/* The stops in the order Tab visits them: 1, 2 and on, one per index, then the final stop `$0`, which the end of the text stands in for. */
+export function parseSnippet(snippet: string): ParsedSnippet {
+    return renderSnippet(new SnippetParser(snippet).parse());
+}
+
+/* One defining occurrence per index, then $0 or the end of the inserted text. */
 export function tabOrder(parsed: ParsedSnippet): SnippetStop[] {
     const first = new Map<number, SnippetStop>();
     for (const stop of parsed.stops) {
-        const known = first.get(stop.index);
-        if (known === undefined || stop.start < known.start) {
+        if (!first.has(stop.index)) {
             first.set(stop.index, stop);
         }
     }
+    for (const field of parsed.fields ?? []) {
+        const range = field.ranges[field.primary];
+        if (range !== undefined) {
+            first.set(field.index, { index: field.index, ...range });
+        }
+    }
     const visited = [...first.values()].filter((stop) => stop.index > 0).sort((left, right) => left.index - right.index);
-    const final = first.get(0) ?? { index: 0, start: parsed.text.length, end: parsed.text.length };
-    return [...visited, final];
+    return [...visited, first.get(0) ?? { index: 0, start: parsed.text.length, end: parsed.text.length }];
 }

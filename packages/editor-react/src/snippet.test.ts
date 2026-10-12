@@ -22,8 +22,8 @@ describe('parseSnippet', () => {
         const parsed = parseSnippet('${1:a ${2:b}} $0');
         expect(parsed.text).toBe('a b ');
         expect(parsed.stops).toEqual([
-            { index: 2, start: 2, end: 3 },
             { index: 1, start: 0, end: 3 },
+            { index: 2, start: 2, end: 3 },
             { index: 0, start: 4, end: 4 }
         ]);
     });
@@ -47,4 +47,68 @@ describe('tabOrder', () => {
         ]);
         expect(tabOrder(parseSnippet('plain'))).toEqual([{ index: 0, start: 5, end: 5 }]);
     });
+});
+
+for (const [source, text, ranges] of [
+    [
+        '${1:foo} = $1;',
+        'foo = foo;',
+        [
+            [0, 3],
+            [6, 9]
+        ]
+    ],
+    [
+        '$1 x ${1:foo}',
+        'foo x foo',
+        [
+            [0, 3],
+            [6, 9]
+        ]
+    ],
+    [
+        '${1|x,y|} $1',
+        'x x',
+        [
+            [0, 1],
+            [2, 3]
+        ]
+    ],
+    [
+        '${1:\\}} $1',
+        '} }',
+        [
+            [0, 1],
+            [2, 3]
+        ]
+    ]
+] as const) {
+    test(`mirrors use the defining value in ${source}`, () => {
+        const parsed = parseSnippet(source);
+        expect(parsed.text).toBe(text);
+        expect(parsed.fields?.find((field) => field.index === 1)?.ranges.map((range) => [range.start, range.end])).toEqual(ranges.map((range) => [...range]));
+    });
+}
+
+test('the defining occurrence is primary even when a bare mirror comes first', () => {
+    const parsed = parseSnippet('$1 x ${1:foo}');
+    expect(parsed.fields?.[0]?.primary).toBe(1);
+    expect(tabOrder(parsed)[0]).toEqual({ index: 1, start: 6, end: 9 });
+});
+
+test('nested fields occur once, with linked projections into parent mirrors', () => {
+    const parsed = parseSnippet('${1:a ${2:b}} $1');
+    expect(parsed.text).toBe('a b a b');
+    expect(parsed.stops.filter((stop) => stop.index === 2)).toEqual([{ index: 2, start: 2, end: 3 }]);
+    expect(parsed.fields?.find((field) => field.index === 2)).toEqual({
+        index: 2,
+        ranges: [{ start: 2, end: 3 }],
+        primary: 0,
+        linked: [{ start: 6, end: 7 }],
+        parents: [1]
+    });
+});
+
+test('cyclic defaults terminate without recursively expanding their own field', () => {
+    expect(parseSnippet('${1:a $1} $1').text).toBe('a  a ');
 });

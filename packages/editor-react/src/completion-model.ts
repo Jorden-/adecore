@@ -3,7 +3,7 @@ import type { CompletionItem, CompletionList, CompletionResult, MarkupContent } 
 import { comparePositions } from './diagnostics-model.ts';
 import { escapeMarkdown, isEmptyHover, splitSignatures, type HoverText } from './hover-content.ts';
 import type { CompletionDocs } from './popups.ts';
-import { parseSnippet, tabOrder, type SnippetStop } from './snippet.ts';
+import { parseSnippet, tabOrder, type SnippetField, type SnippetStop } from './snippet.ts';
 
 const IDENTIFIER_CHARACTER = /[\p{L}\p{N}\p{M}_$]/u;
 
@@ -295,6 +295,7 @@ export interface Insertion {
     readonly text: string;
     /* Where Tab goes in the inserted text, in order; empty for plain text and for a snippet without stops. */
     readonly stops: readonly SnippetStop[];
+    readonly fields?: readonly SnippetField[];
 }
 
 /*
@@ -314,7 +315,7 @@ export function insertionOf(item: CompletionItem, caret: EditorPosition, lineBef
     }
     const followed = range.end.line === caret.line && lineAfter.slice(Math.max(0, range.end.character - caret.character)).startsWith('(');
     const parsed = parseSnippet(followed && isCallableKind(item.kind) ? withoutCall(raw) : raw);
-    return { range, text: parsed.text, stops: tabOrder(parsed) };
+    return { range, text: parsed.text, stops: tabOrder(parsed), fields: parsed.fields };
 }
 
 /*
