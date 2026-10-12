@@ -335,3 +335,27 @@ test('deletion pages may use a zero character budget and a stale commit is refus
     model.undo();
     expect(model.getText()).toBe('cat cat');
 });
+
+test('a full replacement page resumes before the output that did not fit', () => {
+    const wire = endpoint();
+    const dispose = serveEditorSearch(wire.port);
+    const query = { text: 'cat', regex: true, caseSensitive: false, wholeWord: false };
+    wire.send({ type: 'replacements', id: 1, revision: 0, text: 'cat cat cat', query, replacement: 'entry', maxEdits: 1000, maxCharacters: 9 });
+    expect(wire.sent[0]).toMatchObject({ type: 'replacements', ranges: new Uint32Array([0, 3, 5]), text: 'entry', next: 3 });
+    wire.send({ type: 'replacements', id: 2, revision: 0, query, from: 3, replacement: 'entry', maxEdits: 1000, maxCharacters: 9 });
+    expect(wire.sent[1]).toMatchObject({ type: 'replacements', ranges: new Uint32Array([4, 7, 5]), text: 'entry', next: 7 });
+    wire.send({ type: 'replacements', id: 3, revision: 0, query, from: 7, replacement: 'entry', maxEdits: 1000, maxCharacters: 9 });
+    expect(wire.sent[2]).toMatchObject({ type: 'replacements', ranges: new Uint32Array([8, 11, 5]), text: 'entry', next: null });
+    dispose();
+});
+
+test('an invalid revision cannot overwrite the retained snapshot', () => {
+    const wire = endpoint();
+    const dispose = serveEditorSearch(wire.port);
+    wire.send(request('word'));
+    wire.send(request('wrong', { revision: -1 }));
+    expect(wire.sent[1]).toMatchObject({ type: 'error', kind: 'range' });
+    wire.send(request(undefined));
+    expect(wire.sent[2]).toMatchObject({ type: 'matches', revision: 0, ranges: new Uint32Array([0, 4]) });
+    dispose();
+});

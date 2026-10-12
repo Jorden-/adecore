@@ -412,3 +412,66 @@ for (const packet of [
         host.client.dispose();
     });
 }
+
+test('release frees an idle snapshot and a later search starts again', async () => {
+    const host = setup();
+    const first = host.client.search(snapshot, query);
+    await Promise.resolve();
+    host.result();
+    await first;
+    host.client.release();
+    expect(host.workers[0]!.stopped).toBe(1);
+    const next = host.client.search(snapshot, query);
+    await Promise.resolve();
+    expect(host.workers).toHaveLength(2);
+    expect(host.workers[1]!.messages[0]).toHaveProperty('text', snapshot.text);
+    host.result();
+    await next;
+    host.client.dispose();
+});
+
+test('release rejects active and queued requests without ending the client', async () => {
+    const host = setup();
+    const queued = caught(host.client.search(snapshot, query));
+    host.client.release();
+    expect((await queued).kind).toBe('superseded');
+    expect(host.workers).toHaveLength(0);
+    const active = caught(host.client.search(snapshot, query));
+    await Promise.resolve();
+    host.client.release();
+    expect((await active).kind).toBe('superseded');
+    expect(host.workers[0]!.stopped).toBe(1);
+    host.client.dispose();
+});
+
+test('release preserves a sticky unavailable worker', async () => {
+    const host = setup();
+    const pending = caught(host.client.search(snapshot, query));
+    await Promise.resolve();
+    host.workers[0]!.emit('error', { message: '404' } as ErrorEvent);
+    expect((await pending).kind).toBe('unavailable');
+    host.client.release();
+    expect((await caught(host.client.search(snapshot, query))).kind).toBe('unavailable');
+    expect(host.workers).toHaveLength(1);
+    host.client.dispose();
+});
+
+for (const range of [
+    { from: -1, to: 0 },
+    { from: 2, to: 1 },
+    { from: 0, to: 4 },
+    { from: 1, to: 2 },
+    { from: 0, to: 1 },
+    { from: 0.5, to: 2 }
+]) {
+    test(`cursor replies reject invalid bounds ${JSON.stringify(range)}`, async () => {
+        const host = setup();
+        const pending = caught(host.client.next({ revision: 0, text: '😀x' }, query, 0));
+        await Promise.resolve();
+        const worker = host.workers[0]!;
+        const message = worker.messages[0]!;
+        worker.reply({ type: 'next', id: message.id, revision: 0, range });
+        expect((await pending).kind).toBe('error');
+        host.client.dispose();
+    });
+}

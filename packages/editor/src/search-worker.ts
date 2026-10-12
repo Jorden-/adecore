@@ -86,10 +86,14 @@ function searchReply(request: EditorSearchInput, snapshot: EditorSearchSnapshot)
                 break;
             }
             const replacement = replacementText(text, match, request.replacement, false, request.preserveCase);
-            characters += replacement.length;
-            if (characters > request.maxCharacters) {
-                throw new RangeError('Replacement output exceeds the response size limit.');
+            if (characters + replacement.length > request.maxCharacters) {
+                if (pieces.length === 0) {
+                    throw new RangeError('One replacement exceeds the response size limit.');
+                }
+                next = resume;
+                break;
             }
+            characters += replacement.length;
             ranges.push(match.from, match.to, replacement.length);
             pieces.push(replacement);
             // Resuming after an empty match must skip the same full code point as the matcher.
@@ -117,11 +121,11 @@ export function serveEditorSearch(endpoint: EditorSearchWorkerEndpoint): () => v
     let snapshot: EditorSearchSnapshot | undefined;
     const listener = ({ data: request }: MessageEvent<EditorSearchInput>): void => {
         try {
-            if (request.text !== undefined) {
-                snapshot = { revision: request.revision, text: request.text };
-            }
             if (!Number.isSafeInteger(request.revision) || request.revision < 0) {
                 throw new RangeError('The search revision must be a nonnegative safe integer.');
+            }
+            if (request.text !== undefined) {
+                snapshot = { revision: request.revision, text: request.text };
             }
             if (snapshot === undefined || snapshot.revision !== request.revision) {
                 endpoint.postMessage({

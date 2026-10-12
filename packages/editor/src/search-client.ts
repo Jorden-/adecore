@@ -46,6 +46,8 @@ export interface EditorSearchClient {
         options?: EditorSearchReplacementOptions
     ): Promise<EditorSearchReplacements>;
     cancel(): void;
+    /* Frees the snapshot and worker; this client can start again afterward. */
+    release(): void;
     dispose(): void;
 }
 
@@ -85,6 +87,12 @@ function validateSearch(snapshot: EditorSearchSnapshot, query: EditorFindQuery, 
             throw new EditorSearchError('syntax', error instanceof Error ? error.message : String(error));
         }
     }
+}
+
+function splitsSurrogate(text: string, offset: number): boolean {
+    const previous = text.charCodeAt(offset - 1),
+        current = text.charCodeAt(offset);
+    return previous >= 0xd800 && previous <= 0xdbff && current >= 0xdc00 && current <= 0xdfff;
 }
 
 function scheduleTimer(callback: () => void, delay: number): () => void {
@@ -318,7 +326,20 @@ export function createSearchClient(options: EditorSearchClientOptions): EditorSe
                     if (reply.type !== 'next') {
                         throw new EditorSearchError('error', 'The worker returned an unexpected cursor response.');
                     }
-                    return reply.range;
+                    const range = reply.range;
+                    if (
+                        range !== null &&
+                        (!Number.isInteger(range.from) ||
+                            !Number.isInteger(range.to) ||
+                            range.from < (bounds.from ?? 0) ||
+                            range.to < range.from ||
+                            range.to > (bounds.to ?? snapshot.text.length) ||
+                            splitsSurrogate(snapshot.text, range.from) ||
+                            splitsSurrogate(snapshot.text, range.to))
+                    ) {
+                        throw new EditorSearchError('error', 'The worker returned invalid cursor bounds.');
+                    }
+                    return range;
                 }
             );
         },
@@ -366,10 +387,13 @@ export function createSearchClient(options: EditorSearchClientOptions): EditorSe
                     }
                     if (reply.next !== null) {
                         const index = reply.ranges.length - 3;
+                        if (index < 0) {
+                            throw new EditorSearchError('error', 'The worker returned an empty replacement continuation.');
+                        }
                         const start = reply.ranges[index],
                             end = reply.ranges[index + 1];
                         const resume = end! + (start === end ? ((snapshot.text.codePointAt(end!) ?? 0) > 0xffff ? 2 : 1) : 0);
-                        if (index < 0 || reply.next !== resume || reply.next > (to ?? snapshot.text.length)) {
+                        if (reply.next !== resume || reply.next > (to ?? snapshot.text.length)) {
                             throw new EditorSearchError('error', 'The worker returned an invalid replacement continuation.');
                         }
                     }
@@ -391,6 +415,10 @@ export function createSearchClient(options: EditorSearchClientOptions): EditorSe
         },
         cancel() {
             cancel('superseded');
+        },
+        release() {
+            cancel('superseded');
+            stopWorker();
         },
         dispose() {
             disposed = true;
