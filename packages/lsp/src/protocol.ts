@@ -204,6 +204,30 @@ export interface WorkspaceSymbol {
     data?: unknown;
 }
 
+/* A function, method or class that calls are traced through; `data` is the server's own and goes back to it untouched. */
+export interface CallHierarchyItem {
+    name: string;
+    kind: SymbolKind;
+    tags?: 1[];
+    detail?: string;
+    uri: string;
+    range: Range;
+    selectionRange: Range;
+    data?: unknown;
+}
+
+/* A caller of an item. `fromRanges` are the call sites, in the file of `from`. */
+export interface CallHierarchyIncomingCall {
+    from: CallHierarchyItem;
+    fromRanges: Range[];
+}
+
+/* An item that another one calls. `fromRanges` are the call sites, in the file of the item that was asked about. */
+export interface CallHierarchyOutgoingCall {
+    to: CallHierarchyItem;
+    fromRanges: Range[];
+}
+
 export type DocumentSymbolResult = DocumentSymbol[] | SymbolInformation[] | null;
 export type WorkspaceSymbolResult = SymbolInformation[] | WorkspaceSymbol[] | null;
 
@@ -447,6 +471,7 @@ export interface ServerCapabilities {
     selectionRangeProvider?: boolean | ProviderOptions;
     semanticTokensProvider?: ProviderOptions & { legend: SemanticTokensLegend };
     inlayHintProvider?: boolean | ProviderOptions;
+    callHierarchyProvider?: boolean | ProviderOptions;
     diagnosticProvider?: ProviderOptions;
     [capability: string]: unknown;
 }

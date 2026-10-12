@@ -14,6 +14,8 @@
 
 `PeekPanel` is the panel. It renders into an editor widget row, so it scrolls with the text.
 
+`language.callHierarchy.open()` is the same panel for the callers and callees of a symbol; see [call hierarchy](/editor-react/call-hierarchy).
+
 ## Symbols
 
 `language.symbolPicker.open()` opens `SymbolPicker`, a filter over the document's symbols, as Mod+F12 does. `:12` goes to line 12, and `#name` searches the symbols of the whole project through `workspace/symbol`, where the service supports it.

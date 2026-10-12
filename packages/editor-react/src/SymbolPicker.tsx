@@ -28,7 +28,8 @@ const TONES: Record<SymbolTone, string> = {
 
 const SEARCH_DELAY_MS = 200;
 
-function Badge({ kind }: { kind: number }) {
+/* The letter badge of a symbol kind, tinted by what the symbol is. */
+export function SymbolBadge({ kind }: { kind: number }) {
     return (
         <span className={`grid size-4 shrink-0 place-items-center rounded-sm font-mono text-xs font-semibold ${TONES[toneOfKind(kind)]}`}>
             {letterOfKind(kind)}
@@ -153,7 +154,7 @@ export function SymbolPicker({ language, view }: { language: EditorLanguage; vie
                                 className="flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-xs cursor-row"
                                 onClick={() => choose(index)}
                             >
-                                <Badge kind={place.kind} />
+                                <SymbolBadge kind={place.kind} />
                                 <span className="shrink-0">{place.name}</span>
                                 <span className="min-w-0 truncate font-mono text-text-faint">{place.container}</span>
                                 <span className="ml-auto shrink-0 font-mono text-text-faint">
@@ -182,7 +183,7 @@ export function SymbolPicker({ language, view }: { language: EditorLanguage; vie
                                             className="flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-xs cursor-row"
                                             onClick={() => choose(position)}
                                         >
-                                            <Badge kind={entry.kind} />
+                                            <SymbolBadge kind={entry.kind} />
                                             <span className="shrink-0">{entry.name}</span>
                                             <span className="min-w-0 truncate font-mono text-text-faint">{entry.detail}</span>
                                             {entry.container !== '' && <span className="min-w-0 truncate text-text-faint">{entry.container}</span>}

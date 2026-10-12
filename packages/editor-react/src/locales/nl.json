@@ -93,6 +93,33 @@
             "noDefinition": "Geen definitie gevonden",
             "unavailableDefinition": "Geen language server vindt definities in dit bestand"
         },
+        "callHierarchy": {
+            "unavailable": "Geen language server vindt aanroepen in dit bestand",
+            "none": "Hier is geen symbool met aanroepen gevonden",
+            "failed": "Aanroepen opzoeken mislukt: {{message}}",
+            "label": "Aanroephiërarchie",
+            "direction": "Richting",
+            "incoming": "Aanroepers",
+            "outgoing": "Aangeroepen",
+            "close": "Sluit",
+            "loading": "Laden…",
+            "noIncoming": "Geen aanroepers",
+            "noOutgoing": "Roept niets aan",
+            "retry": "Aanroepen laden mislukt: {{message}}. Druk om opnieuw te proberen",
+            "more_one": "Toon nog {{formatted}} aanroep ({{hidden}} over)",
+            "more_other": "Toon nog {{formatted}} aanroepen ({{hidden}} over)",
+            "sites_one": "{{formatted}} aanroep",
+            "sites_other": "{{formatted}} aanroepen",
+            "site": "Aanroep {{current}} van {{total}}",
+            "previousSite": "Vorige aanroep",
+            "nextSite": "Volgende aanroep",
+            "announce": {
+                "incoming_one": "{{count}} aanroeper van {{name}}",
+                "incoming_other": "{{count}} aanroepers van {{name}}",
+                "outgoing_one": "{{count}} aangeroepen door {{name}}",
+                "outgoing_other": "{{count}} aangeroepen door {{name}}"
+            }
+        },
         "codeVision": {
             "usagesNone": "Niet gebruikt",
             "usages_one": "{{formatted}} keer gebruikt",
@@ -171,6 +198,7 @@
         "goToDefinition": "Ga naar definitie",
         "goToTypeDefinition": "Ga naar typedefinitie",
         "goToImplementation": "Ga naar implementatie",
+        "callHierarchy": "Aanroephiërarchie",
         "peekReferences": "Bekijk referenties",
         "renameSymbol": "Symbool hernoemen",
         "codeActions": "Codeacties",

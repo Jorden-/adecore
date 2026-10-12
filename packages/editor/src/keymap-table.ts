@@ -105,6 +105,7 @@ export const KEYMAP = {
     goToImplementation: bind('Mod+Alt+B'),
     peekDefinition: bind('Alt+Space', 'Ctrl+Shift+I'),
     peekReferences: bind('Alt+F7'),
+    callHierarchy: bind('Ctrl+Alt+H'),
     historyBack: bind('Mod+[', 'Ctrl+Alt+ArrowLeft'),
     historyForward: bind('Mod+]', 'Ctrl+Alt+ArrowRight'),
     recentLocations: bind('Mod+Shift+E'),

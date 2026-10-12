@@ -2,6 +2,9 @@ import { ErrorCodes, LspError, StaleResultError } from './connection.ts';
 import { applyContentChanges, minimalChange } from './edits.ts';
 import type { LspSession } from './session.ts';
 import type {
+    CallHierarchyIncomingCall,
+    CallHierarchyItem,
+    CallHierarchyOutgoingCall,
     CodeAction,
     CodeActionContext,
     CodeLens,
@@ -236,6 +239,19 @@ export class LspDocument {
 
     resolveInlayHint(hint: InlayHint, options?: DocumentRequestOptions): Promise<InlayHint> {
         return this.resolve('inlayHint/resolve', hint, options);
+    }
+
+    prepareCallHierarchy(position: Position, options?: DocumentRequestOptions): Promise<CallHierarchyItem[] | null> {
+        return this.feature('textDocument/prepareCallHierarchy', { position }, options);
+    }
+
+    /* The callers of an item the server gave. Neighbouring expansions run beside each other, so a newer one does not cancel an older unless `cancelPrevious` says so. */
+    incomingCalls(item: CallHierarchyItem, options?: DocumentRequestOptions): Promise<CallHierarchyIncomingCall[] | null> {
+        return this.perform('callHierarchy/incomingCalls', { item }, { cancelPrevious: false, ...options });
+    }
+
+    outgoingCalls(item: CallHierarchyItem, options?: DocumentRequestOptions): Promise<CallHierarchyOutgoingCall[] | null> {
+        return this.perform('callHierarchy/outgoingCalls', { item }, { cancelPrevious: false, ...options });
     }
 
     diagnostics(previousResultId?: string, identifier?: string, options?: DocumentRequestOptions): Promise<DocumentDiagnosticReport> {

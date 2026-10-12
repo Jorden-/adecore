@@ -1,4 +1,7 @@
 import type {
+    CallHierarchyIncomingCall,
+    CallHierarchyItem,
+    CallHierarchyOutgoingCall,
     CodeAction,
     CodeActionContext,
     CodeLens,
@@ -106,6 +109,11 @@ export interface LanguageService {
     foldingRanges(uri: string, options?: LanguageRequestOptions): Promise<FoldingRange[] | null>;
     /* One chain per position, the smallest range first, each in its `parent`. */
     selectionRanges(uri: string, positions: readonly Position[], options?: LanguageRequestOptions): Promise<SelectionRange[] | null>;
+    /* The call hierarchy methods are optional so a service from before them still fits; `supports('textDocument/prepareCallHierarchy', uri)` says whether a server answers. */
+    prepareCallHierarchy?(uri: string, position: Position, options?: LanguageRequestOptions): Promise<CallHierarchyItem[] | null>;
+    /* `uri` is the document the hierarchy was prepared in, which names the server to ask. */
+    incomingCalls?(uri: string, item: CallHierarchyItem, options?: LanguageRequestOptions): Promise<CallHierarchyIncomingCall[] | null>;
+    outgoingCalls?(uri: string, item: CallHierarchyItem, options?: LanguageRequestOptions): Promise<CallHierarchyOutgoingCall[] | null>;
     codeLenses(uri: string, options?: LanguageRequestOptions): Promise<CodeLens[] | null>;
     resolveCodeLens(uri: string, lens: CodeLens, options?: LanguageRequestOptions): Promise<CodeLens>;
 }

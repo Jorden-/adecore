@@ -19,10 +19,9 @@ const CODE =
     'font-mono text-(length:--code-font-size) [tab-size:4] [&_.line]:block [&_.line]:h-(--code-line-height) [&_.line]:leading-(--code-line-height) [&_pre]:m-0 [&_pre]:bg-transparent! [&_pre]:p-0 [&_pre]:whitespace-pre [&_code]:font-mono';
 
 /* The code around the active reference, drawn like the editor's own rows: its gutter, the line the reference is on and the name marked. */
-function Preview({ view }: { view: PeekView }) {
+export function Preview({ preview }: { preview: PeekView['preview'] }) {
     const { theme, highlight } = useEditorRendering();
     const scroller = useRef<HTMLDivElement>(null);
-    const { preview } = view;
     const [html, setHtml] = useState<{ key: string; html: string } | null>(null);
     const path = preview === null ? null : fileUriToPath(preview.uri);
     const key = preview === null ? '' : `${theme}\0${path}\0${preview.text}`;
@@ -204,7 +203,7 @@ export function PeekPanel({ language, view }: { language: EditorLanguage; view: 
                 </div>
             </div>
             <div className="flex h-[180px] shrink-0">
-                <Preview view={view} />
+                <Preview preview={view.preview} />
                 <Places language={language} view={view} />
             </div>
             <div className="peek-hatch h-[14px]" />

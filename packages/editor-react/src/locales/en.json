@@ -93,6 +93,33 @@
             "noDefinition": "No definition found",
             "unavailableDefinition": "No language server finds definitions in this file"
         },
+        "callHierarchy": {
+            "unavailable": "No language server finds calls in this file",
+            "none": "No symbol with calls found here",
+            "failed": "Could not look up the calls: {{message}}",
+            "label": "Call hierarchy",
+            "direction": "Direction",
+            "incoming": "Callers",
+            "outgoing": "Callees",
+            "close": "Close",
+            "loading": "Loading…",
+            "noIncoming": "No callers",
+            "noOutgoing": "No callees",
+            "retry": "Could not load the calls: {{message}}. Press to try again",
+            "more_one": "Show {{formatted}} more call ({{hidden}} left)",
+            "more_other": "Show {{formatted}} more calls ({{hidden}} left)",
+            "sites_one": "{{formatted}} call",
+            "sites_other": "{{formatted}} calls",
+            "site": "Call {{current}} of {{total}}",
+            "previousSite": "Previous call",
+            "nextSite": "Next call",
+            "announce": {
+                "incoming_one": "{{count}} caller of {{name}}",
+                "incoming_other": "{{count}} callers of {{name}}",
+                "outgoing_one": "{{count}} callee of {{name}}",
+                "outgoing_other": "{{count}} callees of {{name}}"
+            }
+        },
         "codeVision": {
             "usagesNone": "No usages",
             "usages_one": "{{formatted}} usage",
@@ -171,6 +198,7 @@
         "goToDefinition": "Go to definition",
         "goToTypeDefinition": "Go to type definition",
         "goToImplementation": "Go to implementation",
+        "callHierarchy": "Call hierarchy",
         "peekReferences": "Peek references",
         "renameSymbol": "Rename symbol",
         "codeActions": "Code actions",

@@ -1,6 +1,7 @@
 import { KEYMAP, type Keymap } from '@adecore/editor/keymap';
 import type { Editor, EditorPosition } from '@adecore/editor';
 import type { Location } from '@adecore/lsp';
+import { CallHierarchyFeature } from './call-hierarchy.ts';
 import { CodeActionsFeature } from './code-actions.ts';
 import { CodeVisionFeature } from './code-vision.ts';
 import { CompletionFeature } from './completion.ts';
@@ -53,6 +54,7 @@ export class EditorLanguage {
     readonly rename: RenameFeature;
     readonly navigation: NavigationFeature;
     readonly peek: PeekFeature;
+    readonly callHierarchy: CallHierarchyFeature;
     readonly symbolPicker: SymbolPickerFeature;
     readonly contextMenu: ContextMenuFeature;
     readonly history: HistoryFeature;
@@ -85,6 +87,7 @@ export class EditorLanguage {
         this.rename = new RenameFeature(this);
         this.navigation = new NavigationFeature(this);
         this.peek = new PeekFeature(this);
+        this.callHierarchy = new CallHierarchyFeature(this);
         this.symbolPicker = new SymbolPickerFeature(this);
         this.contextMenu = new ContextMenuFeature(this);
         this.history = new HistoryFeature(this);

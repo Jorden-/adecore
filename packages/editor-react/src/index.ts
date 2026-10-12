@@ -21,6 +21,7 @@ export { SignatureCard } from './SignatureCard.tsx';
 export { RenameCard } from './RenameCard.tsx';
 export { PickPopup } from './PickPopup.tsx';
 export { PeekPanel } from './PeekPanel.tsx';
+export { CallHierarchyPanel } from './CallHierarchyPanel.tsx';
 export { SymbolPicker } from './SymbolPicker.tsx';
 export { CodeAuthorsCard } from './CodeAuthorsCard.tsx';
 export { EditorContextMenu } from './EditorContextMenu.tsx';
@@ -49,6 +50,7 @@ export type {
     RenameView,
     RenameFileView,
     PeekView,
+    CallHierarchyView,
     PickView,
     PickGroup,
     PickRow,

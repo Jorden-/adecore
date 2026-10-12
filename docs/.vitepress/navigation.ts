@@ -347,6 +347,7 @@ export const sidebar: DefaultTheme.SidebarMulti = {
             ['Completion and signatures', '/editor-react/completion'],
             ['Hover and problems', '/editor-react/hover'],
             ['Navigation', '/editor-react/navigation'],
+            ['Call hierarchy', '/editor-react/call-hierarchy'],
             ['Rename and code actions', '/editor-react/rename'],
             ['FindReplace', '/editor-react/find-replace'],
             ['Reviews and agents', '/editor-react/change-review'],

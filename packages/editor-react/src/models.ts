@@ -86,6 +86,20 @@ export {
     visualColumnOf
 } from './peek-model.ts';
 export {
+    type CallDirection,
+    type CallLoad,
+    type CallNode,
+    type CallRow,
+    CALL_LEVEL_LIMIT,
+    rootsOf,
+    childrenOf,
+    rowsOf,
+    stepsOf,
+    targetOf,
+    statusIdOf,
+    moreIdOf
+} from './call-hierarchy-model.ts';
+export {
     type SymbolGroup,
     SYMBOL_GROUPS,
     groupOfKind,

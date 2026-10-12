@@ -2,6 +2,7 @@ import { useEffect, useReducer, type ReactNode } from 'react';
 import { useStore } from 'zustand';
 import type { EditorLanguage } from './editor-language.ts';
 import { AnchoredPopup } from './AnchoredPopup.tsx';
+import { CallHierarchyPanel } from './CallHierarchyPanel.tsx';
 import { CodeAuthorsCard } from './CodeAuthorsCard.tsx';
 import { CompletionPopup } from './CompletionPopup.tsx';
 import { EditorContextMenu } from './EditorContextMenu.tsx';
@@ -25,6 +26,7 @@ export function LanguagePopups({ language, contextMenuItems }: { language: Edito
     const pick = useStore(language.popups, (state) => state.pick);
     const rename = useStore(language.popups, (state) => state.rename);
     const peek = useStore(language.popups, (state) => state.peek);
+    const callHierarchy = useStore(language.popups, (state) => state.callHierarchy);
     const symbols = useStore(language.popups, (state) => state.symbols);
     const menu = useStore(language.popups, (state) => state.menu);
     const authors = useStore(language.popups, (state) => state.authors);
@@ -58,6 +60,7 @@ export function LanguagePopups({ language, contextMenuItems }: { language: Edito
             )}
             {symbols !== null && <SymbolPicker language={language} view={symbols} />}
             {peek !== null && <PeekPanel language={language} view={peek} />}
+            {callHierarchy !== null && <CallHierarchyPanel language={language} view={callHierarchy} />}
             {authors !== null && <CodeAuthorsCard language={language} view={authors} />}
             {rename !== null && renameRect !== null && <RenameCard language={language} view={rename} rect={renameRect} endRect={renameEnd} />}
         </>

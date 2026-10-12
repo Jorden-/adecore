@@ -10,6 +10,9 @@ import {
     type ContentChange,
     type Disposable,
     type ProviderOptions,
+    type CallHierarchyIncomingCall,
+    type CallHierarchyItem,
+    type CallHierarchyOutgoingCall,
     type CodeAction,
     type CodeActionContext,
     type CodeLens,
@@ -230,6 +233,18 @@ export class FakeLanguageService implements LanguageService {
 
     selectionRanges(uri: string, positions: readonly Position[], options: LanguageRequestOptions = {}): Promise<SelectionRange[] | null> {
         return this.request<SelectionRange[] | null>('textDocument/selectionRange', uri, { positions }, options);
+    }
+
+    prepareCallHierarchy(uri: string, position: Position, options: LanguageRequestOptions = {}): Promise<CallHierarchyItem[] | null> {
+        return this.request<CallHierarchyItem[] | null>('textDocument/prepareCallHierarchy', uri, { position }, options);
+    }
+
+    incomingCalls(uri: string, item: CallHierarchyItem, options: LanguageRequestOptions = {}): Promise<CallHierarchyIncomingCall[] | null> {
+        return this.request<CallHierarchyIncomingCall[] | null>('callHierarchy/incomingCalls', uri, { item }, options);
+    }
+
+    outgoingCalls(uri: string, item: CallHierarchyItem, options: LanguageRequestOptions = {}): Promise<CallHierarchyOutgoingCall[] | null> {
+        return this.request<CallHierarchyOutgoingCall[] | null>('callHierarchy/outgoingCalls', uri, { item }, options);
     }
 
     codeLenses(uri: string, options: LanguageRequestOptions = {}): Promise<CodeLens[] | null> {

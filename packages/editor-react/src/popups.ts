@@ -4,6 +4,7 @@ import type { Location } from '@adecore/lsp';
 import type { CodeAuthorship } from './code-authors.ts';
 import type { Problem } from './diagnostics-model.ts';
 import type { PeekFile, PeekSnippet } from './peek-model.ts';
+import type { CallDirection, CallRow } from './call-hierarchy-model.ts';
 import type { ActionEntry } from './code-actions-model.ts';
 import type { SymbolEntry } from './symbol-picker-model.ts';
 import type { HoverText } from './hover-content.ts';
@@ -153,6 +154,21 @@ export interface PeekView {
     readonly preview: (PeekSnippet & { readonly uri: string }) | null;
 }
 
+/* The callers of a symbol, or the symbols it calls, as a tree between the lines of the file with the code of the active call. */
+export interface CallHierarchyView {
+    readonly direction: CallDirection;
+    /* The row the editor draws it in, which the editor makes again when it scrolls back into view. */
+    readonly container: HTMLElement | null;
+    /* The symbol the hierarchy was opened on. */
+    readonly name: string;
+    readonly rows: readonly CallRow[];
+    readonly active: string;
+    /* The call site of the active row that is shown, from zero, among `sites`. */
+    readonly site: number;
+    readonly sites: number;
+    readonly preview: (PeekSnippet & { readonly uri: string }) | null;
+}
+
 /* The picker that jumps to a symbol of the file, over the symbols the servers know in it. */
 export interface SymbolsView {
     /* The file's name, for the placeholder. */
@@ -185,6 +201,7 @@ export interface PopupState {
     readonly pick: PickView | null;
     readonly rename: RenameView | null;
     readonly peek: PeekView | null;
+    readonly callHierarchy: CallHierarchyView | null;
     readonly symbols: SymbolsView | null;
     readonly menu: MenuView | null;
     readonly authors: AuthorsView | null;
@@ -200,6 +217,7 @@ export function createPopupStore(): PopupStore {
         pick: null,
         rename: null,
         peek: null,
+        callHierarchy: null,
         symbols: null,
         menu: null,
         authors: null

@@ -17,6 +17,7 @@ export function EditorContextMenu({ language, view, children }: { language: Edit
         { id: 'goToTypeDefinition', method: 'textDocument/typeDefinition', run: () => void language.navigation.go('typeDefinition') },
         { id: 'goToImplementation', method: 'textDocument/implementation', run: () => void language.navigation.go('implementation') },
         { id: 'peekReferences', method: 'textDocument/references', run: () => void language.peek.open() },
+        { id: 'callHierarchy', method: 'textDocument/prepareCallHierarchy', run: () => void language.callHierarchy.open() },
         { id: 'renameSymbol', method: 'textDocument/rename', run: () => void language.rename.start() },
         { id: 'codeActions', method: 'textDocument/codeAction', run: () => void language.codeActions.open() }
     ];

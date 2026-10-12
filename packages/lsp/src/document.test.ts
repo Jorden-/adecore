@@ -264,4 +264,44 @@ describe('versioned language documents', () => {
         expect(await resolved).toEqual({ ...item, detail: 'd' });
         await session.shutdown();
     });
+
+    it('asks for a call hierarchy only when the server announces it, and keeps neighboring expansions alive', async () => {
+        const { session, transport } = await sessionWith({ callHierarchyProvider: true });
+        const initialize = transport.request('initialize').params as { capabilities: { textDocument: { callHierarchy: unknown } } };
+        expect(initialize.capabilities.textDocument.callHierarchy).toEqual({ dynamicRegistration: false });
+        const document = session.openDocument({ uri: 'file:///main.ts', languageId: 'typescript', text: 'x' });
+        const prepared = document.prepareCallHierarchy(origin);
+        await flush();
+        expect(transport.request('textDocument/prepareCallHierarchy').params).toEqual({ textDocument: { uri: document.uri }, position: origin });
+        const item = {
+            name: 'run',
+            kind: 12 as const,
+            uri: document.uri,
+            range: { start: origin, end: origin },
+            selectionRange: { start: origin, end: origin },
+            data: 7
+        };
+        transport.respond('textDocument/prepareCallHierarchy', [item]);
+        expect(await prepared).toEqual([item]);
+        const incoming = document.incomingCalls(item);
+        const outgoing = document.outgoingCalls(item);
+        const callers = document.incomingCalls({ ...item, name: 'other' });
+        await flush();
+        expect(transport.request('callHierarchy/outgoingCalls').params).toEqual({ item });
+        transport.respond('callHierarchy/outgoingCalls', [{ to: item, fromRanges: [] }]);
+        expect(await outgoing).toEqual([{ to: item, fromRanges: [] }]);
+        // Both caller requests are alive: the second did not cancel the first.
+        const asked = transport.sent.filter((message) => 'method' in message && message.method === 'callHierarchy/incomingCalls') as { id: number }[];
+        expect(asked).toHaveLength(2);
+        transport.emit({ jsonrpc: '2.0', id: asked[0]!.id, result: [{ from: item, fromRanges: [] }] });
+        transport.emit({ jsonrpc: '2.0', id: asked[1]!.id, result: null });
+        expect(await incoming).toEqual([{ from: item, fromRanges: [] }]);
+        expect(await callers).toBeNull();
+        await session.shutdown();
+        const { session: bare } = await sessionWith({});
+        const other = bare.openDocument({ uri: 'file:///main.ts', languageId: 'typescript', text: 'x' });
+        await expect(other.prepareCallHierarchy(origin)).rejects.toMatchObject({ code: -32601 });
+        await expect(other.incomingCalls(item)).rejects.toMatchObject({ code: -32601 });
+        await bare.shutdown();
+    });
 });

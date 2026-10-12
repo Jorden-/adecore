@@ -83,6 +83,9 @@ const PROVIDERS: Record<string, keyof ServerCapabilities> = {
     'textDocument/semanticTokens/range': 'semanticTokensProvider',
     'textDocument/inlayHint': 'inlayHintProvider',
     'inlayHint/resolve': 'inlayHintProvider',
+    'textDocument/prepareCallHierarchy': 'callHierarchyProvider',
+    'callHierarchy/incomingCalls': 'callHierarchyProvider',
+    'callHierarchy/outgoingCalls': 'callHierarchyProvider',
     'textDocument/diagnostic': 'diagnosticProvider'
 };
 
@@ -92,6 +95,8 @@ const REGISTRATION_METHODS: Record<string, string> = {
     'codeAction/resolve': 'textDocument/codeAction',
     'codeLens/resolve': 'textDocument/codeLens',
     'inlayHint/resolve': 'textDocument/inlayHint',
+    'callHierarchy/incomingCalls': 'textDocument/prepareCallHierarchy',
+    'callHierarchy/outgoingCalls': 'textDocument/prepareCallHierarchy',
     'textDocument/prepareRename': 'textDocument/rename',
     'workspaceSymbol/resolve': 'workspace/symbol',
     'textDocument/semanticTokens/full': 'textDocument/semanticTokens',
@@ -620,6 +625,7 @@ function clientCapabilities(options: LspSessionOptions): object {
                 multilineTokenSupport: false
             },
             inlayHint: { ...dynamic, resolveSupport: { properties: ['tooltip', 'textEdits', 'label.tooltip', 'label.location', 'label.command'] } },
+            callHierarchy: { dynamicRegistration: false },
             diagnostic: { ...dynamic, relatedDocumentSupport: true }
         }
     };

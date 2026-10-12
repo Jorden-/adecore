@@ -126,6 +126,7 @@ export class PeekFeature {
                 ? files[0]!.places[0]!
                 : (files.flatMap((file) => file.places).find((place) => !(place.location.uri === uri && place.line === position.line)) ?? files[0]!.places[0]!);
         this.line = position.line;
+        this.language.callHierarchy.close();
         this.language.popups.setState({ peek: { kind, container: null, files, active: first.id, collapsed: [], count: unique.length, preview: null } });
         this.select(first.id);
         // The editor draws a row once per id, so a peek opened over another needs an id of its own to get a container.
