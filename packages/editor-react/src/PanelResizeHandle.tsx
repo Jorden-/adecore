@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PANEL_BODY_MIN, PANEL_KEY_STEP, availableHeightOf, clampPanelBody, panelBodyMax } from './panel-size.ts';
 import { realTimers, revealRow } from './timers.ts';
@@ -13,16 +13,32 @@ interface Props {
 /* The bottom edge of a panel: a drag, or the arrow keys, change the height of its body. */
 export function PanelResizeHandle({ container, height, onHeight, onCommit }: Props) {
     const { t } = useTranslation('editor');
-    const drag = useRef<{ startY: number; startHeight: number } | null>(null);
+    const drag = useRef<{ startY: number; startHeight: number; lastY: number } | null>(null);
     const [dragging, setDragging] = useState(false);
-    const available = availableHeightOf(container);
-    const max = panelBodyMax(available);
+    const [max, setMax] = useState(() => panelBodyMax(availableHeightOf(container)));
 
-    function settle(value: number): void {
+    useEffect(() => {
+        const viewport = container.closest<HTMLElement>('.se-viewport');
+        const Observer = viewport?.ownerDocument.defaultView?.ResizeObserver;
+        if (viewport === null || viewport === undefined || Observer === undefined) {
+            return;
+        }
+        const observer = new Observer(() => setMax(panelBodyMax(availableHeightOf(container))));
+        observer.observe(viewport);
+        return () => observer.disconnect();
+    }, [container]);
+
+    function settle(value: number, from: number): void {
         const next = clampPanelBody(value, availableHeightOf(container));
         onHeight(next);
-        onCommit(next);
-        revealRow(realTimers, container);
+        if (next !== from) {
+            onCommit(next);
+            revealRow(realTimers, container);
+        }
+    }
+
+    function heightAt(clientY: number): number {
+        return clampPanelBody(drag.current!.startHeight + clientY - drag.current!.startY, availableHeightOf(container));
     }
 
     function down(event: PointerEvent<HTMLDivElement>): void {
@@ -30,36 +46,40 @@ export function PanelResizeHandle({ container, height, onHeight, onCommit }: Pro
             return;
         }
         event.currentTarget.setPointerCapture(event.pointerId);
-        drag.current = { startY: event.clientY, startHeight: height };
+        drag.current = { startY: event.clientY, startHeight: height, lastY: event.clientY };
         setDragging(true);
     }
 
     function move(event: PointerEvent<HTMLDivElement>): void {
         if (drag.current !== null) {
-            onHeight(clampPanelBody(drag.current.startHeight + event.clientY - drag.current.startY, availableHeightOf(container)));
+            drag.current.lastY = event.clientY;
+            onHeight(heightAt(event.clientY));
         }
     }
 
-    function up(event: PointerEvent<HTMLDivElement>): void {
+    // Also the end of a drag whose capture was lost, such as a container that was replaced under the pointer.
+    function end(event: PointerEvent<HTMLDivElement>): void {
         if (drag.current === null) {
             return;
         }
-        const next = clampPanelBody(drag.current.startHeight + event.clientY - drag.current.startY, availableHeightOf(container));
+        const { startHeight } = drag.current;
+        const next = heightAt(drag.current.lastY);
         drag.current = null;
         setDragging(false);
         event.currentTarget.releasePointerCapture?.(event.pointerId);
-        settle(next);
+        settle(next, startHeight);
     }
 
     function key(event: KeyboardEvent<HTMLDivElement>): void {
         const step = event.shiftKey ? PANEL_KEY_STEP * 4 : PANEL_KEY_STEP;
-        const target = { ArrowUp: height - step, ArrowDown: height + step, Home: PANEL_BODY_MIN, End: max }[event.key];
+        const end = panelBodyMax(availableHeightOf(container));
+        const target = { ArrowUp: height - step, ArrowDown: height + step, Home: PANEL_BODY_MIN, End: end }[event.key];
         if (target === undefined) {
             return;
         }
         event.preventDefault();
         event.stopPropagation();
-        settle(target);
+        settle(target, height);
     }
 
     return (
@@ -75,8 +95,9 @@ export function PanelResizeHandle({ container, height, onHeight, onCommit }: Pro
             className="absolute inset-x-0 bottom-0 z-10 h-1 cursor-row-resize touch-none outline-none hover:bg-accent-soft focus-visible:bg-accent-soft data-[dragging=true]:bg-accent-soft"
             onPointerDown={down}
             onPointerMove={move}
-            onPointerUp={up}
-            onPointerCancel={up}
+            onPointerUp={end}
+            onPointerCancel={end}
+            onLostPointerCapture={end}
             onKeyDown={key}
         />
     );

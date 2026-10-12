@@ -7,6 +7,7 @@ import { createPage } from '@adecore/editor/testing';
 import { CallHierarchyPanel } from './CallHierarchyPanel.tsx';
 import type { CallRow } from './call-hierarchy-model.ts';
 import type { EditorLanguage } from './editor-language.ts';
+import { ProjectLanguage } from './project-language.ts';
 import type { CallHierarchyView } from './popups.ts';
 
 async function inPage(run: (page: ReturnType<typeof createPage>, root: ReturnType<typeof createRoot>) => Promise<void>): Promise<void> {
@@ -64,7 +65,7 @@ test('the tree names its rows, levels and open state, and the editor points at t
         const calls: string[] = [];
         const language = {
             editor,
-            project: { folder: '/work' },
+            project: { folder: '/work', onPanelBodyChange: () => () => undefined },
             callHierarchy: {
                 select: (id: string) => calls.push(`select ${id}`),
                 go: (id: string) => calls.push(`go ${id}`),
@@ -124,7 +125,12 @@ test('the bottom edge resizes the body by keyboard and reports where it ended', 
         const sizes: number[] = [];
         const language = {
             editor,
-            project: { folder: '/work', panelBodyHeight: 180, resizePanelBody: (height: number) => sizes.push(height) },
+            project: {
+                folder: '/work',
+                panelBodyHeight: 180,
+                onPanelBodyChange: () => () => undefined,
+                resizePanelBody: (height: number) => sizes.push(height)
+            },
             callHierarchy: {}
         } as unknown as EditorLanguage;
         const container = page.document.createElement('div');
@@ -143,6 +149,21 @@ test('the bottom edge resizes the body by keyboard and reports where it ended', 
         expect(body().style.height).toBe('88px');
         await act(async () => press('ArrowUp'));
         expect(body().style.height).toBe('88px');
-        expect(sizes).toEqual([202, 88, 88]);
+        expect(sizes).toEqual([202, 88]);
+    });
+});
+
+test('an open panel follows a resize made in another editor of the project', async () => {
+    await inPage(async (page, root) => {
+        const editor = new FakeEditor(page.host, { text: 'run()' } as never);
+        const project = new ProjectLanguage({ onDiagnostics: () => () => undefined } as never, { panelBodyHeight: 180 });
+        const language = { editor, project, callHierarchy: {} } as unknown as EditorLanguage;
+        const container = page.document.createElement('div');
+        page.document.body.append(container);
+        const view = { direction: 'incoming', container, name: 'run', rows: [], active: '', site: 0, sites: 0, preview: null } as CallHierarchyView;
+        await act(async () => root.render(createElement(CallHierarchyPanel, { language, view })));
+        const body = () => page.document.querySelector('[role="tree"]')!.parentElement as HTMLElement;
+        await act(async () => project.resizePanelBody(240));
+        expect(body().style.height).toBe('240px');
     });
 });

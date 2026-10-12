@@ -82,8 +82,8 @@ export function rootsOf(items: readonly CallHierarchyItem[]): CallNode[] {
 }
 
 /*
- * The children of a node made from the calls a server returned, in the order the server gave them. The call sites of a caller are in its own file; those of a callee are in the file of the node
- * that was asked about.
+ * The children of a node made from the calls a server returned, in the order the server gave them.
+ * The call sites of a caller are in its own file; those of a callee are in the file of the node that was asked about.
  */
 export function childrenOf(direction: CallDirection, parent: CallNode, calls: readonly (CallHierarchyIncomingCall | CallHierarchyOutgoingCall)[]): CallNode[] {
     const entries = calls.map((call) => ({ item: 'from' in call ? call.from : call.to, sites: call.fromRanges }));

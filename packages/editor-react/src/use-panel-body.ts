@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { EditorLanguage } from './editor-language.ts';
 import { clampPanelBody } from './panel-size.ts';
 
@@ -6,6 +6,9 @@ import { clampPanelBody } from './panel-size.ts';
 export function usePanelBody(language: EditorLanguage): { height: number; set(height: number): void; commit(height: number): void } {
     const { project } = language;
     const [height, set] = useState(() => clampPanelBody(project.panelBodyHeight));
+
+    useEffect(() => project.onPanelBodyChange((value) => set(clampPanelBody(value))), [project]);
+
     return {
         height,
         set,

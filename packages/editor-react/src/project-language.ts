@@ -101,6 +101,7 @@ export class ProjectLanguage {
     private readonly files: ProjectFiles | null;
     /* The body height of the peek and call hierarchy panels, shared by the editors of the project. */
     panelBodyHeight: number;
+    private readonly panelListeners = new Set<(height: number) => void>();
     private pendingCaret: Place | null = null;
     private lastPlace: Place | null = null;
     private disposed = false;
@@ -115,8 +116,18 @@ export class ProjectLanguage {
         this.problems = new ProjectProblems(service, (uri) => this.pathOfLocation(uri) ?? uri);
     }
 
+    /* Open panels of other editors of the project follow a resize. */
+    onPanelBodyChange(listener: (height: number) => void): () => void {
+        this.panelListeners.add(listener);
+        return () => this.panelListeners.delete(listener);
+    }
+
     resizePanelBody(height: number): void {
+        if (height === this.panelBodyHeight) {
+            return;
+        }
         this.panelBodyHeight = height;
+        this.panelListeners.forEach((listener) => listener(height));
         this.host.onPanelResize?.(height);
     }
 
