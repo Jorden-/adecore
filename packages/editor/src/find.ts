@@ -1,5 +1,8 @@
 import type { DocumentChange, DocumentModel, FindMatch } from '@adecore/editor-core';
 import { mapOffset } from './offsets.ts';
+import { FindSearchQueue, scheduleFind, type FindSearchOptions } from './find-search.ts';
+import { EditorSearchError } from './search-client.ts';
+import type { EditorSearchSnapshot } from './search-protocol.ts';
 import { SEARCH_LIMIT } from './search-protocol.ts';
 import type { EditorFindQuery, EditorFindState } from './types.ts';
 
@@ -9,6 +12,11 @@ export interface FindMark {
 }
 
 export const FIND_LIMIT = SEARCH_LIMIT;
+const LIVE_REGEX_LIMIT = 8_000_000;
+
+export interface FindControllerOptions extends FindSearchOptions {
+    readonly changed: () => void;
+}
 
 /*
  * The find of the host's find bar: every match marked, one of them current. It searches the model on
@@ -25,9 +33,23 @@ export class FindController {
     pendingAnchor: number | undefined;
 
     private readonly model: DocumentModel;
+    private readonly options: FindControllerOptions | undefined;
+    private readonly search: FindSearchQueue | undefined;
+    private regexCache: { revision: number; key: string; complete: boolean } | undefined;
+    private snapshotMemo: EditorSearchSnapshot | undefined;
+    private retained: FindMatch | null = null;
+    private epoch = 0;
+    private searching = false;
+    private failed: EditorFindState['failed'];
+    private cancelSearch: (() => void) | undefined;
+    private cancelMatch: (() => void) | undefined;
+    private preview = false;
+    private disposed = false;
 
-    constructor(model: DocumentModel) {
+    constructor(model: DocumentModel, options?: FindControllerOptions) {
         this.model = model;
+        this.options = options;
+        this.search = options === undefined ? undefined : new FindSearchQueue(options);
     }
 
     get activeQuery(): EditorFindQuery | null {
@@ -50,7 +72,10 @@ export class FindController {
         return {
             count: this.marks.length,
             current: this.index,
-            ...(this.cache?.complete === false ? { limited: true } : {}),
+            ...(this.cache?.complete === false || (this.failed === undefined && this.regexCache?.complete === false) ? { limited: true } : {}),
+            ...(this.searching ? { searching: true } : {}),
+            ...(this.failed === undefined ? {} : { failed: this.failed }),
+            ...(this.search !== undefined && this.query?.regex && this.model.getLength() > LIVE_REGEX_LIMIT ? { large: true } : {}),
             ...(this.query?.inSelection === true && this.bounds === null ? { noSelection: true } : {})
         };
     }
@@ -89,6 +114,10 @@ export class FindController {
     }
 
     get currentMatch(): FindMatch | null {
+        if (this.search !== undefined && this.query?.regex) {
+            const mark = this.currentMark;
+            return this.freshRegex && this.retained?.from === mark?.from && this.retained?.to === mark?.to ? this.retained : null;
+        }
         const matches = this.cachedMatches;
         return this.index === null || matches === null ? null : (matches[this.index] ?? null);
     }
@@ -145,6 +174,12 @@ export class FindController {
     refresh(): void {
         const previous = this.currentMark;
         const query = this.query;
+        if (this.search !== undefined && query?.regex) {
+            this.refreshRegex(previous);
+            return;
+        }
+        this.resetRegex(true);
+
         if (query === null) {
             this.marks = [];
             this.cache = undefined;
@@ -181,10 +216,198 @@ export class FindController {
     }
 
     step(direction: 1 | -1): void {
+        if (this.search !== undefined && this.query?.regex && !this.freshRegex) {
+            this.startRegex(true);
+            return;
+        }
         const count = this.marks.length;
         if (count === 0) {
             return;
         }
         this.index = this.index === null ? (direction === 1 ? 0 : count - 1) : (this.index + direction + count) % count;
+        this.preparePreview();
+    }
+
+    private get freshRegex(): boolean {
+        return (
+            this.failed === undefined && !this.searching && this.regexCache?.revision === this.model.getRevision() && this.regexCache.key === this.cacheKey()
+        );
+    }
+
+    private resetRegex(release: boolean): void {
+        this.epoch++;
+        this.cancelSearch?.();
+        this.cancelSearch = undefined;
+        this.cancelMatch?.();
+        this.cancelMatch = undefined;
+        this.regexCache = undefined;
+        this.snapshotMemo = undefined;
+        this.retained = null;
+        this.searching = false;
+        this.failed = undefined;
+        if (release) {
+            this.search?.release();
+        }
+    }
+
+    private refreshRegex(previous: FindMark | null): void {
+        if (this.freshRegex) {
+            return;
+        }
+        const failure = this.failed;
+        const retryBlocked = failure === 'timeout' || failure === 'unavailable';
+        const sameQuery = this.regexCache?.key === this.cacheKey();
+        this.resetRegex(false);
+        this.cache = undefined;
+        this.marks = [];
+        this.index = null;
+        if (retryBlocked && sameQuery) {
+            this.failed = failure;
+            this.regexCache = { revision: this.model.getRevision(), key: this.cacheKey(), complete: false };
+            return;
+        }
+        this.pendingAnchor ??= previous?.from;
+        this.startRegex(false);
+    }
+
+    private startRegex(explicit: boolean): void {
+        const query = this.query;
+        if (query === null || this.search === undefined || this.disposed) {
+            return;
+        }
+        if (query.inSelection && this.bounds === null) {
+            return;
+        }
+        if (!explicit && this.model.getLength() > LIVE_REGEX_LIMIT) {
+            return;
+        }
+        const epoch = this.epoch;
+        const key = this.cacheKey();
+        const revision = this.model.getRevision();
+        this.failed = undefined;
+        this.searching = true;
+        this.cancelSearch?.();
+        this.cancelSearch = (this.options?.schedule ?? scheduleFind)(
+            () => {
+                this.cancelSearch = undefined;
+                const snapshot = this.snapshot();
+                void this.search!.request((client) => {
+                    if (epoch !== this.epoch || this.disposed) {
+                        throw new EditorSearchError('superseded', 'The find query changed.');
+                    }
+                    return client.search(snapshot, query, { ...this.scope, maxResults: FIND_LIMIT });
+                })
+                    .then((result) => {
+                        if (epoch !== this.epoch || revision !== this.model.getRevision() || this.disposed) {
+                            return;
+                        }
+                        this.regexCache = { revision, key, complete: !result.limited };
+                        const marks: FindMark[] = [];
+                        for (let index = 0; index < result.ranges.length; index += 2) {
+                            marks.push({ from: result.ranges[index]!, to: result.ranges[index + 1]! });
+                        }
+                        this.marks = marks;
+                        const selection = this.model.getPrimary();
+                        const anchor = this.pendingAnchor ?? Math.min(selection.anchor, selection.head);
+                        this.pendingAnchor = undefined;
+                        this.index =
+                            marks.length === 0
+                                ? null
+                                : Math.max(
+                                      0,
+                                      marks.findIndex((mark) => mark.from >= anchor)
+                                  );
+                        this.searching = false;
+                        this.options?.changed();
+                        this.preparePreview();
+                    })
+                    .catch((error) => {
+                        if (epoch !== this.epoch || this.disposed || (error instanceof EditorSearchError && error.kind === 'superseded')) {
+                            return;
+                        }
+                        this.searching = false;
+                        this.failed =
+                            error instanceof EditorSearchError
+                                ? error.kind === 'syntax'
+                                    ? 'invalid'
+                                    : error.kind === 'timeout' || error.kind === 'unavailable'
+                                      ? error.kind
+                                      : 'error'
+                                : 'error';
+                        this.regexCache = { revision, key, complete: false };
+                        this.options?.changed();
+                    });
+            },
+            explicit || this.model.getLength() <= 1_000_000 ? 0 : 150
+        );
+    }
+
+    private snapshot(): EditorSearchSnapshot {
+        const revision = this.model.getRevision();
+        if (this.snapshotMemo?.revision !== revision) {
+            this.snapshotMemo = { revision, text: this.model.getText() };
+        }
+        return this.snapshotMemo;
+    }
+
+    setPreview(active: boolean): void {
+        this.preview = active;
+        this.preparePreview();
+    }
+
+    private preparePreview(): void {
+        this.cancelMatch?.();
+        this.cancelMatch = undefined;
+        if (this.preview && this.search !== undefined && this.query?.regex && this.freshRegex && this.currentMatch === null) {
+            this.cancelMatch = (this.options?.schedule ?? scheduleFind)(() => {
+                this.cancelMatch = undefined;
+                void this.ensureMatch().catch(() => {});
+            }, 50);
+        }
+    }
+
+    async ensureMatch(): Promise<FindMatch | null> {
+        if (this.currentMatch !== null || this.search === undefined || !this.query?.regex || !this.freshRegex) {
+            return this.currentMatch;
+        }
+        const mark = this.currentMark;
+        if (mark === null) {
+            return null;
+        }
+        const query = this.query;
+        const epoch = this.epoch;
+        const snapshot = this.snapshot();
+        const current = (): boolean =>
+            !this.disposed &&
+            epoch === this.epoch &&
+            this.model.getRevision() === snapshot.revision &&
+            this.currentMark?.from === mark.from &&
+            this.currentMark?.to === mark.to;
+        try {
+            const found = await this.search.request((client) => {
+                if (!current()) {
+                    throw new EditorSearchError('superseded', 'The current find match changed.');
+                }
+                return client.match(snapshot, query, mark);
+            });
+            if (!current()) {
+                return null;
+            }
+            this.retained = found;
+            this.options?.changed();
+            return found;
+        } catch (error) {
+            if (current() && !(error instanceof EditorSearchError && error.kind === 'superseded')) {
+                this.failed = error instanceof EditorSearchError && (error.kind === 'timeout' || error.kind === 'unavailable') ? error.kind : 'error';
+                this.options?.changed();
+            }
+            return null;
+        }
+    }
+
+    dispose(): void {
+        this.disposed = true;
+        this.resetRegex(false);
+        this.search?.dispose();
     }
 }

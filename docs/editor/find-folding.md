@@ -75,3 +75,5 @@ The editor reads the blocks of a document, the stretches with a header line such
 `setSelectionRanges(provider)` lets Extend Selection grow through a language server's ranges instead of the model's lexical ones; `null` goes back.
 
 Call `release()` when a search session ends to free the worker and its snapshot. The client remains usable; the next request starts a fresh worker. `dispose()` ends its lifetime.
+
+The find state reserves optional `searching`, `failed` (`invalid`, `timeout`, `unavailable`, or `error`), and `large` fields for worker-backed searches. The DOM engine still uses the synchronous find cache; the worker client and async controller are separate building blocks until the engine and find-bar wiring is complete.

@@ -453,6 +453,10 @@ export interface EditorFindState {
     readonly noSelection?: boolean;
     /* More results exist than the marked count. */
     readonly limited?: boolean;
+    readonly searching?: boolean;
+    readonly failed?: 'invalid' | 'timeout' | 'unavailable' | 'error';
+    /* Regex searches in large documents start only on an explicit step. */
+    readonly large?: boolean;
 }
 
 export interface EditorReplaceOptions {
