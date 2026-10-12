@@ -351,3 +351,64 @@ test('a stale or different match range cannot become a retained match', async ()
     expect((await failure).kind).toBe('error');
     host.client.dispose();
 });
+
+test('cursor requests reuse the snapshot and keep revision and direction guards', async () => {
+    const host = setup();
+    const first = host.client.next(snapshot, query, 2, { backwards: true, wrap: false });
+    await Promise.resolve();
+    const worker = host.workers[0]!;
+    const message = worker.messages[0]!;
+    expect(message).toMatchObject({ type: 'next', offset: 2, backwards: true, wrap: false, text: 'word' });
+    worker.reply({ type: 'next', id: message.id, revision: 1, range: { from: 0, to: 4 } });
+    expect(host.timers[0]!.cancelled).toBe(false);
+    worker.reply({ type: 'next', id: message.id, revision: 0, range: null });
+    expect(await first).toBeNull();
+    host.client.dispose();
+});
+
+test('replacement requests carry one bounded page and reuse the immutable snapshot', async () => {
+    const host = setup();
+    const first = host.client.replacements(snapshot, query, 'entry', { maxEdits: 2, maxCharacters: 5, preserveCase: true });
+    await Promise.resolve();
+    const worker = host.workers[0]!;
+    const message = worker.messages[0]!;
+    expect(message).toMatchObject({ type: 'replacements', replacement: 'entry', maxEdits: 2, maxCharacters: 5, preserveCase: true });
+    worker.reply({ type: 'replacements', id: message.id, revision: 0, ranges: new Uint32Array([0, 4, 5]), text: 'entry', next: null });
+    expect(await first).toEqual({ revision: 0, ranges: new Uint32Array([0, 4, 5]), text: 'entry', next: null });
+    const second = host.client.replacements(snapshot, query, '', { maxEdits: 1, maxCharacters: 0 });
+    await Promise.resolve();
+    const next = worker.messages[1]!;
+    expect(next).not.toHaveProperty('text');
+    worker.reply({ type: 'replacements', id: next.id, revision: 0, ranges: new Uint32Array([0, 4, 0]), text: '', next: null });
+    await second;
+    host.client.dispose();
+});
+
+test('invalid replacement limits never start a worker', async () => {
+    const host = setup();
+    for (const limits of [{ maxEdits: 0 }, { maxEdits: 10001 }, { maxEdits: 1.5 }, { maxCharacters: -1 }, { maxCharacters: 4_000_001 }]) {
+        expect((await caught(host.client.replacements(snapshot, query, 'entry', limits))).kind).toBe('range');
+    }
+    expect(host.workers).toHaveLength(0);
+    host.client.dispose();
+});
+
+for (const packet of [
+    { ranges: [0, 4], text: '', next: null },
+    { ranges: [3, 2, 0], text: '', next: null },
+    { ranges: [0, 5, 0], text: '', next: null },
+    { ranges: [0, 4, 2], text: 'x', next: null },
+    { ranges: [], text: '', next: 0 },
+    { ranges: [0, 4, 1], text: 'x', next: 1 }
+]) {
+    test(`a malformed replacement page is refused before a host can commit it ${JSON.stringify(packet)}`, async () => {
+        const host = setup();
+        const result = caught(host.client.replacements(snapshot, query, 'x'));
+        await Promise.resolve();
+        const worker = host.workers[0]!;
+        const message = worker.messages[0]!;
+        worker.reply({ type: 'replacements', id: message.id, revision: 0, ...packet, ranges: Uint32Array.from(packet.ranges) });
+        expect((await result).kind).toBe('error');
+        host.client.dispose();
+    });
+}

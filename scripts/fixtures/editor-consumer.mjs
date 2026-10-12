@@ -65,6 +65,21 @@ assert.deepEqual([...searchReplies[0].ranges], [4, 7]);
 searchListener({ data: { type: 'match', id: 2, revision: 0, query: { text: '(two)', regex: true, caseSensitive: true, wholeWord: false }, from: 4, to: 7 } });
 assert.deepEqual(searchReplies[1].match.captures, ['two']);
 assert.equal(Object.hasOwn(searchReplies[1].match, 'text'), false);
+searchListener({ data: { type: 'next', id: 3, revision: 0, query: { text: 'one', regex: false, caseSensitive: false, wholeWord: false }, offset: 1 } });
+assert.deepEqual(searchReplies[2].range, { from: 0, to: 3 });
+searchListener({
+    data: {
+        type: 'replacements',
+        id: 4,
+        revision: 0,
+        query: { text: '(two)', regex: true, caseSensitive: false, wholeWord: false },
+        replacement: '$1!',
+        maxEdits: 1000,
+        maxCharacters: 100
+    }
+});
+assert.deepEqual([...searchReplies[3].ranges], [4, 7, 4]);
+assert.equal(searchReplies[3].text, 'two!');
 stopSearch();
 assert.equal(searchListener, undefined);
 assert.ok(createPage().host);

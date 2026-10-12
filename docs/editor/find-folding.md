@@ -22,7 +22,7 @@ Matches never touch the selection until `endFind`. A regular expression expands 
 
 ## Search worker
 
-`@adecore/editor/search-worker` supplies `serveEditorSearch` for a worker entry and `createSearchClient` for its caller. Importing the entry starts nothing. The worker runs the same `findMatches` engine as editor-core, including captures, named groups, bounds, Unicode and zero-width matches.
+`@adecore/editor/search-worker` supplies `serveEditorSearch` for a worker entry and `createSearchClient` for its caller. Importing the entry starts nothing. The worker runs the same `iterateMatches` engine as editor-core, including captures, named groups, bounds, Unicode and zero-width matches.
 
 ```ts
 // search.worker.ts
@@ -41,6 +41,12 @@ search.dispose();
 Keep one client per document. A revision identifies immutable text; the client sends that text only when the revision changes or a worker restarts. `search` accepts optional `from`, `to` and `maxResults` bounds. Selection bounds come from the caller, not the query's `inSelection` flag. Results contain the revision, a transferable `Uint32Array` of `[from, to]` pairs and `limited`, which says another match exists beyond the returned prefix. The cap is 10,000 matches, so the range buffer is at most 80,000 bytes. Matched text and captures are not copied with search marks, including a match on a large line.
 
 `match(snapshot, query, { from, to })` retrieves one exact range through the worker and returns a retained `FindMatch` or `null`. Its text comes from the caller's immutable snapshot; the worker supplies captures, named groups and regex metadata. Captures and named groups together must fit within 4,000,000 UTF-16 code units. An oversized capture response fails instead of cloning a large payload. Lookup uses the same deadline and cancellation rules as search, with no regex execution on the page. Preview and replacing can use that retained match with editor-core's revision checks.
+
+`next(snapshot, query, offset, options?)` returns one range or `null`, with optional `backwards`, `wrap`, `from` and `to`. It preserves the original nonoverlapping match grid and retains only a few results, even when wrapping backward through a large prefix.
+
+`replacements(snapshot, query, replacement, options?)` prepares one page without changing the model. It returns `revision`, a transferable `ranges` buffer of `[from, to, replacementLength]` triples, the concatenated replacement `text`, and `next`. A non-null `next` is the exact continuation offset; pass it as `from` on the next request with the same snapshot. Empty matches advance by a whole code point. `preserveCase` and all replacement tokens use the original snapshot on every page.
+
+A page defaults to 1,000 edits and 4,000,000 UTF-16 output code units; `maxEdits` must be between 1 and 10,000, and `maxCharacters` between 0 and 4,000,000. An overflowing output is refused. For a total operation budget, reduce `maxCharacters` by the output already accumulated, and limit the accumulated edit count separately. Do not commit each page: collect every page, refuse any failure or changed revision, then apply all edits once with `expectedRevision`. This gives one undo step and never a partial replacement. The client checks page lengths, bounds and continuation offsets before returning them.
 
 The default deadline is 1,500 ms from posting, including startup. A timeout or superseding request terminates the worker because a running regular expression cannot process a cancel message. A later request starts a fresh worker. Requests in the same microtask burst keep only the latest; replies from old workers, ids or revisions cannot settle a newer request. A completed worker stays available until `dispose`. `cancel` rejects pending work but keeps an idle worker available.
 
