@@ -54,7 +54,7 @@ test('an edit review loads the host engine once and updates the same read-only e
         expect(editor.lineNumbers!(0)).toBe('1');
         expect(editor.lineNumbers!(1)).toBe('1');
         expect(editor.lineTokens).not.toBeNull();
-        expect(editor.lineHighlights.map((highlight) => highlight.sign)).toEqual(['-', '+']);
+        expect(editor.lineHighlights.map((highlight) => highlight.bar)).toEqual(['hatched', 'solid']);
         await act(async () => render({ path: 'main.rs', before: 'left\n', after: 'right\n' }));
         expect(loads).toBe(1);
         expect(engine.editors).toHaveLength(1);
@@ -166,7 +166,7 @@ test('patch reviews validate snapshots and read whitespace-filtered context from
         );
         expect(engine.last.getText()).toBe('  keep\nold\nnew');
         expect([0, 1, 2].map((line) => engine.last.lineNumbers!(line))).toEqual(['2', '3', '3']);
-        expect(engine.last.lineHighlights.map((line) => line.sign)).toEqual(['-', '+']);
+        expect(engine.last.lineHighlights.map((line) => line.bar)).toEqual(['hatched', 'solid']);
         await act(async () =>
             root.render(
                 <EditorPatchDiff

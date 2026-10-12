@@ -14,13 +14,17 @@ const document = diffDocument(patchOf(before, after), { old: before, new: after 
 <DiffView engine={engine} document={document} theme="github-dark" label="Proposed changes" />;
 ```
 
-Removed and added lines are both document text: keyboard selection, copy, find, horizontal scrolling and wrapping use the editor itself. Source numbers, change signs and no-final-newline labels stay outside copied text. Copy joins displayed lines with LF, including lines separated by a collapsed gap. A literal CR in source text remains in the display; when it ends a displayed line, joining that line with LF forms CRLF. Fully unfolding a gap restores its context. Partial patches keep their original numbers but cannot unfold omitted text. Unified context reads the new snapshot, including when a patch ignores whitespace.
+Removed and added lines are both document text: keyboard selection, copy, find, horizontal scrolling and wrapping use the editor itself. Source numbers and no-final-newline labels stay outside copied text. Copy joins displayed lines with LF, including lines separated by a collapsed gap. A literal CR in source text remains in the display; when it ends a displayed line, joining that line with LF forms CRLF. Fully unfolding a gap restores its context. Partial patches keep their original numbers but cannot unfold omitted text. Unified context reads the new snapshot, including when a patch ignores whitespace.
 
 The view keeps the same editor when its document, tokens, theme or wrap setting changes. Fold arrows, sticky blocks and indentation guides are disabled because combined source lines do not form one program. Ordinary folding commands are disabled. Replaced words use stronger tints when the bounded word comparison succeeds; coarse differences skip word marks. Whitespace-only ranges are omitted when the document ignores whitespace.
 
+### Gutter
+
+A changed line has a gutter cell tinted in its change color, its number drawn in a readable shade of that color, and a bar along the left edge: solid for an added line, striped for a removed one. The bar runs on over consecutive changed lines. There is no `+` or `-` sign and no triangle. In the split layout each side draws its own numbers and bars, and a unified view draws its one number column the same way. The colors come from `--editor-added` and `--editor-deleted`, and [`--editor-mark-number-mix` and `--editor-mark-bar-width`](/editor/theme) tune the number shade and bar width.
+
 ### Accessibility
 
-A changed line is not told by color alone. The gutter of each line holds visually hidden text that a screen reader reads with the line: `Added, new line 12` or `Removed, old line 8`, and in a unified view `Old line 3, new line 3` for an unchanged line, so both numbers are available. The drawn number and sign are hidden from assistive technology on a line that has one. The split layout wraps the whole view in a group named by `label` and each side in a group named `Before` or `After`, which also names each side's textarea (`label: Before`). Only the rows the editor draws carry the text, so virtualization is unchanged. The structure is not a table or grid, and no table roles are used.
+A changed line is not told by color alone. The gutter of each line holds visually hidden text that a screen reader reads with the line: `Added, new line 12` or `Removed, old line 8`, and in a unified view `Old line 3, new line 3` for an unchanged line, so both numbers are available. The drawn number is hidden from assistive technology on a line that has one. The split layout wraps the whole view in a group named by `label` and each side in a group named `Before` or `After`, which also names each side's textarea (`label: Before`). Only the rows the editor draws carry the text, so virtualization is unchanged. The structure is not a table or grid, and no table roles are used.
 
 No screen reader has tested this. The text and roles are checked in LinkeDOM tests only.
 

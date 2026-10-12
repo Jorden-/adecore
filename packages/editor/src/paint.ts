@@ -1,5 +1,5 @@
 import { offsetOfStop, rowOfStop, stopAtOffset, stopCount, xOfStop } from './geometry-stops.ts';
-import { type AttributedLines, colorValue } from './attribution.ts';
+import { type AttributedLines, colorValue, tintValue } from './attribution.ts';
 import {
     type BlockWidget,
     type EditorLayout,
@@ -414,9 +414,19 @@ export function paintGutter(container: HTMLElement, layout: EditorLayout, rows: 
         item.className = paint.activeLines.has(row.line) ? 'se-line-number se-active-number' : 'se-line-number';
         item.style.top = `${row.top}px`;
         item.style.height = `${layout.metrics.lineHeight}px`;
-        const fill = paint.highlights.get(row.line)?.fill;
+        const highlight = paint.highlights.get(row.line);
+        const fill = highlight?.fill;
         if (fill !== undefined) {
             item.style.background = colorValue(fill);
+        }
+        if (highlight?.bar !== undefined) {
+            item.classList.add('se-line-marked');
+            item.style.height = `${row.height}px`;
+            item.style.setProperty('--se-line', `${layout.metrics.lineHeight}px`);
+            item.style.setProperty('--se-mark', colorValue(highlight.color));
+            if (fill === undefined) {
+                item.style.background = tintValue(highlight.color);
+            }
         }
         const number = document.createElement('span');
         number.textContent = paint.lineNumber(row.line);
@@ -453,6 +463,12 @@ export function paintGutter(container: HTMLElement, layout: EditorLayout, rows: 
             mark.style.color = colorValue(paint.highlights.get(row.line)!.color);
             item.append(mark);
         }
+        if (highlight?.bar !== undefined) {
+            const mark = document.createElement('span');
+            mark.className = `se-line-bar se-line-bar-${highlight.bar}`;
+            mark.setAttribute('aria-hidden', 'true');
+            item.append(mark);
+        }
         const bar = paint.attribution.get(row.line);
         if (bar) {
             const mark = document.createElement('span');
@@ -464,7 +480,7 @@ export function paintGutter(container: HTMLElement, layout: EditorLayout, rows: 
         }
         const change = paint.changes.get(row.line);
         // The bar of an agent stands where the mark of a change would, and a removal is a triangle between lines that the bar never hides.
-        if (change && (!bar || change === 'deleted')) {
+        if (change && (!bar || change === 'deleted') && highlight?.bar === undefined) {
             const mark = document.createElement('span');
             mark.className = `se-change se-change-${change}`;
             if (change !== 'deleted') {

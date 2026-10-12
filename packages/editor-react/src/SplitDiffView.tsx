@@ -193,7 +193,7 @@ export function SplitDiffView({
                         startLine: index + 1,
                         endLine: index + 1,
                         color: side === 'old' ? '--editor-deleted' : '--editor-added',
-                        sign: side === 'old' ? '-' : '+',
+                        bar: side === 'old' ? 'hatched' : 'solid',
                         emphasis: [emphasis[side].get(row[side]!.index) ?? []]
                     });
                 }

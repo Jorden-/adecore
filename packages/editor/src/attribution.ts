@@ -10,6 +10,7 @@ export interface AttributedLines {
     readonly color: string;
     readonly sign?: string;
     readonly fill?: string;
+    readonly bar?: 'solid' | 'hatched';
     readonly emphasis?: readonly { from: number; to: number }[];
 }
 
@@ -18,6 +19,7 @@ interface Run {
     color: string;
     sign: string | undefined;
     fill: string | undefined;
+    bar: 'solid' | 'hatched' | undefined;
     from: number;
     to: number;
     emphasis: { from: number; to: number }[];
@@ -63,7 +65,16 @@ export class AttributionRuns {
                     return last > first ? [{ from: bounds.start + first, to: bounds.start + last }] : [];
                 });
             });
-            return { id: mark.id, color: mark.color, sign: mark.sign, fill: mark.fill, from: lineBounds(start).start, to: lineBounds(end).end, emphasis };
+            return {
+                id: mark.id,
+                color: mark.color,
+                sign: mark.sign,
+                fill: mark.fill,
+                bar: mark.bar,
+                from: lineBounds(start).start,
+                to: lineBounds(end).end,
+                emphasis
+            };
         });
     }
 
@@ -86,7 +97,7 @@ export class AttributionRuns {
             if (run.to < from || run.from > to) {
                 continue;
             }
-            const value = { id: run.id, color: run.color, sign: run.sign, fill: run.fill };
+            const value = { id: run.id, color: run.color, sign: run.sign, fill: run.fill, bar: run.bar };
             const emphasis = new Map<number, { from: number; to: number }[]>();
             for (const range of run.emphasis) {
                 if (range.to <= from || range.from > to) {

@@ -117,13 +117,17 @@ function UnifiedDiffView({
                 startLine: index + 1,
                 endLine: index + 1,
                 color: removed ? '--editor-deleted' : '--editor-added',
-                sign: removed ? '-' : '+',
+                bar: removed ? 'hatched' : 'solid',
                 emphasis: [(removed ? emphasis.old.get(row.old!.index) : emphasis.new.get(row.new!.index)) ?? []]
             });
         }
         editor.setLineHighlights(highlights);
         editor.setChangeMarks(
-            highlights.map((highlight) => ({ startLine: highlight.startLine, endLine: highlight.endLine, kind: highlight.sign === '-' ? 'deleted' : 'added' }))
+            highlights.map((highlight) => ({
+                startLine: highlight.startLine,
+                endLine: highlight.endLine,
+                kind: highlight.bar === 'hatched' ? 'deleted' : 'added'
+            }))
         );
         rows.set(
             display.gaps.map(({ before, row }) => ({

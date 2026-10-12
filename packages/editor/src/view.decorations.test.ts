@@ -213,6 +213,26 @@ describe('change marks', () => {
         expect(marked).toEqual(['2:added', '3:added', '5:modified', '8:deleted']);
     });
 
+    test('give way to the bar of a highlight that draws the gutter as a review, and keep the scroll ticks', () => {
+        const { host, view } = mount(text);
+        view.setChangeMarks([
+            { kind: 'added', startLine: 2, endLine: 3 },
+            { kind: 'deleted', startLine: 5, endLine: 5 }
+        ]);
+        view.setLineHighlights([
+            { startLine: 2, endLine: 3, color: '--editor-added', bar: 'solid' },
+            { startLine: 5, endLine: 5, color: '--editor-deleted', bar: 'hatched' }
+        ]);
+        expect(host.querySelectorAll('.se-change').length).toBe(0);
+        expect(host.querySelectorAll('.se-line-bar-solid').length).toBe(2);
+        expect(host.querySelectorAll('.se-line-bar-hatched').length).toBe(1);
+        expect(host.querySelectorAll('.se-line-sign').length).toBe(0);
+        expect(host.querySelectorAll('.se-tick-added').length).toBe(1);
+        view.setLineHighlights([]);
+        expect(host.querySelectorAll('.se-change-deleted').length).toBe(1);
+        expect(host.querySelectorAll('.se-line-bar').length).toBe(0);
+    });
+
     test('follow their lines through an edit above them', () => {
         const { host, model, view } = mount(text);
         view.setChangeMarks([{ kind: 'modified', startLine: 5, endLine: 5 }]);

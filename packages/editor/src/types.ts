@@ -210,6 +210,12 @@ export interface EditorLineHighlight {
     readonly fill?: EditorMarkColor;
     /* A character in the gutter of each line, such as `+`, in the same color. */
     readonly sign?: string;
+    /*
+     * Draws the gutter of each line as a review does: the cell tinted in `color`, the number in a readable
+     * shade of it and a bar of whole pixels along the left edge, solid or striped, continuous over
+     * consecutive lines. It takes the place of the change mark on those lines.
+     */
+    readonly bar?: 'solid' | 'hatched';
     /* Per line from `startLine`, UTF-16 character ranges with a stronger tint; they follow their text through edits. */
     readonly emphasis?: ReadonlyArray<ReadonlyArray<readonly [number, number]>>;
 }

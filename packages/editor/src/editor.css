@@ -17,6 +17,8 @@
     --editor-added: var(--status-idle);
     --editor-modified: var(--accent);
     --editor-deleted: var(--status-error);
+    --editor-mark-number-mix: 72%;
+    --editor-mark-bar-width: 3px;
     --editor-sticky-shadow: color-mix(in srgb, black 12%, transparent);
     --agent-1: #c4602f;
     --agent-2: #7c4dd8;
@@ -35,6 +37,7 @@
     --editor-margin: color-mix(in srgb, var(--text) 16%, transparent);
     --editor-whitespace: color-mix(in srgb, var(--text) 32%, transparent);
     --editor-hatch: color-mix(in srgb, var(--text) 10%, transparent);
+    --editor-mark-number-mix: 82%;
     --editor-sticky-shadow: color-mix(in srgb, black 60%, transparent);
 }
 
@@ -230,6 +233,29 @@
 }
 .se-active-number {
     color: var(--text-muted);
+}
+/* A line a host marked with a bar: the number in a shade of the mark that reads on the tint, and a bar along the edge. */
+.se-line-marked {
+    align-items: flex-start;
+}
+.se-line-marked > span:first-child {
+    display: flex;
+    align-items: center;
+    height: var(--se-line);
+    color: color-mix(in srgb, var(--se-mark) var(--editor-mark-number-mix), var(--text));
+}
+.se-line-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--editor-mark-bar-width);
+    height: 100%;
+}
+.se-line-bar-solid {
+    background: var(--se-mark);
+}
+.se-line-bar-hatched {
+    background: repeating-linear-gradient(135deg, var(--se-mark) 0 2px, transparent 2px 4px);
 }
 .se-fold-toggle {
     position: absolute;
