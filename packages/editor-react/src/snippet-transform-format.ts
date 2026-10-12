@@ -12,13 +12,15 @@ import {
     type SnippetTransformJob
 } from './snippet-transform-protocol.ts';
 const CASES: ReadonlySet<string> = new Set(['upcase', 'downcase', 'capitalize', 'camelcase', 'pascalcase']);
-export function compileSnippetTransformFormat(source: string): readonly SnippetTransformFormatNode[] {
-    if (source.length > MAX_TRANSFORM_FORMAT) {
-        throw new RangeError('The transform format is too long.');
-    }
+function readFormat(source: string, start: number, stopAtSlash: boolean): { nodes: readonly SnippetTransformFormatNode[]; end: number } {
     const nodes: SnippetTransformFormatNode[] = [];
-    let at = 0,
+    let at = start,
         text = '';
+    const bound = (): void => {
+        if (at - start > MAX_TRANSFORM_FORMAT) {
+            throw new RangeError('The transform format is too long.');
+        }
+    };
     const push = (node: SnippetTransformFormatNode): void => {
         if (nodes.length >= MAX_TRANSFORM_NODES) {
             throw new RangeError('The transform format has too many nodes.');
@@ -38,10 +40,12 @@ export function compileSnippetTransformFormat(source: string): readonly SnippetT
                 at++;
             }
             value += source[at++]!;
+            bound();
         }
         return value;
     };
-    while (at < source.length) {
+    while (at < source.length && !(stopAtSlash && source[at] === '/')) {
+        bound();
         if (source[at] === '\\' && (source[at + 1] === '\\' || source[at + 1] === '/')) {
             at++;
             text += source[at++]!;
@@ -108,7 +112,52 @@ export function compileSnippetTransformFormat(source: string): readonly SnippetT
         push(node);
     }
     flush();
-    return nodes;
+    bound();
+    if (stopAtSlash && source[at] !== '/') {
+        throw new SyntaxError('Unclosed snippet transform format.');
+    }
+    return { nodes, end: at };
+}
+export function compileSnippetTransformFormat(source: string): readonly SnippetTransformFormatNode[] {
+    return readFormat(source, 0, false).nodes;
+}
+export function scanSnippetTransform(
+    source: string,
+    at: number
+): { pattern: string; flags: string; format: readonly SnippetTransformFormatNode[]; end: number } {
+    if (source[at++] !== '/') {
+        throw new SyntaxError('A snippet transform needs an opening slash.');
+    }
+    let pattern = '';
+    while (at < source.length && source[at] !== '/') {
+        const character = source[at++]!;
+        if (character === '\\' && at < source.length) {
+            const next = source[at++]!;
+            pattern += next === '/' ? '/' : character + next;
+        } else {
+            pattern += character;
+        }
+        if (pattern.length > MAX_TRANSFORM_PATTERN) {
+            throw new RangeError('The snippet transform pattern is too long.');
+        }
+    }
+    if (source[at++] !== '/') {
+        throw new SyntaxError('Unclosed snippet transform pattern.');
+    }
+    const parsed = readFormat(source, at, true);
+    at = parsed.end + 1;
+    let flags = '';
+    while (at < source.length && source[at] !== '}') {
+        const flag = source[at++]!;
+        if (!'gimsu'.includes(flag) || flags.includes(flag)) {
+            throw new SyntaxError('Invalid snippet transform flags.');
+        }
+        flags += flag;
+    }
+    if (source[at++] !== '}') {
+        throw new SyntaxError('Unclosed snippet transform flags.');
+    }
+    return { pattern, flags, format: parsed.nodes, end: at };
 }
 function capitalize(value: string): string {
     const first = value.slice(0, (value.codePointAt(0) ?? 0) > 0xffff ? 2 : 1);

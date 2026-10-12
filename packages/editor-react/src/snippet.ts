@@ -1,10 +1,15 @@
+import { scanSnippetTransform } from './snippet-transform-format.ts';
+import type { SnippetTransformJob } from './snippet-transform-protocol.ts';
 import { SNIPPET_VARIABLES } from './snippet-variable-names.ts';
+
+export type SnippetTransform = Omit<SnippetTransformJob, 'value'>;
 
 /* UTF-16 offsets into the inserted text; equal for an empty stop. */
 export interface SnippetRange {
     readonly start: number;
     readonly end: number;
     readonly parents?: readonly number[];
+    readonly transform?: SnippetTransform;
 }
 
 export interface SnippetStop extends SnippetRange {
@@ -28,12 +33,13 @@ export interface ParsedSnippet {
     readonly stops: readonly SnippetStop[];
     /* Optional so callers that construct the older text/stops shape remain valid. */
     readonly fields?: readonly SnippetField[];
+    readonly transforms?: readonly (SnippetRange & { readonly transform: SnippetTransform })[];
 }
 
 type Node =
-    | { kind: 'text'; text: string }
-    | { kind: 'field'; index: number; body?: Node[]; choices?: string[] }
-    | { kind: 'variable'; name: string; body?: Node[] };
+    | { kind: 'text'; text: string; transform?: SnippetTransform }
+    | { kind: 'field'; index: number; body?: Node[]; choices?: string[]; transform?: SnippetTransform }
+    | { kind: 'variable'; name: string; body?: Node[]; transform?: SnippetTransform };
 
 export type SnippetVariableResolver = (name: string) => string | undefined;
 export interface SnippetTemplate {
@@ -148,8 +154,19 @@ class SnippetParser {
             return { ...field(), choices: this.choices() };
         }
         if (next === '/') {
-            this.skipTransform();
-            return index === null ? { kind: 'variable', name } : field();
+            try {
+                const { end, ...transform } = scanSnippetTransform(this.source, this.at);
+                this.at = end;
+                return index === null ? { kind: 'variable', name, transform } : { ...field(), transform };
+            } catch (error) {
+                if (error instanceof RangeError) {
+                    throw new SnippetLimitError();
+                }
+                if (error instanceof SyntaxError) {
+                    throw new MalformedSnippetError();
+                }
+                throw error;
+            }
         }
         this.at = start + 1;
         return null;
@@ -173,45 +190,6 @@ class SnippetParser {
         this.at = Math.min(this.source.length, this.at + 2);
         return values;
     }
-
-    private skipTransform(): void {
-        // Format markers belong to the transform; they must not become snippet definitions.
-        this.at++;
-        while (this.at < this.source.length) {
-            const character = this.source[this.at++]!;
-            if (character === '\\') {
-                this.at++;
-            } else if (character === '/') {
-                break;
-            }
-        }
-        if (this.source[this.at - 1] !== '/') {
-            throw new MalformedSnippetError();
-        }
-        let nested = 0;
-        while (this.at < this.source.length) {
-            const character = this.source[this.at++]!;
-            if (character === '\\') {
-                this.at++;
-            } else if (character === '$' && this.source[this.at] === '{') {
-                nested++;
-                this.at++;
-            } else if (character === '}') {
-                if (nested === 0) {
-                    throw new MalformedSnippetError();
-                }
-                nested--;
-            } else if (character === '/' && nested === 0) {
-                const end = this.source.indexOf('}', this.at);
-                if (end < 0) {
-                    throw new MalformedSnippetError();
-                }
-                this.at = end + 1;
-                return;
-            }
-        }
-        throw new MalformedSnippetError();
-    }
 }
 
 function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
@@ -222,7 +200,9 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
                 const known = definitions.get(node.index);
                 if (
                     known === undefined ||
-                    (known.body === undefined && known.choices === undefined && (node.body !== undefined || node.choices !== undefined))
+                    (known.body === undefined &&
+                        known.choices === undefined &&
+                        (node.body !== undefined || node.choices !== undefined || (known.transform !== undefined && node.transform === undefined)))
                 ) {
                     definitions.set(node.index, node);
                 }
@@ -238,6 +218,7 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
         { index: number; ranges: SnippetRange[]; linked: SnippetRange[]; primary: number; parents: Set<number>; choices?: string[] }
     >();
     const stops: SnippetStop[] = [];
+    const transforms: (SnippetRange & { transform: SnippetTransform })[] = [];
     let text = '';
     let work = 0;
     let ranges = 0;
@@ -256,7 +237,14 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
                 throw new SnippetLimitError();
             }
             if (node.kind === 'text') {
+                const start = text.length;
                 append(node.text);
+                if (node.transform !== undefined) {
+                    if (++ranges > MAX_SNIPPET_RANGES) {
+                        throw new SnippetLimitError();
+                    }
+                    transforms.push({ start, end: text.length, transform: node.transform, ...(parents.length === 0 ? {} : { parents: [...parents] }) });
+                }
                 continue;
             }
             if (node.kind === 'variable') {
@@ -275,7 +263,12 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
                     render(definition.body ?? [], linked || node !== definition, [...parents, node.index], new Set([...visiting, node.index]));
                 }
             }
-            const range: SnippetRange = { start: from, end: text.length, ...(parents.length === 0 ? {} : { parents: [...parents] }) };
+            const range: SnippetRange = {
+                start: from,
+                end: text.length,
+                ...(parents.length === 0 ? {} : { parents: [...parents] }),
+                ...(node.transform === undefined ? {} : { transform: node.transform })
+            };
             const field = fields.get(node.index) ?? {
                 index: node.index,
                 ranges: [],
@@ -292,7 +285,7 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
                     field.primary = field.ranges.length;
                 }
                 field.ranges.push(range);
-                stops.push({ index: node.index, start: range.start, end: range.end });
+                stops.push({ index: node.index, start: range.start, end: range.end, ...(node.transform === undefined ? {} : { transform: node.transform }) });
             }
             fields.set(node.index, field);
         }
@@ -302,6 +295,7 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
     return {
         text,
         stops,
+        ...(transforms.length === 0 ? {} : { transforms }),
         fields: [...fields.values()]
             .filter((field) => field.ranges.length > 0)
             .map((field) => ({
@@ -365,6 +359,8 @@ function resolveVariables(nodes: readonly Node[], indices: ReadonlyMap<string, n
                     previous.body = node.body;
                     previous.defaulted = true;
                     previous.definition = node;
+                } else if (!previous.defaulted && node.transform === undefined && previous.definition.transform !== undefined) {
+                    previous.definition = node;
                 }
             }
             if (node.kind !== 'text' && node.body !== undefined) {
@@ -385,6 +381,9 @@ function resolveVariables(nodes: readonly Node[], indices: ReadonlyMap<string, n
             }
             if (node.kind === 'variable' && !unknown.has(node.name)) {
                 const value = valueOf(node.name);
+                if (node.transform !== undefined) {
+                    return [{ kind: 'text', text: value ?? '', transform: node.transform }];
+                }
                 return value !== undefined && value !== '' ? [{ kind: 'text', text: value }] : normalize(node.body ?? [], visiting, depth + 1);
             }
             if (node.kind === 'field') {
@@ -396,6 +395,7 @@ function resolveVariables(nodes: readonly Node[], indices: ReadonlyMap<string, n
                     {
                         kind: 'field',
                         index: field.index,
+                        ...(node.transform === undefined ? {} : { transform: node.transform }),
                         ...(node !== field.definition
                             ? {}
                             : { body: visiting.has(node.name) ? [] : normalize(field.body, new Set([...visiting, node.name]), depth + 1) })
@@ -459,7 +459,12 @@ export function tabOrder(parsed: ParsedSnippet): SnippetStop[] {
     for (const field of parsed.fields ?? []) {
         const range = field.ranges[field.primary];
         if (range !== undefined) {
-            first.set(field.index, { index: field.index, start: range.start, end: range.end });
+            first.set(field.index, {
+                index: field.index,
+                start: range.start,
+                end: range.end,
+                ...(range.transform === undefined ? {} : { transform: range.transform })
+            });
         }
     }
     const visited = [...first.values()].filter((stop) => stop.index > 0).sort((left, right) => left.index - right.index);

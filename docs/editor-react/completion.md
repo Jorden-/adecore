@@ -35,7 +35,7 @@ snippet.text; // 'print(value, count)'
 tabOrder(snippet).map((stop) => stop.index); // [1, 2, 0]
 ```
 
-`ParsedSnippet` keeps its `text` and `stops` shape and adds optional `fields`. A `SnippetField` groups UTF-16 `SnippetRange` offsets by index; `primary` selects the occurrence defining the default, `linked` describes child projections in parent copies, and `parents` names enclosing fields. `choices` supplies the strings shown in the choice picker. `tabOrder` still returns one `SnippetStop` per index, ending at `$0` or the end of the inserted text. Stops are returned in text order, with an enclosing placeholder before its children.
+`ParsedSnippet` keeps its `text` and `stops` shape and adds optional `fields` and `transforms`. `SnippetTransform` is the pattern, flags and format AST on an occurrence, without its value. `SnippetRange.transform` records field occurrences, stops and linked projections; `ParsedSnippet.transforms` records non-navigable variable ranges, including empty ones. A `SnippetField` groups UTF-16 `SnippetRange` offsets by index; `primary` selects the occurrence defining the default, `linked` describes child projections in parent copies, and `parents` names enclosing fields. `choices` supplies the strings shown in the choice picker. `tabOrder` still returns one `SnippetStop` per index, ending at `$0` or the end of the inserted text. Stops are returned in text order, with an enclosing placeholder before its children.
 
 Snippets exceeding 100,000 source or expanded UTF-16 units, 10,000 syntax nodes or choices, 1,000 field occurrences, 50,000 rendering visits or 64 nesting levels insert their original text without a snippet session. This bounds expansion from language servers, including acyclic mirror chains. Escape closes an open popup before ending a snippet.
 
@@ -71,4 +71,8 @@ The format compiler returns a flat AST for numeric captures, five case operation
 
 This client uses the shared worker lifecycle. Its provisional default deadline is 1,500 ms, including startup and posting; hosts can supply `deadline` and an injected `schedule`. A timeout terminates the worker. `cancel` supersedes the request, `release` frees the worker while keeping the client reusable, and `dispose` is final. Allocate a separate client from find. Tightening the deadline requires cold-start and warm-roundtrip measurements in each supported runtime.
 
-The worker is a standalone building block in this release. Snippet insertion and field-exit transforms are not wired to it yet.
+The snippet parser now retains transform metadata while inserting the same untransformed text. One scanner handles pattern slashes, format captures/branches and strict `gimsu` flags; it never compiles a server regex. Format `RangeError`s become the snippet's `limited` fallback, and malformed syntax retains the whole snippet literally. A loose closing brace in a format is text.
+
+Plain field occurrences take precedence over transformed mirrors as the primary stop. A transform-only field remains navigable. Children projected into a transformed parent remain linked; field-exit wiring must discard projected ranges covered by the replacement. Resolved variables carry transforms even when empty, unknown variables carry them on synthetic field occurrences, and both count against the shared 1,000-range budget. Indentation maps every metadata range and preserves the transform.
+
+The worker is still a standalone building block: variable insertion and field-exit transforms are not wired to it yet.

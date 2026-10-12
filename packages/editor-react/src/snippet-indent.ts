@@ -30,6 +30,7 @@ export function indentSnippet(parsed: ParsedSnippet, before: string): ParsedSnip
     return {
         text: parsed.text.replace(/\n/g, '\n' + prefix),
         stops: parsed.stops.map(range),
+        ...(parsed.transforms === undefined ? {} : { transforms: parsed.transforms.map(range) }),
         ...(parsed.fields === undefined
             ? {}
             : {

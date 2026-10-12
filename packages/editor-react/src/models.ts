@@ -122,6 +122,7 @@ export {
 export { MAX_DECLARATIONS, type CodeVisionDeclaration, type DeclarationSource, startAfterComments, declarationsOf, usagesText } from './code-vision-model.ts';
 export { UNCOMMITTED, mapBlame, type CodeAuthor, type CodeAuthorship, shortName, authorshipOf, authorsText } from './code-authors.ts';
 export {
+    type SnippetTransform,
     type SnippetStop,
     type SnippetRange,
     type SnippetField,

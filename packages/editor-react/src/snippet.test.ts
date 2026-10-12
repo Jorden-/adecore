@@ -1,3 +1,4 @@
+import { indentSnippet } from './snippet-indent.ts';
 import './test-setup.ts';
 import { describe, expect, test } from 'bun:test';
 import { compileSnippet, parseSnippet, tabOrder } from './snippet.ts';
@@ -187,3 +188,68 @@ for (const broken of ['${1/abc} tail', '${1/abc/xyz tail', '${1/a/${1:/upcase} t
         expect(parseSnippet(broken).text).toBe(broken);
     });
 }
+
+test('transforms share one scanner for escaped patterns and slash-containing branches', () => {
+    const bs = String.fromCharCode(92);
+    const parsed = parseSnippet('${1:foo} ${1/a' + bs + '/b/${1:+a/b}/gi}');
+    const transform = parsed.fields![0]!.ranges[1]!.transform!;
+    expect(parsed.text).toBe('foo foo');
+    expect(transform).toEqual({ pattern: 'a/b', flags: 'gi', format: [{ kind: 'conditional', index: 1, if: 'a/b' }] });
+    expect(parsed.stops[1]!.transform).toBe(transform);
+    const escaped = parseSnippet('${1/' + bs + 'd+/$0/}');
+    expect(escaped.fields![0]!.ranges[0]!.transform!.pattern).toBe(bs + 'd+');
+});
+
+test('transformed mirrors leave plain occurrences primary and keep children linked', () => {
+    const parsed = parseSnippet('${1/(.*)/${1:/upcase}/} ${1:a ${2:b}}');
+    expect(parsed.text).toBe('a b a b');
+    const first = parsed.fields!.find((field) => field.index === 1)!;
+    expect(first.primary).toBe(1);
+    expect(tabOrder(parsed)[0]!.start).toBe(4);
+    expect(tabOrder(parsed)[0]!.transform).toBeUndefined();
+    expect(parsed.fields!.find((field) => field.index === 2)!.linked).toHaveLength(1);
+    const only = parseSnippet('${1/(.*)/$0/}');
+    expect(tabOrder(only)[0]!.transform?.pattern).toBe('(.*)');
+});
+
+test('resolved variables retain transforms at zero-width and indented ranges', () => {
+    const parsed = parseSnippet('head\n${TM_FILENAME/^$/fallback/}!', () => '');
+    expect(parsed.text).toBe('head\n!');
+    expect(parsed.stops).toEqual([]);
+    expect(parsed.transforms).toHaveLength(1);
+    expect(parsed.transforms![0]).toMatchObject({ start: 5, end: 5, transform: { pattern: '^$', flags: '' } });
+    const indented = indentSnippet(parsed, '  ');
+    expect(indented.transforms![0]).toMatchObject({ start: 7, end: 7 });
+    expect(indented.transforms![0]!.transform).toBe(parsed.transforms![0]!.transform);
+    const fields = indentSnippet(parseSnippet('head\n${1:x} ${1/(.*)/$1/}'), '  ');
+    expect(fields.fields![0]!.ranges[1]!.transform?.pattern).toBe('(.*)');
+    expect(fields.stops[1]!.transform?.pattern).toBe('(.*)');
+});
+
+test('unresolved names keep occurrence transforms without taking the primary mirror', () => {
+    const parsed = parseSnippet('${UNKNOWN/(.*)/$1/} $UNKNOWN');
+    expect(parsed.text).toBe('UNKNOWN UNKNOWN');
+    expect(parsed.fields![0]!.primary).toBe(1);
+    expect(parsed.fields![0]!.ranges[0]!.transform?.pattern).toBe('(.*)');
+    expect(parsed.transforms).toBeUndefined();
+});
+
+test('metadata scanning validates flags and budgets without compiling the regex', () => {
+    for (const flags of ['y', 'gg']) {
+        const source = '${1/a/x/' + flags + '} tail';
+        expect(parseSnippet(source)).toEqual({ text: source, stops: [] });
+    }
+    for (const source of ['${1/a/$100/}', '${1/' + 'x'.repeat(1025) + '/x/}', '${1/a/' + 'x'.repeat(10001) + '/}']) {
+        expect(parseSnippet(source)).toEqual({ text: source, stops: [], limited: true });
+    }
+    const invalidRegex = parseSnippet('${1:foo} ${1/(/$1/}');
+    expect(invalidRegex.text).toBe('foo foo');
+    expect(invalidRegex.fields![0]!.ranges[1]!.transform?.pattern).toBe('(');
+    const brace = parseSnippet('${1:foo} ${1/a/}/}');
+    expect(brace.fields![0]!.ranges[1]!.transform?.format).toEqual([{ kind: 'text', text: '}' }]);
+});
+
+test('variable transforms share the range budget with fields and linked projections', () => {
+    const source = '${TM_FILENAME/a/x/}'.repeat(1001);
+    expect(parseSnippet(source, () => '')).toEqual({ text: source, stops: [], limited: true });
+});
