@@ -304,11 +304,19 @@ export class FakeEditor implements Editor {
     blocks: readonly EditorBlock[] | null = null;
     private readonly scopes = new Set<(scope: readonly EditorBlock[]) => void>();
 
-    /* What the host marked as changed last. */
-    changeMarks: readonly EditorChangeMark[] = [];
+    /* The marks of every layer, in the order the layers last became non-empty. */
+    get changeMarks(): readonly EditorChangeMark[] {
+        return [...this.changeLayers.values()].flat();
+    }
 
-    setChangeMarks(marks: readonly EditorChangeMark[]): void {
-        this.changeMarks = marks;
+    private readonly changeLayers = new Map<string, readonly EditorChangeMark[]>();
+
+    setChangeMarks(marks: readonly EditorChangeMark[], layer = ''): void {
+        if (marks.length === 0) {
+            this.changeLayers.delete(layer);
+        } else {
+            this.changeLayers.set(layer, marks);
+        }
     }
 
     /* The tinted lines the host set last. */

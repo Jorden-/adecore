@@ -1,7 +1,7 @@
 import './test-setup.ts';
 import { describe, expect, test } from 'bun:test';
 import { mountEditor } from '@adecore/editor/testing';
-import { decoratePatch, type PatchLineLabels } from './patch-decorations.ts';
+import { decoratePatch, type PatchLineLabels, type PatchTimer } from './patch-decorations.ts';
 
 const PATCH = ['diff --git a/a.ts b/a.ts', '--- a/a.ts', '+++ b/a.ts', '@@ -10,3 +10,3 @@ fn()', ' keep', '-old', '+new', ' tail', ''].join('\n');
 
@@ -17,6 +17,26 @@ function numbers(host: HTMLElement): (string | null)[] {
 
 function spoken(host: HTMLElement): string[] {
     return [...host.querySelectorAll('.se-line-number .se-sr-only')].map((item) => item.textContent ?? '');
+}
+
+function fakeTimer(): PatchTimer & { pending(): number; run(): void } {
+    const callbacks = new Map<number, () => void>();
+    let next = 0;
+    return {
+        set: (callback) => {
+            callbacks.set(++next, callback);
+            return next;
+        },
+        clear: (handle) => {
+            callbacks.delete(handle as number);
+        },
+        pending: () => callbacks.size,
+        run: () => {
+            const due = [...callbacks.values()];
+            callbacks.clear();
+            due.forEach((callback) => callback());
+        }
+    };
 }
 
 const settle = (): Promise<void> => Promise.resolve();
@@ -54,7 +74,8 @@ describe('decoratePatch', () => {
     test('reads the layout again after an edit and tells the listeners once per turn', async () => {
         const { editor, page, type } = mountEditor({ text: PATCH });
         const seen: number[] = [];
-        const decoration = decoratePatch(editor, { onLayout: (layout) => seen.push(layout.lines.length) });
+        const timer = fakeTimer();
+        const decoration = decoratePatch(editor, { timer, onLayout: (layout) => seen.push(layout.lines.length) });
         expect(seen).toHaveLength(1);
         seen.length = 0;
         editor.setCaret({ line: 7, character: 5 });
@@ -62,14 +83,53 @@ describe('decoratePatch', () => {
         type('y');
         expect(seen).toEqual([]);
         await settle();
-        expect(seen).toHaveLength(1);
+        expect(seen).toEqual([]);
         expect(decoration.layout.lines[7]).toEqual({ role: 'context', old: 12, new: 12 });
+        timer.run();
+        expect(seen).toHaveLength(1);
         editor.setCaret({ line: 7, character: 0 });
         type('+inserted\n');
         await settle();
         expect(decoration.layout.files[0]!.hunks[0]!.consistent).toBe(false);
         expect(decoration.layout.files[0]!.added).toBe(2);
         expect(numbers(page.host)[7]).toBe('12');
+    });
+
+    test('keeps the file list quiet while typing and tells it once the edits rest', async () => {
+        const { editor, type } = mountEditor({ text: PATCH });
+        const timer = fakeTimer();
+        const seen: number[] = [];
+        decoratePatch(editor, { timer, onLayout: (layout) => seen.push(layout.lines.length) });
+        seen.length = 0;
+        editor.setCaret({ line: 8, character: 0 });
+        for (const key of 'abc') {
+            type(key);
+            await settle();
+        }
+        expect(seen).toEqual([]);
+        expect(timer.pending()).toBe(1);
+        timer.run();
+        expect(seen).toHaveLength(1);
+    });
+
+    test('waits for the edits to rest before decorating a patch past the threshold', async () => {
+        const { editor, page, type } = mountEditor({ text: PATCH });
+        const timer = fakeTimer();
+        decoratePatch(editor, { timer, immediateBelow: 10 });
+        editor.setCaret({ line: 7, character: 0 });
+        type('+');
+        await settle();
+        expect(page.host.querySelectorAll('.se-line-bar-solid')).toHaveLength(1);
+        timer.run();
+        expect(page.host.querySelectorAll('.se-line-bar-solid')).toHaveLength(2);
+    });
+
+    test('draws its change marks in a layer of its own and leaves the host marks when disposed', () => {
+        const { editor, page } = mountEditor({ text: PATCH });
+        editor.setChangeMarks([{ kind: 'modified', startLine: 1, endLine: 1 }]);
+        const decoration = decoratePatch(editor);
+        decoration.dispose();
+        expect(page.host.querySelectorAll('.se-change-modified')).toHaveLength(1);
     });
 
     test('stays editable and stops following the editor when disposed', async () => {

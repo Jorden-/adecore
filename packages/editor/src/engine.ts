@@ -633,8 +633,8 @@ class SmartEditor implements Editor {
         this.view.applySettings();
     }
 
-    setChangeMarks(marks: readonly EditorChangeMark[]): void {
-        this.view.setChangeMarks(marks);
+    setChangeMarks(marks: readonly EditorChangeMark[], layer?: string): void {
+        this.view.setChangeMarks(marks, layer);
     }
 
     setAttributionMarks(marks: readonly EditorAttributionMark[]): void {

@@ -52,7 +52,7 @@ The default deadline is 1,500 ms from posting, including startup. A timeout or s
 
 Failures reject with `EditorSearchError.kind`: `timeout`, `superseded`, `unavailable`, `syntax`, `range`, `snapshot`, `error` or `disposed`. A failed factory or an error before the worker handshake stays `unavailable` for that client; construct a new client to retry after host configuration changes. A `messageerror` fails immediately. Syntax and range errors retain an idle worker and its snapshot; a revision desync restarts it. Bounds and regex syntax are validated before posting, with compilation only and no regex execution on the page. There is no main-thread retry. `deadline` and the cancellable `schedule(callback, delay)` timer can be supplied for deterministic tests. `serveEditorSearch` returns a cleanup function that removes its message listener and releases the snapshot.
 
-This entry is the worker foundation. The editor's current find commands remain synchronous until the worker client is connected to them.
+This entry is the worker foundation. The DOM engine connects it to its find commands, as described below.
 
 ## Folding
 

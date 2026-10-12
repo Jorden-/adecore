@@ -12,6 +12,8 @@ const METHOD = 'textDocument/inlayHint';
 const RESOLVE_METHOD = 'inlayHint/resolve';
 const TOAST_ID = 'language-inlay-hint';
 const PAUSE_MS = 300;
+/* How long a click on a hint that a double click would also act on waits for its second press; the editor's own interval for a double press. */
+const DOUBLE_PRESS_MS = 500;
 /* Lines asked for above and below what is in view, so a little scrolling stays inside what is already drawn. */
 const MARGIN_LINES = 60;
 
@@ -117,7 +119,7 @@ type Action =
     | { readonly kind: 'run'; readonly command: Command }
     | { readonly kind: 'insert'; readonly edits: TextEdit[] };
 
-/* What a press does, from what is known of the hint: a double click inserts it, Mod+click follows a part's place, a plain click runs its command. */
+/* What a press does, from what is known of the hint: a double click inserts it and nothing else, Mod+click follows a part's place, a plain click runs its command. */
 export function actionOf(hint: InlayHint, click: Pick<EditorInlayClick, 'part' | 'mod' | 'clicks'>): Action | null {
     if (click.clicks === 2) {
         return hint.textEdits !== undefined && hint.textEdits.length > 0 ? { kind: 'insert', edits: hint.textEdits } : null;
@@ -145,10 +147,12 @@ interface Entry {
  * last ones stay until the answer comes, so nothing blinks while typing; scrolling asks again only once the
  * view leaves the lines that were asked for.
  *
- * A hint can be acted on with the pointer. Resting on it for the hover delay shows its tooltip, asking the
- * server to resolve it first when nothing in it says anything yet. Mod+click on a part follows its place, a
- * click on a part runs its command and a double click inserts its text edits as one undo step. A finger has no
- * hover, so a tap shows the tooltip and does nothing more. All of it is for the pointer: the hints are not part
+ * A hint can be acted on with the pointer. The server is asked to resolve a hint as the pointer arrives, and
+ * resting on it for the hover delay shows its tooltip. Mod+click on a part follows its place, a click on a
+ * part runs its command and a double click inserts its text edits as one undo step, never together with the
+ * command: when a hint has both, the command waits for the double press interval. A press on a hint that
+ * offers nothing (yet) moves the caret as beside the text. A finger has no hover, so a tap shows the
+ * tooltip and does nothing more. All of it is for the pointer: the hints are not part
  * of the text and stay out of the keyboard's way, and Quick Info on the caret shows the tooltip of a hint that
  * sits there.
  */
@@ -166,6 +170,8 @@ export class InlayHintsFeature {
     private target: { id: string; part: number | null } | null = null;
     private modHeld = false;
     private showTimer: unknown;
+    /* The command of a click that may still become a double click. */
+    private commandTimer: unknown;
     /* Counts what the pointer does, so a tooltip that was waited for is dropped once the pointer has moved on. */
     private request = 0;
 
@@ -236,6 +242,7 @@ export class InlayHintsFeature {
                 off();
             }
             this.cancelHover();
+            this.timers.clear(this.commandTimer);
             this.refresher.dispose();
             this.entries.clear();
             editor.setInlayHints([]);
@@ -284,6 +291,11 @@ export class InlayHintsFeature {
             return;
         }
         this.showTimer = this.timers.set(() => void this.showTooltip(target, request), SHOW_DELAY_MS);
+        // A press has to know what the hint offers when it comes, so the answer is asked for as the pointer arrives.
+        const entry = this.entries.get(target.id);
+        if (entry !== undefined && this.resolvable(entry)) {
+            void this.resolve(entry).then(() => this.updateLink());
+        }
     }
 
     private cancelHover(): void {
@@ -380,22 +392,25 @@ export class InlayHintsFeature {
         if (click.alt || click.shift) {
             return false;
         }
+        this.timers.clear(this.commandTimer);
         const action = actionOf(entry.hint, click);
+        const insertable = entry.hint.textEdits !== undefined && entry.hint.textEdits.length > 0;
+        if (action?.kind === 'run' && insertable) {
+            // A double click inserts the edits, so the command of its first press waits to see whether a second one comes.
+            const epoch = this.epoch;
+            this.commandTimer = this.timers.set(() => {
+                if (epoch === this.epoch) {
+                    void this.perform(entry, action);
+                }
+            }, DOUBLE_PRESS_MS);
+            return true;
+        }
         if (action !== null) {
             void this.perform(entry, action);
             return true;
         }
-        if (this.resolvable(entry)) {
-            void this.resolve(entry).then((hint) => {
-                const later = entry.epoch === this.epoch ? actionOf(hint, click) : null;
-                if (later !== null) {
-                    return this.perform(entry, later);
-                }
-            });
-            return true;
-        }
         // The first press of a double click must not move the caret either, or the second would land beside the hint.
-        return click.clicks === 1 && !click.mod && entry.hint.textEdits !== undefined && entry.hint.textEdits.length > 0;
+        return click.clicks === 1 && !click.mod && insertable;
     }
 
     private async perform(entry: Entry, action: Action): Promise<void> {

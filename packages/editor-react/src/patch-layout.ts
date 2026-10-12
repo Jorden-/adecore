@@ -69,6 +69,8 @@ interface Section {
     oldPath: string | null;
     newPath: string | null;
     git: boolean;
+    /* Whether the `diff --git` line showed `a/X b/Y`, which is the only time `a/` and `b/` are not part of the path. */
+    prefixed: boolean;
     created: boolean;
     deleted: boolean;
     renamed: boolean;
@@ -136,24 +138,29 @@ function stripPrefix(path: string | null, prefix: 'a/' | 'b/'): string | null {
 }
 
 /* The two names of a `diff --git a/x b/y` line; with spaces in an unquoted name, the split that gives both halves the same name wins. */
-function gitPaths(rest: string): [string | null, string | null] {
+function gitPaths(rest: string): { oldPath: string | null; newPath: string | null; prefixed: boolean } {
     if (rest.startsWith('"')) {
         const end = rest.indexOf('" ', 1);
         if (end !== -1) {
-            return [stripPrefix(unquote(rest.slice(0, end + 1)), 'a/'), stripPrefix(unquote(rest.slice(end + 2)), 'b/')];
+            const oldName = unquote(rest.slice(0, end + 1));
+            const newName = unquote(rest.slice(end + 2));
+            const prefixed = oldName.startsWith('a/') && newName.startsWith('b/');
+            return prefixed ? { oldPath: oldName.slice(2), newPath: newName.slice(2), prefixed } : { oldPath: oldName, newPath: newName, prefixed };
         }
     }
     const middle = rest.indexOf(' b/');
     if (rest.startsWith('a/') && middle !== -1) {
         for (let at = middle; at !== -1; at = rest.indexOf(' b/', at + 1)) {
             if (rest.slice(2, at) === rest.slice(at + 3)) {
-                return [rest.slice(2, at), rest.slice(at + 3)];
+                return { oldPath: rest.slice(2, at), newPath: rest.slice(at + 3), prefixed: true };
             }
         }
-        return [rest.slice(2, middle), unquote(rest.slice(middle + 3))];
+        return { oldPath: rest.slice(2, middle), newPath: unquote(rest.slice(middle + 3)), prefixed: true };
     }
     const split = rest.indexOf(' ');
-    return split === -1 ? [unquote(rest), null] : [unquote(rest.slice(0, split)), unquote(rest.slice(split + 1))];
+    return split === -1
+        ? { oldPath: unquote(rest), newPath: null, prefixed: false }
+        : { oldPath: unquote(rest.slice(0, split)), newPath: unquote(rest.slice(split + 1)), prefixed: false };
 }
 
 function emptySection(firstLine: number, git: boolean): Section {
@@ -171,7 +178,8 @@ function emptySection(firstLine: number, git: boolean): Section {
         added: 0,
         removed: 0,
         hunks: [],
-        named: false
+        named: false,
+        prefixed: false
     };
 }
 
@@ -203,7 +211,8 @@ function linesOf(text: string, limits: Required<PatchLimits>): { lines: string[]
         lines.push(text.slice(start, end).replace(/\r$/, ''));
         start = end + 1;
     }
-    return { lines, truncated: true };
+    // Stopping right after a final newline leaves nothing unread.
+    return { lines, truncated: start < text.length };
 }
 
 /*
@@ -257,7 +266,7 @@ export function patchLayoutOf(text: string, limits: PatchLimits = {}): PatchLayo
         }
         if (gitStart) {
             const created = open(index, true);
-            [created.oldPath, created.newPath] = gitPaths(line.slice('diff --git '.length));
+            ({ oldPath: created.oldPath, newPath: created.newPath, prefixed: created.prefixed } = gitPaths(line.slice('diff --git '.length)));
             push(FILE_HEADER, index);
             continue;
         }
@@ -350,7 +359,7 @@ function contentLine(line: string, hunk: OpenHunk, section: Section): PatchLayou
 function nameSides(section: Section, oldLine: string, newLine: string): void {
     const oldName = pathOf(oldLine.slice(4));
     const newName = pathOf(newLine.slice(4));
-    const prefixed = section.git || ((oldName?.startsWith('a/') ?? false) && (newName?.startsWith('b/') ?? false));
+    const prefixed = section.git ? section.prefixed : (oldName?.startsWith('a/') ?? false) && (newName?.startsWith('b/') ?? false);
     section.oldPath = prefixed ? stripPrefix(oldName, 'a/') : oldName;
     section.newPath = prefixed ? stripPrefix(newName, 'b/') : newName;
     section.created ||= oldName === null;

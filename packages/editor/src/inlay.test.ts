@@ -102,4 +102,14 @@ describe('inlay hints', () => {
         editor.setInlayLink!(null);
         expect(parts[1]!.classList.contains('se-inlay-link')).toBe(false);
     });
+
+    test('keeps the link when the line is painted again', () => {
+        const { editor, pills } = setup();
+        editor.setInlayHints([{ id: 'h', position: { line: 0, character: 1 }, label: 'ab', parts: ['a', 'b'] }]);
+        editor.setInlayLink!({ id: 'h', part: 1 });
+        editor.setText('x');
+        editor.setInlayHints([{ id: 'h', position: { line: 0, character: 1 }, label: 'ab', parts: ['a', 'b'] }]);
+        expect(pills()[0]!.querySelectorAll('.se-inlay-link')).toHaveLength(1);
+        expect(pills()[0]!.querySelectorAll('.se-inlay-part')[1]!.classList.contains('se-inlay-link')).toBe(true);
+    });
 });

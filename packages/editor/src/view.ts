@@ -242,7 +242,7 @@ export class EditorView {
     private readonly outline = new Outline();
     private stickyEntries: StickyEntry[] = [];
     private scopeKey = '';
-    private changeMarks: { kind: EditorChangeKind; from: number; to: number }[] = [];
+    private readonly changeLayers = new Map<string, { kind: EditorChangeKind; from: number; to: number }[]>();
     private changeVersion = 0;
     private readonly attribution = new AttributionRuns();
     private readonly highlights = new AttributionRuns();
@@ -271,6 +271,7 @@ export class EditorView {
     private inlays: Inlay[] = [];
     private readonly inlayHoverListeners = new Set<(target: { id: string; part: number | null; rect: EditorRect } | null) => void>();
     private inlayHover: { id: string; part: number | null } | null = null;
+    private inlayLink: { id: string; part: number | null } | null = null;
     private inlayLinkElement: HTMLElement | null = null;
     /* The host's widgets by owner, so one owner setting its rows never takes another's away. */
     private readonly blocks = new Map<string, BlockWidget[]>();
@@ -481,7 +482,6 @@ export class EditorView {
             text: inlay.text.replace(/[\r\n]/g, ' '),
             ...(inlay.parts === undefined ? {} : { parts: inlay.parts.map((part) => part.replace(/[\r\n]/g, ' ')) })
         }));
-        this.inlayLinkElement = null;
         this.configureText();
     }
 
@@ -794,7 +794,12 @@ export class EditorView {
         }
         this.customFolds = this.customFolds.map((fold) => mapRange(fold, map));
         this.find.mapBounds(changes);
-        this.changeMarks = this.changeMarks.map((mark) => mapRange(mark, map));
+        for (const [layer, marks] of this.changeLayers) {
+            this.changeLayers.set(
+                layer,
+                marks.map((mark) => mapRange(mark, map))
+            );
+        }
         this.markers = this.markers.map((marker) => mapRange(marker, map));
         this.mapTracked(changes);
         this.attribution.map(changes, map);
@@ -1726,18 +1731,29 @@ export class EditorView {
         return subscribe(this.inlayHoverListeners, listener);
     }
 
-    /* Draws a hint or one of its parts as a link, which only the pill on screen can show. */
+    /* Draws a hint or one of its parts as a link, which only the pill on screen can show. The target outlives a repaint of its line. */
     setInlayLink(target: { id: string; part: number | null } | null): void {
-        this.inlayLinkElement?.classList.remove('se-inlay-link');
-        this.inlayLinkElement = null;
-        if (target === null) {
+        this.inlayLink = target === null ? null : { id: target.id, part: target.part };
+        this.applyInlayLink();
+    }
+
+    private applyInlayLink(): void {
+        const target = this.inlayLink;
+        if (target === null && this.inlayLinkElement === null) {
             return;
         }
-        const pill = Array.from(this.content.querySelectorAll<HTMLElement>('[data-inlay-id]')).find((element) => element.dataset.inlayId === target.id);
-        const element =
-            target.part === null
-                ? pill
-                : (Array.from(pill?.querySelectorAll<HTMLElement>('[data-part]') ?? []).find((part) => part.dataset.part === String(target.part)) ?? pill);
+        let element: HTMLElement | undefined;
+        if (target !== null) {
+            const pill = Array.from(this.content.querySelectorAll<HTMLElement>('[data-inlay-id]')).find((candidate) => candidate.dataset.inlayId === target.id);
+            element =
+                target.part === null
+                    ? pill
+                    : (Array.from(pill?.querySelectorAll<HTMLElement>('[data-part]') ?? []).find((part) => part.dataset.part === String(target.part)) ?? pill);
+        }
+        if (element === this.inlayLinkElement) {
+            return;
+        }
+        this.inlayLinkElement?.classList.remove('se-inlay-link');
         element?.classList.add('se-inlay-link');
         this.inlayLinkElement = element ?? null;
     }
@@ -2054,6 +2070,7 @@ export class EditorView {
                 rows = this.layout.visibleRows(this.scrollTop, this.viewportHeight, this.overscan);
                 this.painter.paint(rows, paint);
             }
+            this.applyInlayLink();
             this.content.style.height = `${this.layout.height}px`;
             this.content.style.width = `${Math.max(this.layout.width, this.viewportWidth)}px`;
             this.renderedScroll = { top: this.scrollTop, left: this.scrollLeft };
@@ -2221,16 +2238,34 @@ export class EditorView {
         this.root.dataset.carets = String(selections.length);
     }
 
-    /* The lines the host marked, which stay on their lines through edits until it marks them again. */
-    setChangeMarks(marks: readonly EditorChangeMark[]): void {
+    /*
+     * The lines the host marked in a layer, which stay on their lines through edits until the layer is set again. Layers
+     * draw together; where two mark the same line the layer that was set first after being empty sits below the later one.
+     */
+    setChangeMarks(marks: readonly EditorChangeMark[], layer = ''): void {
         const last = this.model.getLineCount();
         const clamp = (line: number): number => Math.min(last, Math.max(1, Math.trunc(line) || 1)) - 1;
-        this.changeMarks = marks.map((mark) => {
-            const from = this.model.getLine(clamp(mark.startLine)).start;
-            return { kind: mark.kind, from, to: mark.kind === 'deleted' ? from : this.model.getLine(Math.max(clamp(mark.startLine), clamp(mark.endLine))).end };
-        });
+        if (marks.length === 0) {
+            this.changeLayers.delete(layer);
+        } else {
+            this.changeLayers.set(
+                layer,
+                marks.map((mark) => {
+                    const from = this.model.getLine(clamp(mark.startLine)).start;
+                    return {
+                        kind: mark.kind,
+                        from,
+                        to: mark.kind === 'deleted' ? from : this.model.getLine(Math.max(clamp(mark.startLine), clamp(mark.endLine))).end
+                    };
+                })
+            );
+        }
         this.changeVersion++;
         this.render();
+    }
+
+    private get changeMarks(): { kind: EditorChangeKind; from: number; to: number }[] {
+        return [...this.changeLayers.values()].flat();
     }
 
     private markedLines(mark: { kind: EditorChangeKind; from: number; to: number }): { start: number; end: number } {

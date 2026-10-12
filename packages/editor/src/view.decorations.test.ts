@@ -241,6 +241,20 @@ describe('change marks', () => {
         expect(marked).toEqual(['7']);
     });
 
+    test('layers draw together, the later layer wins a shared line and clearing one leaves the other', () => {
+        const { host, view } = mount(text);
+        const marked = (): string[] =>
+            [...host.querySelectorAll('.se-line-number')].flatMap((item) => {
+                const mark = item.querySelector('.se-change');
+                return mark ? [`${item.textContent}:${mark.className.replace('se-change se-change-', '')}`] : [];
+            });
+        view.setChangeMarks([{ kind: 'added', startLine: 2, endLine: 3 }]);
+        view.setChangeMarks([{ kind: 'modified', startLine: 3, endLine: 4 }], 'patch');
+        expect(marked()).toEqual(['2:added', '3:modified', '4:modified']);
+        view.setChangeMarks([], 'patch');
+        expect(marked()).toEqual(['2:added', '3:added']);
+    });
+
     test('and the find matches are ticks in the scroll track', () => {
         const { host, view } = mount(text);
         view.setChangeMarks([{ kind: 'added', startLine: 10, endLine: 12 }]);

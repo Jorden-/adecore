@@ -8,16 +8,17 @@ A host that shows an editable `.patch` or `.diff` file can draw it the way the [
 
 - `lines` has one entry per line of `text.split('\n')`, with a `role`, and for context, added and removed lines the one-based `old` and `new` numbers from the hunk headers (`null` where the file has no such line).
 - `files` lists the file sections for a tree: `oldPath` and `newPath` (`null` for `/dev/null`), `status`, the zero-based `firstLine` and `lastLine` of the section in the text, the `added` and `removed` counts and the `hunks`.
-- `truncated` says the text went past a limit.
+- `truncated` says the text went past a limit. A text that ends with a newline right at a limit is not truncated.
+- Paths lose `a/` and `b/` only when the `diff --git` line shows both (`a/X b/Y`); a patch made without prefixes keeps them, so a real top-level folder `a` stays.
 
-| Role                                           | Lines                                                                                              |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `file-header`                                  | `diff --git`, `---`, `+++`, `index`, the mode, similarity, rename and copy lines                  |
-| `hunk-header`                                  | `@@ -a,b +c,d @@ section`                                                                         |
-| `context`, `added`, `removed`                  | The lines of a hunk. An empty line inside a hunk is context whose space an editor trimmed         |
-| `no-newline`                                   | `\ No newline at end of file`                                                                      |
-| `binary`                                       | `Binary files a and b differ`, and the data of a `GIT binary patch`                                |
-| `other`                                        | Everything else: a mail header, a diffstat, a blank line, a line that belongs nowhere             |
+| Role                          | Lines                                                                                     |
+| ----------------------------- | ----------------------------------------------------------------------------------------- |
+| `file-header`                 | `diff --git`, `---`, `+++`, `index`, the mode, similarity, rename and copy lines          |
+| `hunk-header`                 | `@@ -a,b +c,d @@ section`                                                                 |
+| `context`, `added`, `removed` | The lines of a hunk. An empty line inside a hunk is context whose space an editor trimmed |
+| `no-newline`                  | `\ No newline at end of file`                                                             |
+| `binary`                      | `Binary files a and b differ`, and the data of a `GIT binary patch`                       |
+| `other`                       | Everything else: a mail header, a diffstat, a blank line, a line that belongs nowhere     |
 
 A file `status` is `added`, `deleted`, `renamed`, `copied`, `modified` or `binary`. Git patches and plain `diff -u` output both work, with timestamps after a tab, quoted paths with escapes and octal bytes, names with spaces, and CRLF line endings. A `---` line followed by `+++` starts a file section; inside a hunk that still expects lines, `--- x` is a removed line. The `-- ` signature of a mailed patch is not a removed line.
 
@@ -47,7 +48,7 @@ for (const file of layout.files) {
 - File headers sit on a raised surface, and hunk headers are tinted in the accent color.
 - With `labels`, a screen reader hears `Removed, old line 8`, `Added, new line 12` or `Old line 3, new line 3` with the line, once. A hook that fills `labels` from the editor namespace is below.
 
-`onLayout` is called with the layout after every read, the first one included, which is what a file tree follows. It returns a `PatchDecoration` with the current `layout`, `refresh()` and `dispose()`, which takes everything off the editor again. The text is read again once per turn of edits, however many keystrokes come in it, and a read is one pass over at most the limits.
+`onLayout` is called with the layout after the first read and after `refresh()`, and otherwise once the edits have rested for `delay` milliseconds (150 by default), so a file tree is not rebuilt per keystroke. It returns a `PatchDecoration` with the current `layout`, `refresh()` and `dispose()`, which takes the decorations off the editor again. The change marks are drawn in a layer of their own (`'patch'`), so `dispose()` leaves the marks a host set itself. A patch under `immediateBelow` characters (100,000 by default, measured on the last read) is read again on the microtask after an edit, so its decorations are right within a frame; a larger one is read again once the edits have rested for `delay`. A read is one pass over at most the limits. `timer` replaces `setTimeout` and `clearTimeout` for a test.
 
 ```ts
 import { decoratePatch } from '@adecore/editor-react';

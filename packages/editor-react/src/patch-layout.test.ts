@@ -203,4 +203,18 @@ describe('patchLayoutOf', () => {
         expect(patchLayoutOf(text).truncated).toBe(false);
         expect(patchLayoutOf('a\nb', { maxLines: 2 }).truncated).toBe(false);
     });
+
+    test('does not call a text truncated when only its final newline is left', () => {
+        expect(patchLayoutOf('a\nb\n', { maxLines: 2 }).truncated).toBe(false);
+        expect(patchLayoutOf('abcd\n', { maxCharacters: 4 }).truncated).toBe(false);
+        expect(patchLayoutOf('a\nb\nc', { maxLines: 2 }).truncated).toBe(true);
+    });
+
+    test('keeps a real top-level folder a or b when the patch has no prefixes', () => {
+        const bare = ['diff --git a/x.ts a/x.ts', '--- a/x.ts', '+++ a/x.ts', '@@ -1 +1 @@', '-old', '+new', ''].join('\n');
+        const file = patchLayoutOf(bare).files[0]!;
+        expect([file.oldPath, file.newPath]).toEqual(['a/x.ts', 'a/x.ts']);
+        const prefixed = patchLayoutOf(GIT).files[0]!;
+        expect([prefixed.oldPath, prefixed.newPath]).toEqual(['src/a.ts', 'src/a.ts']);
+    });
 });

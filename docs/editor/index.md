@@ -68,7 +68,7 @@ A pen behaves like a mouse. Selection handles to extend a selection with a finge
 - A line longer than 20,000 characters is not colored.
 - Every edit rebuilds the list of rows, which is linear in the number of lines.
 - Folding ranges and the marks of a selection's other occurrences are skipped in a document over 2 million characters.
-- Search and folding read the whole document synchronously, and a regular expression has no time limit; see the [limits of the model](/editor-core/#limits).
+- A regular expression search, preview or replacement runs in the search worker (`searchWorker` on the engine) with a deadline of 1.5 seconds live and 10 seconds on request, and never runs on the page; without a worker factory it reports unavailable. Literal search stays on the page, its results are cached by revision and query and capped at 10,000 matches, and above 8 million UTF-16 units a regular expression starts only on Enter or a find step. Folding and selection expansion still read the whole document synchronously on the page. The [synchronous model API](/editor-core/#limits) has no time limit on a regular expression. See [find and folding](/editor/find-folding#search-worker).
 - Wrapped lines break at spaces, or inside a word that does not fit, and continue at the line's indentation plus two columns.
 - Documentation comments are drawn as text unless the host renders them with [`setReplacements`](/editor/rows#replacing-lines); the rendering itself is in [`@adecore/editor-react`](/editor-react/rendered-documentation). A replaced row has no caret of its own, so find marks and selections inside it are not drawn until the lines are shown as text.
 

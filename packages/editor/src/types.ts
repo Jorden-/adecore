@@ -618,8 +618,12 @@ export interface Editor {
     setLabel(label: string): void;
     /* What a language server knows about the folds: the bodies of symbols and the ranges it folds. They follow their text through edits until set again; null forgets them. */
     setFoldHints(hints: EditorFoldHints | null): void;
-    /* Marks that follow their lines through edits until the host sets them again. */
-    setChangeMarks(marks: readonly EditorChangeMark[]): void;
+    /*
+     * Marks that follow their lines through edits until the host sets them again. Every layer (default: the unnamed one)
+     * holds its own marks and the editor draws the union, so setting one layer never clears another; an empty list
+     * removes the layer. On a line two layers mark, the later one wins, in the order the layers last became non-empty.
+     */
+    setChangeMarks(marks: readonly EditorChangeMark[], layer?: string): void;
     /*
      * The blocks sticky scroll and the breadcrumb go by. The editor reads them from brackets and
      * indentation until the host has better, such as a language server's symbols; null goes back.

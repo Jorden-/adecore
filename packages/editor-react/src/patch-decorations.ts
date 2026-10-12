@@ -15,9 +15,25 @@ export interface PatchDecorationOptions {
     numbers?: 'single' | 'both';
     labels?: PatchLineLabels;
     limits?: PatchLimits;
-    /* Called with the layout after each read, the first one included, once per run of edits. */
+    /* Called with the layout after the first read and after `refresh()`, and once the edits have rested for `delay` ms, so a file list is not rebuilt per keystroke. */
     onLayout?(layout: PatchLayout): void;
+    /* Milliseconds of rest before `onLayout` follows edits, and before a patch of `immediateBelow` characters or more is decorated again. Defaults to 150. */
+    delay?: number;
+    /* Up to this many characters (of the last read) the decorations follow an edit on the same microtask. Defaults to 100000. */
+    immediateBelow?: number;
+    /* Replaces `setTimeout` and `clearTimeout`, for a test that drives the clock. */
+    timer?: PatchTimer;
 }
+
+export interface PatchTimer {
+    set(callback: () => void, delay: number): unknown;
+    clear(handle: unknown): void;
+}
+
+const DEFAULT_TIMER: PatchTimer = {
+    set: (callback, delay) => setTimeout(callback, delay),
+    clear: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>)
+};
 
 export interface PatchDecoration {
     readonly layout: PatchLayout;
@@ -26,6 +42,8 @@ export interface PatchDecoration {
     /* Takes the decorations off the editor and stops following it. */
     dispose(): void;
 }
+
+const CHANGE_LAYER = 'patch';
 
 function numberOf(line: PatchLayoutLine, numbers: 'single' | 'both', width: number): string | null {
     if (line.old === null && line.new === null) {
@@ -70,13 +88,32 @@ function highlightsOf(layout: PatchLayout): { highlights: EditorLineHighlight[];
 
 /*
  * Draws a patch in the editor the way the diff views draw a change: tinted lines, numbers from the hunk
- * headers in the gutter and styled file and hunk headers. The editor stays editable, and the layout is
- * read again after the edits of one turn, so typing costs one pass over the text (bounded by the limits).
+ * headers in the gutter and styled file and hunk headers. The editor stays editable. A small patch is read
+ * again on the microtask after an edit, so its decorations are right within a frame; a large one waits for
+ * the edits to rest, and `onLayout` always does. Typing costs one pass over the text (bounded by the limits).
  */
 export function decoratePatch(editor: Editor, options: PatchDecorationOptions = {}): PatchDecoration {
     let layout = patchLayoutOf('', options.limits);
     let pending = false;
     let disposed = false;
+    let length = 0;
+    let wait: unknown = null;
+    const timer = options.timer ?? DEFAULT_TIMER;
+    const delay = options.delay ?? 150;
+    const immediateBelow = options.immediateBelow ?? 100_000;
+    const clearWait = (): void => {
+        if (wait !== null) {
+            timer.clear(wait);
+            wait = null;
+        }
+    };
+    const after = (callback: () => void): void => {
+        clearWait();
+        wait = timer.set(() => {
+            wait = null;
+            callback();
+        }, delay);
+    };
     const apply = (): void => {
         const numbers = options.numbers ?? 'single';
         const lines = layout.lines;
@@ -102,21 +139,43 @@ export function decoratePatch(editor: Editor, options: PatchDecorationOptions = 
         );
         const { highlights, marks } = highlightsOf(layout);
         editor.setLineHighlights(highlights);
-        editor.setChangeMarks(marks);
+        editor.setChangeMarks(marks, CHANGE_LAYER);
     };
-    const read = (): void => {
+    const decorate = (): void => {
         pending = false;
         if (disposed) {
             return;
         }
-        layout = patchLayoutOf(editor.getText(), options.limits);
+        const text = editor.getText();
+        length = text.length;
+        layout = patchLayoutOf(text, options.limits);
         apply();
-        options.onLayout?.(layout);
+    };
+    const announce = (): void => {
+        if (!disposed) {
+            options.onLayout?.(layout);
+        }
+    };
+    const read = (): void => {
+        clearWait();
+        decorate();
+        announce();
     };
     const schedule = (): void => {
-        if (!pending) {
-            pending = true;
-            queueMicrotask(read);
+        if (pending) {
+            return;
+        }
+        pending = true;
+        if (length < immediateBelow) {
+            queueMicrotask(() => {
+                decorate();
+                after(announce);
+            });
+        } else {
+            after(() => {
+                decorate();
+                announce();
+            });
         }
     };
     const stop = editor.onTextChange(schedule);
@@ -128,11 +187,12 @@ export function decoratePatch(editor: Editor, options: PatchDecorationOptions = 
         refresh: read,
         dispose() {
             disposed = true;
+            clearWait();
             stop();
             editor.setLineNumbers(null);
             editor.setLineLabels(null);
             editor.setLineHighlights([]);
-            editor.setChangeMarks([]);
+            editor.setChangeMarks([], CHANGE_LAYER);
         }
     };
 }

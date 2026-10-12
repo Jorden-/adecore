@@ -202,4 +202,54 @@ describe('interactive inlay hints in the real editor', () => {
         await settle();
         expect(card()?.info?.text.markdown).toBe('Parameter name');
     });
+
+    test('moves the caret on a click when resolving finds no command', async () => {
+        const { part, hover, pressHint, editor, calls } = await setup([{ position: at(4), label: [label('Map')], data: 1 }], { resolve: (hint) => hint });
+        hover(part(0, 0));
+        await settle();
+        editor.setCaret({ line: 1, character: 2 });
+        pressHint(part(0, 0));
+        await settle();
+        expect(editor.getCaret().line).toBe(0);
+        expect(calls(COMMAND)).toHaveLength(0);
+    });
+
+    test('resolves on hover so the first click already knows the command', async () => {
+        const command = { title: 'Do it', command: 'hint.do' };
+        const { part, hover, pressHint, calls } = await setup([{ position: at(4), label: [label('Map')], data: 1 }], {
+            resolve: (hint) => ({ ...hint, label: [label('Map', { command })] })
+        });
+        hover(part(0, 0));
+        await settle();
+        expect(calls(RESOLVE)).toHaveLength(1);
+        pressHint(part(0, 0));
+        await settle();
+        expect(calls(COMMAND).map((call) => call.params)).toEqual([command]);
+    });
+
+    test('inserts the edits of a double click and never runs the command of the first click', async () => {
+        const command = { title: 'Do it', command: 'hint.do' };
+        const { part, pressHint, editor, calls, timers } = await setup([
+            { position: at(4), label: [label('name:', { command })], textEdits: [{ range: { start: at(4), end: at(4) }, newText: 'name: ' }] }
+        ]);
+        pressHint(part(0, 0));
+        pressHint(part(0, 0));
+        timers.advance(1000);
+        await settle();
+        expect(editor.getText()).toBe('run(name: a, b)\nsecond line');
+        expect(calls(COMMAND)).toHaveLength(0);
+    });
+
+    test('runs the command of a single click once the double click interval has passed when the hint also has edits', async () => {
+        const command = { title: 'Do it', command: 'hint.do' };
+        const { part, pressHint, calls, timers } = await setup([
+            { position: at(4), label: [label('name:', { command })], textEdits: [{ range: { start: at(4), end: at(4) }, newText: 'name: ' }] }
+        ]);
+        pressHint(part(0, 0));
+        await settle();
+        expect(calls(COMMAND)).toHaveLength(0);
+        timers.advance(1000);
+        await settle();
+        expect(calls(COMMAND)).toHaveLength(1);
+    });
 });

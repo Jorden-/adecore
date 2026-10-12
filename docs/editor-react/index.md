@@ -21,6 +21,7 @@ The demos on these pages run over [`FakeLanguageService`](/editor-react/testing)
 - [EditorView](/editor-react/editor-view): the component, `EditorLanguage` for an editor mounted by hand, `LanguagePopups` and `AnchoredPopup`.
 - [Completion and signatures](/editor-react/completion), [Hover and problems](/editor-react/hover), [Navigation](/editor-react/navigation) and [Rename and code actions](/editor-react/rename): the features and their cards.
 - [FindReplace](/editor-react/find-replace): a find and replace bar.
+- [Call hierarchy](/editor-react/call-hierarchy), [Format on type](/editor-react/format-on-type), [Patch files](/editor-react/patch-files) and [Rendered documentation](/editor-react/rendered-documentation): callers and callees, typing-time formatting, editable `.patch` files and documentation comments drawn in place of their lines.
 - [Reviews and agents](/editor-react/change-review): `DiffView`, `ChangeReview`, `AttributionCard` and React in editor rows.
 - [Code vision](/editor-react/code-vision): usages and authors above declarations.
 - [Models](/editor-react/models): the pure functions behind the features.
@@ -54,10 +55,10 @@ The symbol picker is a dialog with its own input and is not pointed at from the 
 - What works depends on what the service supports. A feature asks only for methods the service supports; a command for one it does not support tells the person so through the app's `notify`.
 - The view's limits hold: no bidirectional text, and the [performance limits](/editor/#limits) of the editor.
 - Accessibility is [untested with a screen reader](#accessibility), as it is for the editor.
-- Snippets are a subset: tab stops, placeholders and the first value of a choice. Variables insert nothing or their default, and transforms are skipped. Stops with the same number are not edited together.
+- Snippets follow the LSP syntax: tab stops, placeholders, choices with a picker, mirrors that are edited together, variables (built-ins and host overrides) and nested sessions, with variable and field transforms run in a worker. A host without `snippetTransformWorker` keeps the raw variable values and cannot run field transforms. A snippet past the [size and nesting limits](/editor-react/completion#snippets) (for example 100,000 units, 1,000 field occurrences or 64 levels) inserts its text without a session, and at most eight nested frames stay open. Inside a nested snippet the generated final stop sorts after a target of an enclosing snippet at the same point. See [snippets](/editor-react/completion#snippets).
 - Inlay hint actions (follow, command, insert) are for the pointer; only the tooltip has a keyboard path, through Quick Info on the caret. See [inlay hints](/editor-react/hover#inlay-hints).
 - Semantic tokens are asked in full after each pause in typing; the delta and range requests of the protocol are not used.
-- A workspace edit that creates or moves a file over one that is there is refused, a delete needs a host that reports unsaved work, a read only editor is refused up front when it can say so, and a failure halfway does not roll back the steps before it. See [workspace edits](/editor-react/project#workspace-edits).
+- A workspace edit that creates or moves a file over one that is there is refused unless it says `overwrite` and the host reports `supportsOverwrite`, a delete needs a host that reports unsaved work, a read only editor is refused up front when it can say so, and a failure halfway does not roll back the steps before it. See [workspace edits](/editor-react/project#workspace-edits).
 - Code vision rows are skipped in files over 20,000 lines.
 
 The package is FSL-1.1-MIT.
