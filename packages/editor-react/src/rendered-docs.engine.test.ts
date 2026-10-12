@@ -55,6 +55,19 @@ describe('rendered documentation comments', () => {
         expect(markers()[0]!.getAttribute('aria-label')).toBe('Show rendered documentation');
     });
 
+    test('draws no buttons and ignores the toggles while disabled, and restores them when enabled again', () => {
+        const { docs, markers, blocks, language } = setup();
+        docs.configure({ renderDocComments: true, enabled: false });
+        expect(markers()).toEqual([]);
+        expect(blocks()).toEqual([]);
+        expect(docs.toggleAt(7)).toBe(false);
+        language.editor.setSelections([{ start: { line: 8, character: 0 }, end: { line: 8, character: 0 } }]);
+        expect(docs.toggle()).toBe(false);
+        docs.configure({ renderDocComments: true });
+        expect(markers()).toHaveLength(2);
+        expect(blocks()).toHaveLength(2);
+    });
+
     test('draws nothing formatted while the setting is off, which is how it starts', () => {
         const { blocks, drawn } = setup();
         expect(blocks()).toEqual([]);

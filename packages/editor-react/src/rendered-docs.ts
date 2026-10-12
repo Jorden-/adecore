@@ -16,6 +16,8 @@ const MAX_PARSED = 200;
 export interface RenderedDocsSettings {
     /* Draw every documentation comment as formatted text, as the Reader mode of the documentation does. Off by default. */
     readonly renderDocComments: boolean;
+    /* Off draws no buttons, ignores the shortcut and shows every comment as source; on unless false. */
+    readonly enabled?: boolean;
 }
 
 /* A documentation comment the editor drew a row for, and the element of that row. */
@@ -69,6 +71,7 @@ export class RenderedDocsFeature {
     private readonly language: EditorLanguage;
     private readonly timers: Timers;
     private settings: RenderedDocsSettings = { renderDocComments: false };
+    private enabled = true;
     private comments: DocComment[] = [];
     private overrides: Override[] = [];
     private readonly containers = new Map<string, HTMLElement>();
@@ -140,11 +143,16 @@ export class RenderedDocsFeature {
 
     /* Whether every documentation comment is drawn as text until a person switches it. Changing it puts every comment back under it. */
     configure(settings: RenderedDocsSettings): void {
-        if (settings.renderDocComments === this.settings.renderDocComments) {
+        const enabled = settings.enabled !== false;
+        if (settings.renderDocComments === this.settings.renderDocComments && enabled === this.enabled) {
             return;
         }
+        const sameRendering = settings.renderDocComments === this.settings.renderDocComments;
         this.settings = settings;
-        this.clearOverrides();
+        this.enabled = enabled;
+        if (!sameRendering) {
+            this.clearOverrides();
+        }
         this.publish();
     }
 
@@ -162,7 +170,7 @@ export class RenderedDocsFeature {
     toggle(): boolean {
         this.settle();
         const comment = this.at(this.language.editor.getCaret().line);
-        if (comment === undefined || !this.canRender(comment)) {
+        if (!this.enabled || comment === undefined || !this.canRender(comment)) {
             return false;
         }
         this.setRendered(comment, !this.wantsRendered(comment));
@@ -173,7 +181,7 @@ export class RenderedDocsFeature {
     toggleAt(startLine: number): boolean {
         this.settle();
         const comment = this.comments.find((candidate) => candidate.startLine === startLine);
-        if (comment === undefined || !this.canRender(comment)) {
+        if (!this.enabled || comment === undefined || !this.canRender(comment)) {
             return false;
         }
         this.setRendered(comment, !this.wantsRendered(comment));
@@ -225,7 +233,7 @@ export class RenderedDocsFeature {
     }
 
     private wantsRendered(comment: DocComment): boolean {
-        if (!this.canRender(comment)) {
+        if (!this.enabled || !this.canRender(comment)) {
             return false;
         }
         const start = startOf(comment);
@@ -375,7 +383,7 @@ export class RenderedDocsFeature {
             this.bump();
         }
         this.markerLines.clear();
-        const markers = this.comments.map((comment) => {
+        const markers = (this.enabled ? this.comments : []).map((comment) => {
             const id = `docs:${comment.startLine}`;
             this.markerLines.set(id, comment.startLine);
             const on = this.wantsRendered(comment);
