@@ -1,6 +1,6 @@
 import { applyTextEdits, type CodeAction, type Command, type Diagnostic, type Range, type WorkspaceEdit } from '@adecore/lsp';
 import { comparePositions } from './diagnostics-model.ts';
-import { entriesOf, renamesOf } from './workspace-edit.ts';
+import { resourceOperationsOf, textEntriesOf } from './workspace-edit.ts';
 
 export type ActionGroup = 'quickfix' | 'rewrite' | 'extract' | 'inline' | 'move' | 'refactor' | 'source' | 'other';
 
@@ -97,10 +97,14 @@ export interface EditPreview {
     readonly added: readonly string[];
     /* Lines left out of `removed` and `added` to keep the preview short. */
     readonly hiddenLines: number;
-    /* The other files the edit reaches. */
+    /* The other files the edit edits, apart from the ones it makes. */
     readonly otherFiles: number;
     /* The files it moves. */
     readonly moves: number;
+    /* The files it makes. */
+    readonly creates?: number;
+    /* The files it deletes. */
+    readonly deletes?: number;
 }
 
 const PREVIEW_LINES = 3;
@@ -109,15 +113,17 @@ function linesOf(text: string): string[] {
     return text.split(/\r\n|\r|\n/);
 }
 
-/* Null when the edit changes nothing, or deletes a file, which a preview of lines cannot show. A file it creates counts as another file. */
+/* Null when the edit changes nothing. A file it creates is counted under `creates` and not as another file; moves and deletes are counted apart. */
 export function previewOf(text: string, edit: WorkspaceEdit, uri: string): EditPreview | null {
-    const entries = entriesOf(edit);
-    if (entries === null) {
-        return null;
-    }
+    const entries = textEntriesOf(edit);
+    const operations = resourceOperationsOf(edit);
+    const count = (kind: string): number => operations.filter((operation) => operation.kind === kind).length;
+    const moves = count('rename');
+    const creates = count('create');
+    const deletes = count('delete');
     const own = entries.get(uri);
-    const moves = renamesOf(edit).length;
-    const otherFiles = [...entries.keys()].filter((key) => key !== uri).length;
+    const made = new Set(operations.filter((operation) => operation.kind === 'create').map((operation) => operation.uri));
+    const otherFiles = [...entries.keys()].filter((key) => key !== uri && !made.has(key)).length;
     let removed: string[] = [];
     let added: string[] = [];
     if (own !== undefined) {
@@ -140,9 +146,9 @@ export function previewOf(text: string, edit: WorkspaceEdit, uri: string): EditP
         removed = before.slice(head, before.length - tail);
         added = next.slice(head, next.length - tail);
     }
-    if (removed.length === 0 && added.length === 0 && otherFiles === 0 && moves === 0) {
+    if (removed.length === 0 && added.length === 0 && otherFiles === 0 && moves === 0 && creates === 0 && deletes === 0) {
         return null;
     }
     const hiddenLines = Math.max(0, removed.length - PREVIEW_LINES) + Math.max(0, added.length - PREVIEW_LINES);
-    return { removed: removed.slice(0, PREVIEW_LINES), added: added.slice(0, PREVIEW_LINES), hiddenLines, otherFiles, moves };
+    return { removed: removed.slice(0, PREVIEW_LINES), added: added.slice(0, PREVIEW_LINES), hiddenLines, otherFiles, moves, creates, deletes };
 }

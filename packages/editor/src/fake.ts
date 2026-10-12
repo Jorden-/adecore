@@ -771,6 +771,10 @@ export class FakeEditor implements Editor {
         this.readOnlyReason = reason;
     }
 
+    isReadOnly(): boolean {
+        return this.readOnly;
+    }
+
     /* The commands run, in order; the fake has no commands of its own to carry out. */
     readonly commands: EditorRunCommand[] = [];
 

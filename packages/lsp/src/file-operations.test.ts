@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { renamesTaken } from './file-operations.ts';
-import { flush, sessionWith } from './test-transport.ts';
+import { LspSession } from './session.ts';
+import { flush, ScriptedTransport, sessionWith } from './test-transport.ts';
 
 const user = { oldUri: 'file:///work/src/Models/User.php', newUri: 'file:///work/src/Domain/User.php', directory: false };
 const models = { oldUri: 'file:///work/src/Models', newUri: 'file:///work/src/Entities', directory: true };
@@ -38,6 +39,20 @@ describe('telling a server about renamed files', () => {
         const { capabilities } = transport.request('initialize').params as { capabilities: { workspace: Record<string, unknown> } };
         expect(capabilities.workspace.workspaceEdit).toMatchObject({ documentChanges: true, resourceOperations: ['create', 'rename'] });
         expect(capabilities.workspace.fileOperations).toEqual({ dynamicRegistration: true, willRename: true, didRename: true });
+        await session.shutdown();
+    });
+
+    it('announces the resource operations the host carries out', async () => {
+        const transport = new ScriptedTransport();
+        transport.autoInitialize = { textDocumentSync: 2 };
+        const session = new LspSession(transport, { resourceOperations: ['create', 'rename', 'delete'] });
+        await session.initialize();
+        const { capabilities } = transport.request('initialize').params as { capabilities: { workspace: Record<string, unknown> } };
+        expect(capabilities.workspace.workspaceEdit).toEqual({
+            documentChanges: true,
+            resourceOperations: ['create', 'rename', 'delete'],
+            failureHandling: 'abort'
+        });
         await session.shutdown();
     });
 

@@ -86,6 +86,11 @@ function Hints({ view, active, onPick }: { view: RenameView; active: number; onP
 function Preview({ language, view }: { language: EditorLanguage; view: RenameView }) {
     const { t } = useTranslation('editor');
     const folder = language.project.folder;
+    const operations = view.operations ?? [];
+    const shownPath = (uri: string): string => {
+        const path = fileUriToPath(uri);
+        return path === null ? uri : relativeTo(path, folder);
+    };
     return (
         <div className="flex w-[520px] max-w-full flex-col" onPointerDown={(event) => event.preventDefault()}>
             <div className="max-h-[320px] overflow-y-auto">
@@ -115,6 +120,19 @@ function Preview({ language, view }: { language: EditorLanguage; view: RenameVie
                         </div>
                     );
                 })}
+                {operations.length > 0 && (
+                    <div className="flex flex-col gap-px border-b border-border px-3 py-1.5 text-xs last:border-b-0">
+                        {operations.map((operation, index) => (
+                            <div key={`${operation.kind}:${operation.uri}:${index}`} className="flex items-center gap-2">
+                                <span className="shrink-0 font-medium">{t(`language.rename.operations.${operation.kind}`)}</span>
+                                <span className="min-w-0 truncate text-text-faint">
+                                    {shownPath(operation.uri)}
+                                    {operation.newUri === undefined ? '' : ` \u2192 ${shownPath(operation.newUri)}`}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-border p-2">
                 <Button size="xs" variant="ghost" onClick={() => language.rename.cancel()}>

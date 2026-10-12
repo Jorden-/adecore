@@ -67,6 +67,8 @@ export interface LanguageService {
     /* Applies `didChange` entries in order. Every call raises the version by one. */
     changeDocument(uri: string, changes: readonly ContentChange[]): Promise<void>;
     closeDocument(uri: string): Promise<void>;
+    /* The version the servers hold an open document at, for checking a workspace edit; null when it is not open. Without it such versions cannot be checked. */
+    versionOf?(uri: string): number | null;
 
     /* Whether any server of the document answers `method` now, and the options it gave (trigger characters, a legend, resolve support). */
     supports(method: string, uri: string): boolean;

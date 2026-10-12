@@ -314,7 +314,9 @@ export class CodeActionsFeature {
         const notes = [
             ...(found.hiddenLines > 0 ? [this.say('moreLines', { count: found.hiddenLines })] : []),
             ...(found.otherFiles > 0 ? [this.say('otherFiles', { count: found.otherFiles })] : []),
-            ...(found.moves > 0 ? [this.say('moves', { count: found.moves })] : [])
+            ...(found.moves > 0 ? [this.say('moves', { count: found.moves })] : []),
+            ...((found.creates ?? 0) > 0 ? [this.say('creates', { count: found.creates })] : []),
+            ...((found.deletes ?? 0) > 0 ? [this.say('deletes', { count: found.deletes })] : [])
         ];
         return { removed: found.removed, added: found.added, note: notes.length === 0 ? null : notes.join(' · ') };
     }

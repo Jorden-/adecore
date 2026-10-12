@@ -30,6 +30,10 @@
             "otherFiles_other": "en nog {{count}} bestanden",
             "moves_one": "verplaatst {{count}} bestand",
             "moves_other": "verplaatst {{count}} bestanden",
+            "creates_one": "maakt {{count}} bestand aan",
+            "creates_other": "maakt {{count}} bestanden aan",
+            "deletes_one": "verwijdert {{count}} bestand",
+            "deletes_other": "verwijdert {{count}} bestanden",
             "groups": {
                 "quickfix": "Quick fix",
                 "rewrite": "Herschrijven",
@@ -56,7 +60,12 @@
             "cancel": "Annuleer",
             "apply": "Hernoem",
             "suggestions": "Voorgestelde namen",
-            "useSuggestion": "Suggestie gebruiken"
+            "useSuggestion": "Suggestie gebruiken",
+            "operations": {
+                "create": "Maakt aan",
+                "rename": "Verplaatst",
+                "delete": "Verwijdert"
+            }
         },
         "navigation": {
             "unavailable": "Geen language server die dat hier beantwoordt",

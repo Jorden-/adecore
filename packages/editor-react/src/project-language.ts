@@ -110,7 +110,12 @@ export class ProjectLanguage {
 
     /* Makes an edit of a language server: an open document takes it as one undo step and any other file gets an unsaved draft. */
     applyWorkspaceEdit(edit: WorkspaceEdit): Promise<ApplyWorkspaceEditResult> {
-        return applyWorkspaceEdit(edit, { editorOf: (uri) => this.holders.get(uri)?.editors[0], files: this.files });
+        const { service } = this;
+        return applyWorkspaceEdit(edit, {
+            editorOf: (uri) => this.holders.get(uri)?.editors[0],
+            files: this.files,
+            ...(service.versionOf === undefined ? {} : { versionOf: (uri: string) => service.versionOf!(uri) })
+        });
     }
 
     /* The text of a file as it stands now: an open document's, else a draft's or the machine's; null when it is no text file. */

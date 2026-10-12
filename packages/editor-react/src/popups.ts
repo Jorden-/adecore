@@ -8,6 +8,7 @@ import type { ActionEntry } from './code-actions-model.ts';
 import type { SymbolEntry } from './symbol-picker-model.ts';
 import type { HoverText } from './hover-content.ts';
 import type { SignatureViewModel } from './signature-model.ts';
+import type { ResourceOperationView } from './workspace-edit.ts';
 
 /* What a hover card shows for the character under the pointer. */
 export interface HoverView {
@@ -132,6 +133,8 @@ export interface RenameView {
     readonly error: string | null;
     readonly name: string;
     readonly files: readonly RenameFileView[];
+    /* The files the rename makes, moves or deletes, listed in the preview next to the lines. */
+    readonly operations?: readonly ResourceOperationView[];
     /* Names the host suggests from how the symbol is used. They fill the input when chosen and never apply by themselves. */
     readonly suggestions: readonly string[];
 }

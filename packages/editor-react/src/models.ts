@@ -119,6 +119,7 @@ export {
     type EditPreview,
     previewOf
 } from './code-actions-model.ts';
+export { resourceOperationsOf, type ResourceOperationView } from './workspace-edit.ts';
 export { MAX_DECLARATIONS, type CodeVisionDeclaration, type DeclarationSource, startAfterComments, declarationsOf, usagesText } from './code-vision-model.ts';
 export { UNCOMMITTED, mapBlame, type CodeAuthor, type CodeAuthorship, shortName, authorshipOf, authorsText } from './code-authors.ts';
 export {

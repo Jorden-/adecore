@@ -1,12 +1,15 @@
 import type { Editor, EditorContentChange } from '@adecore/editor';
 import {
-    applyTextEdits,
     fileUriToPath,
+    planWorkspaceOperations,
     type ApplyWorkspaceEditResult,
-    type CreateFile,
+    type PlannedDeleteStep,
+    type PlannedTextStep,
+    type ResourceOperationKind,
     type RenameFile,
     type TextEdit,
-    type WorkspaceEdit
+    type WorkspaceEdit,
+    type WorkspaceEditStep
 } from '@adecore/lsp';
 import type { DiskText } from './host-types.ts';
 import { messageOf } from './error-message.ts';
@@ -25,63 +28,66 @@ export interface ProjectFiles {
     stage(files: readonly StagedFile[]): void;
     /* Writes the new texts through the machine; the reason of the first file that could not be saved, or null. */
     save(files: readonly StagedFile[]): Promise<string | null>;
-    /* Moves a file or folder on the machine, with what is open on it, and tells the servers it moved; the reason it could not, or null. */
+    /* Moves a file or folder on the machine, with what is open on it, and tells the servers it moved; the reason it could not, or null. Without `exists` an edit cannot tell whether the target is there, so refuse a target that is. */
     rename(from: string, to: string): Promise<string | null>;
-    /* Makes a file that is not there with its text, through the machine; the reason it could not, or null. Without it no edit creates a file. */
+    /* Makes a file that is not there with its text, through the machine; the reason it could not, or null. Without it no edit creates a file. Without `exists`, refuse a file that is there. */
     create?(path: string, text: string): Promise<string | null>;
+    /* Deletes a file, or a folder with what is in it when `recursive`; the reason it could not, or null. Without it no edit deletes anything. */
+    delete?(path: string, options: { readonly recursive: boolean }): Promise<string | null>;
+    /* Whether a draft or an open editor at the path, or under it for a folder, holds text that is not saved. A delete that would lose it is refused. */
+    isUnsaved?(path: string): boolean;
+    /* Whether anything is at the path: a file of any kind or a folder. Without it, what is no text file is of unknown existence: an edit may move or delete it and the machine decides, and `ignoreIfNotExists` cannot be honored. */
+    exists?(path: string): Promise<boolean>;
+    /* Whether the path is a folder. Without it, deleting anything that is no text file needs `recursive`. */
+    isFolder?(path: string): Promise<boolean>;
 }
 
 export interface WorkspaceEditHost {
     /* The editor whose document this is, which takes the edit as one undo step. */
     editorOf(uri: string): Editor | undefined;
     readonly files: ProjectFiles | null;
+    /* The version the language servers hold an open document at; null when it is not known. The version of an edit is only enforced for an open document when this reports one; the text check stands in otherwise. */
+    versionOf?(uri: string): number | null;
+    /* Whether the editor of a document is read only. Without it the editor's own `isReadOnly` says, and an editor without that is found out when the edit is applied. */
+    isReadOnly?(uri: string): boolean;
+    /* The URIs of every document an editor of this project holds. With it, deleting a folder finds open documents under it when `files.isUnsaved` is missing; without both, a recursive delete is refused. */
+    openUris?(): readonly string[];
+}
+
+/* One resource operation of an edit, for a preview: a file that is made, moved or deleted. `newUri` is where a move ends. */
+export interface ResourceOperationView {
+    readonly kind: ResourceOperationKind;
+    readonly uri: string;
+    readonly newUri?: string;
 }
 
 function refused(failureReason: string): ApplyWorkspaceEditResult {
     return { applied: false, failureReason };
 }
 
-/* One thing an edit does, in the order it says: text edits of a document, a file that is made, or a file that moves. */
-type Step =
-    | { readonly kind: 'edits'; readonly uri: string; readonly edits: TextEdit[] }
-    | { readonly kind: 'create'; readonly file: CreateFile }
-    | { readonly kind: 'rename'; readonly oldUri: string; readonly newUri: string };
-
-/* The steps of an edit; null when it deletes a file, which an edit is not applied with. */
-function stepsOf(edit: WorkspaceEdit): Step[] | null {
-    const steps: Step[] = [];
-    for (const change of edit.documentChanges ?? []) {
-        if ('textDocument' in change) {
-            steps.push({ kind: 'edits', uri: change.textDocument.uri, edits: change.edits });
-        } else if (change.kind === 'create') {
-            steps.push({ kind: 'create', file: change });
-        } else if (change.kind === 'rename') {
-            steps.push({ kind: 'rename', oldUri: change.oldUri, newUri: change.newUri });
-        } else {
-            return null;
-        }
-    }
+/* The text edits of an edit per document, as the entries a document has in it, whatever else the edit does. */
+export function textEntriesOf(edit: WorkspaceEdit): Map<string, TextEdit[][]> {
+    const entries = new Map<string, TextEdit[][]>();
+    const add = (uri: string, edits: TextEdit[]): void => {
+        entries.set(uri, [...(entries.get(uri) ?? []), edits]);
+    };
     if (edit.documentChanges === undefined) {
         for (const [uri, edits] of Object.entries(edit.changes ?? {})) {
-            steps.push({ kind: 'edits', uri, edits });
+            add(uri, edits);
+        }
+        return entries;
+    }
+    for (const change of edit.documentChanges) {
+        if ('textDocument' in change) {
+            add(change.textDocument.uri, change.edits);
         }
     }
-    return steps;
+    return entries;
 }
 
 /* The text edits of an edit per document, as the entries a document has in it; null when it deletes a file. */
 export function entriesOf(edit: WorkspaceEdit): Map<string, TextEdit[][]> | null {
-    const steps = stepsOf(edit);
-    if (steps === null) {
-        return null;
-    }
-    const entries = new Map<string, TextEdit[][]>();
-    for (const step of steps) {
-        if (step.kind === 'edits') {
-            entries.set(step.uri, [...(entries.get(step.uri) ?? []), step.edits]);
-        }
-    }
-    return entries;
+    return (edit.documentChanges ?? []).some((change) => 'kind' in change && change.kind === 'delete') ? null : textEntriesOf(edit);
 }
 
 /* The files an edit moves, which a preview of lines cannot show. */
@@ -89,165 +95,286 @@ export function renamesOf(edit: WorkspaceEdit): RenameFile[] {
     return (edit.documentChanges ?? []).filter((change): change is RenameFile => 'kind' in change && change.kind === 'rename');
 }
 
+/* Every file an edit makes, moves or deletes, in the order it says. */
+export function resourceOperationsOf(edit: WorkspaceEdit): ResourceOperationView[] {
+    const operations: ResourceOperationView[] = [];
+    for (const change of edit.documentChanges ?? []) {
+        if ('textDocument' in change) {
+            continue;
+        }
+        operations.push(change.kind === 'rename' ? { kind: 'rename', uri: change.oldUri, newUri: change.newUri } : { kind: change.kind, uri: change.uri });
+    }
+    return operations;
+}
+
 function contentChangeOf(edit: TextEdit): EditorContentChange {
     return { range: edit.range, text: edit.newText };
 }
 
-/* What a step of text edits does to one document, worked out before anything changes. */
-interface PlannedEdits {
-    readonly kind: 'edits';
-    readonly uri: string;
-    readonly edits: TextEdit[];
-    readonly before: string;
-    readonly after: string;
-    /* Set when no editor holds the document: what the machine has, which the new text is a draft of. */
-    readonly disk: DiskText | null;
+/* Everything the plan was made from that has to be true still when it runs. */
+interface Reads {
+    /* The text an open editor had when it was read, by the URI it was read at. */
+    readonly open: Map<string, { readonly text: string; readonly version: number | null }>;
+    /* What the machine had of a file no editor held, by the URI it was read at. */
+    readonly disks: Map<string, DiskText>;
 }
 
-/* A file to make, with the text every step of the edit leaves in it. */
-interface PlannedCreate {
-    readonly kind: 'create';
-    readonly path: string;
-    text: string;
+/* The resource operations a project has a way to carry out; pass it as the session's `resourceOperations` so servers only ask for what can be done. */
+export function supportedResourceOperations(files: ProjectFiles | null | undefined): ResourceOperationKind[] {
+    const operations: ResourceOperationKind[] = [];
+    if (files?.create !== undefined) {
+        operations.push('create');
+    }
+    if (files?.rename !== undefined) {
+        operations.push('rename');
+    }
+    if (files?.delete !== undefined) {
+        operations.push('delete');
+    }
+    return operations;
 }
 
-type Planned = PlannedEdits | PlannedCreate | { readonly kind: 'rename'; readonly oldPath: string; readonly newPath: string };
+function within(uri: string, folder: string): boolean {
+    return uri.startsWith(`${folder}/`);
+}
+
+/* Where a deleted URI stood before the renames that ran ahead of it, and what was moved into it: the places unsaved work can be. */
+function placesOf(uri: string, renames: readonly RenameFile[]): string[] {
+    const found = new Set([uri]);
+    for (let i = renames.length - 1; i >= 0; i--) {
+        const { oldUri, newUri } = renames[i]!;
+        for (const place of [...found]) {
+            if (place === newUri || within(place, newUri)) {
+                found.add(oldUri + place.slice(newUri.length));
+            } else if (within(newUri, place)) {
+                found.add(oldUri);
+            }
+        }
+    }
+    return [...found];
+}
+
+/* Whether deleting loses work nobody saved at any of the places. Without `isUnsaved` that is an editor on, or under, a place. */
+function losesWork(step: PlannedDeleteStep, places: readonly string[], host: WorkspaceEditHost): boolean {
+    const files = host.files!;
+    if (files.isUnsaved !== undefined) {
+        return places.some((place) => {
+            const path = fileUriToPath(place);
+            return path !== null && files.isUnsaved!(path);
+        });
+    }
+    if (host.openUris === undefined && step.recursive) {
+        return true;
+    }
+    const open = host.openUris?.() ?? [];
+    return places.some((place) => host.editorOf(place) !== undefined || open.some((uri) => uri === place || within(uri, place)));
+}
+
+function readOnlyAt(host: WorkspaceEditHost, uri: string, editor: Editor | undefined): boolean {
+    return host.isReadOnly?.(uri) ?? editor?.isReadOnly?.() ?? false;
+}
+
+/* Checks a plan against what only the host can see: paths, overwrites, unsaved work and the editors it touches. Null when it fits. */
+function problemWith(steps: readonly WorkspaceEditStep[], host: WorkspaceEditHost, reads: Reads): string | null {
+    const renames: RenameFile[] = [];
+    for (const step of steps) {
+        if (step.kind === 'edits') {
+            if (step.open && readOnlyAt(host, step.readUri, host.editorOf(step.readUri))) {
+                return `${step.uri} is read only`;
+            }
+            continue;
+        }
+        const uris = step.kind === 'rename' ? [step.oldUri, step.newUri] : [step.uri];
+        const paths = uris.map((uri) => fileUriToPath(uri));
+        if (paths.includes(null)) {
+            return `${uris[0]} cannot be changed from here`;
+        }
+        if ((step.kind === 'create' || step.kind === 'rename') && step.overwrite) {
+            return `${paths[paths.length - 1]} already exists`;
+        }
+        if (step.kind === 'rename') {
+            renames.push({ kind: 'rename', oldUri: step.oldUri, newUri: step.newUri });
+        }
+        if (step.kind === 'delete' && losesWork(step, placesOf(step.uri, renames), host)) {
+            return `${paths[0]} has changes that are not saved`;
+        }
+    }
+    for (const [uri, planned] of reads.open) {
+        const editor = host.editorOf(uri);
+        if (editor === undefined || editor.getText() !== planned.text) {
+            return `${uri} changed while the edit was being prepared`;
+        }
+        const version = host.versionOf?.(uri) ?? null;
+        if (planned.version !== null && version !== planned.version) {
+            return `${uri} changed while the edit was being prepared`;
+        }
+    }
+    for (const uri of reads.disks.keys()) {
+        if (host.editorOf(uri) !== undefined) {
+            return `${uri} was opened while the edit was being prepared`;
+        }
+    }
+    return null;
+}
 
 /*
- * Applies an LSP workspace edit step by step, after checking it against every text so one that does not fit
- * changes nothing. A file an editor holds takes its edits as one undo step; any other file gets an unsaved
- * draft, since nothing is written to disk on a server's word alone, unless the edit also moves a file: then it
- * is one change, saved and moved through the machine. A file the edit creates is made through the machine.
+ * Applies an LSP workspace edit step by step, after planning it against every text (`planWorkspaceOperations`)
+ * so one that does not fit changes nothing. What the host supports follows `host.files`: moves need `rename`,
+ * makes need `create` and deletes need `delete`. Just before the first step runs, every open editor must still
+ * hold the text and version the plan was made from, and a delete must not lose unsaved work. Each text step
+ * and each delete checks that again right before it runs, since the steps before it are awaited.
+ *
+ * A file an editor holds takes its edits as one undo step per step of the edit; any other file gets an unsaved
+ * draft, since nothing is written to disk on a server's word alone, unless the edit also moves files: then it
+ * is one change, saved and moved through the machine. A create or a move over a file that is there is refused.
+ * The steps run in order and a step that no longer fits stops the edit there, with the steps before it applied
+ * and nothing rolled back. A folder that only exists because an earlier move in the same edit made it is
+ * looked for where it was and refused.
  */
 export async function applyWorkspaceEdit(edit: WorkspaceEdit, host: WorkspaceEditHost): Promise<ApplyWorkspaceEditResult> {
-    const steps = stepsOf(edit);
-    if (steps === null) {
-        return refused('Deleting files is not supported yet');
+    const reads: Reads = { open: new Map(), disks: new Map() };
+    const files = host.files;
+    let steps: readonly WorkspaceEditStep[];
+    try {
+        ({ steps } = await planWorkspaceOperations(edit, {
+            operations: supportedResourceOperations(files),
+            read: async (uri) => {
+                const editor = host.editorOf(uri);
+                if (editor !== undefined) {
+                    const text = editor.getText();
+                    const version = host.versionOf?.(uri) ?? null;
+                    reads.open.set(uri, { text, version });
+                    return { text, version, open: true };
+                }
+                const path = fileUriToPath(uri);
+                const disk = path === null || files === null ? null : await files.read(path);
+                if (disk === null) {
+                    return null;
+                }
+                reads.disks.set(uri, disk);
+                return { text: disk.text, version: null, open: false };
+            },
+            ...(files?.exists === undefined
+                ? {}
+                : {
+                      exists: async (uri: string) => {
+                          const path = fileUriToPath(uri);
+                          return path !== null && (await files.exists!(path));
+                      }
+                  }),
+            ...(files?.isFolder === undefined
+                ? {}
+                : {
+                      isFolder: async (uri: string) => {
+                          const path = fileUriToPath(uri);
+                          return path === null || (await files.isFolder!(path));
+                      }
+                  })
+        }));
+    } catch (error) {
+        return refused(messageOf(error));
     }
-    const planned = await plan(steps, host);
-    if (typeof planned === 'string') {
-        return refused(planned);
+    const problem = problemWith(steps, host, reads);
+    if (problem !== null) {
+        return refused(problem);
     }
-    const moving = planned.some((item) => item.kind === 'rename');
-    const staged: StagedFile[] = [];
-    for (const item of planned) {
-        if (item.kind === 'rename' || item.kind === 'create') {
-            const reason = item.kind === 'rename' ? await host.files!.rename(item.oldPath, item.newPath) : await host.files!.create!(item.path, item.text);
-            if (reason !== null) {
-                return refused(reason);
-            }
-            continue;
-        }
-        if (item.after === item.before) {
-            continue;
-        }
-        const editor = host.editorOf(item.uri);
-        if (editor) {
-            // The edits stay apart, so the caret and what is drawn over the text stay where they were between them.
-            if (!editor.applyEdits(item.edits.map(contentChangeOf))) {
-                return refused(`${item.uri} is read only`);
-            }
-            continue;
-        }
-        const path = fileUriToPath(item.uri);
-        if (path === null || item.disk === null) {
-            continue;
-        }
-        const file = { path, disk: item.disk, text: item.after };
-        if (!moving) {
-            staged.push(file);
-            continue;
-        }
-        const reason = await host.files!.save([file]);
+    const running: Running = { ahead: [], reads, saving: steps.some((step) => step.kind === 'rename'), staged: [], touched: new Set() };
+    for (const [index, step] of steps.entries()) {
+        running.ahead = steps.slice(index + 1);
+        const reason = await run(step, host, running);
         if (reason !== null) {
             return refused(reason);
         }
     }
-    if (staged.length > 0) {
-        host.files?.stage(staged);
+    if (running.staged.length > 0) {
+        files?.stage(running.staged);
     }
     return { applied: true };
 }
 
-/* Reads every text the edit needs and works out what each step leaves, or says why it does not fit. */
-async function plan(steps: readonly Step[], host: WorkspaceEditHost): Promise<Planned[] | string> {
-    const texts = new Map<string, { text: string; disk: DiskText | null }>();
-    // A file that has moved is read where it still stands: nothing moves until the plan is made.
-    const origins = new Map<string, string>();
-    // A file that is made is written once, with what every step leaves in it.
-    const creates = new Map<string, PlannedCreate>();
-    const planned: Planned[] = [];
-    for (const step of steps) {
-        if (step.kind === 'create') {
-            const made = await planCreate(step.file, host, texts);
-            if (typeof made === 'string') {
-                return made;
-            }
-            if (made !== null) {
-                creates.set(step.file.uri, made);
-                planned.push(made);
-            }
-            continue;
-        }
-        if (step.kind === 'rename') {
-            const oldPath = fileUriToPath(step.oldUri);
-            const newPath = fileUriToPath(step.newUri);
-            if (oldPath === null || newPath === null || host.files === null) {
-                return `${step.oldUri} cannot be moved from here`;
-            }
-            origins.set(step.newUri, origins.get(step.oldUri) ?? step.oldUri);
-            planned.push({ kind: 'rename', oldPath, newPath });
-            continue;
-        }
-        const source = origins.get(step.uri) ?? step.uri;
-        const created = creates.get(source);
-        if (created !== undefined) {
-            try {
-                created.text = applyTextEdits(created.text, step.edits);
-            } catch (error) {
-                return messageOf(error);
-            }
-            continue;
-        }
-        if (!texts.has(source)) {
-            const editor = host.editorOf(source);
-            if (editor) {
-                texts.set(source, { text: editor.getText(), disk: null });
-            } else {
-                const path = fileUriToPath(source);
-                const disk = path === null || host.files === null ? null : await host.files.read(path);
-                if (disk === null) {
-                    return `${source} cannot be read as text`;
-                }
-                texts.set(source, { text: disk.text, disk });
-            }
-        }
-        const held = texts.get(source)!;
-        let after: string;
-        try {
-            after = applyTextEdits(held.text, step.edits);
-        } catch (error) {
-            return messageOf(error);
-        }
-        planned.push({ kind: 'edits', uri: step.uri, edits: step.edits, before: held.text, after, disk: held.disk });
-        texts.set(source, { text: after, disk: held.disk });
-    }
-    return planned;
+/* What the steps share while they run. */
+interface Running {
+    /* The steps still to run after the current one. */
+    ahead: readonly WorkspaceEditStep[];
+    readonly reads: Reads;
+    /* A rename is in the edit, so the files it edits are saved in order instead of staged as drafts. */
+    readonly saving: boolean;
+    readonly staged: StagedFile[];
+    /* Editors this run edited, whose version moved because of it. */
+    readonly touched: Set<Editor>;
 }
 
-/* A file that is not there yet, or null when it is and the create says to leave it. Making one over a file that is there is not supported. */
-async function planCreate(
-    file: CreateFile,
-    host: WorkspaceEditHost,
-    texts: ReadonlyMap<string, { text: string; disk: DiskText | null }>
-): Promise<PlannedCreate | null | string> {
-    const path = fileUriToPath(file.uri);
-    if (path === null || host.files?.create === undefined) {
-        return `Creating ${file.uri} is not supported here`;
+/* Why a text step no longer fits its editor, now that the steps before it ran; null when it does. */
+function driftOf(step: PlannedTextStep, host: WorkspaceEditHost, uri: string, editor: Editor, touched: ReadonlySet<Editor>): string | null {
+    if (editor.getText() !== step.before) {
+        return `${step.uri} changed while the edit was being applied`;
     }
-    const there = texts.has(file.uri) || host.editorOf(file.uri) !== undefined || (await host.files.read(path)) !== null;
-    if (!there) {
-        return { kind: 'create', path, text: '' };
+    const version = uri === step.readUri && !touched.has(editor) ? host.versionOf?.(uri) : undefined;
+    if (version !== undefined && step.version !== null && version !== step.version) {
+        return `${step.uri} changed while the edit was being applied`;
     }
-    return file.options?.ignoreIfExists === true && file.options.overwrite !== true ? null : `${path} already exists`;
+    return readOnlyAt(host, uri, editor) ? `${step.uri} is read only` : null;
+}
+
+/* Does one step; the reason it could not, or null. */
+async function run(step: WorkspaceEditStep, host: WorkspaceEditHost, running: Running): Promise<string | null> {
+    const files = host.files!;
+    if (step.kind === 'create') {
+        return files.create!(fileUriToPath(step.uri)!, step.text);
+    }
+    if (step.kind === 'rename') {
+        return files.rename(fileUriToPath(step.oldUri)!, fileUriToPath(step.newUri)!);
+    }
+    if (step.kind === 'delete') {
+        const path = fileUriToPath(step.uri)!;
+        if (losesWork(step, [step.uri], host)) {
+            return `${path} has changes that are not saved`;
+        }
+        return files.delete!(path, { recursive: step.recursive });
+    }
+    if (step.after === step.before) {
+        return null;
+    }
+    if (step.open) {
+        const uri = host.editorOf(step.uri) === undefined ? step.readUri : step.uri;
+        return editOpen(step, host, running, uri, host.editorOf(uri));
+    }
+    return runDraft(step, host, running);
+}
+
+function editOpen(step: PlannedTextStep, host: WorkspaceEditHost, running: Running, uri: string, editor: Editor | undefined): string | null {
+    if (editor === undefined) {
+        return `${step.uri} is not open any more`;
+    }
+    const drift = driftOf(step, host, uri, editor, running.touched);
+    if (drift !== null) {
+        return drift;
+    }
+    running.touched.add(editor);
+    // The edits stay apart, so the caret and what is drawn over the text stay where they were between them.
+    return editor.applyEdits(step.edits.map(contentChangeOf)) ? null : `${step.uri} is read only`;
+}
+
+/* Whether a later step deletes the file or a folder around it, so a draft or a save of it would only bring it back. */
+function deletedAhead(uri: string, ahead: readonly WorkspaceEditStep[]): boolean {
+    return ahead.some((step) => step.kind === 'delete' && (step.uri === uri || within(uri, step.uri.replace(/\/$/, ''))));
+}
+
+async function runDraft(step: PlannedTextStep, host: WorkspaceEditHost, running: Running): Promise<string | null> {
+    const { reads, saving, staged, ahead } = running;
+    const uri = [step.uri, step.readUri].find((candidate) => host.editorOf(candidate) !== undefined);
+    if (uri !== undefined) {
+        return editOpen(step, host, running, uri, host.editorOf(uri));
+    }
+    const path = fileUriToPath(step.uri);
+    const disk = reads.disks.get(step.readUri);
+    if (path === null || disk === undefined || deletedAhead(step.uri, ahead)) {
+        return null;
+    }
+    const file = { path, disk, text: step.after };
+    if (!saving) {
+        staged.push(file);
+        return null;
+    }
+    return host.files!.save([file]);
 }

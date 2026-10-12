@@ -30,6 +30,10 @@
             "otherFiles_other": "and {{count}} other files",
             "moves_one": "moves {{count}} file",
             "moves_other": "moves {{count}} files",
+            "creates_one": "creates {{count}} file",
+            "creates_other": "creates {{count}} files",
+            "deletes_one": "deletes {{count}} file",
+            "deletes_other": "deletes {{count}} files",
             "groups": {
                 "quickfix": "Quick fix",
                 "rewrite": "Rewrite",
@@ -56,7 +60,12 @@
             "cancel": "Cancel",
             "apply": "Rename",
             "suggestions": "Suggested names",
-            "useSuggestion": "Use suggestion"
+            "useSuggestion": "Use suggestion",
+            "operations": {
+                "create": "Creates",
+                "rename": "Moves",
+                "delete": "Deletes"
+            }
         },
         "navigation": {
             "unavailable": "No language server answers that here",

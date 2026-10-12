@@ -6,7 +6,7 @@
 
 `language.rename.start()` opens `RenameCard` over the name at the caret, as Shift+F6 does. When the service declares `prepareProvider`, it asks `textDocument/prepareRename` for the range and the placeholder first; otherwise it takes the word at the caret. The other uses of the name light up while the card is open.
 
-In the card, Enter renames and Shift+Enter first lists the lines the rename changes, grouped by file, with Enter to apply them. Escape, or an edit in the file, cancels. A refusal of the service stays under the input, so the person can try another name. The edit goes through [`applyWorkspaceEdit`](/editor-react/project#workspace-edits), so open files take it as one undo step and other files become drafts. A rename that also moves files has no line list and is applied as a whole.
+In the card, Enter renames and Shift+Enter first lists the lines the rename changes, grouped by file, with Enter to apply them. Escape, or an edit in the file, cancels. A refusal of the service stays under the input, so the person can try another name. The edit goes through [`applyWorkspaceEdit`](/editor-react/project#workspace-edits), so open files take it as one undo step and other files become drafts. The preview also lists the files the rename makes, moves and deletes, as `Creates`, `Moves` (old path to new path) and `Deletes` rows under the lines. These come from `resourceOperationsOf` and `RenameView.operations`.
 
 With `suggestNames` on the [host](/editor-react/project#languagehost), the card shows suggested names. The callback gets the name, the code around it and a few of its uses, with an `AbortSignal`; which model or rule answers is the app's choice.
 
@@ -25,7 +25,7 @@ With `suggestNames` on the [host](/editor-react/project#languagehost), the card 
 | `formatDocument()`        | Formats the file with the editor's indentation                         |
 | `list(only)`, `apply(entry)` | The entries of some kinds, and one applied                          |
 
-Applying resolves the action through `codeAction/resolve` when the server needs that, makes its edit through the project, and runs its command on the server that offered it. A command can ask the app to apply more edits through `workspace/applyEdit`; send those through the same `applyWorkspaceEdit`.
+The preview of an action notes the other files it edits, and how many files it moves, creates and deletes. Applying resolves the action through `codeAction/resolve` when the server needs that, makes its edit through the project, and runs its command on the server that offered it. A command can ask the app to apply more edits through `workspace/applyEdit`; send those through the same `applyWorkspaceEdit`.
 
 ## Context menu
 

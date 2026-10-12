@@ -31,7 +31,7 @@ export { ChangeReview } from './ChangeReview.tsx';
 export type { ChangeReviewProps } from './ChangeReview.tsx';
 export { ProjectProblems, countsOf, compareRows } from './project-problems.ts';
 export type { ProblemFile, ProblemRow } from './project-problems.ts';
-export { applyWorkspaceEdit } from './workspace-edit.ts';
+export { applyWorkspaceEdit, supportedResourceOperations } from './workspace-edit.ts';
 export type { ProjectFiles, StagedFile, WorkspaceEditHost } from './workspace-edit.ts';
 export { useProblemCounts } from './use-problem-counts.ts';
 export type { ProblemCounts } from './diagnostics.ts';

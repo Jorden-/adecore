@@ -6,18 +6,18 @@
 
 The `host` is what the app allows the features to do. Every field is optional.
 
-| Field                           | What the app does                                                                                  |
-| ------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `folder`                        | The project's folder, so paths show relative to it                                                 |
-| `files`                         | Reads, drafts, saves and renames files; see [workspace edits](#workspace-edits)                    |
-| `keymap`, `apple`               | The same resolved [key table](/editor/options#keymaps) and platform as the engine                  |
-| `i18n`                          | The i18next instance the features read their words from; the default instance without one         |
-| `openPlace(place)`              | Opens another file at a zero-based position; the features call it to go to a definition elsewhere |
-| `pathOfUri(uri)`                | The path to show for a URI, or `null`; without it, `file:` URIs under `folder` are made relative   |
-| `serverNames(uri)`              | The names of the servers of a document, for the cards                                              |
-| `notify(notification)`          | Shows a short `success` or `error` message with an `id` and a `title`, such as a toast             |
+| Field                                   | What the app does                                                                                                                                                                 |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `folder`                                | The project's folder, so paths show relative to it                                                                                                                                |
+| `files`                                 | Reads, drafts, saves and renames files; see [workspace edits](#workspace-edits)                                                                                                   |
+| `keymap`, `apple`                       | The same resolved [key table](/editor/options#keymaps) and platform as the engine                                                                                                 |
+| `i18n`                                  | The i18next instance the features read their words from; the default instance without one                                                                                         |
+| `openPlace(place)`                      | Opens another file at a zero-based position; the features call it to go to a definition elsewhere                                                                                 |
+| `pathOfUri(uri)`                        | The path to show for a URI, or `null`; without it, `file:` URIs under `folder` are made relative                                                                                  |
+| `serverNames(uri)`                      | The names of the servers of a document, for the cards                                                                                                                             |
+| `notify(notification)`                  | Shows a short `success` or `error` message with an `id` and a `title`, such as a toast                                                                                            |
 | `resolveSnippetVariable(name, context)` | Synchronous snippet overrides; `undefined` delegates to built-ins or an editable unknown-variable placeholder. The `SnippetVariableContext` describes one caret before insertion. |
-| `suggestNames(request, signal)` | Suggests new names during a rename, from any source the app picks                                  |
+| `suggestNames(request, signal)`         | Suggests new names during a rename, from any source the app picks                                                                                                                 |
 
 `openPlace` only asks. The app opens the file, and when the editor of that file puts its caret on the line, the feature moves it to the right column (`takeCaret`). `jumpTo(place)` does the same from outside an editor, such as a problems panel, and records the last caret in the history.
 
@@ -35,24 +35,34 @@ The features ask for symbols, folds, inlay hints, semantic colors, code actions 
 
 `project.applyWorkspaceEdit(edit)` makes an edit of a language server, such as a rename across files. `applyWorkspaceEdit(edit, host)` is the same function for an app without a project; its `WorkspaceEditHost` has `editorOf(uri)` and `files`.
 
-It checks every text edit against its document first, so an edit that does not fit changes nothing. Then it goes through the steps in order:
+It plans the edit first with [`planWorkspaceOperations`](/lsp/documents#resource-operations), so an edit that does not fit changes nothing. Then, just before the first step runs, it checks again that every open editor still holds the text and the version the plan was read from, and that the file of a delete holds no unsaved work, also where an earlier move in the edit took it from. Then it goes through the steps in order, and each text step and each delete checks that again right before it runs, since the steps before it are awaited. A step that no longer fits stops the edit there; the steps before it stay applied:
 
 - A file open in an editor takes its edits as one undo step.
 - Any other file becomes an unsaved draft through `files.stage`. Nothing is written on a server's word alone.
-- When the edit also moves files, the drafts are saved through `files.save` and the moves go through `files.rename`, since a move and the edits that come with it are one change.
-- A file the edit creates is made through `files.create`, once, with the text every step of the edit writes into it. One that is there already is refused, unless the create says `ignoreIfExists`; then the edits after it go to that file.
+- When the edit moves files, the drafts are saved through `files.save` and the moves go through `files.rename`, since a move and the edits that come with it are one change.
+- A file the edit creates is made through `files.create`, once, with the text every step of the edit writes into it. One that is there already is refused, unless the create says `ignoreIfExists`; then the edits after it go to that file. A create or a move that says `overwrite` is refused, since the files cannot replace a file.
+- A file or folder the edit deletes goes through `files.delete`. A delete that would lose unsaved work is refused.
+- A version in the edit must be the one of the editor. Give the host `versionOf(uri)` for that (`project.applyWorkspaceEdit` uses `service.versionOf` when the service has it). The version is only enforced when the host reports versions; without it the check of the text stands in. A version for a file no editor holds is always refused.
 
 `ProjectFiles` is the app's side:
 
-| Method               | What it does                                                                      |
-| -------------------- | --------------------------------------------------------------------------------- |
-| `read(path)`         | The `DiskText` (`text`, `mtime`) of a file, from its draft or the disk; or `null` |
-| `stage(files)`       | Puts `StagedFile`s (`path`, `disk`, `text`) in drafts and tells the person        |
-| `save(files)`        | Writes the files; returns the reason the first one failed, or `null`              |
-| `rename(from, to)`   | Moves a file or folder; returns the reason it failed, or `null`                   |
-| `create(path, text)` | Optional. Makes a file that is not there; returns the reason it failed, or `null` |
+| Method                        | What it does                                                                                          |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `read(path)`                  | The `DiskText` (`text`, `mtime`) of a file, from its draft or the disk; or `null`                     |
+| `stage(files)`                | Puts `StagedFile`s (`path`, `disk`, `text`) in drafts and tells the person                            |
+| `save(files)`                 | Writes the files; returns the reason the first one failed, or `null`                                  |
+| `rename(from, to)`            | Moves a file or folder; returns the reason it failed, or `null`                                       |
+| `create(path, text)`          | Optional. Makes a file that is not there; returns the reason it failed, or `null`                     |
+| `delete(path, { recursive })` | Optional. Deletes a file, or a folder with what is in it; returns the reason it failed, or `null`     |
+| `isUnsaved(path)`             | Optional. Whether a draft or an open editor at the path, or under it for a folder, holds unsaved text |
+| `exists(path)`                | Optional. Whether anything is at the path, folders and files that are not text included; see below    |
+| `isFolder(path)`              | Optional. Whether the path is a folder                                                                |
 
-The permission checks belong in these. Without `create` an edit that creates a file is refused, and an edit that deletes a file always is, with `Deleting files is not supported yet`. Versions in the edit are not checked, and a failure halfway leaves the steps before it applied. For a check of versions without applying anything, see [`planWorkspaceEdit`](/lsp/documents#workspace-edits).
+The permission checks belong in these. The operations the host supports follow what `ProjectFiles` has: `rename`, `create` and `delete`; a host that announces an operation its `ProjectFiles` cannot carry out gets that edit refused as unsupported. `supportedResourceOperations(files)` lists them, and is the value to pass as the session's `resourceOperations` so servers only ask for what can be done. Without `isUnsaved`, a delete of a file an editor holds is refused, since its state is unknown; for a folder the host gives `openUris()` so open documents under it are found, and without that a recursive delete is refused. Without `isFolder`, deleting anything that is no text file, or whose kind is unknown, needs `recursive`.
+
+Without `exists`, what `read` has no text for is of unknown existence. A move or delete of it is planned and the machine decides, `ignoreIfNotExists` cannot be honored, and a create or move onto it is planned as no overwrite, so `create` and `rename` must refuse a target that is there. A folder that only exists because an earlier move in the same edit made it is looked for where it was and refused.
+
+`WorkspaceEditHost` also takes `versionOf(uri)`, `isReadOnly(uri)` and `openUris()`. A read only editor is refused before any step runs, from `isReadOnly(uri)` or else the editor's own `isReadOnly()`; an editor that can say neither is found out when its step runs, and the steps before it stay applied. A failure halfway is never rolled back: the steps that ran stay done. The `resourceOperationsOf(edit)` model lists the files an edit makes, moves and deletes, as the rename card and the code action preview do.
 
 ## Problems
 

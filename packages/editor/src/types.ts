@@ -646,6 +646,8 @@ export interface Editor {
     /* Reads the code face off the page again, after the page changed its size, family or ligatures. */
     refreshFont(): void;
     setReadOnly(readOnly: boolean, reason?: string): void;
+    /* Whether the editor refuses edits. Optional so an editor from before it still fits. */
+    isReadOnly?(): boolean;
     /* Runs an editing command on every caret, as its key would. False when it changed nothing. */
     runCommand(command: EditorRunCommand): boolean;
     focus(): void;

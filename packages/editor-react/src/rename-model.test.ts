@@ -56,7 +56,7 @@ describe('the rows of a rename preview', () => {
         ]);
     });
 
-    test('reads every file of an edit, an open one or not, and gives up on one that renames files', async () => {
+    test('reads every file of an edit, an open one or not, and keeps the lines of an edit that deletes a file', async () => {
         const edit = {
             changes: { 'file:///a.ts': [{ range: range(0, 6, 13), newText: 'scores' }], 'file:///b.ts': [{ range: range(0, 0, 1), newText: 'x' }] }
         };
@@ -65,6 +65,14 @@ describe('the rows of a rename preview', () => {
             { uri: 'file:///a.ts', rows: [{ line: 1, before: 'const weights = {};', after: 'const scores = {};' }] },
             { uri: 'file:///b.ts', rows: [] }
         ]);
-        expect(await renamePreviewOf({ documentChanges: [{ kind: 'delete', uri: 'file:///a.ts' }] }, async () => text)).toBeNull();
+        const deleting = {
+            documentChanges: [
+                { textDocument: { uri: 'file:///a.ts', version: null }, edits: [{ range: range(0, 6, 13), newText: 'scores' }] },
+                { kind: 'delete' as const, uri: 'file:///b.ts' }
+            ]
+        };
+        expect(await renamePreviewOf(deleting, async () => text)).toEqual([
+            { uri: 'file:///a.ts', rows: [{ line: 1, before: 'const weights = {};', after: 'const scores = {};' }] }
+        ]);
     });
 });

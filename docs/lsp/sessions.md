@@ -55,6 +55,7 @@ child.stderr.on('data', (chunk) => log(String(chunk)));
 | `snippetSupport`         | `false`            | Whether completion items may be snippets                                   |
 | `insertTextModes`        | not advertised     | Supported completion insertion modes: `1` as-is, `2` adjusted indentation   |
 | `completionItemDefaults` | not advertised     | Completion-list default fields the consumer applies to each item           |
+| `resourceOperations`     | `create`, `rename` | The resource operations the host carries out for a workspace edit, announced to servers. A host that also deletes lists `delete`; see [workspace edits](/lsp/documents#workspace-edits) |
 | `onConfiguration(item)`  |                    | Answers each configuration item instead of `configuration`                 |
 | `onApplyEdit(params)`    | refuses            | Applies a `workspace/applyEdit` of the server                              |
 | `onShowMessage(params)`  | `null`             | Answers a `window/showMessageRequest`                                      |

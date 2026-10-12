@@ -812,6 +812,10 @@ class SmartEditor implements Editor {
         this.view.applySettings();
     }
 
+    isReadOnly(): boolean {
+        return this.settings.readOnly;
+    }
+
     runCommand(command: EditorRunCommand): boolean {
         return this.controller.command(command);
     }

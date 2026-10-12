@@ -2,6 +2,7 @@ import { ErrorCodes, JsonRpcConnection, LspError, type RequestHandler } from './
 import { LspDocument } from './document.ts';
 import { renamesTaken, type RenamedFile } from './file-operations.ts';
 import { globMatch } from './glob.ts';
+import type { ResourceOperationKind } from './workspace-operations.ts';
 import type {
     ApplyWorkspaceEditParams,
     ApplyWorkspaceEditResult,
@@ -40,6 +41,12 @@ export interface LspSessionOptions {
     snippetSupport?: boolean;
     insertTextModes?: readonly (1 | 2)[];
     completionItemDefaults?: readonly string[];
+    /*
+     * The resource operations the host carries out for a workspace edit, announced to servers. Defaults to create
+     * and rename. The failure handling is `abort`: the client stops at the first change that fails, and the changes
+     * that already ran are not rolled back.
+     */
+    resourceOperations?: readonly ResourceOperationKind[];
     onConfiguration?: (item: ConfigurationItem) => unknown | Promise<unknown>;
     onApplyEdit?: (params: ApplyWorkspaceEditParams) => ApplyWorkspaceEditResult | Promise<ApplyWorkspaceEditResult>;
     onShowMessage?: (params: { type: number; message: string; actions?: { title: string }[] }) => { title: string } | null | Promise<{ title: string } | null>;
@@ -483,7 +490,7 @@ function clientCapabilities(options: LspSessionOptions): object {
         general: { positionEncodings: ['utf-16'] },
         workspace: {
             applyEdit: !!options.onApplyEdit,
-            workspaceEdit: { documentChanges: true, resourceOperations: ['create', 'rename'], failureHandling: 'abort' },
+            workspaceEdit: { documentChanges: true, resourceOperations: [...(options.resourceOperations ?? ['create', 'rename'])], failureHandling: 'abort' },
             fileOperations: { dynamicRegistration: true, willRename: true, didRename: true },
             configuration: true,
             workspaceFolders: true,

@@ -31,6 +31,7 @@ The features are built on pure functions without React or an editor, which `@ade
 | `peekFilesOf`, `snippetOf`, `definitionSnippetOf`, `distinguishingFolders`, `visualColumnOf`, `PEEK_READ_FILES` | The files and code of a peek |
 | `entriesOf`, `groupEntries`, `filterEntries`, `scoreOf`, `modeOf`, `workspaceEntriesOf`, `groupOfKind`, `letterOfKind`, `toneOfKind`, `SYMBOL_GROUPS` | The symbol picker |
 | `wordRangeAt`, `renameTargetOf`, `occurrencesOf`, `renameRowsOf`, `renamePreviewOf`       | Rename                                           |
+| `resourceOperationsOf`, `ResourceOperationView`                                           | The files an edit makes, moves and deletes       |
 | `actionsOf`, `groupOf`, `mergeEntries`, `isHint`, `fixableOnLine`, `diagnosticsAt`, `previewOf`, `ACTION_GROUPS`, `REFACTOR_GROUPS` | Code actions |
 | `declarationsOf`, `startAfterComments`, `usagesText`, `MAX_DECLARATIONS`                  | Code vision declarations                         |
 | `mapBlame`, `authorshipOf`, `authorsText`, `shortName`, `UNCOMMITTED`                     | Authors from Git blame                           |

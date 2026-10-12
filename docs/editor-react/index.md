@@ -33,7 +33,7 @@ The demos on these pages run over [`FakeLanguageService`](/editor-react/testing)
 | -------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `@adecore/editor-react`                            | The components, `ProjectLanguage`, `EditorLanguage`, the hosts and every model |
 | `@adecore/editor-react/models`                     | Only the [models](/editor-react/models), without React                         |
-| `@adecore/editor-react/testing`                    | `FakeLanguageService`, `ManualTimers` and the `LanguageCall` type             |
+| `@adecore/editor-react/testing`                    | `FakeLanguageService`, `ManualTimers` and the `LanguageCall` type              |
 | `@adecore/editor-react/editor-react.css`           | The styles of the cards                                                        |
 | `@adecore/editor-react/locales/en.json`, `nl.json` | The words of the `editor` namespace                                            |
 
@@ -44,7 +44,7 @@ The demos on these pages run over [`FakeLanguageService`](/editor-react/testing)
 - Snippets are a subset: tab stops, placeholders and the first value of a choice. Variables insert nothing or their default, and transforms are skipped. Stops with the same number are not edited together.
 - Inlay hints flatten a label with parts to its text and ignore padding, tooltips, commands and edits.
 - Semantic tokens are asked in full after each pause in typing; the delta and range requests of the protocol are not used.
-- A workspace edit that deletes a file, or creates one over a file that is there, is refused, versions in the edit are not checked, and a failure halfway does not roll back the steps before it. See [workspace edits](/editor-react/project#workspace-edits).
+- A workspace edit that creates or moves a file over one that is there is refused, a delete needs a host that reports unsaved work, a read only editor is refused up front when it can say so, and a failure halfway does not roll back the steps before it. See [workspace edits](/editor-react/project#workspace-edits).
 - Code vision rows are skipped in files over 20,000 lines.
 
 The package is FSL-1.1-MIT.

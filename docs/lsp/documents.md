@@ -14,18 +14,18 @@ Opening, changes, requests, saving and closing go out in the order they were mad
 
 `LspDocument` has a method per feature, each with the position or range it needs and optional `DocumentRequestOptions`:
 
-| Feature               | Methods                                                                                    |
-| --------------------- | ------------------------------------------------------------------------------------------ |
-| Completion            | `completion`, `resolveCompletion`                                                          |
-| Information           | `hover`, `signatureHelp`                                                                   |
-| Navigation            | `definition`, `declaration`, `typeDefinition`, `implementation`                            |
-| Uses                  | `references`, `documentHighlights`                                                         |
-| Symbols and structure | `documentSymbols`, `foldingRanges`, `selectionRanges`, `codeLenses`, `resolveCodeLens`     |
-| Rename                | `prepareRename`, `rename`                                                                  |
-| Actions               | `codeActions`, `resolveCodeAction`                                                         |
-| Formatting            | `formatting`, `rangeFormatting`                                                            |
+| Feature               | Methods                                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------------------ |
+| Completion            | `completion`, `resolveCompletion`                                                                |
+| Information           | `hover`, `signatureHelp`                                                                         |
+| Navigation            | `definition`, `declaration`, `typeDefinition`, `implementation`                                  |
+| Uses                  | `references`, `documentHighlights`                                                               |
+| Symbols and structure | `documentSymbols`, `foldingRanges`, `selectionRanges`, `codeLenses`, `resolveCodeLens`           |
+| Rename                | `prepareRename`, `rename`                                                                        |
+| Actions               | `codeActions`, `resolveCodeAction`                                                               |
+| Formatting            | `formatting`, `rangeFormatting`                                                                  |
 | Colors and hints      | `semanticTokens`, `semanticTokensDelta`, `semanticTokensRange`, `inlayHints`, `resolveInlayHint` |
-| Diagnostics           | `diagnostics`, the pull model                                                              |
+| Diagnostics           | `diagnostics`, the pull model                                                                    |
 
 `request(method, params, options?)` sends any other method of a document, with the same guards.
 
@@ -35,10 +35,10 @@ A method the server does not support rejects with `MethodNotFound` before anythi
 
 The protocol has two shapes of edit, and mixing them up gives wrong text:
 
-| Shape                                  | Ranges are in                              | Helper                                |
-| -------------------------------------- | ------------------------------------------ | ------------------------------------- |
-| `ContentChange`, as in `didChange`     | The text the change before it left         | `applyContentChanges(text, changes)`  |
-| `TextEdit`, as in formatting or rename | The text before all of them, at once       | `applyTextEdits(text, edits)`         |
+| Shape                                  | Ranges are in                        | Helper                               |
+| -------------------------------------- | ------------------------------------ | ------------------------------------ |
+| `ContentChange`, as in `didChange`     | The text the change before it left   | `applyContentChanges(text, changes)` |
+| `TextEdit`, as in formatting or rename | The text before all of them, at once | `applyTextEdits(text, edits)`        |
 
 ```ts
 import { applyContentChanges, applyTextEdits, minimalChange } from '@adecore/lsp';
@@ -56,9 +56,32 @@ applyContentChanges('red blue red', [minimalChange('red blue red', after)]) === 
 
 ## Workspace edits
 
-`planWorkspaceEdit(edit, snapshots)` works out a `WorkspaceEdit` in memory without applying it. `snapshots` maps each URI to a `DocumentSnapshot`, its `text` and `version` (or `null`). The result is a `PlannedDocumentEdit` per document: `uri`, `version`, the text `before` and the planned `text`. A file the edit creates has no snapshot, since it is not there; it is planned from an empty text with `created: true`, and the app makes it with exclusive creation, so a file that appeared in the meantime is not written over. It throws an `LspError` for a document without a snapshot, a version that does not match, edits that overlap, a create of a file that has a snapshot (unless its options say `overwrite` or `ignoreIfExists`), and any rename or delete. The app applies the plan, after its own permission checks.
+`planWorkspaceEdit(edit, snapshots)` works out a `WorkspaceEdit` in memory without applying it. `snapshots` maps each URI to a `DocumentSnapshot`, its `text` and `version` (or `null`). The result is a `PlannedDocumentEdit` per document: `uri`, `version`, the text `before` and the planned `text`. A file the edit creates has no snapshot, since it is not there; it is planned from an empty text with `created: true`, and the app makes it with exclusive creation, so a file that appeared in the meantime is not written over. It throws an `LspError` for a document without a snapshot, a version that does not match, edits that overlap, a create of a file that has a snapshot (unless its options say `overwrite` or `ignoreIfExists`), and any rename or delete. The app applies the plan, after its own permission checks. For renames and deletes, see the [resource operations](#resource-operations) below.
 
-[`applyWorkspaceEdit`](/editor-react/project#workspace-edits) of the editor views goes further: it edits open editors, stages drafts and moves files, but checks no versions.
+### Resource operations
+
+`planWorkspaceOperations(edit, source)` is the planner for a host that also makes, moves and deletes files. It is async, changes nothing and returns a `WorkspaceEditPlan`: `steps`, the changes in the order the edit gives them, all checked. It rejects with an `LspError` on the first change that does not fit; a version that does not match or cannot be checked has the code `ContentModified`.
+
+The `WorkspaceEditSource` is the host's side:
+
+| Member          | What it gives                                                                                                                                                                                                                                                                                       |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `read(uri)`     | A `WorkspaceEditText` (`text`, `version`, `open`), or `null` when there is no such text file                                                                                                                                                                                                        |
+| `exists(uri)`   | Optional. Whether anything is there, asked only after `read` said `null`, for folders and files that are not text. Without it, what `read` has no text for is of unknown existence: a move or delete of it is planned and left to the host, and a create or move onto it is planned as no overwrite |
+| `isFolder(uri)` | Optional. Whether the URI is a folder                                                                                                                                                                                                                                                               |
+| `operations`    | The `ResourceOperationKind`s (`create`, `rename`, `delete`) the host carries out                                                                                                                                                                                                                    |
+
+Each URI is read at most once. A step is a `PlannedTextStep` (`uri`, `readUri`, `edits`, `before`, `after`, `version`, `open`), a `PlannedCreateStep` (`uri`, `text`, `overwrite`), a `PlannedRenameStep` (`oldUri`, `newUri`, `overwrite`) or a `PlannedDeleteStep` (`uri`, `recursive`). The rules:
+
+- A version in a text edit must equal the `version` of the source. A file no editor holds (`open` is `false`) has no version to check, so a version on it is refused. For an open file the source reports no version for, the version is not enforced. Legacy `changes` carry no version. A file the plan makes is not checked.
+- An operation outside `operations` is refused.
+- A create over a file that is there is refused, unless it says `overwrite` (planned with `overwrite` and an empty text) or `ignoreIfExists` (left out). A rename onto a target that is there works the same way, and a rename of something that is not there is always refused.
+- A delete of something that is not there is refused unless it says `ignoreIfNotExists`.
+- Whether a folder is empty cannot be told, so a delete of a folder needs `recursive`. When the source has no `isFolder`, so does anything that exists and is no text file.
+- Edits to a URI after it was deleted or moved away are refused. Edits to a moved file, or to a file under a moved folder, are read from where it stood (`readUri`), and edits to a file the plan makes become its `text`.
+- Edits that overlap are refused. Folders are matched by URI prefix, as spelled, so the URIs of one edit must be spelled the same; a trailing slash is ignored.
+
+The plan is made before anything changes, but running it is the host's and it is not atomic. A session announces `failureHandling: 'abort'`, and a step that fails halfway leaves the steps before it done; nothing is rolled back. [`applyWorkspaceEdit`](/editor-react/project#workspace-edits) of the editor views is a host built on this planner. Pass `resourceOperations` to the [session](/lsp/sessions) so servers only send what the host carries out.
 
 ## Files and URIs
 

@@ -1,7 +1,7 @@
 import type { EditorPosition, EditorRange } from '@adecore/editor';
 import type { Location, PrepareRenameResult, TextEdit, WorkspaceEdit } from '@adecore/lsp';
 import { isIdentifierCharacter } from './completion-model.ts';
-import { entriesOf } from './workspace-edit.ts';
+import { textEntriesOf } from './workspace-edit.ts';
 
 /* The identifier the caret is in or touches; null where there is none. */
 export function wordRangeAt(lineText: string, position: EditorPosition): EditorRange | null {
@@ -115,14 +115,10 @@ export function renameRowsOf(text: string, edits: readonly TextEdit[]): RenameRo
         });
 }
 
-/* Resource renames are omitted; create/delete operations refuse the text-only preview with null. */
-export async function renamePreviewOf(edit: WorkspaceEdit, textOf: (uri: string) => Promise<string | null>): Promise<RenameFile[] | null> {
-    const entries = entriesOf(edit);
-    if (entries === null) {
-        return null;
-    }
+/* The lines of the files an edit edits; the files it makes, moves or deletes are listed by `resourceOperationsOf`. */
+export async function renamePreviewOf(edit: WorkspaceEdit, textOf: (uri: string) => Promise<string | null>): Promise<RenameFile[]> {
     const files: RenameFile[] = [];
-    for (const [uri, list] of entries) {
+    for (const [uri, list] of textEntriesOf(edit)) {
         const text = await textOf(uri);
         files.push({ uri, rows: text === null ? [] : renameRowsOf(text, list.flat()) });
     }

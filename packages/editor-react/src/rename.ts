@@ -5,6 +5,7 @@ import { lineTextOf } from './line-text.ts';
 import type { RenameView } from './popups.ts';
 import { occurrencesOf, renamePreviewOf, renameTargetOf, wordRangeAt, type RenameTarget } from './rename-model.ts';
 import { isShortcut } from './shortcut-keys.ts';
+import { resourceOperationsOf } from './workspace-edit.ts';
 import { messageOf } from './error-message.ts';
 
 const METHOD = 'textDocument/rename';
@@ -86,7 +87,7 @@ export class RenameFeature {
         }
         const session: Session = { target, original: editor.textInRange(target.range), edit: null, names: new AbortController() };
         this.session = session;
-        this.publish({ phase: 'input', busy: false, name: target.placeholder, files: [], occurrences: null, suggestions: [] });
+        this.publish({ phase: 'input', busy: false, name: target.placeholder, files: [], operations: [], occurrences: null, suggestions: [] });
         void this.light(session).then((locations) => this.suggest(session, locations));
     }
 
@@ -121,12 +122,7 @@ export class RenameFeature {
             if (this.session !== session) {
                 return;
             }
-            if (files === null) {
-                // An edit that renames files too has no list of lines to show, so it is applied or refused as a whole.
-                await this.apply(session);
-                return;
-            }
-            this.publish({ phase: 'preview', busy: false, name: next, files });
+            this.publish({ phase: 'preview', busy: false, name: next, files, operations: resourceOperationsOf(edit) });
         } catch (error) {
             if (this.session === session) {
                 this.fail(error instanceof StaleResultError ? this.say('stale') : messageOf(error));
@@ -172,7 +168,7 @@ export class RenameFeature {
     private fail(message: string): void {
         if (this.session !== null) {
             this.session.edit = null;
-            this.publish({ phase: 'input', busy: false, files: [], error: this.say('failed', { message }) });
+            this.publish({ phase: 'input', busy: false, files: [], operations: [], error: this.say('failed', { message }) });
         }
     }
 
@@ -271,6 +267,7 @@ export class RenameFeature {
                 error: null,
                 name: session.target.placeholder,
                 files: [],
+                operations: [],
                 suggestions: [],
                 ...current,
                 ...patch

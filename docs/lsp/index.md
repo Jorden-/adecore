@@ -29,7 +29,7 @@ Positions are the protocol's: zero-based lines and UTF-16 characters. The edit h
 
 - Only the UTF-16 position encoding is offered. A server that picks another one fails to initialize.
 - Diagnostics without a version cannot be proven fresh and are passed on while their document is open.
-- The package applies no workspace edit and touches no file. It declares only renames as resource operations.
+- The package applies no workspace edit and touches no file. It plans one, and declares `create` and `rename` as resource operations unless the host says otherwise. The failure handling it announces is `abort`: a server stops at the first change that fails, and nothing that already ran is rolled back.
 - A server that negotiated no document changes cannot follow an edit; `applyChanges` rejects.
 - A session does not reconnect. After the transport closes, start a new session and open the documents again.
 

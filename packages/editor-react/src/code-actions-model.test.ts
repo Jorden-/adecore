@@ -101,7 +101,9 @@ describe('preview of an edit', () => {
             added: ['const salary = fresh(x);'],
             hiddenLines: 0,
             otherFiles: 0,
-            moves: 0
+            moves: 0,
+            creates: 0,
+            deletes: 0
         });
     });
 
@@ -121,10 +123,10 @@ describe('preview of an edit', () => {
 
     test('counts the files an edit moves, and shows them even when no line changes', () => {
         const edit = { documentChanges: [{ kind: 'rename' as const, oldUri: uri, newUri: 'file:///work/b.ts' }] };
-        expect(previewOf(text, edit, uri)).toEqual({ removed: [], added: [], hiddenLines: 0, otherFiles: 0, moves: 1 });
+        expect(previewOf(text, edit, uri)).toEqual({ removed: [], added: [], hiddenLines: 0, otherFiles: 0, moves: 1, creates: 0, deletes: 0 });
     });
 
-    test('counts a file an edit creates as another file', () => {
+    test('counts a file an edit creates apart from the other files it edits', () => {
         const created = 'file:///work/BInterface.ts';
         const edit = {
             documentChanges: [
@@ -133,12 +135,23 @@ describe('preview of an edit', () => {
                 { textDocument: { uri, version: null }, edits: [{ range: range(0, 0, 0), newText: '// B\n' }] }
             ]
         };
-        expect(previewOf(text, edit, uri)).toMatchObject({ added: ['// B'], otherFiles: 1, moves: 0 });
+        expect(previewOf(text, edit, uri)).toMatchObject({ added: ['// B'], otherFiles: 0, creates: 1, moves: 0 });
+    });
+
+    test('counts the files an edit deletes, and still shows the lines it changes', () => {
+        const gone = { documentChanges: [{ kind: 'delete' as const, uri: 'file:///work/old.ts' }] };
+        expect(previewOf(text, gone, uri)).toEqual({ removed: [], added: [], hiddenLines: 0, otherFiles: 0, moves: 0, creates: 0, deletes: 1 });
+        const mixed = {
+            documentChanges: [
+                { textDocument: { uri, version: null }, edits: [{ range: range(1, 15, 18), newText: 'fresh' }] },
+                { kind: 'delete' as const, uri: 'file:///work/old.ts' }
+            ]
+        };
+        expect(previewOf(text, mixed, uri)).toMatchObject({ added: ['const salary = fresh(x);'], deletes: 1 });
     });
 
     test('has none for an edit that changes nothing or one that cannot be shown', () => {
         expect(previewOf(text, { changes: { [uri]: [{ range: range(0, 0, 0), newText: '' }] } }, uri)).toBeNull();
-        expect(previewOf(text, { documentChanges: [{ kind: 'delete', uri }] }, uri)).toBeNull();
         expect(previewOf(text, { changes: { [uri]: [{ range: range(9, 0, 0), newText: 'x' }] } }, uri)).toBeNull();
     });
 });
