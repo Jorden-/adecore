@@ -215,7 +215,7 @@ export class FindController {
             this.refreshRegex(previous);
             return;
         }
-        this.resetRegex(query === null);
+        this.resetRegex(query === null || this.search?.busy === true);
 
         if (query === null) {
             this.marks = [];

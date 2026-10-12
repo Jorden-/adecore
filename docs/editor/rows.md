@@ -76,3 +76,5 @@ Long wrapped lines keep their full layout and text for selection, copying and hi
 
 
 Edits retain the geometry and measured wrap height of untouched lines, including when earlier edits move a line. A changed line is measured again; lines with inlays, folded partial lines and metric or wrap-width changes take the full measurement path. Each retained line includes its CRLF ending when checking whether an edit touches it. Layout still rebuilds the document's row list, and an edit inside a long line still measures that full line.
+
+Measured wrap heights are kept for at most 400 lines in insertion order. Unwrapped lines keep no height entries. After eviction a line uses its height estimate until drawn again, so a long scroll history cannot increase the work of mapping cached measurements on each edit.

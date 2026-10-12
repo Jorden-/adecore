@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test, spyOn } from 'bun:test';
 import { DocumentModel } from '@adecore/editor-core';
 import { EditorLayout, type LayoutMetrics, type TextRow, scanLine, wrapIndent, wrapStops } from './layout.ts';
 
@@ -423,3 +423,18 @@ test('grouped undo and redo remap cached lines through every transaction', () =>
     }
     subscription.dispose();
 });
+
+for (const wrap of [false, true]) {
+    test(`scroll history keeps edit mapping bounded, wrap=${wrap}`, () => {
+        const { model, layout } = layoutOf('a short line\n'.repeat(3000), wrap ? 100 : null);
+        for (let first = 0; first < layout.rows.length; first += 20) {
+            layout.syncRows(layout.rows.slice(first, first + 20));
+        }
+        const positions = spyOn(model, 'positionAt');
+        const subscription = model.subscribe((snapshot) => layout.configure({ textChanged: true, changes: snapshot.changes }));
+        model.applyEdits([{ from: 0, to: 1, text: 'Z' }]);
+        expect(positions.mock.calls.length).toBeLessThanOrEqual(wrap ? 800 : 400);
+        positions.mockRestore();
+        subscription.dispose();
+    });
+}

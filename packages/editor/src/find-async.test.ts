@@ -501,3 +501,16 @@ test('a closed cursor search releases only after queued cursor commands finish',
     expect(host.counts().released).toBe(1);
     host.find.dispose();
 });
+
+test('switching to literal find releases a regex still running in the worker', async () => {
+    const host = setup();
+    host.find.set(query);
+    host.fire(0);
+    await flush();
+    expect(host.searches).toHaveLength(1);
+    host.find.set({ ...query, regex: false });
+    expect(host.counts().released).toBe(1);
+    await flush();
+    expect(host.find.state).toEqual({ count: 2, current: 0 });
+    host.find.dispose();
+});

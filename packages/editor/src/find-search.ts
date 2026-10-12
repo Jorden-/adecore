@@ -41,6 +41,10 @@ export class FindSearchQueue {
         this.options = options;
     }
 
+    get busy(): boolean {
+        return this.active !== undefined || this.pending.length > 0;
+    }
+
     request<Result>(
         run: (client: EditorSearchClient, isCurrent: () => boolean) => Promise<Result>,
         kind: SearchKind = 'live',

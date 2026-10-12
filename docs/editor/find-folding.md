@@ -90,3 +90,5 @@ Stepping beyond the 10,000 marked matches uses directional worker search. `limit
 Replacement expansion can use a `maxCharacters` limit in editor-core `replacementText`. Worker output is bounded before concatenation. Previews are limited to 10,000 units of template and output, so context substitutions cannot allocate an unbounded string on the page.
 
 `MAX_REPLACEMENT_PAGE` and `MAX_REPLACEMENT_CHARACTERS` from `@adecore/editor` provide the replacement limits for a host's status messages.
+
+Switching to literal find cancels any active worker operation; an idle worker remains available for navigation beyond the marked cache.

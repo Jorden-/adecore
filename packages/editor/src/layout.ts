@@ -585,7 +585,10 @@ export class EditorLayout {
             }
             const geometry = this.geometry(row);
             const subRows = geometry.subRows;
-            if (row.head === null) {
+            if (row.head === null && this.wrapWidth !== null) {
+                if (!this.measuredRows.has(row.line) && this.measuredRows.size >= GEOMETRY_CACHE_SIZE) {
+                    this.measuredRows.delete(this.measuredRows.keys().next().value!);
+                }
                 this.measuredRows.set(row.line, { start: geometry.start, end: geometry.end, next: geometry.next, subRows });
             } else {
                 this.measuredRows.delete(row.line);
