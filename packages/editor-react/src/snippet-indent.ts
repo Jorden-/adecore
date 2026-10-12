@@ -13,12 +13,12 @@ export function indentSnippet(parsed: ParsedSnippet, before: string): ParsedSnip
     if (parsed.text.length + insertions.length * prefix.length > MAX_SNIPPET_TEXT) {
         return { text: parsed.text, stops: [], limited: true };
     }
-    const shift = (offset: number): number => {
+    const shift = (offset: number, after = true): number => {
         let low = 0;
         let high = insertions.length;
         while (low < high) {
             const middle = (low + high) >>> 1;
-            if (insertions[middle]! <= offset) {
+            if (insertions[middle]! < offset || (after && insertions[middle] === offset)) {
                 low = middle + 1;
             } else {
                 high = middle;
@@ -26,7 +26,11 @@ export function indentSnippet(parsed: ParsedSnippet, before: string): ParsedSnip
         }
         return offset + low * prefix.length;
     };
-    const range = <Range extends SnippetRange>(range: Range): Range => ({ ...range, start: shift(range.start), end: shift(range.end) });
+    const range = <Range extends SnippetRange>(range: Range): Range => ({
+        ...range,
+        start: shift(range.start),
+        end: shift(range.end, range.start === range.end)
+    });
     return {
         text: parsed.text.replace(/\n/g, '\n' + prefix),
         stops: parsed.stops.map(range),

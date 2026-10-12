@@ -44,3 +44,12 @@ test('case operations preserve word interiors and values without words', () => {
     expect(applySnippetTransform(job('a', '\\n \\$ \\/ \\\\'))).toBe('\\n \\$ / \\');
     expect(applySnippetTransform(job('😀', 'x', '(?:)', 'g'))).toBe('x\ud83dx\ude00x');
 });
+
+test('conditional strings escape dollars, braces and backslashes separately from format text', () => {
+    const bs = String.fromCharCode(92);
+    expect(compileSnippetTransformFormat('${1:?a' + bs + '}b:' + bs + '$missing' + bs + bs + '}')).toEqual([
+        { kind: 'conditional', index: 1, if: 'a}b', else: '$missing' + bs }
+    ]);
+    expect(() => compileSnippetTransformFormat('${1:+a' + bs + 'nb}')).toThrow(SyntaxError);
+    expect(compileSnippetTransformFormat(bs + bs + ' ' + bs + '/ ' + bs + 'n')).toEqual([{ kind: 'text', text: bs + ' / ' + bs + 'n' }]);
+});

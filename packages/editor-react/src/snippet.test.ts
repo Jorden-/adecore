@@ -253,3 +253,26 @@ test('variable transforms share the range budget with fields and linked projecti
     const source = '${TM_FILENAME/a/x/}'.repeat(1001);
     expect(parseSnippet(source, () => '')).toEqual({ text: source, stops: [], limited: true });
 });
+
+test('a pattern backslash leaves the following backslash available to escape the slash', () => {
+    const bs = String.fromCharCode(92);
+    const source = '${1/' + bs + bs + '/z//}';
+    expect(parseSnippet(source).fields![0]!.ranges[0]!.transform).toEqual({
+        pattern: bs + '/z',
+        flags: '',
+        format: []
+    });
+});
+
+test('a nonempty field or variable ending after a newline excludes the next lines indentation', () => {
+    const field = indentSnippet(parseSnippet('${1:foo\n}$2'), '  ');
+    expect(field.text).toBe('foo\n  ');
+    expect(field.fields![0]!.ranges[0]).toMatchObject({ start: 0, end: 4 });
+    expect(field.fields![1]!.ranges[0]).toMatchObject({ start: 6, end: 6 });
+    const variable = indentSnippet(
+        parseSnippet('${TM_FILENAME/a/b/}$1', () => 'foo\n'),
+        '  '
+    );
+    expect(variable.transforms![0]).toMatchObject({ start: 0, end: 4 });
+    expect(variable.fields![0]!.ranges[0]).toMatchObject({ start: 6, end: 6 });
+});

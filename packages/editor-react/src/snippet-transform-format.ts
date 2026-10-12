@@ -36,7 +36,10 @@ function readFormat(source: string, start: number, stopAtSlash: boolean): { node
     const string = (colon = false): string => {
         let value = '';
         while (at < source.length && source[at] !== '}' && !(colon && source[at] === ':')) {
-            if (source[at] === '\\' && (source[at + 1] === '\\' || source[at + 1] === '/')) {
+            if (source[at] === '\\') {
+                if (!['$', '}', '\\'].includes(source[at + 1] ?? '')) {
+                    throw new SyntaxError('Invalid conditional transform escape.');
+                }
                 at++;
             }
             value += source[at++]!;
@@ -131,9 +134,8 @@ export function scanSnippetTransform(
     let pattern = '';
     while (at < source.length && source[at] !== '/') {
         const character = source[at++]!;
-        if (character === '\\' && at < source.length) {
-            const next = source[at++]!;
-            pattern += next === '/' ? '/' : character + next;
+        if (character === '\\' && source[at] === '/') {
+            pattern += source[at++]!;
         } else {
             pattern += character;
         }
