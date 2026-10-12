@@ -3,7 +3,8 @@ import {
     fileUriToPath,
     planWorkspaceOperations,
     type ApplyWorkspaceEditResult,
-    type PlannedDeleteStep,
+    type PlannedCreateStep,
+    type PlannedRenameStep,
     type PlannedTextStep,
     type ResourceOperationKind,
     type RenameFile,
@@ -28,12 +29,14 @@ export interface ProjectFiles {
     stage(files: readonly StagedFile[]): void;
     /* Writes the new texts through the machine; the reason of the first file that could not be saved, or null. */
     save(files: readonly StagedFile[]): Promise<string | null>;
-    /* Moves a file or folder on the machine, with what is open on it, and tells the servers it moved; the reason it could not, or null. Without `exists` an edit cannot tell whether the target is there, so refuse a target that is. */
-    rename(from: string, to: string): Promise<string | null>;
-    /* Makes a file that is not there with its text, through the machine; the reason it could not, or null. Without it no edit creates a file. Without `exists`, refuse a file that is there. */
-    create?(path: string, text: string): Promise<string | null>;
-    /* Deletes a file, or a folder with what is in it when `recursive`; the reason it could not, or null. Without it no edit deletes anything. */
+    /* Moves a file or folder on the machine, with what is open on it, and tells the servers it moved; the reason it could not, or null. Without `exists` an edit cannot tell whether the target is there, so refuse a target that is. With `overwrite` the target is there and is replaced, which needs `supportsOverwrite`; what is open on the replaced target is the host's to close or reload. */
+    rename(from: string, to: string, options?: { readonly overwrite: boolean }): Promise<string | null>;
+    /* Makes a file with its text, through the machine, and tells the servers it was made; the reason it could not, or null. Without it no edit creates a file. Without `exists`, refuse a file that is there. With `overwrite` the file is there and its content becomes `text`, which needs `supportsOverwrite`; an editor still open on it is set to `text` by the edit itself. */
+    create?(path: string, text: string, options?: { readonly overwrite: boolean }): Promise<string | null>;
+    /* Deletes a file, or a folder with what is in it when `recursive`, and tells the servers it is gone; the reason it could not, or null. Without it no edit deletes anything. */
     delete?(path: string, options: { readonly recursive: boolean }): Promise<string | null>;
+    /* Whether `create` and `rename` take `overwrite`. Without it an edit that asks to overwrite a file is refused, since the file is there. */
+    readonly supportsOverwrite?: boolean;
     /* Whether a draft or an open editor at the path, or under it for a folder, holds text that is not saved. A delete that would lose it is refused. */
     isUnsaved?(path: string): boolean;
     /* Whether anything is at the path: a file of any kind or a folder. Without it, what is no text file is of unknown existence: an edit may move or delete it and the machine decides, and `ignoreIfNotExists` cannot be honored. */
@@ -154,8 +157,8 @@ function placesOf(uri: string, renames: readonly RenameFile[]): string[] {
     return [...found];
 }
 
-/* Whether deleting loses work nobody saved at any of the places. Without `isUnsaved` that is an editor on, or under, a place. */
-function losesWork(step: PlannedDeleteStep, places: readonly string[], host: WorkspaceEditHost): boolean {
+/* Whether deleting or replacing loses work nobody saved at any of the places. Without `isUnsaved` that is an editor on, or under, a place. A `recursive` one may be a folder. */
+function losesWork(recursive: boolean, places: readonly string[], host: WorkspaceEditHost): boolean {
     const files = host.files!;
     if (files.isUnsaved !== undefined) {
         return places.some((place) => {
@@ -163,7 +166,7 @@ function losesWork(step: PlannedDeleteStep, places: readonly string[], host: Wor
             return path !== null && files.isUnsaved!(path);
         });
     }
-    if (host.openUris === undefined && step.recursive) {
+    if (host.openUris === undefined && recursive) {
         return true;
     }
     const open = host.openUris?.() ?? [];
@@ -172,6 +175,27 @@ function losesWork(step: PlannedDeleteStep, places: readonly string[], host: Wor
 
 function readOnlyAt(host: WorkspaceEditHost, uri: string, editor: Editor | undefined): boolean {
     return host.isReadOnly?.(uri) ?? editor?.isReadOnly?.() ?? false;
+}
+
+/* Why a create or move over a file that is there is refused; null when the host can replace it without losing work. */
+function overwriteProblem(
+    step: PlannedCreateStep | PlannedRenameStep,
+    target: string,
+    places: readonly string[],
+    host: WorkspaceEditHost,
+    reads: Reads
+): string | null {
+    const path = fileUriToPath(target)!;
+    if (host.files?.supportsOverwrite !== true) {
+        return `${path} already exists`;
+    }
+    // A target no text was read from may be a folder, with unsaved work anywhere under it.
+    const isText = step.kind === 'create' || reads.open.has(target) || reads.disks.has(target);
+    if (losesWork(!isText, places, host)) {
+        return `${path} has changes that are not saved`;
+    }
+    const editor = host.editorOf(target);
+    return editor !== undefined && step.kind === 'create' && readOnlyAt(host, target, editor) ? `${path} is read only` : null;
 }
 
 /* Checks a plan against what only the host can see: paths, overwrites, unsaved work and the editors it touches. Null when it fits. */
@@ -190,12 +214,16 @@ function problemWith(steps: readonly WorkspaceEditStep[], host: WorkspaceEditHos
             return `${uris[0]} cannot be changed from here`;
         }
         if ((step.kind === 'create' || step.kind === 'rename') && step.overwrite) {
-            return `${paths[paths.length - 1]} already exists`;
+            const target = step.kind === 'create' ? step.uri : step.newUri;
+            const refusal = overwriteProblem(step, target, placesOf(target, renames), host, reads);
+            if (refusal !== null) {
+                return refusal;
+            }
         }
         if (step.kind === 'rename') {
             renames.push({ kind: 'rename', oldUri: step.oldUri, newUri: step.newUri });
         }
-        if (step.kind === 'delete' && losesWork(step, placesOf(step.uri, renames), host)) {
+        if (step.kind === 'delete' && losesWork(step.recursive, placesOf(step.uri, renames), host)) {
             return `${paths[0]} has changes that are not saved`;
         }
     }
@@ -226,7 +254,10 @@ function problemWith(steps: readonly WorkspaceEditStep[], host: WorkspaceEditHos
  *
  * A file an editor holds takes its edits as one undo step per step of the edit; any other file gets an unsaved
  * draft, since nothing is written to disk on a server's word alone, unless the edit also moves files: then it
- * is one change, saved and moved through the machine. A create or a move over a file that is there is refused.
+ * is one change, saved and moved through the machine. A create or a move over a file that is there is refused,
+ * unless it says `overwrite` and `files.supportsOverwrite` is set. Then it is refused only when the target, or
+ * anything under a folder target, has unsaved work, checked again right before the step runs. `overwrite` wins
+ * over `ignoreIfExists`, as the protocol says. A created file that an editor still holds shows its new text.
  * The steps run in order and a step that no longer fits stops the edit there, with the steps before it applied
  * and nothing rolled back. A folder that only exists because an earlier move in the same edit made it is
  * looked for where it was and refused.
@@ -320,14 +351,21 @@ function driftOf(step: PlannedTextStep, host: WorkspaceEditHost, uri: string, ed
 async function run(step: WorkspaceEditStep, host: WorkspaceEditHost, running: Running): Promise<string | null> {
     const files = host.files!;
     if (step.kind === 'create') {
-        return files.create!(fileUriToPath(step.uri)!, step.text);
+        return step.overwrite ? overwriteFile(step, host) : files.create!(fileUriToPath(step.uri)!, step.text);
     }
     if (step.kind === 'rename') {
-        return files.rename(fileUriToPath(step.oldUri)!, fileUriToPath(step.newUri)!);
+        const [from, to] = [fileUriToPath(step.oldUri)!, fileUriToPath(step.newUri)!];
+        if (!step.overwrite) {
+            return files.rename(from, to);
+        }
+        // The steps before this one ran, so the unsaved work at the target is looked for once more.
+        return losesWork(!running.reads.disks.has(step.newUri) && !running.reads.open.has(step.newUri), [step.newUri], host)
+            ? `${to} has changes that are not saved`
+            : files.rename(from, to, { overwrite: true });
     }
     if (step.kind === 'delete') {
         const path = fileUriToPath(step.uri)!;
-        if (losesWork(step, [step.uri], host)) {
+        if (losesWork(step.recursive, [step.uri], host)) {
             return `${path} has changes that are not saved`;
         }
         return files.delete!(path, { recursive: step.recursive });
@@ -340,6 +378,19 @@ async function run(step: WorkspaceEditStep, host: WorkspaceEditHost, running: Ru
         return editOpen(step, host, running, uri, host.editorOf(uri));
     }
     return runDraft(step, host, running);
+}
+
+/* Empties a file that is there and gives it its text; the editor that still holds it is set to the same text. */
+async function overwriteFile(step: PlannedCreateStep, host: WorkspaceEditHost): Promise<string | null> {
+    const path = fileUriToPath(step.uri)!;
+    if (losesWork(false, [step.uri], host)) {
+        return `${path} has changes that are not saved`;
+    }
+    const reason = await host.files!.create!(path, step.text, { overwrite: true });
+    if (reason === null) {
+        host.editorOf(step.uri)?.setText(step.text);
+    }
+    return reason;
 }
 
 function editOpen(step: PlannedTextStep, host: WorkspaceEditHost, running: Running, uri: string, editor: Editor | undefined): string | null {
