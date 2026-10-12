@@ -73,3 +73,6 @@ A widget with `fixed: true` uses its `height` as exact pixels and is never measu
 
 
 Long wrapped lines keep their full layout and text for selection, copying and hit testing. The text DOM draws a band of visual rows around the viewport, in blocks of 64 rows. Selection, find marks and wrap signs are clipped to the same viewport and overscan. This bounds painting; measuring a line still reads its full text.
+
+
+Edits retain the geometry and measured wrap height of untouched lines, including when earlier edits move a line. A changed line is measured again; lines with inlays, folded partial lines and metric or wrap-width changes take the full measurement path. Each retained line includes its CRLF ending when checking whether an edit touches it. Layout still rebuilds the document's row list, and an edit inside a long line still measures that full line.

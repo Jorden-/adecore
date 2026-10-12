@@ -651,7 +651,7 @@ export class EditorView {
             this.outline.edited(batches);
             this.changeVersion++;
             this.tokens.edited(batches, (offset) => this.model.positionAt(offset).line);
-            this.layout.configure({ textChanged: true, inlays: this.displayedInlays(), blocks: this.allBlocks(), folds: this.foldStates() });
+            this.layout.configure({ textChanged: true, changes: batches, inlays: this.displayedInlays(), blocks: this.allBlocks(), folds: this.foldStates() });
             if (anchor && this.viewport.scrollTop > 0) {
                 let offset = anchor.offset;
                 for (const changes of batches) {

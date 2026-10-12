@@ -149,7 +149,7 @@ export function lineElement(
         span.className = 'se-run';
         span.style.left = `${run.x}px`;
         span.style.top = `${run.subRow * lineHeight}px`;
-        fillRun(span, geometry, run.from, run.to, tokens, whitespace);
+        fillRun(span, geometry, geometry.start + run.from, geometry.start + run.to, tokens, whitespace);
         element.append(span);
     }
     if (whitespace) {
@@ -302,7 +302,7 @@ export class RowPainter {
             span.className = 'se-run';
             span.style.left = `${left + run.x}px`;
             span.style.top = `${(header.subRows - 1) * this.layout.metrics.lineHeight}px`;
-            fillRun(span, geometry, run.from, run.to, tokens, false, lineStart);
+            fillRun(span, geometry, geometry.start + run.from, geometry.start + run.to, tokens, false, lineStart);
             element.append(span);
         }
     }

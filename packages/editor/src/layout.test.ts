@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { DocumentModel } from '@adecore/editor-core';
-import { EditorLayout, type LayoutMetrics, scanLine, wrapIndent, wrapStops } from './layout.ts';
+import { EditorLayout, type LayoutMetrics, type TextRow, scanLine, wrapIndent, wrapStops } from './layout.ts';
 
 /* Every character is 10px wide, a line 20px tall, so the numbers in an assertion can be read off the text. */
 const METRICS: LayoutMetrics = {
@@ -317,4 +317,109 @@ test('a narrow wrapped line with more subrows than a function argument limit kee
     const geometry = scanLine({ start: 0, end: text.length, text }, METRICS, 20, []);
     expect(geometry.subRows).toBeGreaterThan(100000);
     expect(geometry.width).toBe(20);
+});
+
+describe('geometry across edits', () => {
+    test('an edit outside a long line retains its geometry and measured wrap height', () => {
+        const { model, layout } = layoutOf('word '.repeat(2000) + '\nshort', 100);
+        layout.syncRows(layout.rows);
+        const before = layout.geometry(layout.rows[0] as TextRow);
+        const height = layout.rows[0]!.height;
+        const subscription = model.subscribe((snapshot) => layout.configure({ textChanged: true, changes: snapshot.changes }));
+        model.applyEdits([{ from: model.getLength() - 1, to: model.getLength(), text: 'Z' }]);
+        expect(layout.geometry(layout.rows[0] as TextRow) === before).toBe(true);
+        expect(layout.rows[0]!.height).toBe(height);
+        subscription.dispose();
+    });
+
+    test('newlines before a cached line move its origin without copying character arrays', () => {
+        const { model, layout } = layoutOf('first\nword '.repeat(20) + '\nlast', 100);
+        layout.syncRows(layout.rows);
+        const before = layout.geometry(layout.rows[1] as TextRow);
+        const subscription = model.subscribe((snapshot) => layout.configure({ textChanged: true, changes: snapshot.changes }));
+        model.applyEdits([{ from: 0, to: 1, text: 'new\nlines' }]);
+        const after = layout.geometry(layout.rows[2] as TextRow);
+        expect(after.offsets === before.offsets).toBe(true);
+        expect(after.runs === before.runs).toBe(true);
+        expect(after).toEqual(scanLine(model.getLine(2), METRICS, 100, []));
+        subscription.dispose();
+    });
+
+    test('cached geometry stays equal to a fresh scan across edits, undo and redo', () => {
+        const { model, layout } = layoutOf('first\nword '.repeat(20) + '\n😀 é\r\nlast', 100);
+        const subscription = model.subscribe((snapshot) => layout.configure({ textChanged: true, changes: snapshot.changes }));
+        let seed = 913;
+        const random = (limit: number): number => {
+            seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+            return seed % limit;
+        };
+        const verify = (): void => {
+            layout.syncRows(layout.rows);
+            for (const row of layout.rows) {
+                if (row.kind === 'text') {
+                    expect(layout.geometry(row)).toEqual(scanLine(model.getLine(row.line), METRICS, 100, []));
+                }
+            }
+        };
+        verify();
+        for (let index = 0; index < 100; index++) {
+            let from = random(model.getLength() + 1);
+            let to = Math.min(model.getLength(), from + random(5));
+            const split = (at: number): boolean => /[\uD800-\uDBFF]/.test(model.slice(at - 1, at)) && /[\uDC00-\uDFFF]/.test(model.slice(at, at + 1));
+            if (from > 0 && split(from)) {
+                from--;
+            }
+            if (to < model.getLength() && split(to)) {
+                to++;
+            }
+            const text = ['x', '\n', '\r\n', '\t', '😀', 'é', ''][random(7)]!;
+            model.applyEdits([{ from, to, text }]);
+            verify();
+            if (index % 9 === 0) {
+                model.undo();
+                verify();
+                model.redo();
+                verify();
+            }
+        }
+        subscription.dispose();
+    });
+});
+
+test('moving an inlay across a newline invalidates only the geometry that carries it', () => {
+    const { model, layout } = layoutOf('first\nword text\nlast', 100);
+    layout.configure({ inlays: [{ id: 'hint', at: 8, text: 'hint' }] });
+    layout.syncRows(layout.rows);
+    const before = layout.geometry(layout.rows[2] as TextRow);
+    const subscription = model.subscribe((snapshot) =>
+        layout.configure({ textChanged: true, changes: snapshot.changes, inlays: [{ id: 'hint', at: 12, text: 'hint' }] })
+    );
+    model.applyEdits([{ from: 0, to: 1, text: 'new\nx' }]);
+    const untouched = layout.geometry(layout.rows[3] as TextRow);
+    expect(untouched.offsets === before.offsets).toBe(true);
+    expect(layout.geometry(layout.rows[2] as TextRow)).toEqual(scanLine(model.getLine(2), METRICS, 100, [{ id: 'hint', at: 12, text: 'hint' }]));
+    subscription.dispose();
+});
+
+test('grouped undo and redo remap cached lines through every transaction', () => {
+    const { model, layout } = layoutOf('first\nword '.repeat(20), 100);
+    let transactions = 0;
+    const subscription = model.subscribe((snapshot) => {
+        transactions = snapshot.changes?.length ?? 0;
+        layout.configure({ textChanged: true, changes: snapshot.changes });
+    });
+    layout.syncRows(layout.rows);
+    model.applyEdits([{ from: 0, to: 1, text: 'x' }], { historyGroup: 'typing' });
+    model.applyEdits([{ from: 1, to: 1, text: '\n' }], { historyGroup: 'typing' });
+    for (const action of ['undo', 'redo'] as const) {
+        model[action]();
+        expect(transactions).toBe(2);
+        layout.syncRows(layout.rows);
+        for (const row of layout.rows) {
+            if (row.kind === 'text') {
+                expect(layout.geometry(row)).toEqual(scanLine(model.getLine(row.line), METRICS, 100, []));
+            }
+        }
+    }
+    subscription.dispose();
 });

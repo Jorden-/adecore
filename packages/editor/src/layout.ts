@@ -1,4 +1,6 @@
-import type { Position } from '@adecore/editor-core';
+import type { DocumentChange, Position } from '@adecore/editor-core';
+
+import { lineChangeMapper } from './layout-changes.ts';
 
 export type Affinity = 'before' | 'after';
 
@@ -102,6 +104,7 @@ export interface BlockRow extends RowBase {
 export type LayoutRow = TextRow | BlockRow;
 
 export interface TextRun {
+    /* Line-relative offsets let preceding edits move a line without rewriting its runs. */
     from: number;
     to: number;
     x: number;
@@ -121,6 +124,7 @@ export interface InlineBox {
 export interface LineGeometry {
     start: number;
     end: number;
+    next: number;
     text: string;
     /* UTF-16 offsets into the line at which a character begins, then the line's length. */
     offsets: number[];
@@ -248,7 +252,7 @@ export function wrapStops(text: string, offsets: readonly number[], metrics: Lay
 
 /* A line of text laid out against its metrics; wrapped at `limit` pixels unless that is null. */
 export function scanLine(
-    line: { start: number; end: number; text: string },
+    line: { start: number; end: number; text: string; next?: number },
     metrics: LayoutMetrics,
     limit: number | null,
     lineInlays: readonly Inlay[]
@@ -260,6 +264,7 @@ export function scanLine(
     const geometry: LineGeometry = {
         start: line.start,
         end: line.end,
+        next: line.next ?? line.end,
         text,
         offsets,
         before: [],
@@ -280,7 +285,7 @@ export function scanLine(
     let runX = 0;
     const flushRun = (end: number): void => {
         if (runStart >= 0 && end > runStart) {
-            geometry.runs.push({ from: line.start + runStart, to: line.start + end, x: runX, subRow: row, text: text.slice(runStart, end) });
+            geometry.runs.push({ from: runStart, to: end, x: runX, subRow: row, text: text.slice(runStart, end) });
         }
         runStart = -1;
     };
@@ -326,8 +331,9 @@ export function scanLine(
 }
 
 export interface LayoutConfig {
-    /* The text changed, so nothing remembered about a line number holds any more. */
+    /* Clear remembered geometry when transaction offsets are unavailable. */
     textChanged?: boolean;
+    changes?: readonly (readonly DocumentChange[])[];
     metrics?: LayoutMetrics;
     /* The pixels a visual line may take before it wraps; null for no wrapping. */
     wrapWidth?: number | null;
@@ -349,7 +355,7 @@ export class EditorLayout {
     width = 0;
     private lineRows: number[] = [];
     private geometryCache = new Map<number, LineGeometry>();
-    private measuredRows = new Map<number, number>();
+    private measuredRows = new Map<number, { start: number; end: number; next: number; subRows: number }>();
     private measuredHeights = new Map<string, number>();
     private inlaysByLine = new Map<number, Inlay[]>();
     private inlays: readonly Inlay[] = [];
@@ -383,7 +389,6 @@ export class EditorLayout {
         }
         if (config.inlays) {
             this.inlays = config.inlays;
-            measureAgain = true;
         }
         if (config.blocks) {
             this.blocks = config.blocks;
@@ -392,13 +397,66 @@ export class EditorLayout {
             this.folds = config.folds;
             this.lineHeightsVersion++;
         }
-        if (measureAgain || config.textChanged) {
+        if (measureAgain || (config.textChanged && !config.changes?.length)) {
             this.lineHeightsVersion++;
             this.geometryCache.clear();
             this.measuredRows.clear();
             this.width = 0;
+        } else {
+            if (config.changes?.length) {
+                this.retainGeometry(config.changes);
+                this.lineHeightsVersion++;
+            }
+            if (config.inlays !== undefined) {
+                if (!config.changes?.length) {
+                    for (const line of this.inlaysByLine.keys()) {
+                        this.geometryCache.delete(line);
+                        this.measuredRows.delete(line);
+                    }
+                }
+                for (const inlay of config.inlays) {
+                    const line = this.document.positionAt(inlay.at).line;
+                    this.geometryCache.delete(line);
+                    this.measuredRows.delete(line);
+                }
+                this.lineHeightsVersion++;
+            }
+            this.width = 0;
+            if (this.wrapWidth === null) {
+                for (const geometry of this.geometryCache.values()) {
+                    this.width = Math.max(this.width, geometry.width + ADDITIONAL_COLUMNS * this.metrics.charWidth);
+                }
+            }
         }
         this.rebuild();
+    }
+
+    private retainGeometry(batches: readonly (readonly DocumentChange[])[]): void {
+        const map = lineChangeMapper(batches);
+        const remap = (bounds: { start: number; end: number; next: number }): { line: number; start: number; end: number; next: number } | null => {
+            const next = map({ start: bounds.start, end: Math.max(bounds.end, bounds.next - 1) });
+            if (next === null) {
+                return null;
+            }
+            const delta = next.start - bounds.start;
+            return { start: next.start, end: bounds.end + delta, next: bounds.next + delta, line: this.document.positionAt(next.start).line };
+        };
+        const geometries = new Map<number, LineGeometry>();
+        for (const geometry of this.geometryCache.values()) {
+            const next = remap(geometry);
+            if (next !== null && geometry.inlays.length === 0) {
+                geometries.set(next.line, next.start === geometry.start ? geometry : { ...geometry, start: next.start, end: next.end, next: next.next });
+            }
+        }
+        const measured = new Map<number, { start: number; end: number; next: number; subRows: number }>();
+        for (const [line, bounds] of this.measuredRows) {
+            const next = remap(bounds);
+            if (next !== null && !this.inlaysByLine.has(line)) {
+                measured.set(next.line, { start: next.start, end: next.end, next: next.next, subRows: bounds.subRows });
+            }
+        }
+        this.geometryCache = geometries;
+        this.measuredRows = measured;
     }
 
     private rowCountOf(line: number, length: number): number {
@@ -408,7 +466,7 @@ export class EditorLayout {
         }
         const measured = this.measuredRows.get(line);
         if (measured !== undefined) {
-            return measured;
+            return measured.subRows;
         }
         return Math.max(1, Math.ceil((length * this.metrics.charWidth) / Math.max(limit, this.metrics.charWidth)));
     }
@@ -525,9 +583,14 @@ export class EditorLayout {
             if (row.kind !== 'text') {
                 continue;
             }
-            const subRows = this.geometry(row).subRows;
+            const geometry = this.geometry(row);
+            const subRows = geometry.subRows;
+            if (row.head === null) {
+                this.measuredRows.set(row.line, { start: geometry.start, end: geometry.end, next: geometry.next, subRows });
+            } else {
+                this.measuredRows.delete(row.line);
+            }
             if (subRows !== row.subRows) {
-                this.measuredRows.set(row.line, subRows);
                 row.subRows = subRows;
                 row.height = subRows * this.metrics.lineHeight;
                 changed = true;
