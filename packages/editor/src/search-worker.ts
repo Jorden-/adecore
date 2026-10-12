@@ -24,14 +24,14 @@ export function serveEditorSearch(endpoint: EditorSearchWorkerEndpoint): () => v
     let snapshot: EditorSearchSnapshot | undefined;
     const listener = ({ data: request }: MessageEvent<EditorSearchInput>): void => {
         try {
+            if (request.text !== undefined) {
+                snapshot = { revision: request.revision, text: request.text };
+            }
             if (!Number.isSafeInteger(request.revision) || request.revision < 0) {
                 throw new RangeError('The search revision must be a nonnegative safe integer.');
             }
             if (request.type === 'search' && (!Number.isInteger(request.maxResults) || request.maxResults < 0 || request.maxResults > SEARCH_LIMIT)) {
                 throw new RangeError(`Search results must be limited to ${SEARCH_LIMIT} matches or fewer.`);
-            }
-            if (request.text !== undefined) {
-                snapshot = { revision: request.revision, text: request.text };
             }
             if (snapshot === undefined || snapshot.revision !== request.revision) {
                 endpoint.postMessage({

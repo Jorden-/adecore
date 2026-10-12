@@ -173,3 +173,13 @@ for (const fixture of [
         dispose();
     });
 }
+
+test('an invalid request still retains the supplied snapshot for the next valid request', () => {
+    const wire = endpoint();
+    const dispose = serveEditorSearch(wire.port);
+    wire.send(request('next', { revision: 1, maxResults: 10001 }));
+    expect(wire.sent[0]).toMatchObject({ type: 'error', kind: 'range' });
+    wire.send(request(undefined, { revision: 1, query: { text: 'next', regex: false, caseSensitive: false, wholeWord: false } }));
+    expect(wire.sent[1]).toMatchObject({ type: 'matches', revision: 1, ranges: new Uint32Array([0, 4]) });
+    dispose();
+});
