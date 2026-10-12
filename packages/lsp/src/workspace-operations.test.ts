@@ -149,6 +149,39 @@ describe('planning a create', () => {
         expect(left.steps).toMatchObject([{ kind: 'edits', before: 'old', after: 'xold' }]);
     });
 
+    it('plans each combination of overwrite and ignoreIfExists for a create', async () => {
+        const there = rig({ [a]: { text: 'old' } }).source;
+        const missing = rig({}).source;
+        const plan = async (source: WorkspaceEditSource, options: { overwrite?: boolean; ignoreIfExists?: boolean }) =>
+            (await planWorkspaceOperations({ documentChanges: [{ kind: 'create', uri: a, options }] }, source)).steps;
+        expect(await plan(there, { overwrite: true })).toEqual([{ kind: 'create', uri: a, text: '', overwrite: true }]);
+        expect(await plan(there, { overwrite: true, ignoreIfExists: true })).toEqual([{ kind: 'create', uri: a, text: '', overwrite: true }]);
+        expect(await plan(there, { ignoreIfExists: true })).toEqual([]);
+        expect(await plan(there, { overwrite: false, ignoreIfExists: false }).catch((error: LspError) => error.message)).toContain('already exists');
+        for (const options of [{ overwrite: true }, { ignoreIfExists: true }, { overwrite: true, ignoreIfExists: true }, {}]) {
+            expect(await plan(missing, options)).toEqual([{ kind: 'create', uri: a, text: '', overwrite: false }]);
+        }
+    });
+
+    it('keeps the text edits after an overwriting create as the new text of the file', async () => {
+        const { source } = rig({ [a]: { text: 'old' } });
+        const plan = await planWorkspaceOperations(
+            {
+                documentChanges: [
+                    { kind: 'create', uri: a, options: { overwrite: true } },
+                    { textDocument: { uri: a, version: null }, edits: [insert('fresh')] }
+                ]
+            },
+            source
+        );
+        expect(plan.steps).toEqual([{ kind: 'create', uri: a, text: 'fresh', overwrite: true }]);
+    });
+
+    it('refuses a create over something that is no text file even when it may overwrite', async () => {
+        const { source } = rig({}, [dir]);
+        expect((await refusal({ documentChanges: [{ kind: 'create', uri: dir, options: { overwrite: true } }] }, source)).message).toContain('not a text file');
+    });
+
     it('refuses a create the host cannot carry out', async () => {
         const { source } = rig({}, [], ['rename']);
         expect((await refusal({ documentChanges: [{ kind: 'create', uri: a }] }, source)).message).toContain('not supported');
@@ -214,6 +247,27 @@ describe('planning a rename', () => {
         expect(over.steps).toEqual([{ kind: 'rename', oldUri: a, newUri: b, overwrite: true }]);
         const left = await planWorkspaceOperations({ documentChanges: [{ kind: 'rename', oldUri: a, newUri: b, options: { ignoreIfExists: true } }] }, source);
         expect(left.steps).toEqual([]);
+    });
+
+    it('plans each combination of overwrite and ignoreIfExists for a rename', async () => {
+        const there = rig({ [a]: { text: 'a' }, [b]: { text: 'b' } }).source;
+        const free = rig({ [a]: { text: 'a' } }).source;
+        const plan = async (source: WorkspaceEditSource, options: { overwrite?: boolean; ignoreIfExists?: boolean }) =>
+            (await planWorkspaceOperations({ documentChanges: [{ kind: 'rename', oldUri: a, newUri: b, options }] }, source)).steps;
+        const replaced = [{ kind: 'rename' as const, oldUri: a, newUri: b, overwrite: true }];
+        expect(await plan(there, { overwrite: true })).toEqual(replaced);
+        expect(await plan(there, { overwrite: true, ignoreIfExists: true })).toEqual(replaced);
+        expect(await plan(there, { ignoreIfExists: true })).toEqual([]);
+        expect(await plan(there, { overwrite: false, ignoreIfExists: false }).catch((error: LspError) => error.message)).toContain('already exists');
+        for (const options of [{ overwrite: true }, { ignoreIfExists: true }, { overwrite: true, ignoreIfExists: true }]) {
+            expect(await plan(free, options)).toEqual([{ kind: 'rename', oldUri: a, newUri: b, overwrite: false }]);
+        }
+    });
+
+    it('replaces a folder that is there when a rename may overwrite', async () => {
+        const { source } = rig({ [a]: { text: 'a' } }, [dir]);
+        const plan = await planWorkspaceOperations({ documentChanges: [{ kind: 'rename', oldUri: a, newUri: dir, options: { overwrite: true } }] }, source);
+        expect(plan.steps).toEqual([{ kind: 'rename', oldUri: a, newUri: dir, overwrite: true }]);
     });
 
     it('moves a file the plan makes, with the text collected so far', async () => {

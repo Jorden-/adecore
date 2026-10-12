@@ -1,5 +1,5 @@
 export { EditorLanguage } from './editor-language.ts';
-export { ProjectLanguage } from './project-language.ts';
+export { ProjectLanguage, type FileOperationTarget } from './project-language.ts';
 export type { LanguageDocumentHandle } from './project-language.ts';
 export type {
     SnippetVariableContext,

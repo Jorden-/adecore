@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { renamesTaken } from './file-operations.ts';
+import { createsTaken, deletesTaken, renamesTaken } from './file-operations.ts';
 import { LspSession } from './session.ts';
 import { flush, ScriptedTransport, sessionWith } from './test-transport.ts';
 
@@ -38,7 +38,15 @@ describe('telling a server about renamed files', () => {
         const { transport, session } = await sessionWith({});
         const { capabilities } = transport.request('initialize').params as { capabilities: { workspace: Record<string, unknown> } };
         expect(capabilities.workspace.workspaceEdit).toMatchObject({ documentChanges: true, resourceOperations: ['create', 'rename'] });
-        expect(capabilities.workspace.fileOperations).toEqual({ dynamicRegistration: true, willRename: true, didRename: true });
+        expect(capabilities.workspace.fileOperations).toEqual({
+            dynamicRegistration: true,
+            willRename: true,
+            didRename: true,
+            willCreate: true,
+            didCreate: true,
+            willDelete: true,
+            didDelete: true
+        });
         await session.shutdown();
     });
 
@@ -107,4 +115,55 @@ describe('telling a server about renamed files', () => {
         expect(transport.sent.filter((message) => 'method' in message && message.method === 'workspace/didRenameFiles')).toHaveLength(1);
         await session.shutdown();
     });
+});
+
+describe('telling a server about created and deleted files', () => {
+    const made = { uri: 'file:///work/src/Models/Post.php', directory: false };
+    const folder = { uri: 'file:///work/src/Models', directory: true };
+    const kinds = [
+        { name: 'create', taken: createsTaken, will: 'willCreateFiles', did: 'didCreateFiles', ask: 'willCreate', tell: 'didCreate' },
+        { name: 'delete', taken: deletesTaken, will: 'willDeleteFiles', did: 'didDeleteFiles', ask: 'willDelete', tell: 'didDelete' }
+    ] as const;
+
+    for (const kind of kinds) {
+        it(`filters ${kind.name}d files by kind, scheme and case like a rename`, () => {
+            const filters = [{ scheme: 'file', pattern: { glob: '**/*.php', matches: 'file' as const } }];
+            expect(kind.taken(filters, [made, folder])).toEqual([{ uri: made.uri }]);
+            expect(kind.taken([{ scheme: 'untitled', pattern: { glob: '**' } }], [made])).toEqual([]);
+            expect(kind.taken([{ pattern: { glob: '**/*.PHP', options: { ignoreCase: true } } }], [made])).toHaveLength(1);
+            expect(kind.taken([{ pattern: { glob: '**', matches: 'folder' } }], [made, folder])).toEqual([{ uri: folder.uri }]);
+        });
+
+        it(`asks for the edit before files are ${kind.name}d, and only for what the filters take`, async () => {
+            const { transport, session } = await sessionWith({
+                workspace: { fileOperations: { [kind.ask]: { filters: [{ pattern: { glob: '**/*.php', matches: 'file' } }] } } }
+            });
+            const asked = session[kind.will]([made, folder, { uri: 'file:///work/a.txt', directory: false }]);
+            await flush();
+            expect(transport.request(`workspace/${kind.will}`).params).toEqual({ files: [{ uri: made.uri }] });
+            const edit = { documentChanges: [] };
+            transport.respond(`workspace/${kind.will}`, edit);
+            expect(await asked).toEqual(edit);
+            expect(await session[kind.will]([folder])).toBeNull();
+            await session.shutdown();
+        });
+
+        it(`notifies of ${kind.name}d files by registration and ignores the other operations`, async () => {
+            const { transport, session } = await sessionWith({ workspace: { fileOperations: { [kind.ask]: { filters: [{ pattern: { glob: '**' } }] } } } });
+            await session[kind.did]([made]);
+            expect(transport.sent.filter((message) => 'method' in message && message.method === `workspace/${kind.did}`)).toHaveLength(0);
+            transport.emit({
+                jsonrpc: '2.0',
+                id: 300,
+                method: 'client/registerCapability',
+                params: {
+                    registrations: [{ id: kind.tell, method: `workspace/${kind.did}`, registerOptions: { filters: [{ pattern: { glob: '**/*.php' } }] } }]
+                }
+            });
+            await flush();
+            await session[kind.did]([made, folder]);
+            expect(transport.sent).toContainEqual({ jsonrpc: '2.0', method: `workspace/${kind.did}`, params: { files: [{ uri: made.uri }] } });
+            await session.shutdown();
+        });
+    }
 });

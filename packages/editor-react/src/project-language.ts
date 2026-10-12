@@ -1,6 +1,6 @@
 import { disposeSnippetTransforms } from './snippet-transform-queue.ts';
 import i18next, { type i18n } from 'i18next';
-import { fileUriToPath, type ApplyWorkspaceEditResult, type ContentChange, type LanguageService, type WorkspaceEdit } from '@adecore/lsp';
+import { fileUriToPath, pathToFileUri, type ApplyWorkspaceEditResult, type ContentChange, type LanguageService, type WorkspaceEdit } from '@adecore/lsp';
 import type { Editor, EditorPosition } from '@adecore/editor';
 import { NavigationHistory, type Place } from './navigation-history.ts';
 import { ProjectProblems } from './project-problems.ts';
@@ -74,6 +74,17 @@ interface Holder {
     languageId: string;
 }
 
+/* A file or folder for a file operation notification: a bare path is a file. */
+export type FileOperationTarget = string | { readonly path: string; readonly directory?: boolean };
+
+function filesOf(targets: readonly FileOperationTarget[]): Array<{ uri: string; directory: boolean }> {
+    return targets.map((target) => {
+        const { path, directory } =
+            typeof target === 'string' ? { path: target, directory: false } : { path: target.path, directory: target.directory === true };
+        return { uri: pathToFileUri(path), directory };
+    });
+}
+
 /*
  * A shared language service and document ownership for the editors of a project. Two editors on the same
  * file hold one document, and only the first one sends changes, since both would report the same edit.
@@ -116,6 +127,29 @@ export class ProjectLanguage {
             files: this.files,
             ...(service.versionOf === undefined ? {} : { versionOf: (uri: string) => service.versionOf!(uri) })
         });
+    }
+
+    /*
+     * What the servers want changed before files are made, for a host that makes them outside a language server's
+     * edit: apply the edit with `applyWorkspaceEdit`, then make the files. Null when no server has anything to say.
+     */
+    willCreateFiles(targets: readonly FileOperationTarget[]): Promise<WorkspaceEdit | null> {
+        return this.service.willCreateFiles?.(filesOf(targets)) ?? Promise.resolve(null);
+    }
+
+    /* Tells the servers that files were made, once they are. */
+    didCreateFiles(targets: readonly FileOperationTarget[]): Promise<void> {
+        return this.service.didCreateFiles?.(filesOf(targets)) ?? Promise.resolve();
+    }
+
+    /* What the servers want changed before files are deleted, such as the references to them; null when no server has anything to say. */
+    willDeleteFiles(targets: readonly FileOperationTarget[]): Promise<WorkspaceEdit | null> {
+        return this.service.willDeleteFiles?.(filesOf(targets)) ?? Promise.resolve(null);
+    }
+
+    /* Tells the servers that files were deleted, once they are. */
+    didDeleteFiles(targets: readonly FileOperationTarget[]): Promise<void> {
+        return this.service.didDeleteFiles?.(filesOf(targets)) ?? Promise.resolve();
     }
 
     /* The text of a file as it stands now: an open document's, else a draft's or the machine's; null when it is no text file. */

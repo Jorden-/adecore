@@ -1,6 +1,6 @@
 import { ErrorCodes, JsonRpcConnection, LspError, type RequestHandler } from './connection.ts';
 import { LspDocument } from './document.ts';
-import { renamesTaken, type RenamedFile } from './file-operations.ts';
+import { createsTaken, deletesTaken, renamesTaken, type CreatedFile, type DeletedFile, type RenamedFile } from './file-operations.ts';
 import { globMatch } from './glob.ts';
 import type { ResourceOperationKind } from './workspace-operations.ts';
 import type {
@@ -11,6 +11,7 @@ import type {
     Disposable,
     DocumentItem,
     FileEvent,
+    FileOperation,
     FileOperationFilter,
     FileSystemWatcher,
     InitializeResult,
@@ -379,8 +380,8 @@ export class LspSession {
         return this.notify('workspace/didChangeWatchedFiles', { changes });
     }
 
-    /* The files a server asked to hear about when they are renamed, from its capabilities and its registrations. */
-    fileOperationFilters(operation: 'willRename' | 'didRename'): FileOperationFilter[] {
+    /* The files a server asked to hear about when they are renamed, created or deleted, from its capabilities and its registrations. */
+    fileOperationFilters(operation: FileOperation): FileOperationFilter[] {
         const fileOperations = (this.serverCapabilities.workspace as { fileOperations?: Record<string, ProviderOptions> } | undefined)?.fileOperations;
         const method = `workspace/${operation}Files`;
         return [
@@ -402,6 +403,34 @@ export class LspSession {
         const taken = renamesTaken(this.fileOperationFilters('didRename'), files);
         if (taken.length > 0 && this.phase === 'ready') {
             await this.notify('workspace/didRenameFiles', { files: taken });
+        }
+    }
+
+    /* What the server would change before these files are made, or null when it takes none of them or has nothing to say. */
+    async willCreateFiles(files: readonly CreatedFile[], options?: RequestOptions): Promise<WorkspaceEdit | null> {
+        const taken = createsTaken(this.fileOperationFilters('willCreate'), files);
+        return taken.length === 0 || this.phase !== 'ready' ? null : this.request<WorkspaceEdit | null>('workspace/willCreateFiles', { files: taken }, options);
+    }
+
+    /* Tells the server which of these files were made, those its filters take. */
+    async didCreateFiles(files: readonly CreatedFile[]): Promise<void> {
+        const taken = createsTaken(this.fileOperationFilters('didCreate'), files);
+        if (taken.length > 0 && this.phase === 'ready') {
+            await this.notify('workspace/didCreateFiles', { files: taken });
+        }
+    }
+
+    /* What the server would change before these files are deleted, or null when it takes none of them or has nothing to say. */
+    async willDeleteFiles(files: readonly DeletedFile[], options?: RequestOptions): Promise<WorkspaceEdit | null> {
+        const taken = deletesTaken(this.fileOperationFilters('willDelete'), files);
+        return taken.length === 0 || this.phase !== 'ready' ? null : this.request<WorkspaceEdit | null>('workspace/willDeleteFiles', { files: taken }, options);
+    }
+
+    /* Tells the server which of these files were deleted, those its filters take. */
+    async didDeleteFiles(files: readonly DeletedFile[]): Promise<void> {
+        const taken = deletesTaken(this.fileOperationFilters('didDelete'), files);
+        if (taken.length > 0 && this.phase === 'ready') {
+            await this.notify('workspace/didDeleteFiles', { files: taken });
         }
     }
 
@@ -497,7 +526,15 @@ function clientCapabilities(options: LspSessionOptions): object {
         workspace: {
             applyEdit: !!options.onApplyEdit,
             workspaceEdit: { documentChanges: true, resourceOperations: [...(options.resourceOperations ?? ['create', 'rename'])], failureHandling: 'abort' },
-            fileOperations: { dynamicRegistration: true, willRename: true, didRename: true },
+            fileOperations: {
+                dynamicRegistration: true,
+                willRename: true,
+                didRename: true,
+                willCreate: true,
+                didCreate: true,
+                willDelete: true,
+                didDelete: true
+            },
             configuration: true,
             workspaceFolders: true,
             executeCommand: dynamic,

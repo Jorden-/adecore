@@ -297,6 +297,19 @@ export interface FileRename {
     newUri: string;
 }
 
+/* One entry of `workspace/willCreateFiles` and `didCreateFiles`. */
+export interface FileCreate {
+    uri: string;
+}
+
+/* One entry of `workspace/willDeleteFiles` and `didDeleteFiles`. */
+export interface FileDelete {
+    uri: string;
+}
+
+/* The file operations a server can ask to hear about, each in a `will` form that may answer with an edit and a `did` form that only informs. */
+export type FileOperation = 'willRename' | 'didRename' | 'willCreate' | 'didCreate' | 'willDelete' | 'didDelete';
+
 export interface FileOperationFilter {
     scheme?: string;
     pattern: { glob: string; matches?: 'file' | 'folder'; options?: { ignoreCase?: boolean } };

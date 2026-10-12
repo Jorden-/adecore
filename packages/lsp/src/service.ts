@@ -33,6 +33,7 @@ import type {
     WorkspaceEdit,
     WorkspaceSymbolResult
 } from './protocol.ts';
+import type { CreatedFile, DeletedFile } from './file-operations.ts';
 
 export interface LanguageDocument {
     /* The `file:` URI the language servers know the file by, which `pathToFileUri` makes of a path. */
@@ -116,6 +117,15 @@ export interface LanguageService {
     /* `uri` is the document the hierarchy was prepared in, which names the server to ask. */
     incomingCalls?(uri: string, item: CallHierarchyItem, options?: LanguageRequestOptions): Promise<CallHierarchyIncomingCall[] | null>;
     outgoingCalls?(uri: string, item: CallHierarchyItem, options?: LanguageRequestOptions): Promise<CallHierarchyOutgoingCall[] | null>;
+    /*
+     * File operation notifications are optional so a service from before them still fits. Each asks the servers
+     * that registered for the operation and keeps the files their filters take; `will*` answers the edits the
+     * servers want made first (null when there are none) and `did*` informs them afterwards.
+     */
+    willCreateFiles?(files: readonly CreatedFile[], options?: LanguageRequestOptions): Promise<WorkspaceEdit | null>;
+    didCreateFiles?(files: readonly CreatedFile[]): Promise<void>;
+    willDeleteFiles?(files: readonly DeletedFile[], options?: LanguageRequestOptions): Promise<WorkspaceEdit | null>;
+    didDeleteFiles?(files: readonly DeletedFile[]): Promise<void>;
     codeLenses(uri: string, options?: LanguageRequestOptions): Promise<CodeLens[] | null>;
     resolveCodeLens(uri: string, lens: CodeLens, options?: LanguageRequestOptions): Promise<CodeLens>;
 }
