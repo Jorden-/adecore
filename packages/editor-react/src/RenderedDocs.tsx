@@ -33,7 +33,7 @@ function Code({ children, faint = false }: { children: string; faint?: boolean }
 }
 
 /* Markdown prose and fenced code as the hover draws them: the blocks in the code face, the rest muted. */
-function Prose({ text, language, linkable }: { text: string; language: string; linkable: boolean }) {
+function Prose({ text, language, linkable, compact = false }: { text: string; language: string; linkable: boolean; compact?: boolean }) {
     const plain = linkable ? text : text.replace(LINK, '$1');
     return (
         <>
@@ -43,8 +43,8 @@ function Prose({ text, language, linkable }: { text: string; language: string; l
                         <Signature code={part.block.code} language={part.block.language === 'text' ? language : part.block.language} />
                     </div>
                 ) : (
-                    <div key={index} className="[&_.adecore-editor-markdown]:text-xs [&_p]:my-1">
-                        <Markdown text={part.text} />
+                    <div key={index} className={`[&_.adecore-editor-markdown]:text-xs ${compact ? '[&_p]:my-0' : '[&_p]:my-1'}`}>
+                        <Markdown text={part.text} images={false} />
                     </div>
                 )
             )}
@@ -52,12 +52,13 @@ function Prose({ text, language, linkable }: { text: string; language: string; l
     );
 }
 
-function TagRow({ tag, language, linkable }: { tag: DocTagEntry; language: string; linkable: boolean }) {
+/* A value of a tag, in the second column of the table; `spaced` opens a new section with more room above. */
+function TagRow({ tag, language, linkable, spaced }: { tag: DocTagEntry; language: string; linkable: boolean; spaced: boolean }) {
     const target = tag.name === 'see' && tag.subject !== null ? tag.subject : null;
     const link =
         target === null ? null : /^https?:\/\//i.test(target) ? `[${target}](${target})` : `[\`${target}\`](${DOC_LINK_PREFIX}${encodeURIComponent(target)})`;
     return (
-        <dd className="m-0 flex min-w-0 flex-wrap items-baseline gap-x-2 pl-3">
+        <dd className={`col-start-2 m-0 flex min-w-0 flex-wrap items-baseline gap-x-2 ${spaced ? 'mt-1' : ''}`}>
             {tag.name === 'example' ? (
                 <div className="w-full rounded-md bg-surface-sunken px-2 py-1.5">
                     <Signature code={tag.text} language={language} />
@@ -67,8 +68,13 @@ function TagRow({ tag, language, linkable }: { tag: DocTagEntry; language: strin
                     {tag.subject !== null && target === null && <Code>{tag.subject}</Code>}
                     {tag.type !== null && <Code faint>{tag.type}</Code>}
                     {(link !== null || tag.text !== '') && (
-                        <div className="min-w-0 flex-1 text-text-muted">
-                            <Prose text={[link, tag.text].filter((part) => part !== null && part !== '').join(' ')} language={language} linkable={linkable} />
+                        <div className="min-w-0 grow basis-48 text-text">
+                            <Prose
+                                text={[link, tag.text].filter((part) => part !== null && part !== '').join(' ')}
+                                language={language}
+                                linkable={linkable}
+                                compact
+                            />
                         </div>
                     )}
                 </>
@@ -85,6 +91,7 @@ export function RenderedDocBlock({ language, entry }: { language: EditorLanguage
     const linkable = feature.canFollow;
     const sections = sectionsOf(tags);
     const deprecated = sections.find((section) => section.name === 'deprecated');
+    const shown = sections.filter((section) => section.name !== 'deprecated');
 
     // One handler for every link, since the links are made by the Markdown renderer and not by us.
     const follow = (event: MouseEvent<HTMLDivElement>): void => {
@@ -120,18 +127,18 @@ export function RenderedDocBlock({ language, entry }: { language: EditorLanguage
                     <Prose text={description} language={highlighter} linkable={linkable} />
                 </div>
             )}
-            {sections
-                .filter((section) => section.name !== 'deprecated')
-                .map((section) => (
-                    <dl key={section.name} className="m-0 flex flex-col gap-0.5">
-                        <dt className="font-medium text-text-faint">
+            {shown.length > 0 && (
+                <dl className="m-0 grid grid-cols-[max-content_minmax(0,1fr)] items-baseline gap-x-3 gap-y-0.5">
+                    {shown.map((section, row) => [
+                        <dt key={`${section.name}:label`} className={`col-start-1 font-medium text-text-muted ${row > 0 ? 'mt-1' : ''}`}>
                             {KNOWN.has(section.name) ? t(`language.docs.tags.${section.name}`) : `${section.name}:`}
-                        </dt>
-                        {section.tags.map((tag, index) => (
-                            <TagRow key={index} tag={tag} language={highlighter} linkable={linkable} />
-                        ))}
-                    </dl>
-                ))}
+                        </dt>,
+                        ...section.tags.map((tag, index) => (
+                            <TagRow key={`${section.name}:${index}`} tag={tag} language={highlighter} linkable={linkable} spaced={row > 0 && index === 0} />
+                        ))
+                    ])}
+                </dl>
+            )}
         </div>
     );
 }

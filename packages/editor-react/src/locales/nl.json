@@ -198,6 +198,7 @@
         },
         "docs": {
             "label": "Weergegeven documentatie",
+            "labelNamed": "Weergegeven documentatie: {{- summary}}",
             "render": "Toon weergegeven documentatie",
             "showSource": "Toon bron van documentatie",
             "tags": {

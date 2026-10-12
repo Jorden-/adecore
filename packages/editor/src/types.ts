@@ -364,6 +364,10 @@ export interface EditorReplacement {
     readonly height?: number;
     /* What assistive technology calls the row. */
     readonly label?: string;
+    /* Whether the caret may stop in the row's lines when it moves up or down. Without it a vertical move steps over the row. */
+    readonly enterable?: boolean;
+    /* The editor is about to scroll to a place inside the row's lines. The host shows the lines itself here, so the target is where the person will see it. */
+    onReveal?(): void;
     /* Fills the element the row is drawn in, which the editor makes again whenever the row scrolls back into view. */
     render(container: HTMLElement): void;
 }
@@ -692,6 +696,8 @@ export interface Editor {
     setScrollTop(top: number): void;
     /* Intrinsic text height of a zero-based line, estimated until drawn; zero for hidden or absent lines. */
     getLineHeight(line: number): number;
+    /* The height of one line of text, as the font and the line height setting make it, which a row of the host or a fold never changes. */
+    getBaseLineHeight?(): number;
     /* Text heights changed after a measurement, edit, wrap width or font change; excludes widget heights. */
     onLineHeights(listener: () => void): () => void;
     /* All rows in pixels, including the horizontal scrollbar, for a host that grows with its contents. */

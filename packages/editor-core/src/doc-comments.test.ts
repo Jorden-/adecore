@@ -65,4 +65,14 @@ describe('finding documentation comments', () => {
     test('stops at the limit', () => {
         expect(findDocComments(`${DOC}\n${DOC}\n${DOC}`, 'typescript', 2)).toHaveLength(2);
     });
+
+    test('leaves banners of three stars or more out', () => {
+        expect(findDocComments('/*****************\n * Section\n *****************/\nlet x;', 'typescript')).toEqual([]);
+        expect(findDocComments('/***\n * Section\n */\nlet x;', 'typescript')).toEqual([]);
+    });
+
+    test('leaves the text of a PHP heredoc or nowdoc out', () => {
+        const heredoc = "<?php\n$a = <<<EOT\n/**\n * Not docs.\n */\nEOT;\n/** Real. */\nfunction f() {}\n$b = <<<'RAW'\n/** Raw. */\nRAW;\n";
+        expect(findDocComments(heredoc, 'php').map((comment) => comment.body)).toEqual(['Real.']);
+    });
 });

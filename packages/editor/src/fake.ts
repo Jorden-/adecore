@@ -659,6 +659,10 @@ export class FakeEditor implements Editor {
         return Number.isInteger(line) && line >= 0 && line < this.text.split('\n').length ? this.charSize.height : 0;
     }
 
+    getBaseLineHeight(): number {
+        return this.charSize.height;
+    }
+
     onLineHeights(listener: Listener): () => void {
         return subscribe(this.lineHeights, listener);
     }

@@ -198,6 +198,7 @@
         },
         "docs": {
             "label": "Rendered documentation",
+            "labelNamed": "Rendered documentation: {{- summary}}",
             "render": "Show rendered documentation",
             "showSource": "Show documentation source",
             "tags": {

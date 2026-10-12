@@ -16,6 +16,10 @@ export function shortcutsOf(keymap: Keymap, apple: boolean) {
     return { ...shortcuts, rename: shortcuts.renameSymbol };
 }
 
+/* AltGr reports Ctrl and Alt together and types a character on the layouts that have it, so it is no Ctrl+Alt shortcut. */
 export function isShortcut(target: LanguageShortcut | null, event: KeyboardEvent): boolean {
-    return target !== null && matchesShortcut(target, event, target.apple);
+    if (target === null || (event.ctrlKey && event.altKey && event.getModifierState?.('AltGraph') === true)) {
+        return false;
+    }
+    return matchesShortcut(target, event, target.apple);
 }

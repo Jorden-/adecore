@@ -122,7 +122,10 @@ export const KEYMAP = {
 
 export type KeymapId = keyof typeof KEYMAP;
 
-export type Keymap = Readonly<Record<KeymapId, KeyBinding>>;
+/* Commands added after a host may have written a full keymap of its own; a keymap without one falls back to the built-in chord. */
+export type OptionalKeymapId = 'toggleRenderedDocs';
+
+export type Keymap = Readonly<Record<Exclude<KeymapId, OptionalKeymapId>, KeyBinding> & Partial<Record<OptionalKeymapId, KeyBinding>>>;
 export type KeymapOverrides = Partial<Record<KeymapId, Partial<KeyBinding>>>;
 
 export const KEYMAP_IDS = Object.keys(KEYMAP) as KeymapId[];
@@ -133,7 +136,7 @@ export function resolveKeymap(overrides: KeymapOverrides = {}): Keymap {
 
 /* The chord of a command on a platform, or null when the platform has none. */
 export function chordOf(id: KeymapId, apple: boolean, keymap: Keymap = KEYMAP): string | null {
-    return keymap[id][apple ? 'mac' : 'other'];
+    return (keymap[id] ?? KEYMAP[id])[apple ? 'mac' : 'other'];
 }
 
 const MODIFIERS = new Map<string, 'mod' | 'ctrl' | 'meta' | 'alt' | 'shift'>([

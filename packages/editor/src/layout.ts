@@ -85,6 +85,10 @@ export interface BlockReplacement {
     revision?: number;
     /* What assistive technology calls the row. */
     label?: string;
+    /* Whether vertical caret movement may stop in the row's lines instead of stepping over the row. */
+    enterable?: boolean;
+    /* Called before the view scrolls to an offset inside the row's lines. */
+    onReveal?: () => void;
 }
 
 /* Collapsed, it hides the lines after `startLine` through `endLine`. */
@@ -925,8 +929,9 @@ export class EditorLayout {
     }
 
     /*
-     * The offset a visual line above or below, `distance` pixels away, at an x. Widgets are walked
-     * over, and the document's ends stop the caret on the first or the last offset.
+     * The offset a visual line above or below, `distance` pixels away, at an x. Widgets and the rows of
+     * replaced lines, unless the host made them enterable, are walked over, and the document's ends stop
+     * the caret on the first or the last offset.
      */
     verticalOffset(offset: number, direction: -1 | 1, x: number, distance = this.metrics.lineHeight): number {
         const caret = this.caret(offset);
@@ -935,7 +940,7 @@ export class EditorLayout {
             return 0;
         }
         let row = this.rowAt(y);
-        while (row.kind === 'block') {
+        while (row.kind === 'block' || (row.replacement !== undefined && row.replacement.enterable !== true)) {
             const next = this.rows[row.index + direction];
             if (!next) {
                 return offset;

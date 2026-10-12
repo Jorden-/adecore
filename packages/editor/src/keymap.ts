@@ -10,6 +10,7 @@ export interface KeyLike {
     metaKey: boolean;
     altKey: boolean;
     shiftKey: boolean;
+    getModifierState?(key: string): boolean;
 }
 
 export type MoveKey = 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown' | 'PageUp' | 'PageDown';
@@ -127,8 +128,16 @@ function keyMatches(chordKey: string, event: KeyLike): boolean {
     return event.key === chordKey;
 }
 
+/* AltGr reports Ctrl and Alt together, so it is never the Ctrl+Alt of a chord: on the layouts that have it, it types a character. */
+export function isAltGraph(event: Pick<KeyLike, 'ctrlKey' | 'altKey' | 'getModifierState'>): boolean {
+    return event.ctrlKey && event.altKey && event.getModifierState?.('AltGraph') === true;
+}
+
 /* Whether an event is a chord, with `mod` as Cmd on macOS and Ctrl elsewhere and every modifier the chord does not name up. */
 export function chordMatches(chord: KeyChord, event: KeyLike, apple: boolean): boolean {
+    if (isAltGraph(event)) {
+        return false;
+    }
     const wantsMeta = chord.meta || (chord.mod && apple);
     const wantsCtrl = chord.ctrl || (chord.mod && !apple);
     return (

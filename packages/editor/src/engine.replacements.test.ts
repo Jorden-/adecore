@@ -90,4 +90,30 @@ describe('replacing lines with a row of the host', () => {
         expect(marker.getAttribute('aria-pressed')).toBe('true');
         editor.dispose();
     });
+
+    test('steps the caret over the row, or into it when the host made it enterable', () => {
+        const { editor, press } = setup({ text: TEXT });
+        editor.setReplacements?.(replacing());
+        editor.setCaret({ line: 4, character: 0 });
+        press('ArrowUp');
+        expect(editor.getCaret().line).toBe(0);
+        press('ArrowDown');
+        expect(editor.getCaret().line).toBe(4);
+        editor.setReplacements?.([{ ...replacing()[0]!, enterable: true }]);
+        press('ArrowUp');
+        expect(editor.getCaret().line).toBeGreaterThanOrEqual(1);
+        expect(editor.getCaret().line).toBeLessThanOrEqual(3);
+        editor.dispose();
+    });
+
+    test('tells the host before it scrolls to a place inside the lines', () => {
+        const { editor } = setup({ text: TEXT });
+        const calls: string[] = [];
+        editor.setReplacements?.([{ ...replacing()[0]!, onReveal: () => calls.push('reveal') }]);
+        editor.setCaret({ line: 4, character: 0 });
+        expect(calls).toEqual([]);
+        editor.setCaret({ line: 2, character: 1 });
+        expect(calls).toEqual(['reveal']);
+        editor.dispose();
+    });
 });

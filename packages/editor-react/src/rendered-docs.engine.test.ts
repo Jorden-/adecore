@@ -66,7 +66,7 @@ describe('rendered documentation comments', () => {
         docs.configure({ renderDocComments: true });
         expect(blocks()).toHaveLength(2);
         expect(blocks()[0]!.getAttribute('role')).toBe('group');
-        expect(blocks()[0]!.getAttribute('aria-label')).toBe('Rendered documentation');
+        expect(blocks()[0]!.getAttribute('aria-label')).toBe('Rendered documentation: First function.');
         expect(drawn()).not.toContain('First function.');
         expect(drawn()).toContain('const last = 2;');
         expect(editor.getText()).toBe(TEXT);
@@ -135,7 +135,7 @@ describe('rendered documentation comments', () => {
         editor.setCaret({ line: 5, character: 0 });
         timers.advance(0);
         expect(blocks()).toHaveLength(2);
-        press('ArrowUp');
+        press('ArrowLeft');
         timers.advance(0);
         expect(editor.getCaret().line).toBeGreaterThanOrEqual(1);
         expect(editor.getCaret().line).toBeLessThanOrEqual(4);
@@ -211,5 +211,107 @@ describe('rendered documentation comments', () => {
         const many = Array.from({ length: 600 }, () => '/** One. */\nlet a;').join('\n');
         const { docs } = setup(many);
         expect(docs.all).toHaveLength(500);
+    });
+    test('leaves AltGr+Q to the layout that types an at sign with it', () => {
+        const { press, editor, blocks } = setup();
+        editor.setCaret({ line: 7, character: 4 });
+        const altGraph = { ctrlKey: true, altKey: true, code: 'KeyQ', getModifierState: (name: string) => name === 'AltGraph' } as never;
+        expect(press('@', altGraph)).toBe(false);
+        expect(blocks()).toEqual([]);
+    });
+
+    test('lets the key fall through when the shortcut finds no comment at the caret', () => {
+        const { press, editor, blocks } = setup();
+        editor.setCaret({ line: 0, character: 2 });
+        expect(press('q', { ctrlKey: true, altKey: true, code: 'KeyQ' } as never)).toBe(false);
+        expect(blocks()).toEqual([]);
+    });
+
+    test('draws the lines right again after one edit replaced the whole document', () => {
+        const { docs, editor, timers, drawn, blocks } = setup();
+        docs.configure({ renderDocComments: true });
+        editor.applyEdits([{ range: { start: { line: 0, character: 0 }, end: editor.positionAt(Number.MAX_SAFE_INTEGER) }, text: TEXT.replace('= 1', '= 3') }]);
+        timers.advance(150);
+        expect(blocks()).toHaveLength(2);
+        expect(drawn()).not.toContain('First function.');
+        expect(drawn()).toContain('const first = 3;');
+        expect(drawn()).toContain('function one');
+    });
+
+    test('estimates a row from the base line height, also when line 0 is itself a rendered comment', () => {
+        const { docs, editor } = setup(['/**', ' * a', ' * b', ' * c', ' */', 'x;', '/** Two. */', 'y;'].join('\n'));
+        docs.toggleAt(0);
+        docs.toggleAt(6);
+        expect(editor.getLineHeight(6)).toBe(Math.max(editor.getBaseLineHeight!(), 20));
+    });
+
+    test('skips a rendered comment when the caret moves up or down past it', () => {
+        const { docs, editor, press, timers } = setup();
+        docs.configure({ renderDocComments: true });
+        editor.setCaret({ line: 5, character: 3 });
+        timers.advance(0);
+        press('ArrowUp');
+        timers.advance(0);
+        expect(editor.getCaret()).toEqual({ line: 0, character: 3 });
+        press('ArrowDown');
+        timers.advance(0);
+        expect(editor.getCaret()).toEqual({ line: 5, character: 3 });
+        expect(docs.isRendered(docs.all[0]!)).toBe(true);
+    });
+
+    test('skips a rendered comment when a page step ends inside it', () => {
+        const { docs, editor, press, timers, viewport } = setup();
+        docs.configure({ renderDocComments: true });
+        const lineHeight = editor.getBaseLineHeight!();
+        Object.defineProperty(viewport, 'clientHeight', { value: lineHeight * 2, configurable: true });
+        editor.setCaret({ line: 0, character: 0 });
+        timers.advance(0);
+        press('PageDown');
+        timers.advance(0);
+        expect(editor.getCaret().line).toBeGreaterThanOrEqual(5);
+        expect(docs.isRendered(docs.all[0]!)).toBe(true);
+    });
+
+    test('shows a rendered comment as source before it reveals a find match inside it', () => {
+        const { docs, editor, blocks, drawn } = setup();
+        docs.configure({ renderDocComments: true });
+        editor.setCaret({ line: 10, character: 0 });
+        editor.findFromCursor({ text: 'The input', regex: false, caseSensitive: false, wholeWord: false } as never, -1);
+        expect(blocks()).toHaveLength(1);
+        expect(drawn()).toContain('The input.');
+    });
+
+    test('moves only the carets in the comment when it gets drawn as text', () => {
+        const { docs, editor, blocks } = setup();
+        editor.setSelections([
+            { start: { line: 10, character: 2 }, end: { line: 10, character: 4 } },
+            { start: { line: 3, character: 2 }, end: { line: 3, character: 2 } }
+        ]);
+        docs.toggle();
+        expect(blocks()).toHaveLength(1);
+        expect(editor.getSelections()).toEqual([
+            { start: { line: 10, character: 2 }, end: { line: 10, character: 4 } },
+            { start: { line: 5, character: 0 }, end: { line: 5, character: 0 } }
+        ]);
+    });
+
+    test('keeps a comment that is the whole document as source and its button unpressed', () => {
+        const { docs, markers, blocks, editor } = setup('/**\n * Only.\n */');
+        editor.setCaret({ line: 1, character: 2 });
+        expect(docs.toggle()).toBe(false);
+        expect(blocks()).toEqual([]);
+        expect(markers()[0]!.getAttribute('aria-pressed')).toBe('false');
+        docs.configure({ renderDocComments: true });
+        expect(blocks()).toEqual([]);
+        expect(markers()[0]!.getAttribute('aria-pressed')).toBe('false');
+    });
+
+    test('names every rendered block by the start of its summary', () => {
+        const { docs, blocks } = setup();
+        docs.configure({ renderDocComments: true });
+        expect(blocks().map((block) => block.getAttribute('aria-label'))).toEqual([
+            'Rendered documentation: First function.',
+            'Rendered documentation: Second function.'
+        ]);
     });
 });

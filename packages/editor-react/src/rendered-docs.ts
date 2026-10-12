@@ -5,6 +5,8 @@ import { isShortcut } from './shortcut-keys.ts';
 import { realTimers, type Timers } from './timers.ts';
 
 const OWNER = 'rendered-docs';
+const DOCS_PREFIX = 'docs-';
+const SUMMARY_WORDS = 6;
 const SETTLE_MS = 100;
 /* What a row is taken to be tall until its content is in and measured. */
 const ESTIMATED_LINE_HEIGHT = 20;
@@ -33,6 +35,26 @@ function startOf(comment: DocComment): EditorPosition {
     return { line: comment.startLine, character: comment.indent.length };
 }
 
+/* A selection touches a comment unless it merely ends where the comment begins or swallows the comment whole. */
+function touches(range: EditorRange, comment: DocComment): boolean {
+    if (range.end.line < comment.startLine || range.start.line > comment.endLine) {
+        return false;
+    }
+    const empty = range.start.line === range.end.line && range.start.character === range.end.character;
+    if (!empty && range.end.line === comment.startLine && range.end.character === 0) {
+        return false;
+    }
+    return empty || range.start.line >= comment.startLine || range.end.line <= comment.endLine;
+}
+
+/* The first words of what a comment says, to tell its row from the others for a person who hears it. */
+function summaryOf(body: string): string {
+    const lead = body.split('\n').findIndex((line) => /^\s*@/.test(line));
+    const text = (lead === -1 ? body : body.split('\n').slice(0, lead).join('\n')).replace(/[`*_#>[\]()]/g, ' ');
+    const words = text.split(/\s+/).filter((word) => word !== '');
+    return words.slice(0, SUMMARY_WORDS).join(' ');
+}
+
 function samePlace(range: EditorRange | null, position: EditorPosition): boolean {
     return range !== null && range.start.line === position.line && range.start.character === position.character;
 }
@@ -52,6 +74,9 @@ export class RenderedDocsFeature {
     private readonly containers = new Map<string, HTMLElement>();
     private readonly markerLines = new Map<string, number>();
     private readonly parsed = new Map<string, ParsedDocComment>();
+    private indexes = new Map<DocComment, number>();
+    /* Comments a reveal showed as source until the caret has settled where it was going. */
+    private readonly revealed = new Set<DocComment>();
     private readonly listeners = new Set<() => void>();
     private version = 0;
     private settleTimer: unknown;
@@ -75,7 +100,10 @@ export class RenderedDocsFeature {
             // The caret is told before the text change that moved it, so what the lines are is decided a moment later.
             editor.onCaret(() => {
                 this.timers.clear(this.caretTimer);
-                this.caretTimer = this.timers.set(() => this.publish(), 0);
+                this.caretTimer = this.timers.set(() => {
+                    this.revealed.clear();
+                    this.publish();
+                }, 0);
             }),
             editor.onGutterMarker((id) => {
                 const line = this.markerLines.get(id);
@@ -84,11 +112,7 @@ export class RenderedDocsFeature {
                 }
             }),
             editor.onKeyDown((event) => {
-                if (isShortcut(this.language.shortcuts.toggleRenderedDocs, event)) {
-                    this.toggle();
-                    return true;
-                }
-                return false;
+                return isShortcut(this.language.shortcuts.toggleRenderedDocs, event) && this.toggle();
             }),
             editor.onViewChange(() => this.sweep())
         ];
@@ -128,14 +152,14 @@ export class RenderedDocsFeature {
 
     /* Whether a comment is drawn as text now: its own switch, else the setting. A comment the caret is in is not, whatever its switch says. */
     isRendered(comment: DocComment): boolean {
-        return this.wantsRendered(comment) && !this.touched(comment);
+        return this.wantsRendered(comment) && !this.touched(comment) && !this.revealed.has(comment);
     }
 
     /* Switches the comment the caret is in between formatted and source. False when the caret is in none. */
     toggle(): boolean {
         this.settle();
         const comment = this.at(this.language.editor.getCaret().line);
-        if (comment === undefined) {
+        if (comment === undefined || !this.canRender(comment)) {
             return false;
         }
         this.setRendered(comment, !this.wantsRendered(comment));
@@ -146,7 +170,7 @@ export class RenderedDocsFeature {
     toggleAt(startLine: number): boolean {
         this.settle();
         const comment = this.comments.find((candidate) => candidate.startLine === startLine);
-        if (comment === undefined) {
+        if (comment === undefined || !this.canRender(comment)) {
             return false;
         }
         this.setRendered(comment, !this.wantsRendered(comment));
@@ -157,7 +181,7 @@ export class RenderedDocsFeature {
     entries(): readonly RenderedDocEntry[] {
         const result: RenderedDocEntry[] = [];
         for (const [id, container] of this.containers) {
-            const comment = this.comments.find((candidate) => this.idOf(candidate) === id);
+            const comment = this.comments[Number(id.slice(DOCS_PREFIX.length))];
             if (comment !== undefined) {
                 result.push({ id, comment, parsed: this.parse(comment), container });
             }
@@ -189,10 +213,18 @@ export class RenderedDocsFeature {
 
     /* By place in the document, so a row keeps its element when an edit above it moves its lines. */
     private idOf(comment: DocComment): string {
-        return `docs-${this.comments.indexOf(comment)}`;
+        return `${DOCS_PREFIX}${this.indexes.get(comment) ?? -1}`;
+    }
+
+    /* A comment that is all the document has has no line to leave the caret on, so it stays source. */
+    private canRender(comment: DocComment): boolean {
+        return comment.startLine > 0 || comment.endLine < this.language.editor.positionAt(Number.MAX_SAFE_INTEGER).line;
     }
 
     private wantsRendered(comment: DocComment): boolean {
+        if (!this.canRender(comment)) {
+            return false;
+        }
         const start = startOf(comment);
         const override = this.overrides.find((candidate) => samePlace(candidate.tracked.get(), start));
         return override?.rendered ?? this.settings.renderDocComments;
@@ -202,18 +234,8 @@ export class RenderedDocsFeature {
         return this.comments.find((comment) => line >= comment.startLine && line <= comment.endLine);
     }
 
-    /* A selection touches a comment unless it merely ends where the comment begins or swallows the comment whole. */
     private touched(comment: DocComment): boolean {
-        return this.language.editor.getSelections().some((range) => {
-            if (range.end.line < comment.startLine || range.start.line > comment.endLine) {
-                return false;
-            }
-            const empty = range.start.line === range.end.line && range.start.character === range.end.character;
-            if (!empty && range.end.line === comment.startLine && range.end.character === 0) {
-                return false;
-            }
-            return empty || range.start.line >= comment.startLine || range.end.line <= comment.endLine;
-        });
+        return this.language.editor.getSelections().some((range) => touches(range, comment));
     }
 
     private setRendered(comment: DocComment, rendered: boolean): void {
@@ -233,10 +255,11 @@ export class RenderedDocsFeature {
         this.publish();
     }
 
-    /* Takes the caret out of a comment about to be drawn as text, to the line under it, else the one above it. */
+    /* Takes the carets and selections that touch a comment about to be drawn as text to the line under it, else the one above it. The others stay. */
     private leave(comment: DocComment): void {
         const { editor } = this.language;
-        if (!this.touched(comment)) {
+        const selections = editor.getSelections();
+        if (!selections.some((range) => touches(range, comment))) {
             return;
         }
         const count = editor.positionAt(Number.MAX_SAFE_INTEGER).line + 1;
@@ -246,7 +269,14 @@ export class RenderedDocsFeature {
         }
         const text = editor.textInRange({ start: { line, character: 0 }, end: { line, character: Number.MAX_SAFE_INTEGER } });
         const character = line > comment.endLine ? (/^[ \t]*/.exec(text)?.[0].length ?? 0) : text.length;
-        editor.setCaret({ line, character });
+        const place = { line, character };
+        editor.setSelections(selections.map((range) => (touches(range, comment) ? { start: place, end: place } : range)));
+    }
+
+    /* Shows a comment as source for the reveal that is about to scroll into it, since its row would only be in the way. */
+    private reveal(comment: DocComment): void {
+        this.revealed.add(comment);
+        this.publish();
     }
 
     private clearOverrides(): void {
@@ -271,6 +301,8 @@ export class RenderedDocsFeature {
         this.stale = false;
         const { editor, languageId } = this.language;
         this.comments = findDocComments(editor.getText(), languageId);
+        this.indexes = new Map(this.comments.map((comment, index) => [comment, index]));
+        this.revealed.clear();
         const starts = this.comments.map(startOf);
         this.overrides = this.overrides.filter((override) => {
             const kept = starts.some((start) => samePlace(override.tracked.get(), start));
@@ -279,7 +311,8 @@ export class RenderedDocsFeature {
             }
             return kept;
         });
-        this.publish();
+        // An edit that replaced everything leaves the rows on offsets at the end, which only a new set of rows repairs.
+        this.publish(true);
         this.bump();
     }
 
@@ -296,24 +329,25 @@ export class RenderedDocsFeature {
         return result;
     }
 
-    /* Hands the editor the rows and the buttons, unless they are what it has already. */
-    private publish(): void {
+    /* Hands the editor the rows and the buttons, unless they are what it has already or `force` says to. */
+    private publish(force = false): void {
         if (this.disposed || this.stale) {
             return;
         }
         const { editor } = this.language;
-        const t = (key: string): string => this.language.project.i18n.t(`editor:language.docs.${key}`);
+        const t = (key: string, options?: Record<string, string>): string => this.language.project.i18n.t(`editor:language.docs.${key}`, options);
         const rendered = this.comments.filter((comment) => this.isRendered(comment));
         const signature = rendered.map((comment) => `${this.idOf(comment)}@${comment.startLine}-${comment.endLine}`).join('|');
-        if (signature !== this.drawn) {
+        if (force || signature !== this.drawn) {
             this.drawn = signature;
-            const lineHeight = Math.max(editor.getLineHeight(0), ESTIMATED_LINE_HEIGHT);
+            const lineHeight = Math.max(editor.getBaseLineHeight?.() ?? 0, ESTIMATED_LINE_HEIGHT);
             const rows = rendered.map((comment): EditorReplacement => ({
                 id: this.idOf(comment),
                 startLine: comment.startLine,
                 endLine: comment.endLine,
                 height: Math.min(comment.endLine - comment.startLine + 1, MAX_ESTIMATED_LINES) * lineHeight,
-                label: t('label'),
+                label: this.labelOf(comment, t),
+                onReveal: () => this.reveal(comment),
                 render: (container) => this.mounted(this.idOf(comment), container)
             }));
             const kept = new Set(rows.map((row) => row.id));
@@ -337,6 +371,11 @@ export class RenderedDocsFeature {
             this.marked = marking;
             editor.setGutterMarkers(markers, OWNER);
         }
+    }
+
+    private labelOf(comment: DocComment, t: (key: string, options?: Record<string, string>) => string): string {
+        const summary = summaryOf(comment.body);
+        return summary === '' ? t('label') : t('labelNamed', { summary });
     }
 
     private mounted(id: string, container: HTMLElement): void {

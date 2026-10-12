@@ -32,11 +32,27 @@ function bodyOf(inner: string): string {
     return lines.map((line) => line.replace(/[ \t]+$/, '')).join('\n');
 }
 
+const HEREDOC_OPENER = /<<<[ \t]*(?:'(\w+)'|"(\w+)"|(\w+))\r?\n/g;
+
+/* The bodies of PHP heredocs and nowdocs, which the structure scan reads as code. Offsets of the first character after the opener and of the closing label. */
+function heredocBodies(text: string): [number, number][] {
+    const result: [number, number][] = [];
+    for (const opener of text.matchAll(HEREDOC_OPENER)) {
+        const label = opener[1] ?? opener[2] ?? opener[3]!;
+        const from = opener.index + opener[0].length;
+        const closer = new RegExp(`^[ \\t]*${label}\\b`, 'm').exec(text.slice(from));
+        result.push([from, closer === null ? text.length : from + closer.index]);
+    }
+    return result;
+}
+
 /*
  * The block comments that open with two stars and have their lines to themselves: nothing but
  * whitespace before the opener and after the closer. Only languages that write block comments as
  * a slash and a star have any, and a Vue file has them in its script. A comment that shares a line
- * with code is left out, since a row could not take its lines without hiding the code.
+ * with code is left out, since a row could not take its lines without hiding the code. A banner of
+ * three stars or more is no documentation, and nor is the text of a PHP heredoc or nowdoc. A heredoc
+ * body is still read as code by the scan, so a quote in it can hide the comments that follow.
  */
 export function findDocComments(text: string, language: string, limit = MAX_DOC_COMMENTS): DocComment[] {
     const vue = language.toLowerCase() === 'vue';
@@ -45,6 +61,7 @@ export function findDocComments(text: string, language: string, limit = MAX_DOC_
         return [];
     }
     const result: DocComment[] = [];
+    const bodies = language.toLowerCase() === 'php' && text.includes('<<<') ? heredocBodies(text) : [];
     const lines = vue ? text.split(/\r\n|\r|\n/) : null;
     let counted = 0;
     let line = 0;
@@ -53,6 +70,10 @@ export function findDocComments(text: string, language: string, limit = MAX_DOC_
             break;
         }
         if (range.kind !== 'comment' || commentRole((from, to) => text.slice(from, to), range.from, range.to) === undefined) {
+            continue;
+        }
+        // Three stars or more is a banner, not a comment about the code under it.
+        if (text[range.from + 3] === '*' || bodies.some(([from, to]) => range.from >= from && range.from < to)) {
             continue;
         }
         const lineStart = Math.max(text.lastIndexOf('\n', range.from - 1), text.lastIndexOf('\r', range.from - 1)) + 1;

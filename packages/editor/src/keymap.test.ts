@@ -18,6 +18,18 @@ const chord = (name: string, modifiers: Partial<KeyChord> = {}): KeyChord => ({
 });
 
 describe('chordMatches', () => {
+    test('never reads AltGr as the Ctrl and Alt of a chord', () => {
+        const altGraph = (name: string): boolean => name === 'AltGraph';
+        const event = key('@', { ctrlKey: true, altKey: true, code: 'KeyQ', getModifierState: altGraph });
+        expect(chordMatches(chord('Q', { ctrl: true, alt: true }), event, false)).toBe(false);
+        expect(chordMatches(chord('Q', { ctrl: true, alt: true }), { ...event, getModifierState: () => false }, false)).toBe(true);
+    });
+
+    test('reads the built-in chord of a command a host keymap leaves out', () => {
+        const { toggleRenderedDocs: _left, ...rest } = resolveKeymap();
+        expect(chordOf('toggleRenderedDocs', false, rest)).toBe(KEYMAP.toggleRenderedDocs.other);
+    });
+
     test('reads mod as Cmd on macOS and Ctrl elsewhere', () => {
         expect(chordMatches(chord('K', { mod: true }), key('k', { metaKey: true }), true)).toBe(true);
         expect(chordMatches(chord('K', { mod: true }), key('k', { ctrlKey: true }), true)).toBe(false);

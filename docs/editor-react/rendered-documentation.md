@@ -1,6 +1,6 @@
 # Rendered documentation
 
-Documentation comments drawn as formatted text in place of their lines, the way the Reader mode of the documentation in IntelliJ does. The comment stays in the document: copying, searching, the undo history and a language server see the raw text, and a screen reader finds the formatted block under the label "Rendered documentation".
+Documentation comments drawn as formatted text in place of their lines, the way the Reader mode of the documentation in IntelliJ does. The comment stays in the document: copying, searching, the undo history and a language server see the raw text, and a screen reader finds the formatted block under the label "Rendered documentation" and the first words of its summary.
 
 `language.renderedDocs` is the feature. It is off until a host turns it on for a document, or a person switches one comment with the button in the gutter.
 
@@ -12,13 +12,13 @@ language.renderedDocs.toggleAt(line); // the comment that starts on a line
 
 ## Which comments
 
-A block comment that opens with two stars and has its lines to itself: `/** ... */` in TypeScript, JavaScript, a Vue script, PHP, and every other language whose block comments are written with a slash and a star, such as Java, C#, Go, Rust, Kotlin, Swift and Dart. Ordinary `/* */` and `//` comments are not, nor is a comment that shares a line with code, since a row could not take its lines without hiding the code. It is the same test that gives a fold the role `doc-comment`; `findDocComments(text, languageId)` of `@adecore/editor-core` and `@adecore/editor` returns the comments as `DocComment`s with their offsets, lines, indentation and body.
+A block comment that opens with two stars and has its lines to itself: `/** ... */` in TypeScript, JavaScript, a Vue script, PHP, and every other language whose block comments are written with a slash and a star, such as Java, C#, Go, Rust, Kotlin, Swift and Dart. Ordinary `/* */` and `//` comments are not, nor is a banner of three stars or more, nor is the text of a PHP heredoc or nowdoc (the structure scan still reads a heredoc as code, so a quote in one can hide the comments after it), nor is a comment that shares a line with code, since a row could not take its lines without hiding the code. It is the same test that gives a fold the role `doc-comment`; `findDocComments(text, languageId)` of `@adecore/editor-core` and `@adecore/editor` returns the comments as `DocComment`s with their offsets, lines, indentation and body.
 
 A document is read again 100 ms after the last edit, and at most `MAX_DOC_COMMENTS` (500) comments per document are used; the rest stay text.
 
 ## What it shows
 
-The description is Markdown, then the tags are gathered by name in the order a reader looks for them, as a definition list:
+The description is Markdown, then the tags are gathered by name in the order a reader looks for them, as a definition list laid out as one table of two columns without lines. The label sits in the left column in the muted color, as wide as the widest label, and its values in the right column on the same row. Several parameters stack in that column, each as a name, a type and its text on one line where it fits.
 
 | Tag                                        | Shown as                                                                       |
 | ------------------------------------------ | ------------------------------------------------------------------------------ |
@@ -39,9 +39,9 @@ Inline `{@link Name}`, `{@link Name label}`, `{@link Name|label}`, `{@linkcode}`
 ## Switching
 
 - **Gutter button.** Each documentation comment has a book button at its first line, pressed while the comment is formatted. It is a [gutter marker](/editor/decorations#gutter-buttons) of the owner `rendered-docs`.
-- **Command.** `toggleRenderedDocs` is a key of the key table, `Ctrl+Alt+Q` on every platform. `language.renderedDocs.toggle()` is the same for a menu or a palette. It switches the comment the caret is in and returns false when the caret is in none. Switching a comment to formatted takes the caret to the line under it, or the line above it when the comment ends the document.
+- **Command.** `toggleRenderedDocs` is a key of the key table, `Ctrl+Alt+Q` on every platform. `language.renderedDocs.toggle()` is the same for a menu or a palette. It switches the comment the caret is in and returns false when the caret is in none. Switching a comment to formatted takes the carets and selections that touch it to the line under it, or the line above it when the comment ends the document, and leaves the others where they are. A comment that is the whole document stays source: the command returns false and the button is not pressed. AltGr reports Ctrl and Alt together, so it never fires this shortcut or any other Ctrl+Alt one.
 - **Setting.** `configure({ renderDocComments })` formats every comment, and is off by default as it is in IntelliJ. Changing it puts every comment back under the setting, whatever a person switched before. `isRendered(comment)` and `all` read the state.
-- **Editing.** A comment the caret or a selection touches is drawn as source, and as formatted text again a moment after the caret leaves. A selection that ends where the comment begins, or swallows the comment whole, does not touch it. A click on the formatted block never moves the caret, and nothing typed edits it.
+- **Editing.** A comment the caret or a selection touches is drawn as source, and as formatted text again a moment after the caret leaves. A selection that ends where the comment begins, or swallows the comment whole, does not touch it. A click on the formatted block never moves the caret, and nothing typed edits it. Moving the caret up or down, by a line or by a page, steps over a formatted comment and keeps the column, as it does in IntelliJ. A find match or a go-to target inside a formatted comment shows that comment as source first, then reveals the target. A Markdown image is drawn as its alt text, so a comment cannot make the editor load anything.
 
 ## Links
 

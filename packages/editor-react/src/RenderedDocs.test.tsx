@@ -74,4 +74,24 @@ describe('the rendered block', () => {
         expect(html).toContain('array&lt;string,int&gt;');
         expect(html).toContain('Collection');
     });
+
+    test('lays the tags out as one table of labels and values, without lines', () => {
+        const html = markup(SOURCE);
+        expect(html.match(/<dl\b/g)).toHaveLength(1);
+        expect(html).toContain('grid-cols-[max-content_minmax(0,1fr)]');
+        expect(html).toContain('items-baseline');
+        expect(/<dl\b.*<\/dl>/.exec(html)![0]).not.toMatch(/\bborder/);
+        // Both params share the one label, and the value sits right after its label in the markup.
+        expect(html.match(/<dt\b/g)).toHaveLength(6);
+        expect(html.match(/<dd\b/g)).toHaveLength(7);
+        expect(html).toMatch(/<dt[^>]*>Parameters<\/dt><dd[^>]*>.*?<\/dd><dd[^>]*>/);
+        expect(html).toContain('gap-y-0.5');
+    });
+
+    test('draws a Markdown image as its alt text and never as an image', () => {
+        const html = markup('/**\n * Logo ![the logo](https://example.com/track.png) here.\n */');
+        expect(html).not.toContain('<img');
+        expect(html).not.toContain('example.com/track.png');
+        expect(html).toContain('the logo');
+    });
 });

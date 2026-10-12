@@ -249,6 +249,10 @@ class SmartEditor implements Editor {
         return this.view.getLineHeight(line);
     }
 
+    getBaseLineHeight(): number {
+        return this.view.layout.metrics.lineHeight;
+    }
+
     onLineHeights(listener: Listener): () => void {
         return this.view.onLineHeights(listener);
     }
@@ -709,6 +713,8 @@ class SmartEditor implements Editor {
                 to: this.model.getLine(Math.max(0, Math.min(replacement.endLine, this.model.getLineCount() - 1))).end,
                 height: replacement.height,
                 label: replacement.label,
+                enterable: replacement.enterable,
+                onReveal: replacement.onReveal === undefined ? undefined : () => replacement.onReveal!(),
                 render: (container: HTMLElement) => {
                     container.classList.add('se-widget-replacement');
                     replacement.render(container);

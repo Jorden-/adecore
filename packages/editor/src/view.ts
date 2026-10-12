@@ -1273,6 +1273,10 @@ export class EditorView {
     /* Opens the folds that hide an offset, so a caret or a search result is where it can be seen. */
     ensureVisible(offset: number): void {
         const line = this.model.positionAt(offset).line;
+        const row = this.layout.rowForLine(line);
+        if (row.kind === 'text') {
+            row.replacement?.onReveal?.();
+        }
         if (!this.layout.hides(offset)) {
             return;
         }
