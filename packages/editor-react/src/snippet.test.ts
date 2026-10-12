@@ -276,3 +276,12 @@ test('a nonempty field or variable ending after a newline excludes the next line
     expect(variable.transforms![0]).toMatchObject({ start: 0, end: 4 });
     expect(variable.fields![0]!.ranges[0]).toMatchObject({ start: 6, end: 6 });
 });
+
+test('precomputed variable values render in occurrence order and require the matching count', () => {
+    const template = compileSnippet('${TM_FILENAME/a/b/}$1 ${TM_FILENAME/a/c/}');
+    const parsed = template.render(() => 'a', ['left', 'right']);
+    expect(parsed.text).toBe('left right');
+    expect(parsed.fields![0]!.ranges[0]).toMatchObject({ start: 4, end: 4 });
+    expect(() => template.render(() => 'a', [])).toThrow(RangeError);
+    expect(() => template.render(() => 'a', ['x', 'y', 'z'])).toThrow(RangeError);
+});

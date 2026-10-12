@@ -44,7 +44,7 @@ type Node =
 export type SnippetVariableResolver = (name: string) => string | undefined;
 export interface SnippetTemplate {
     readonly source: string;
-    render(resolve?: SnippetVariableResolver): ParsedSnippet;
+    render(resolve?: SnippetVariableResolver, variableTransforms?: readonly string[]): ParsedSnippet;
 }
 type FieldNode = Extract<Node, { kind: 'field' }>;
 
@@ -192,7 +192,7 @@ class SnippetParser {
     }
 }
 
-function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
+function renderSnippet(nodes: readonly Node[], variableTransforms?: readonly string[]): ParsedSnippet {
     const definitions = new Map<number, FieldNode>();
     const collect = (nodes: readonly Node[]): void => {
         for (const node of nodes) {
@@ -238,7 +238,11 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
             }
             if (node.kind === 'text') {
                 const start = text.length;
-                append(node.text);
+                const value = node.transform === undefined || variableTransforms === undefined ? node.text : variableTransforms[transforms.length];
+                if (typeof value !== 'string') {
+                    throw new RangeError('The variable transform count does not match the snippet.');
+                }
+                append(value);
                 if (node.transform !== undefined) {
                     if (++ranges > MAX_SNIPPET_RANGES) {
                         throw new SnippetLimitError();
@@ -291,6 +295,9 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
         }
     };
     render(nodes, false, [], new Set());
+    if (variableTransforms !== undefined && variableTransforms.length !== transforms.length) {
+        throw new RangeError('The variable transform count does not match the snippet.');
+    }
     stops.sort((left, right) => left.start - right.start || right.end - left.end);
     return {
         text,
@@ -427,12 +434,12 @@ export function compileSnippet(source: string): SnippetTemplate {
     }
     return {
         source,
-        render: (resolve) => {
+        render: (resolve, variableTransforms) => {
             if (nodes === null) {
                 return { text: source, stops: [], limited: true };
             }
             try {
-                return renderSnippet(resolveVariables(nodes, indices, resolve));
+                return renderSnippet(resolveVariables(nodes, indices, resolve), variableTransforms);
             } catch (error) {
                 if (!(error instanceof SnippetLimitError)) {
                     throw error;

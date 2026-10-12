@@ -1,3 +1,4 @@
+import type { SnippetTransformJob } from './snippet-transform-protocol.ts';
 import { fileUriToPath, StaleResultError, type CompletionContext, type CompletionItem } from '@adecore/lsp';
 import type { EditorContentChange, EditorPosition, EditorRange, EditorTextChange } from '@adecore/editor';
 import { comparePositions, shiftPosition } from './diagnostics-model.ts';
@@ -68,6 +69,9 @@ export class CompletionFeature {
     private requestTimer: unknown;
     private refreshTimer: unknown;
     private resolveTimer: unknown;
+    private textRevision = 0;
+    private acceptSequence = 0;
+    private disposed = false;
     private readonly resolved = new Map<CompletionItem, CompletionItem>();
 
     constructor(language: EditorLanguage, timers: Timers = realTimers) {
@@ -81,6 +85,7 @@ export class CompletionFeature {
             editor.onBlur(() => this.close())
         ];
         language.onDispose(() => {
+            this.disposed = true;
             for (const off of offs) {
                 off();
             }
@@ -118,9 +123,25 @@ export class CompletionFeature {
             return;
         }
         const { editor, project, uri, snippets } = this.language;
+        const acceptSequence = ++this.acceptSequence;
         const snippetToken = snippets.token;
         const inSnippet = snippets.isActive;
         const acceptedSelections = editor.getSelections();
+        const revision = this.textRevision;
+        const current = (): boolean => {
+            if (this.disposed || acceptSequence !== this.acceptSequence || revision !== this.textRevision || (inSnippet && snippets.token !== snippetToken)) {
+                return false;
+            }
+            const selections = editor.getSelections();
+            return (
+                selections.length === acceptedSelections.length &&
+                selections.every(
+                    (range, index) =>
+                        comparePositions(range.start, acceptedSelections[index]!.start) === 0 &&
+                        comparePositions(range.end, acceptedSelections[index]!.end) === 0
+                )
+            );
+        };
         recentChoicesOf(this.language.languageId).record(entry.item);
         let item = this.resolved.get(entry.item) ?? entry.item;
         const needsResolve = !this.resolved.has(entry.item) && project.service.providerOptions('completionItem/resolve', uri) !== undefined;
@@ -129,17 +150,7 @@ export class CompletionFeature {
             // Resolving can add the import an item needs; an item that cannot be resolved is still inserted as it is.
             item = await this.resolveNow(entry.item);
         }
-        const selections = editor.getSelections();
-        if (
-            needsResolve &&
-            ((inSnippet && snippets.token !== snippetToken) ||
-                selections.length !== acceptedSelections.length ||
-                selections.some(
-                    (range, index) =>
-                        comparePositions(range.start, acceptedSelections[index]!.start) !== 0 ||
-                        comparePositions(range.end, acceptedSelections[index]!.end) !== 0
-                ))
-        ) {
+        if (!current()) {
             return;
         }
         const caret = editor.getCaret();
@@ -155,6 +166,7 @@ export class CompletionFeature {
         let ranges = 0;
         const now = new Date();
         const template = item.insertTextFormat === 2 ? compileSnippet(item.textEdit?.newText ?? item.insertText ?? item.label) : undefined;
+        const finishes = new Map<Insertion, (values: readonly string[]) => Insertion>();
         const renderAt = (position: EditorPosition, selection: EditorRange): Insertion => {
             const line = editor.textInRange({ start: { line: position.line, character: 0 }, end: { line: position.line, character: Number.MAX_SAFE_INTEGER } });
             const word = wordRangeAt(line, position);
@@ -184,20 +196,25 @@ export class CompletionFeature {
                     : { ...item, textEdit: undefined, insertText: item.textEdit?.newText ?? item.insertText };
             const editStart = editRangeOf(atItem, replace)?.start;
             // A commit character follows the name, so accepting must not also add a call.
-            const insertion = insertionOf(
-                atItem,
-                position,
-                line.slice(0, position.character),
-                replace,
-                commit === undefined ? line.slice(position.character) : '(',
-                {
-                    template,
-                    resolve: resolver,
-                    indentationBefore:
-                        editStart === undefined ? undefined : editor.textInRange({ start: { line: editStart.line, character: 0 }, end: editStart })
-                }
-            );
-            const rendered = commit === undefined ? insertion : { ...insertion, text: insertion.text + commit };
+            const finish = (variableTransforms?: readonly string[]): Insertion => {
+                const insertion = insertionOf(
+                    atItem,
+                    position,
+                    line.slice(0, position.character),
+                    replace,
+                    commit === undefined ? line.slice(position.character) : '(',
+                    {
+                        template,
+                        variableTransforms,
+                        resolve: resolver,
+                        indentationBefore:
+                            editStart === undefined ? undefined : editor.textInRange({ start: { line: editStart.line, character: 0 }, end: editStart })
+                    }
+                );
+                return commit === undefined ? insertion : { ...insertion, text: insertion.text + commit };
+            };
+            const rendered = finish();
+            finishes.set(rendered, finish);
             characters += rendered.text.length;
             ranges += rendered.fields?.reduce((count, field) => count + field.ranges.length + (field.linked?.length ?? 0), 1) ?? rendered.stops.length;
             if (rendered.limited || characters > MAX_COMPLETION_CHARACTERS || ranges > MAX_COMPLETION_RANGES) {
@@ -210,7 +227,7 @@ export class CompletionFeature {
             const { before, rest } = this.surroundings(planned, caret, lineAfter);
             const plan: CallPlan =
                 commit === undefined ? planCall({ item, languageId: this.language.languageId, insertion: planned, before, rest, replace }) : { action: 'none' };
-            const main = plan.action === 'add' ? withParentheses(planned, plan.inside) : planned;
+            let main = plan.action === 'add' ? withParentheses(planned, plan.inside) : planned;
             const extras = (item.additionalTextEdits ?? []).map((edit): EditorContentChange => ({ range: edit.range, text: edit.newText }));
             const instances = new Map<EditorContentChange, Insertion>();
             const continuing = inSnippet && snippets.isActive && snippetToken === snippets.token;
@@ -226,10 +243,52 @@ export class CompletionFeature {
                     const own = renderAt(position, selection);
                     const rendered = plan.action === 'add' ? withParentheses(own, plan.inside) : own;
                     const edit = { ...insertion, text: rendered.text };
-                    instances.set(edit, { ...rendered, range: insertion.range });
+                    const instance = { ...rendered, range: insertion.range };
+                    instances.set(edit, instance);
+                    const finish = finishes.get(own);
+                    if (finish !== undefined) {
+                        finishes.set(instance, (values) => ({ ...finish(values), range: insertion.range }));
+                    }
                     return edit;
                 }
             );
+            const drafts = [...mirrored.map((edit) => instances.get(edit)!), main];
+            const jobs: SnippetTransformJob[] = [];
+            const keys = new Map<string, number>();
+            const slots = drafts.map((draft) =>
+                (draft.variableTransforms ?? []).map((job) => {
+                    const key = JSON.stringify(job);
+                    let slot = keys.get(key);
+                    if (slot === undefined) {
+                        slot = jobs.length;
+                        keys.set(key, slot);
+                        jobs.push(job);
+                    }
+                    return slot;
+                })
+            );
+            if (jobs.length > 0 && project.host.snippetTransformWorker !== undefined) {
+                const values = await snippets.transformVariables(jobs);
+                if (!current()) {
+                    return;
+                }
+                if (values !== null) {
+                    const transformed = drafts.map((draft, index) =>
+                        slots[index]!.length === 0 ? draft : finishes.get(draft)!(slots[index]!.map((slot) => values[slot]!))
+                    );
+                    if (
+                        transformed.some((draft) => draft.limited) ||
+                        transformed.reduce((sum, draft) => sum + draft.text.length, 0) > MAX_COMPLETION_CHARACTERS
+                    ) {
+                        throw new CompletionLimitError();
+                    }
+                    main = transformed.at(-1)!;
+                    mirrored.forEach((edit, index) => {
+                        edit.text = transformed[index]!.text;
+                        instances.set(edit, transformed[index]!);
+                    });
+                }
+            }
             const primary = { range: main.range, text: main.text };
             const changes = [primary, ...mirrored, ...extras];
             if (changes.reduce((total, edit) => total + edit.text.length, 0) > MAX_COMPLETION_CHARACTERS) {
@@ -424,6 +483,7 @@ export class CompletionFeature {
     }
 
     private edited(change: EditorTextChange): void {
+        this.textRevision++;
         if (change.source !== 'input' || change.changes.length !== 1) {
             this.close();
             return;

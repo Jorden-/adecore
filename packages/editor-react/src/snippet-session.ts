@@ -1,3 +1,5 @@
+import { createSnippetTransformClient, type SnippetTransformClient } from './snippet-transform-client.ts';
+import type { SnippetTransformJob } from './snippet-transform-protocol.ts';
 import type { EditorContentChange, EditorPosition, EditorRange, EditorTextChange } from '@adecore/editor';
 import { comparePositions, rangeHolds, shiftPosition } from './diagnostics-model.ts';
 import type { EditorLanguage } from './editor-language.ts';
@@ -153,17 +155,33 @@ export class SnippetFeature {
     private extras: readonly EditorContentChange[] = [];
     private generation = 0;
     private choicePrefix: string | null = null;
+    private transforms: SnippetTransformClient | null = null;
 
     constructor(language: SnippetHost) {
         this.language = language;
         const { editor } = language;
         const offs = [editor.onKeyDown((event) => this.key(event)), editor.onTextChange((change) => this.edited(change)), editor.onCaret(() => this.moved())];
         language.onDispose(() => {
+            this.transforms?.dispose();
             this.end();
             for (const off of offs) {
                 off();
             }
         });
+    }
+
+    async transformVariables(jobs: readonly SnippetTransformJob[]): Promise<readonly string[] | null> {
+        const factory = this.language.project?.host.snippetTransformWorker;
+        if (factory === undefined) {
+            return null;
+        }
+        this.transforms ??= createSnippetTransformClient({ workerFactory: factory });
+        try {
+            return await this.transforms.transform(jobs);
+        } catch {
+            // A refused or timed-out transform retains the untransformed snippet.
+            return null;
+        }
     }
 
     get isActive(): boolean {

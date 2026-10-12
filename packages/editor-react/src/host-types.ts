@@ -1,3 +1,4 @@
+import type { WorkerRequestPort } from '@adecore/editor/worker-client';
 import type { EditorPosition, EditorRange } from '@adecore/editor';
 import type { i18n } from 'i18next';
 import type { Keymap } from '@adecore/editor/keymap';
@@ -53,6 +54,7 @@ export interface SnippetVariableContext {
 }
 
 export interface LanguageHost {
+    readonly snippetTransformWorker?: () => WorkerRequestPort;
     /* The instance the app hands `UIProvider`, which the features read their words from too; the default instance without one. */
     readonly i18n?: i18n;
     readonly folder?: string;

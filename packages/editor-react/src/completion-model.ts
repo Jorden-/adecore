@@ -1,3 +1,4 @@
+import type { SnippetTransformJob } from './snippet-transform-protocol.ts';
 import type { EditorContentChange, EditorPosition, EditorRange } from '@adecore/editor';
 import { applyCompletionDefaults, type CompletionItem, type CompletionResult, type MarkupContent } from '@adecore/lsp';
 import { comparePositions } from './diagnostics-model.ts';
@@ -285,10 +286,12 @@ export interface Insertion {
     /* Where Tab goes in the inserted text, in order; empty for plain text and for a snippet without stops. */
     readonly stops: readonly SnippetStop[];
     readonly fields?: readonly SnippetField[];
+    readonly variableTransforms?: readonly SnippetTransformJob[];
 }
 
 export interface SnippetInsertionOptions {
     readonly resolve?: SnippetVariableResolver;
+    readonly variableTransforms?: readonly string[];
     readonly template?: SnippetTemplate;
     /* The line before the edit start when the edit starts on another line than the caret. */
     readonly indentationBefore?: string;
@@ -323,9 +326,20 @@ export function insertionOf(
     const followed = range.end.line === caret.line && lineAfter.slice(Math.max(0, range.end.character - caret.character)).startsWith('(');
     const source = followed && isCallableKind(item.kind) ? withoutCall(raw) : raw;
     const template = options.template?.source === source ? options.template : compileSnippet(source);
-    const rendered = template.render(options.resolve);
+    const rendered = template.render(options.resolve, options.variableTransforms);
     const parsed = item.insertTextMode === 2 ? indentSnippet(rendered, options.indentationBefore ?? lineBefore.slice(0, range.start.character)) : rendered;
-    return { range, text: parsed.text, stops: tabOrder(parsed), fields: parsed.fields, ...(parsed.limited ? { limited: true } : {}) };
+    return {
+        range,
+        text: parsed.text,
+        stops: tabOrder(parsed),
+        fields: parsed.fields,
+        ...(options.variableTransforms !== undefined || rendered.transforms === undefined
+            ? {}
+            : {
+                  variableTransforms: rendered.transforms.map((range) => ({ ...range.transform, value: rendered.text.slice(range.start, range.end) }))
+              }),
+        ...(parsed.limited ? { limited: true } : {})
+    };
 }
 
 /*
