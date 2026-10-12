@@ -38,3 +38,26 @@ test('malformed default ranges are refused before an item obtains an invalid edi
         expect(() => applyCompletionDefaults({ label: 'x' }, { editRange } as CompletionList['itemDefaults'])).toThrow(RangeError);
     }
 });
+
+test('insert ranges must share one line, a start and a prefix with replace', () => {
+    for (const editRange of [
+        { start: range.start, end: { line: 1, character: 0 } },
+        { insert: range, replace: { start: { line: 0, character: 1 }, end: range.end } },
+        { insert: range, replace: { start: range.start, end: { line: 0, character: 1 } } }
+    ]) {
+        expect(() => applyCompletionDefaults({ label: 'x' }, { editRange })).toThrow(RangeError);
+    }
+});
+
+test('invalid ranges can be reported and ignored without dropping the other defaults', () => {
+    const errors: RangeError[] = [];
+    expect(
+        applyCompletionDefaults(
+            { label: 'x', insertText: 'x($1)' },
+            { editRange: {} as never, insertTextFormat: 2, insertTextMode: 2 },
+            { onInvalidRange: (error) => errors.push(error) }
+        )
+    ).toEqual({ label: 'x', insertText: 'x($1)', insertTextFormat: 2, insertTextMode: 2 });
+    expect(errors).toHaveLength(1);
+    expect(() => applyCompletionDefaults({ label: 1 } as never)).toThrow(TypeError);
+});

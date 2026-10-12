@@ -649,3 +649,21 @@ test('a resolved item retains inherited snippet fields when the server omits the
     expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('x');
     expect(mounted.language.snippets.isActive).toBe(true);
 });
+
+test('a single server with invalid range defaults still supplies a usable snippet', async () => {
+    const mounted = await completion('fo', 'unused');
+    mounted.editor.setCaret({ line: 0, character: 2 });
+    mounted.service.respond('textDocument/completion', () => ({
+        isIncomplete: false,
+        itemDefaults: { editRange: {}, insertTextFormat: 2 },
+        items: [{ label: 'foo', insertText: 'foo(${1:x})$0' }, { label: 'food' }]
+    }));
+    mounted.language.completion.invoke();
+    mounted.timers.advance(1);
+    await new Promise<void>((done) => setImmediate(done));
+    expect(mounted.language.completion.isOpen).toBe(true);
+    await mounted.language.completion.accept(false);
+    expect(mounted.editor.getText()).toBe('foo(x)');
+    expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('x');
+    expect(mounted.language.snippets.isActive).toBe(true);
+});

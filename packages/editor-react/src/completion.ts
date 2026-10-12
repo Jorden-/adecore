@@ -496,16 +496,20 @@ export class CompletionFeature {
         this.controller?.abort();
         const controller = new AbortController();
         this.controller = controller;
-        let result;
+        let normalized: ReturnType<typeof itemsOf>;
         try {
-            result = await project.service.completion(uri, position, context, { signal: controller.signal });
+            const result = await project.service.completion(uri, position, context, { signal: controller.signal });
+            if (request !== this.request) {
+                return;
+            }
+            normalized = itemsOf(result);
         } catch {
+            if (request === this.request) {
+                this.close();
+            }
             return;
         }
-        if (request !== this.request) {
-            return;
-        }
-        const { items, incomplete } = itemsOf(result);
+        const { items, incomplete } = normalized;
         this.pool = items;
         this.incomplete = incomplete;
         this.resolved.clear();

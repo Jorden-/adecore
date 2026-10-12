@@ -150,13 +150,24 @@ export function editRangeOf(item: CompletionItem, replace: boolean): EditorRange
 
 /* Items from a result, with the list's defaults filled in so each carries its own edit range and format. */
 export function itemsOf(result: CompletionResult): { items: CompletionItem[]; incomplete: boolean } {
-    if (result === null) {
-        return { items: [], incomplete: false };
-    }
-    if (Array.isArray(result)) {
-        return { items: result, incomplete: false };
-    }
-    return { incomplete: result.isIncomplete, items: result.items.map((item) => applyCompletionDefaults(item, result.itemDefaults)) };
+    const list = result === null || Array.isArray(result) ? undefined : result;
+    const items = result === null ? [] : Array.isArray(result) ? result : result.items;
+    return {
+        incomplete: list?.isIncomplete ?? false,
+        items: items.flatMap((item) => {
+            if (typeof item?.label !== 'string') {
+                return [];
+            }
+            try {
+                return [applyCompletionDefaults(item, list?.itemDefaults, { onInvalidRange: () => undefined })];
+            } catch (error) {
+                if (error instanceof TypeError || error instanceof RangeError) {
+                    return [];
+                }
+                throw error;
+            }
+        })
+    };
 }
 
 /*

@@ -67,7 +67,7 @@ Without `onConfiguration`, a configuration query without a section gets all sett
 
 ## Completion defaults
 
-`applyCompletionDefaults(item, defaults?)` fills completion-list defaults without changing the item. Explicit item fields win. A default edit range uses `textEditText`, then `label`; `insertText` does not supply a default edit. Malformed ranges throw `RangeError`. The session advertises mode `1` (as-is) as the completion default, matching the editor consumer; explicit item or list modes override it.
+`applyCompletionDefaults(item, defaults?)` fills completion-list defaults without changing the item. Explicit item fields win. A default edit range uses `textEditText`, then `label`; `insertText` does not supply a default edit. Malformed ranges throw `RangeError`; passing `{ onInvalidRange }` as the third argument reports and ignores just the invalid default range, preserving the other defaults. Ranges must be on one line; an insert/replace pair shares a start and the insert range must be a prefix of replace. Non-string labels or edit text throw `TypeError`. The session advertises mode `1` (as-is) as the completion default, matching the editor consumer; explicit item or list modes override it.
 
 ## Capabilities
 

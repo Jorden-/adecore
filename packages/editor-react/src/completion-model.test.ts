@@ -370,3 +370,17 @@ test('an edit-start indentation prefix can differ from the caret line', () => {
     };
     expect(insertionOf(item, { line: 1, character: 2 }, '\tfo', false, '', { indentationBefore: '  ' }).text).toBe('a\n  b');
 });
+
+test('a malformed default edit range retains suggestions and their other defaults', () => {
+    const list = {
+        isIncomplete: false,
+        itemDefaults: { editRange: {}, insertTextFormat: 2, insertTextMode: 2, commitCharacters: [';'] },
+        items: [{ label: 'foo', insertText: 'foo($1)' }, { label: 'food' }]
+    };
+    const result = itemsOf(list as unknown as import('@adecore/lsp').CompletionList);
+    expect(result.items).toEqual([
+        { label: 'foo', insertText: 'foo($1)', insertTextFormat: 2, insertTextMode: 2, commitCharacters: [';'] },
+        { label: 'food', insertTextFormat: 2, insertTextMode: 2, commitCharacters: [';'] }
+    ]);
+    expect(result.incomplete).toBe(false);
+});
