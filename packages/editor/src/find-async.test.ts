@@ -335,11 +335,13 @@ test('a capture timeout is visible and does not trigger an automatic retry', asy
     expect(await capture).toBeNull();
     expect(host.find.state.failed).toBeUndefined();
     expect(host.find.state.captureFailed).toBe('timeout');
-    host.find.step(1);
-    expect(host.find.state.current).toBe(1);
-    expect(host.searches).toHaveLength(1);
     host.find.setPreview(true);
     expect(host.timers.filter((timer) => !timer.cancelled)).toHaveLength(0);
+    host.find.step(1);
+    expect(host.find.state.current).toBe(1);
+    expect(host.find.state.captureFailed).toBeUndefined();
+    expect(host.searches).toHaveLength(1);
+    expect(host.timers.filter((timer) => !timer.cancelled)).toHaveLength(1);
     host.find.dispose();
 });
 

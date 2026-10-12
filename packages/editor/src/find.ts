@@ -239,6 +239,7 @@ export class FindController {
             return;
         }
         this.index = this.index === null ? (direction === 1 ? 0 : count - 1) : (this.index + direction + count) % count;
+        this.captureFailed = undefined;
         this.preparePreview();
     }
 
@@ -402,7 +403,7 @@ export class FindController {
         }
     }
 
-    async ensureMatch(): Promise<FindMatch | null> {
+    async ensureMatch(command = false): Promise<FindMatch | null> {
         if (this.currentMatch !== null || this.search === undefined || !this.query?.regex || !this.freshRegex) {
             return this.currentMatch;
         }
@@ -413,6 +414,9 @@ export class FindController {
         const query = this.query;
         const epoch = this.epoch;
         const snapshot = this.snapshot();
+        if (command) {
+            this.captureFailed = undefined;
+        }
         const current = (): boolean =>
             !this.disposed &&
             epoch === this.epoch &&
@@ -420,12 +424,15 @@ export class FindController {
             this.currentMark?.from === mark.from &&
             this.currentMark?.to === mark.to;
         try {
-            const found = await this.search.request((client) => {
-                if (!current()) {
-                    throw new EditorSearchError('superseded', 'The current find match changed.');
-                }
-                return client.match(snapshot, query, { ...mark, deadline: 10000 });
-            }, 'preview');
+            const found = await this.search.request(
+                (client) => {
+                    if (!current()) {
+                        throw new EditorSearchError('superseded', 'The current find match changed.');
+                    }
+                    return client.match(snapshot, query, { ...mark, deadline: 10000 });
+                },
+                command ? 'command' : 'preview'
+            );
             if (!current()) {
                 return null;
             }
