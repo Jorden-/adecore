@@ -134,7 +134,8 @@
             "insert": "Insert",
             "replace": "Replace",
             "details": "Details",
-            "none": "No suggestions"
+            "none": "No suggestions",
+            "transformFailed": "Snippet transform could not be applied"
         },
         "history": {
             "recent": "Recent locations"

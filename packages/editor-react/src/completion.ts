@@ -1,4 +1,5 @@
-import type { SnippetTransformJob } from './snippet-transform-protocol.ts';
+import { SnippetTransformError } from './snippet-transform-client.ts';
+import { MAX_TRANSFORM_JOBS, MAX_TRANSFORM_WORK, type SnippetTransformJob } from './snippet-transform-protocol.ts';
 import { fileUriToPath, StaleResultError, type CompletionContext, type CompletionItem } from '@adecore/lsp';
 import type { EditorContentChange, EditorPosition, EditorRange, EditorTextChange } from '@adecore/editor';
 import { comparePositions, shiftPosition } from './diagnostics-model.ts';
@@ -82,7 +83,10 @@ export class CompletionFeature {
             editor.onKeyDown((event) => this.key(event)),
             editor.onTextChange((change) => this.edited(change)),
             editor.onCaret((position) => this.caretMoved(position)),
-            editor.onBlur(() => this.close())
+            editor.onBlur(() => {
+                this.acceptSequence++;
+                this.close();
+            })
         ];
         language.onDispose(() => {
             this.disposed = true;
@@ -216,7 +220,9 @@ export class CompletionFeature {
             const rendered = finish();
             finishes.set(rendered, finish);
             characters += rendered.text.length;
-            ranges += rendered.fields?.reduce((count, field) => count + field.ranges.length + (field.linked?.length ?? 0), 1) ?? rendered.stops.length;
+            ranges +=
+                (rendered.variableTransforms?.length ?? 0) +
+                (rendered.fields?.reduce((count, field) => count + field.ranges.length + (field.linked?.length ?? 0), 1) ?? rendered.stops.length);
             if (rendered.limited || characters > MAX_COMPLETION_CHARACTERS || ranges > MAX_COMPLETION_RANGES) {
                 throw new CompletionLimitError();
             }
@@ -267,6 +273,9 @@ export class CompletionFeature {
                     return slot;
                 })
             );
+            if (jobs.length > MAX_TRANSFORM_JOBS || jobs.reduce((sum, job) => sum + job.value.length, 0) > MAX_TRANSFORM_WORK) {
+                throw new CompletionLimitError();
+            }
             if (jobs.length > 0 && project.host.snippetTransformWorker !== undefined) {
                 const values = await snippets.transformVariables(jobs);
                 if (!current()) {
@@ -329,10 +338,13 @@ export class CompletionFeature {
             this.afterInsert(item, commit, lineBefore);
             editor.focus();
         } catch (error) {
-            if (!(error instanceof CompletionLimitError)) {
+            if (error instanceof CompletionLimitError || (error instanceof SnippetTransformError && error.kind === 'range')) {
+                this.refuseLargeCompletion();
+            } else if (error instanceof SnippetTransformError) {
+                project.host.notify?.({ id: TOAST_ID, kind: 'error', title: project.i18n.t('editor:language.completion.transformFailed') });
+            } else {
                 throw error;
             }
-            this.refuseLargeCompletion();
         }
     }
 

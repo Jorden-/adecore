@@ -1,4 +1,4 @@
-import { createSnippetTransformClient, type SnippetTransformClient } from './snippet-transform-client.ts';
+import { createSnippetTransformClient, SnippetTransformError, type SnippetTransformClient } from './snippet-transform-client.ts';
 import type { SnippetTransformJob } from './snippet-transform-protocol.ts';
 import type { EditorContentChange, EditorPosition, EditorRange, EditorTextChange } from '@adecore/editor';
 import { comparePositions, rangeHolds, shiftPosition } from './diagnostics-model.ts';
@@ -178,9 +178,11 @@ export class SnippetFeature {
         this.transforms ??= createSnippetTransformClient({ workerFactory: factory });
         try {
             return await this.transforms.transform(jobs);
-        } catch {
-            // A refused or timed-out transform retains the untransformed snippet.
-            return null;
+        } catch (error) {
+            if (error instanceof SnippetTransformError && ['timeout', 'unavailable', 'superseded', 'disposed'].includes(error.kind)) {
+                return null;
+            }
+            throw error;
         }
     }
 

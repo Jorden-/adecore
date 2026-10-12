@@ -38,7 +38,8 @@ async function mount(source: string, text = 'fo', mode: 1 | 2 = 1, host: Languag
     const port = new Port();
     const service = new FakeLanguageService();
     service.respond('textDocument/completion', () => [{ label: 'foo', insertText: source, insertTextFormat: 2, insertTextMode: mode }, { label: 'food' }]);
-    const project = new ProjectLanguage(service, { snippetTransformWorker: () => port, ...host });
+    const notices: string[] = [];
+    const project = new ProjectLanguage(service, { snippetTransformWorker: () => port, notify: (notice) => notices.push(notice.title), ...host });
     const timers = new ManualTimers();
     const language = new EditorLanguage(project, mounted.editor, 'file:///file_name.ts', 'typescript', timers);
     cleanup.push(() => {
@@ -54,7 +55,7 @@ async function mount(source: string, text = 'fo', mode: 1 | 2 = 1, host: Languag
         await settle();
         return language.completion.accept(false);
     };
-    return { ...mounted, port, language, accept };
+    return { ...mounted, port, language, accept, notices };
 }
 
 test('variable transforms wait once for every caret and insert with fields in one undo step', async () => {
@@ -155,4 +156,63 @@ test('a newer accept supersedes a waiting accept without inserting its raw fallb
     mounted.port.answer(['new']);
     await Promise.all([first, second]);
     expect(mounted.editor.getText()).toBe('new');
+});
+
+test('transform ranges count toward the combined completion limit before a worker starts', async () => {
+    const text = Array.from({ length: 501 }, () => 'fo').join('\n');
+    const mounted = await mount('${CURSOR_NUMBER/(.*)/a$1/}${CURSOR_NUMBER/(.*)/b$1/}', text);
+    mounted.editor.setSelections(Array.from({ length: 501 }, (_, line) => ({ start: { line, character: 2 }, end: { line, character: 2 } })));
+    await mounted.accept();
+    expect(mounted.editor.getText()).toBe(text);
+    expect(mounted.port.requests).toHaveLength(0);
+    expect(mounted.notices).toEqual(['Completion is too large to insert']);
+});
+
+test('a deterministic worker range refusal cannot insert raw values', async () => {
+    const mounted = await mount('${TM_FILENAME/(.*)/$1/}$1');
+    const pending = mounted.accept();
+    await settle();
+    mounted.port.events.dispatchEvent(
+        Object.assign(new Event('message'), { data: { type: 'error', id: mounted.port.requests[0]!.id, kind: 'range', message: 'budget' } })
+    );
+    await pending;
+    expect(mounted.editor.getText()).toBe('fo');
+    expect(mounted.notices).toEqual(['Completion is too large to insert']);
+});
+
+test('an invalid transform pattern refuses the whole accept without starting a worker', async () => {
+    const mounted = await mount('${TM_FILENAME/(/$1/}$1');
+    await mounted.accept();
+    expect(mounted.editor.getText()).toBe('fo');
+    expect(mounted.port.requests).toHaveLength(0);
+    expect(mounted.notices).toHaveLength(1);
+});
+
+test('blur during a transform cannot insert or take focus back', async () => {
+    const mounted = await mount('${TM_FILENAME/(.*)/$1/}$1');
+    mounted.input.focus();
+    const pending = mounted.accept();
+    await settle();
+    const originalNode = globalThis.Node;
+    globalThis.Node = mounted.page.window.Node;
+    try {
+        mounted.input.dispatchEvent(new mounted.page.window.Event('focusout', { bubbles: true }));
+    } finally {
+        globalThis.Node = originalNode;
+    }
+    mounted.port.answer(['late']);
+    await pending;
+    expect(mounted.editor.getText()).toBe('fo');
+    expect(mounted.page.window.document.activeElement).not.toBe(mounted.input);
+});
+
+test('a selection-only move also invalidates a waiting transform', async () => {
+    const mounted = await mount('${TM_FILENAME/(.*)/$1/}$1');
+    const pending = mounted.accept();
+    await settle();
+    mounted.editor.setCaret({ line: 0, character: 0 });
+    mounted.port.answer(['late']);
+    await pending;
+    expect(mounted.editor.getText()).toBe('fo');
+    expect(mounted.editor.getCaret()).toEqual({ line: 0, character: 0 });
 });

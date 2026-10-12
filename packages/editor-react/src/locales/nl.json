@@ -134,7 +134,8 @@
             "insert": "Invoegen",
             "replace": "Vervangen",
             "details": "Details",
-            "none": "Geen suggesties"
+            "none": "Geen suggesties",
+            "transformFailed": "Snippettransformatie kon niet worden toegepast"
         },
         "history": {
             "recent": "Recente plekken"
