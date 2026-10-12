@@ -368,7 +368,7 @@ export class SnippetFeature {
         }
     }
 
-    private openChoices(frame: Frame): void {
+    private openChoices(frame: Frame, activeChoice?: number): void {
         const field = frame.instances.at(-1)?.fields.find((field) => field.index === frame.order[frame.current]);
         if (field?.choices === undefined || field.choices.length === 0 || this.language.pick === undefined) {
             return;
@@ -379,7 +379,7 @@ export class SnippetFeature {
         this.language.pick.open({
             anchor: field.ranges[field.primary]!.start,
             title: this.language.project?.i18n.t('editor:language.snippet.choices'),
-            active: prefix + Math.max(0, field.choices.indexOf(this.language.editor.textInRange(field.ranges[field.primary]!))),
+            active: prefix + (activeChoice ?? Math.max(0, field.choices.indexOf(this.language.editor.textInRange(field.ranges[field.primary]!)))),
             groups: [{ title: null, rows: field.choices.map((label, index) => ({ id: prefix + index, label, detail: '' })) }],
             accept: (id) => {
                 if (token !== this.generation) {
@@ -539,6 +539,10 @@ export class SnippetFeature {
                 start = end;
             }
         }
+        const frame = this.frames.at(-1);
+        const pick = this.language.popups?.getState().pick;
+        const activeChoice =
+            this.choicePrefix !== null && pick?.active.startsWith(this.choicePrefix) ? Number(pick.active.slice(this.choicePrefix.length)) : undefined;
         this.detached = { targets, ranges };
         this.applying = true;
         try {
@@ -546,6 +550,10 @@ export class SnippetFeature {
         } finally {
             this.applying = false;
             this.detached = null;
+        }
+        // The generic picker closes on any text edit, including an exit elsewhere in the snippet.
+        if (frame !== undefined && frame === this.frames.at(-1) && activeChoice !== undefined && this.language.popups?.getState().pick === null) {
+            this.openChoices(frame, activeChoice);
         }
     }
 

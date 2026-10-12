@@ -284,3 +284,40 @@ test('field output cannot expand unboundedly when multiline results acquire inde
     expect(host.editor.getText()).toBe(before);
     expect(host.feature.isActive).toBe(true);
 });
+
+test('a detached field transform keeps the next fields visible choice picker open', async () => {
+    const mounted = mountEditor({ text: 'fo', language: 'typescript' });
+    const port = new Port(),
+        timers = new ManualTimers(),
+        service = new FakeLanguageService();
+    service.respond('textDocument/completion', () => [
+        { label: 'foo', insertText: '${TM_FILENAME/(.*)/$1/} = ${1:bar}; ${1/(.*)/${1:/upcase}/}; ${2|name,item,value|}; $2$0', insertTextFormat: 2 },
+        { label: 'food' }
+    ]);
+    const project = new ProjectLanguage(service, { snippetTransformWorker: () => port });
+    const language = new EditorLanguage(project, mounted.editor, 'file:///file.ts', 'typescript', timers);
+    cleanup.push(() => {
+        language.dispose();
+        project.dispose();
+        mounted.editor.dispose();
+    });
+    await language.document.ready;
+    mounted.editor.setCaret({ line: 0, character: 2 });
+    language.completion.invoke();
+    timers.advance(1);
+    await settle();
+    const accept = language.completion.accept(false);
+    await settle();
+    port.answer(['File']);
+    await accept;
+    mounted.press('Tab');
+    await settle();
+    expect(language.popups.getState().pick?.groups[0]?.rows).toHaveLength(3);
+    mounted.press('ArrowDown');
+    const activeChoice = language.popups.getState().pick?.active;
+    port.answer(['BAR']);
+    await settle();
+    expect(mounted.editor.getText()).toBe('File = bar; BAR; name; name');
+    expect(language.popups.getState().pick?.active).toBe(activeChoice);
+    expect(language.popups.getState().pick?.groups[0]?.rows).toHaveLength(3);
+});
