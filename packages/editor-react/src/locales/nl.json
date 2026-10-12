@@ -126,7 +126,11 @@
             "copy": "Kopieer",
             "paste": "Plak"
         },
+        "snippet": {
+            "choices": "Snippetkeuze"
+        },
         "completion": {
+            "tooLarge": "Deze aanvulling is te groot om in te voegen",
             "insert": "Invoegen",
             "replace": "Vervangen",
             "details": "Details",

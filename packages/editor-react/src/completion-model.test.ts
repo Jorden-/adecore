@@ -360,3 +360,13 @@ test('completion list indentation defaults apply unless an item overrides them',
     expect(insertionOf(items[0]!, { line: 0, character: 4 }, '  bl', false).text).toBe('a\n  b');
     expect(insertionOf(items[1]!, { line: 0, character: 4 }, '  pl', false).text).toBe('a\nb');
 });
+
+test('an edit-start indentation prefix can differ from the caret line', () => {
+    const item = {
+        label: 'block',
+        insertTextFormat: 2 as const,
+        insertTextMode: 2 as const,
+        textEdit: { range: { start: { line: 0, character: 2 }, end: { line: 1, character: 2 } }, newText: 'a\n${1:b}' }
+    };
+    expect(insertionOf(item, { line: 1, character: 2 }, '\tfo', false, '', { indentationBefore: '  ' }).text).toBe('a\n  b');
+});

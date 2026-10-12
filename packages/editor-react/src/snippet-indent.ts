@@ -11,7 +11,7 @@ export function indentSnippet(parsed: ParsedSnippet, before: string): ParsedSnip
         insertions.push(offset + 1);
     }
     if (parsed.text.length + insertions.length * prefix.length > MAX_SNIPPET_TEXT) {
-        return { text: parsed.text, stops: [] };
+        return { text: parsed.text, stops: [], limited: true };
     }
     const shift = (offset: number): number => {
         let low = 0;

@@ -295,6 +295,7 @@ function withoutCall(snippet: string): string {
 }
 
 export interface Insertion {
+    readonly limited?: true;
     readonly range: EditorRange;
     readonly text: string;
     /* Where Tab goes in the inserted text, in order; empty for plain text and for a snippet without stops. */
@@ -305,6 +306,8 @@ export interface Insertion {
 export interface SnippetInsertionOptions {
     readonly resolve?: SnippetVariableResolver;
     readonly template?: SnippetTemplate;
+    /* The line before the edit start when the edit starts on another line than the caret. */
+    readonly indentationBefore?: string;
 }
 
 /*
@@ -328,15 +331,17 @@ export function insertionOf(
               { start: edit.start, end: comparePositions(edit.end, caret) < 0 && edit.end.line === caret.line ? caret : edit.end };
     if (item.insertTextFormat !== SNIPPET_FORMAT) {
         const adjusted =
-            item.insertTextMode === 2 ? indentSnippet({ text: raw, stops: [] }, lineBefore.slice(0, range.start.character)) : { text: raw, stops: [] };
-        return { range, text: adjusted.text, stops: [] };
+            item.insertTextMode === 2
+                ? indentSnippet({ text: raw, stops: [] }, options.indentationBefore ?? lineBefore.slice(0, range.start.character))
+                : { text: raw, stops: [] };
+        return { range, text: adjusted.text, stops: [], ...(adjusted.limited ? { limited: true } : {}) };
     }
     const followed = range.end.line === caret.line && lineAfter.slice(Math.max(0, range.end.character - caret.character)).startsWith('(');
     const source = followed && isCallableKind(item.kind) ? withoutCall(raw) : raw;
     const template = options.template?.source === source ? options.template : compileSnippet(source);
     const rendered = template.render(options.resolve);
-    const parsed = item.insertTextMode === 2 ? indentSnippet(rendered, lineBefore.slice(0, range.start.character)) : rendered;
-    return { range, text: parsed.text, stops: tabOrder(parsed), fields: parsed.fields };
+    const parsed = item.insertTextMode === 2 ? indentSnippet(rendered, options.indentationBefore ?? lineBefore.slice(0, range.start.character)) : rendered;
+    return { range, text: parsed.text, stops: tabOrder(parsed), fields: parsed.fields, ...(parsed.limited ? { limited: true } : {}) };
 }
 
 /*
@@ -348,7 +353,8 @@ export function mirroredInsertions(
     primary: EditorRange,
     caret: EditorPosition,
     text: (range: EditorRange) => string,
-    insertion: Insertion
+    insertion: Insertion,
+    includeSelections = false
 ): EditorContentChange[] {
     const before = insertion.range.start.line === caret.line ? caret.character - insertion.range.start.character : -1;
     const after = insertion.range.end.line === caret.line ? insertion.range.end.character - caret.character : -1;
@@ -358,11 +364,11 @@ export function mirroredInsertions(
     const typed = text({ start: insertion.range.start, end: caret });
     const replaced = text({ start: caret, end: insertion.range.end });
     return carets.flatMap((other): EditorContentChange[] => {
-        const at = other.start;
+        const at = includeSelections ? other.end : other.start;
         if (comparePositions(other.start, primary.start) === 0 && comparePositions(other.end, primary.end) === 0) {
             return [];
         }
-        if (comparePositions(other.start, other.end) !== 0 || at.character < before) {
+        if ((!includeSelections && comparePositions(other.start, other.end) !== 0) || at.character < before) {
             return [];
         }
         const range = { start: { line: at.line, character: at.character - before }, end: { line: at.line, character: at.character + after } };

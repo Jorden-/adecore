@@ -12,6 +12,8 @@ export interface PickSpec {
     /* The row the list opens on; the first one without it. */
     readonly active?: string;
     accept(id: string): void;
+    /* A list can hand Tab back to its surrounding workflow after it closes. */
+    onTab?(backwards: boolean): void;
     /*
      * Asked before the list closes on a row. A reason it cannot be taken keeps the list open with the reason
      * under it, the way a rename keeps its input; null lets the list close and `accept` run.
@@ -154,9 +156,18 @@ export class PickFeature {
                 this.activate(this.ids[this.ids.length - 1]!);
                 return true;
             case 'Enter':
-            case 'Tab':
                 this.choose(this.active);
                 return true;
+            case 'Tab': {
+                const spec = this.spec;
+                if (spec.onTab !== undefined) {
+                    this.close();
+                    spec.onTab(event.shiftKey);
+                } else {
+                    this.choose(this.active);
+                }
+                return true;
+            }
             case 'Escape':
                 this.close();
                 return true;

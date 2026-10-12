@@ -126,7 +126,11 @@
             "copy": "Copy",
             "paste": "Paste"
         },
+        "snippet": {
+            "choices": "Snippet choice"
+        },
         "completion": {
+            "tooLarge": "Completion is too large to insert",
             "insert": "Insert",
             "replace": "Replace",
             "details": "Details",

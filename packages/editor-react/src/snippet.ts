@@ -23,6 +23,7 @@ export interface SnippetField {
 }
 
 export interface ParsedSnippet {
+    readonly limited?: true;
     readonly text: string;
     readonly stops: readonly SnippetStop[];
     /* Optional so callers that construct the older text/stops shape remain valid. */
@@ -417,7 +418,7 @@ export function compileSnippet(source: string): SnippetTemplate {
         source,
         render: (resolve) => {
             if (nodes === null) {
-                return { text: source, stops: [] };
+                return { text: source, stops: [], limited: true };
             }
             try {
                 return renderSnippet(resolveVariables(nodes, indices, resolve));
@@ -426,7 +427,7 @@ export function compileSnippet(source: string): SnippetTemplate {
                     throw error;
                 }
                 // Language-server snippets may expand exponentially; retain the original text without a session.
-                return { text: source, stops: [] };
+                return { text: source, stops: [], limited: true };
             }
         }
     };

@@ -358,3 +358,232 @@ test('Tab aligns unknown names even when a host resolves one at only one caret',
     type('name');
     expect(editor.getText()).toBe('FOO name \nsupplied name ');
 });
+
+async function languageSnippet(source: string, count = 1) {
+    const mounted = await completion('', 'unused');
+    const parsed = parseSnippet(source);
+    mounted.editor.setText(Array.from({ length: count }, () => parsed.text).join('\n'));
+    mounted.language.snippets.beginInstances(
+        Array.from({ length: count }, (_, index) => ({
+            start: mounted.editor.positionAt(index * (parsed.text.length + 1)),
+            text: parsed.text,
+            stops: tabOrder(parsed),
+            fields: parsed.fields
+        }))
+    );
+    return mounted;
+}
+
+async function completeWithin(mounted: Awaited<ReturnType<typeof languageSnippet>>, text: string, imports = false, snippet = false): Promise<void> {
+    mounted.service.respond('textDocument/completion', () => [
+        {
+            label: 'foo',
+            filterText: 'fo',
+            insertText: text,
+            insertTextFormat: snippet ? 2 : 1,
+            ...(imports
+                ? { additionalTextEdits: [{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }, newText: 'import x;\n' }] }
+                : {})
+        }
+    ]);
+    mounted.language.completion.invoke();
+    mounted.timers.advance(1);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+}
+
+test('choosing a value edits all mirrors and retains the active field', async () => {
+    const { editor, language, press } = await languageSnippet('${1|a,b,c|} $1 ${2:end}$0');
+    expect(language.popups.getState().pick?.groups[0]?.rows.map((row) => row.label)).toEqual(['a', 'b', 'c']);
+    press('ArrowDown');
+    press('Enter');
+    expect(editor.getText()).toBe('b b end');
+    expect(language.popups.getState().pick).toBeNull();
+    expect(language.snippets.isActive).toBe(true);
+    expect(editor.getSelections().map((range) => editor.textInRange(range))).toEqual(['b', 'b']);
+    press('Tab');
+    expect(editor.textInRange(editor.getSelection())).toBe('end');
+    editor.runCommand('undo');
+    expect(editor.getText()).toBe('a a end');
+    expect(language.snippets.isActive).toBe(false);
+});
+
+test('choice Tab advances, Escape dismisses before ending, and typing closes the picker', async () => {
+    const first = await languageSnippet('${1|a,b|} $1 ${2:end}$0');
+    first.press('Tab');
+    expect(first.language.popups.getState().pick).toBeNull();
+    expect(first.editor.textInRange(first.editor.getSelection())).toBe('end');
+    const second = await languageSnippet('${1|a,b|} $1');
+    second.press('Escape');
+    expect(second.language.snippets.isActive).toBe(true);
+    expect(second.language.popups.getState().pick).toBeNull();
+    second.press('Escape');
+    expect(second.language.snippets.isActive).toBe(false);
+    expect(second.editor.getSelections()).toHaveLength(1);
+    const third = await languageSnippet('${1|a,b|} $1');
+    third.type('typed');
+    expect(third.language.popups.getState().pick).toBeNull();
+    expect(third.editor.getText()).toBe('typed typed');
+    expect(third.language.snippets.isActive).toBe(true);
+});
+
+test('a choice applies to every original caret instance', async () => {
+    const { editor, language } = await languageSnippet('${1|a,b|} $1 $0', 2);
+    const id = language.popups.getState().pick!.groups[0]!.rows[1]!.id;
+    language.pick.choose(id);
+    expect(editor.getText()).toBe('b b \nb b ');
+    expect(editor.getSelections()).toHaveLength(4);
+    expect(language.snippets.isActive).toBe(true);
+});
+
+for (const imports of [false, true]) {
+    test(`plain completion keeps outer stops ${imports ? 'with a boundary import' : 'without an import'}`, async () => {
+        const mounted = await languageSnippet('${1:x} ${2:y}$0');
+        mounted.type('fo');
+        await completeWithin(mounted, 'foo', imports);
+        expect(mounted.editor.getText()).toBe((imports ? 'import x;\n' : '') + 'foo y');
+        expect(mounted.language.snippets.isActive).toBe(true);
+        mounted.press('Tab');
+        expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('y');
+    });
+}
+
+test('completion replaces selected field mirrors as well as collapsed carets', async () => {
+    const mounted = await languageSnippet('${1:fo} $1 ${2:end}$0');
+    await completeWithin(mounted, 'foo');
+    expect(mounted.editor.getText()).toBe('foo foo end');
+    expect(mounted.language.snippets.isActive).toBe(true);
+    mounted.press('Tab');
+    expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('end');
+});
+
+test('nested fields return to outer stops after the childs final caret', async () => {
+    const mounted = await languageSnippet('for (${1:fo} of ${2:items}) {$0}');
+    await completeWithin(mounted, '${1:a}.${2:b}', false, true);
+    expect(mounted.editor.getText()).toBe('for (a.b of items) {}');
+    expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('a');
+    mounted.type('long');
+    mounted.press('Tab');
+    expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('b');
+    mounted.press('Tab');
+    expect(mounted.language.snippets.isActive).toBe(true);
+    expect(mounted.editor.getCaret().character).toBe(11);
+    mounted.press('Tab');
+    expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('items');
+    mounted.press('Tab');
+    expect(mounted.language.snippets.isActive).toBe(false);
+    expect(mounted.editor.getCaret().character).toBe(mounted.editor.getText().length - 1);
+});
+
+test('Shift+Tab out of the first child field selects its parent field', async () => {
+    const mounted = await languageSnippet('${1:fo} ${2:tail}$0');
+    await completeWithin(mounted, '${1:a}.${2:b}', false, true);
+    mounted.press('Tab', { shiftKey: true });
+    expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('a.b');
+    mounted.press('Tab');
+    expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('tail');
+});
+
+test('nested mirror instances stay linked and return without phantom carets', async () => {
+    const mounted = await languageSnippet('${1:fo} $1 ${2:tail}$0', 2);
+    await completeWithin(mounted, '${1:a}.${2:b}', false, true);
+    expect(mounted.editor.getSelections()).toHaveLength(4);
+    mounted.type('long');
+    mounted.press('Tab');
+    mounted.type('end');
+    expect(mounted.editor.getText()).toBe('long.end long.end tail\nlong.end long.end tail');
+    mounted.press('Tab');
+    expect(mounted.editor.getSelections()).toHaveLength(4);
+    mounted.press('Tab');
+    expect(mounted.editor.getSelections().map((range) => mounted.editor.textInRange(range))).toEqual(['tail', 'tail']);
+});
+
+test('Escape and undo end every nested frame', async () => {
+    const first = await languageSnippet('${1:fo} ${2:tail}$0');
+    await completeWithin(first, '${1:a}.${2:b}', false, true);
+    first.press('Escape');
+    expect(first.language.snippets.isActive).toBe(false);
+    expect(first.editor.getSelections()).toHaveLength(1);
+    const second = await languageSnippet('${1:fo} ${2:tail}$0');
+    await completeWithin(second, '${1:a}.${2:b}', false, true);
+    second.editor.runCommand('undo');
+    expect(second.language.snippets.isActive).toBe(false);
+    expect(second.editor.getText()).toBe('fo tail');
+});
+
+test('an edit crossing the active field ends the old session', async () => {
+    const { editor, language } = await languageSnippet('prefix ${1:fo} ${2:tail}$0');
+    const token = language.snippets.token;
+    language.snippets.applyEdits([{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 9 } }, text: 'foo' }], token);
+    expect(editor.getText()).toBe('foo tail');
+    expect(language.snippets.isActive).toBe(false);
+});
+
+test('an accept resolving after Tab does not push a child onto the new field', async () => {
+    const mounted = await languageSnippet('${1:fo} ${2:fo}$0');
+    let resolve = (_item: unknown): void => undefined;
+    mounted.service.respond(
+        'completionItem/resolve',
+        () =>
+            new Promise((done) => {
+                resolve = done;
+            })
+    );
+    mounted.service.respond('textDocument/completion', () => [{ label: 'foo', insertText: '${1:a}.${2:b}', insertTextFormat: 2 }]);
+    mounted.language.completion.invoke();
+    mounted.timers.advance(1);
+    await new Promise<void>((done) => setImmediate(done));
+    mounted.press('Tab');
+    resolve({ label: 'foo', insertText: '${1:a}.${2:b}', insertTextFormat: 2 });
+    await new Promise<void>((done) => setImmediate(done));
+    mounted.press('Tab');
+    mounted.press('Tab');
+    expect(mounted.language.snippets.isActive).toBe(false);
+});
+
+test('moving outside a child hull resumes its parent without selecting the field again', async () => {
+    const mounted = await languageSnippet('${1:fo} ${2:tail}$0');
+    await completeWithin(mounted, '${1:a}.${2:b}', false, true);
+    mounted.editor.setCaret({ line: 0, character: mounted.editor.getText().length });
+    await Promise.resolve();
+    expect(mounted.language.snippets.isActive).toBe(true);
+    mounted.press('Tab');
+    expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('tail');
+});
+
+test('the ninth nested frame starts fresh instead of retaining an unbounded stack', async () => {
+    const { editor, language, press } = await languageSnippet('${1:fo} ${2:tail}$0');
+    const parsed = parseSnippet('${1:a} ${2:b}$0');
+    for (let index = 0; index < 8; index++) {
+        const range = editor.getSelection();
+        language.snippets.applyEdits([{ range, text: parsed.text }], language.snippets.token);
+        language.snippets.beginInstances([{ start: range.start, text: parsed.text, stops: tabOrder(parsed), fields: parsed.fields }], { nested: true });
+    }
+    press('Tab');
+    expect(editor.textInRange(editor.getSelection())).toBe('b');
+    press('Tab');
+    expect(language.snippets.isActive).toBe(false);
+});
+
+test('range limits apply across instances before creating session positions', async () => {
+    const { editor, language } = await languageSnippet('${1:x} ${2:tail}$0');
+    const parsed = parseSnippet('${1:a} '.repeat(600));
+    editor.setText(parsed.text + '\n' + parsed.text);
+    language.snippets.beginInstances(
+        [0, parsed.text.length + 1].map((offset) => ({ start: editor.positionAt(offset), text: parsed.text, stops: tabOrder(parsed), fields: parsed.fields }))
+    );
+    expect(language.snippets.isActive).toBe(false);
+    expect(editor.getText()).toBe(parsed.text + '\n' + parsed.text);
+});
+
+test('a group exceeding the render budget leaves every caret unchanged and reports refusal', async () => {
+    const { editor, language, timers } = await completion('fo\nfo', '${1:a} '.repeat(600));
+    const notices: string[] = [];
+    language.project.host.notify = (notice) => notices.push(notice.title);
+    editor.setSelections([0, 1].map((line) => ({ start: { line, character: 2 }, end: { line, character: 2 } })));
+    language.completion.invoke();
+    timers.advance(1);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(editor.getText()).toBe('fo\nfo');
+    expect(notices).toEqual(['Completion is too large to insert']);
+    expect(language.snippets.isActive).toBe(false);
+});

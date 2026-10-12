@@ -4,6 +4,7 @@ import { comparePositions, shiftPosition } from './diagnostics-model.ts';
 import type { EditorLanguage } from './editor-language.ts';
 import {
     completionDocsOf,
+    editRangeOf,
     identifierPrefix,
     insertionOf,
     isIdentifierCharacter,
@@ -37,6 +38,10 @@ const RESOLVE_DELAY_MS = 120;
 const PAGE = 8;
 const LINES_BACK = 60;
 const TOAST_ID = 'language-completion';
+const MAX_COMPLETION_CHARACTERS = 2_000_000;
+const MAX_COMPLETION_RANGES = 1_000;
+
+class CompletionLimitError extends Error {}
 
 /*
  * The suggestions that open while a word is typed. A single typed identifier character or a trigger
@@ -89,6 +94,7 @@ export class CompletionFeature {
 
     /* Asks for suggestions at the caret now, as Ctrl+Space does. */
     invoke(): void {
+        this.language.pick.close();
         this.explicit = true;
         this.beginRequest({ triggerKind: 1 }, 0);
     }
@@ -111,7 +117,9 @@ export class CompletionFeature {
         if (entry === undefined) {
             return;
         }
-        const { editor, project, uri } = this.language;
+        const { editor, project, uri, snippets } = this.language;
+        const snippetToken = snippets.token;
+        const inSnippet = snippets.isActive;
         recentChoicesOf(this.language.languageId).record(entry.item);
         let item = this.resolved.get(entry.item) ?? entry.item;
         const needsResolve = !this.resolved.has(entry.item) && project.service.providerOptions('completionItem/resolve', uri) !== undefined;
@@ -124,6 +132,13 @@ export class CompletionFeature {
         const lineBefore = textBeforeOf(editor, caret);
         const lineAfter = editor.textInRange({ start: caret, end: { line: caret.line, character: Number.MAX_SAFE_INTEGER } });
         const carets = editor.getSelections();
+        const source = item.textEdit?.newText ?? item.insertText ?? item.label;
+        if (source.length * carets.length > MAX_COMPLETION_CHARACTERS) {
+            this.refuseLargeCompletion();
+            return;
+        }
+        let characters = 0;
+        let ranges = 0;
         const now = new Date();
         const template = item.insertTextFormat === 2 ? compileSnippet(item.textEdit?.newText ?? item.insertText ?? item.label) : undefined;
         const renderAt = (position: EditorPosition, selection: EditorRange): Insertion => {
@@ -153,68 +168,104 @@ export class CompletionFeature {
                 position === caret || item.textEdit === undefined
                     ? item
                     : { ...item, textEdit: undefined, insertText: item.textEdit?.newText ?? item.insertText };
+            const editStart = editRangeOf(atItem, replace)?.start;
             // A commit character follows the name, so accepting must not also add a call.
-            return insertionOf(atItem, position, line.slice(0, position.character), replace, commit === undefined ? line.slice(position.character) : '(', {
-                template,
-                resolve: resolver
-            });
-        };
-        const planned = renderAt(caret, editor.getSelection());
-        const { before, rest } = this.surroundings(planned, caret, lineAfter);
-        const plan: CallPlan =
-            commit === undefined ? planCall({ item, languageId: this.language.languageId, insertion: planned, before, rest, replace }) : { action: 'none' };
-        const main = plan.action === 'add' ? withParentheses(planned, plan.inside) : planned;
-        const extras = (item.additionalTextEdits ?? []).map((edit): EditorContentChange => ({ range: edit.range, text: edit.newText }));
-        const instances = new Map<EditorContentChange, Insertion>();
-        const mirrored = mirroredInsertions(carets, editor.getSelection(), caret, (range) => editor.textInRange(range), main).map((insertion) => {
-            const position = carets.find(
-                (range) =>
-                    range.start.line === insertion.range.start.line &&
-                    range.start.character >= insertion.range.start.character &&
-                    range.start.character <= insertion.range.end.character
-            )!.start;
-            const own = renderAt(position, { start: position, end: position });
-            const rendered = plan.action === 'add' ? withParentheses(own, plan.inside) : own;
-            const edit = { ...insertion, text: rendered.text };
-            instances.set(edit, { ...rendered, range: insertion.range });
-            return edit;
-        });
-        const primary = { range: main.range, text: main.text };
-        const changes = [primary, ...mirrored, ...extras];
-        // Imports and earlier carets move each insertion independently; the primary instance stays last.
-        const starts = [...mirrored, primary].map((insertion) =>
-            changes
-                .filter((change) => change !== insertion && comparePositions(change.range.end, insertion.range.start) <= 0)
-                .sort((left, right) => comparePositions(right.range.start, left.range.start))
-                .reduce((place, change) => shiftPosition(place, change), insertion.range.start)
-        );
-        if (!editor.applyEdits(changes)) {
-            return;
-        }
-        const landed = editor.getSelections();
-        if (commit === undefined) {
-            this.language.snippets.beginInstances(
-                [...mirrored, primary].map((insertion, index) => {
-                    const rendered = insertion === primary ? main : instances.get(insertion)!;
-                    return { start: starts[index]!, text: rendered.text, stops: rendered.stops, fields: rendered.fields };
-                })
+            const rendered = insertionOf(
+                atItem,
+                position,
+                line.slice(0, position.character),
+                replace,
+                commit === undefined ? line.slice(position.character) : '(',
+                {
+                    template,
+                    resolve: resolver,
+                    indentationBefore:
+                        editStart === undefined ? undefined : editor.textInRange({ start: { line: editStart.line, character: 0 }, end: editStart })
+                }
             );
-            if (plan.action === 'add' && plan.inside && mirrored.length > 0 && main.fields === undefined) {
-                this.placeMirroredCarets(carets, mirrored, landed);
+            characters += rendered.text.length;
+            ranges += rendered.fields?.reduce((count, field) => count + field.ranges.length + (field.linked?.length ?? 0), 1) ?? rendered.stops.length;
+            if (rendered.limited || characters > MAX_COMPLETION_CHARACTERS || ranges > MAX_COMPLETION_RANGES) {
+                throw new CompletionLimitError();
             }
-            if (plan.action === 'enter') {
+            return rendered;
+        };
+        try {
+            const planned = renderAt(caret, editor.getSelection());
+            const { before, rest } = this.surroundings(planned, caret, lineAfter);
+            const plan: CallPlan =
+                commit === undefined ? planCall({ item, languageId: this.language.languageId, insertion: planned, before, rest, replace }) : { action: 'none' };
+            const main = plan.action === 'add' ? withParentheses(planned, plan.inside) : planned;
+            const extras = (item.additionalTextEdits ?? []).map((edit): EditorContentChange => ({ range: edit.range, text: edit.newText }));
+            const instances = new Map<EditorContentChange, Insertion>();
+            const continuing = inSnippet && snippets.isActive && snippetToken === snippets.token;
+            const mirrored = mirroredInsertions(carets, editor.getSelection(), caret, (range) => editor.textInRange(range), main, continuing).map(
+                (insertion) => {
+                    const selection = carets.find(
+                        (range) =>
+                            range.start.line === insertion.range.start.line &&
+                            range.start.character >= insertion.range.start.character &&
+                            range.start.character <= insertion.range.end.character
+                    )!;
+                    const position = selection[continuing ? 'end' : 'start'];
+                    const own = renderAt(position, selection);
+                    const rendered = plan.action === 'add' ? withParentheses(own, plan.inside) : own;
+                    const edit = { ...insertion, text: rendered.text };
+                    instances.set(edit, { ...rendered, range: insertion.range });
+                    return edit;
+                }
+            );
+            const primary = { range: main.range, text: main.text };
+            const changes = [primary, ...mirrored, ...extras];
+            if (changes.reduce((total, edit) => total + edit.text.length, 0) > MAX_COMPLETION_CHARACTERS) {
+                throw new CompletionLimitError();
+            }
+            // Imports and earlier carets move each insertion independently; the primary instance stays last.
+            const starts = [...mirrored, primary].map((insertion) =>
+                changes
+                    .filter((change) => change !== insertion && comparePositions(change.range.end, insertion.range.start) <= 0)
+                    .sort((left, right) => comparePositions(right.range.start, left.range.start))
+                    .reduce((place, change) => shiftPosition(place, change), insertion.range.start)
+            );
+            const applied = inSnippet ? snippets.applyEdits(changes, snippetToken, extras) : editor.applyEdits(changes);
+            if (!applied) {
+                return;
+            }
+            const landed = editor.getSelections();
+            if (commit === undefined) {
+                this.language.snippets.beginInstances(
+                    [...mirrored, primary].map((insertion, index) => {
+                        const rendered = insertion === primary ? main : instances.get(insertion)!;
+                        return { start: starts[index]!, text: rendered.text, stops: rendered.stops, fields: rendered.fields };
+                    }),
+                    { nested: continuing && snippets.isActive }
+                );
+                if (plan.action === 'add' && plan.inside && mirrored.length > 0 && main.fields === undefined) {
+                    this.placeMirroredCarets(carets, mirrored, landed);
+                }
+                if (plan.action === 'enter') {
+                    const end = editor.getCaret();
+                    editor.setCaret({ line: end.line, character: end.character + plan.shift });
+                }
+            } else {
                 const end = editor.getCaret();
-                editor.setCaret({ line: end.line, character: end.character + plan.shift });
+                editor.applyEdits([{ range: { start: end, end }, text: commit }]);
+                if (this.triggerCharacters().includes(commit)) {
+                    this.beginRequest({ triggerKind: 2, triggerCharacter: commit }, 0);
+                }
             }
-        } else {
-            const end = editor.getCaret();
-            editor.applyEdits([{ range: { start: end, end }, text: commit }]);
-            if (this.triggerCharacters().includes(commit)) {
-                this.beginRequest({ triggerKind: 2, triggerCharacter: commit }, 0);
+            this.afterInsert(item, commit, lineBefore);
+            editor.focus();
+        } catch (error) {
+            if (!(error instanceof CompletionLimitError)) {
+                throw error;
             }
+            this.refuseLargeCompletion();
         }
-        this.afterInsert(item, commit, lineBefore);
-        editor.focus();
+    }
+
+    private refuseLargeCompletion(): void {
+        this.language.project.host.notify?.({ id: TOAST_ID, kind: 'error', title: this.language.project.i18n.t('editor:language.completion.tooLarge') });
     }
 
     /* The carets that got the same `()` go inside it like the primary one, which the snippet already placed. */

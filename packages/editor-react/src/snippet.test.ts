@@ -115,17 +115,17 @@ test('cyclic defaults terminate without recursively expanding their own field', 
 
 test('acyclic exponential mirrors fall back to their original text', () => {
     const source = '${1:x}' + Array.from({ length: 30 }, (_, index) => '${' + (index + 2) + ':$' + (index + 1) + '$' + (index + 1) + '}').join('');
-    expect(parseSnippet(source)).toEqual({ text: source, stops: [] });
+    expect(parseSnippet(source)).toEqual({ text: source, stops: [], limited: true });
 });
 
 test('empty mirror expansion also respects its work budget', () => {
     const source = '${1:}' + Array.from({ length: 30 }, (_, index) => '${' + (index + 2) + ':$' + (index + 1) + '$' + (index + 1) + '}').join('');
-    expect(parseSnippet(source)).toEqual({ text: source, stops: [] });
+    expect(parseSnippet(source)).toEqual({ text: source, stops: [], limited: true });
 });
 
 test('deeply nested and oversized snippets fall back without recursion or partial output', () => {
     for (const source of ['${1:'.repeat(2000) + 'x' + '}'.repeat(2000), '$1 '.repeat(40_000), 'x '.repeat(50_001)]) {
-        expect(parseSnippet(source)).toEqual({ text: source, stops: [] });
+        expect(parseSnippet(source)).toEqual({ text: source, stops: [], limited: true });
     }
 });
 
@@ -163,8 +163,8 @@ test('unknown-variable chains and huge resolved values respect expansion budgets
             { length: 25 },
             (_, index) => '${V' + index + ':$' + (index === 0 ? 'A' : 'V' + (index - 1)) + '$' + (index === 0 ? 'A' : 'V' + (index - 1)) + '}'
         ).join('');
-    expect(parseSnippet(source)).toEqual({ text: source, stops: [] });
-    expect(parseSnippet('$TM_CURRENT_LINE', () => 'x'.repeat(100001))).toEqual({ text: '$TM_CURRENT_LINE', stops: [] });
+    expect(parseSnippet(source)).toEqual({ text: source, stops: [], limited: true });
+    expect(parseSnippet('$TM_CURRENT_LINE', () => 'x'.repeat(100001))).toEqual({ text: '$TM_CURRENT_LINE', stops: [], limited: true });
 });
 
 test('unknown variable indices belong to the template rather than its resolver', () => {
