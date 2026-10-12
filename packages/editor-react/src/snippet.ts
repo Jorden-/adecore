@@ -10,6 +10,8 @@ export interface SnippetRange {
     readonly end: number;
     readonly parents?: readonly number[];
     readonly transform?: SnippetTransform;
+    /* A descendant of this occurrence begins at its end, so indentation must keep it contained. */
+    readonly tail?: true;
 }
 
 export interface SnippetStop extends SnippetRange {
@@ -222,6 +224,14 @@ function renderSnippet(nodes: readonly Node[], variableTransforms?: readonly str
     let text = '';
     let work = 0;
     let ranges = 0;
+    let tailEvent = 0;
+    let tailOffset = -1;
+    const recordTail = (range: SnippetRange): void => {
+        if (range.start === range.end || range.tail === true) {
+            tailEvent++;
+            tailOffset = range.end;
+        }
+    };
     const append = (value: string): void => {
         if (text.length + value.length > MAX_SNIPPET_TEXT) {
             throw new SnippetLimitError();
@@ -247,7 +257,9 @@ function renderSnippet(nodes: readonly Node[], variableTransforms?: readonly str
                     if (++ranges > MAX_SNIPPET_RANGES) {
                         throw new SnippetLimitError();
                     }
-                    transforms.push({ start, end: text.length, transform: node.transform, ...(parents.length === 0 ? {} : { parents: [...parents] }) });
+                    const range = { start, end: text.length, transform: node.transform, ...(parents.length === 0 ? {} : { parents: [...parents] }) };
+                    transforms.push(range);
+                    recordTail(range);
                 }
                 continue;
             }
@@ -260,6 +272,7 @@ function renderSnippet(nodes: readonly Node[], variableTransforms?: readonly str
             }
             const definition = definitions.get(node.index)!;
             const from = text.length;
+            const beforeTail = tailEvent;
             if (!visiting.has(node.index)) {
                 if (definition.choices !== undefined) {
                     append(definition.choices[0] ?? '');
@@ -271,8 +284,10 @@ function renderSnippet(nodes: readonly Node[], variableTransforms?: readonly str
                 start: from,
                 end: text.length,
                 ...(parents.length === 0 ? {} : { parents: [...parents] }),
-                ...(node.transform === undefined ? {} : { transform: node.transform })
+                ...(node.transform === undefined ? {} : { transform: node.transform }),
+                ...(tailEvent !== beforeTail && tailOffset === text.length ? { tail: true as const } : {})
             };
+            recordTail(range);
             const field = fields.get(node.index) ?? {
                 index: node.index,
                 ranges: [],
@@ -289,7 +304,13 @@ function renderSnippet(nodes: readonly Node[], variableTransforms?: readonly str
                     field.primary = field.ranges.length;
                 }
                 field.ranges.push(range);
-                stops.push({ index: node.index, start: range.start, end: range.end, ...(node.transform === undefined ? {} : { transform: node.transform }) });
+                stops.push({
+                    index: node.index,
+                    start: range.start,
+                    end: range.end,
+                    ...(node.transform === undefined ? {} : { transform: node.transform }),
+                    ...(range.tail === undefined ? {} : { tail: range.tail })
+                });
             }
             fields.set(node.index, field);
         }

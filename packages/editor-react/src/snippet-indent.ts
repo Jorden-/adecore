@@ -26,32 +26,22 @@ export function indentSnippet(parsed: ParsedSnippet, before: string): ParsedSnip
         }
         return offset + low * prefix.length;
     };
-    const childStarts = new Map<number, Set<number>>();
-    const children = [...(parsed.fields ?? []).flatMap((field) => [...field.ranges, ...(field.linked ?? [])]), ...(parsed.transforms ?? [])];
-    for (const child of children) {
-        for (const parent of child.parents ?? []) {
-            const starts = childStarts.get(parent) ?? new Set<number>();
-            starts.add(child.start);
-            childStarts.set(parent, starts);
-        }
-    }
-    const range = <Range extends SnippetRange>(range: Range, index?: number): Range => ({
+    const range = <Range extends SnippetRange>(range: Range): Range => ({
         ...range,
         start: shift(range.start),
-        // A child at the newline must remain contained even though other ranges exclude the next prefix.
-        end: shift(range.end, range.start === range.end || (index !== undefined && childStarts.get(index)?.has(range.end) === true))
+        end: shift(range.end, range.start === range.end || range.tail === true)
     });
     return {
         text: parsed.text.replace(/\n/g, '\n' + prefix),
-        stops: parsed.stops.map((stop) => range(stop, stop.index)),
+        stops: parsed.stops.map((stop) => range(stop)),
         ...(parsed.transforms === undefined ? {} : { transforms: parsed.transforms.map((transform) => range(transform)) }),
         ...(parsed.fields === undefined
             ? {}
             : {
                   fields: parsed.fields.map((field) => ({
                       ...field,
-                      ranges: field.ranges.map((child) => range(child, field.index)),
-                      ...(field.linked === undefined ? {} : { linked: field.linked.map((child) => range(child, field.index)) })
+                      ranges: field.ranges.map((child) => range(child)),
+                      ...(field.linked === undefined ? {} : { linked: field.linked.map((child) => range(child)) })
                   }))
               })
     };

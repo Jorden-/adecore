@@ -301,3 +301,18 @@ test('indentation also contains an empty resolved variable transform at the pare
     expect(parsed.fields![0]!.ranges[0]).toMatchObject({ start: 0, end: 6 });
     expect(parsed.transforms![0]).toMatchObject({ start: 6, end: 6, parents: [1] });
 });
+
+test('indentation containment belongs to the occurrence that rendered the child', () => {
+    const parsed = indentSnippet(parseSnippet('${1:${2}a\n}$1'), '  ');
+    const parent = parsed.fields!.find((field) => field.index === 1)!;
+    expect(parent.ranges.map(({ start, end }) => ({ start, end }))).toEqual([
+        { start: 0, end: 2 },
+        { start: 4, end: 6 }
+    ]);
+    expect(parsed.stops.find((stop) => stop.index === 1)).toMatchObject({ start: 0, end: 2 });
+    const ownTail = indentSnippet(parseSnippet('${1:a\n$2}$1'), '  ');
+    expect(ownTail.fields!.find((field) => field.index === 1)!.ranges.map(({ start, end }) => ({ start, end }))).toEqual([
+        { start: 0, end: 4 },
+        { start: 4, end: 8 }
+    ]);
+});

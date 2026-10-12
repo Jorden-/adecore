@@ -732,3 +732,16 @@ test('explicit multiline completion edits keep fields and the edit-start indenta
     expect(mounted.editor.getText()).toBe('  first\n  second');
     expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('second');
 });
+
+test('a touching parent does not consume the next occurrences indentation', async () => {
+    const mounted = await completion('  fo', '${1:${2}a\n}$1', false, 2);
+    mounted.editor.setCaret({ line: 0, character: 4 });
+    mounted.language.completion.invoke();
+    mounted.timers.advance(1);
+    await new Promise<void>((done) => setImmediate(done));
+    await mounted.language.completion.accept(false);
+    expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('a\n');
+    mounted.type('x');
+    expect(mounted.editor.getSelections()).toHaveLength(2);
+    expect(mounted.editor.getText()).toBe('  x  x  ');
+});
