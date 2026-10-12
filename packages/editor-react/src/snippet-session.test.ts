@@ -6,6 +6,7 @@ import { ProjectLanguage } from './project-language.ts';
 import { FakeLanguageService, ManualTimers } from './testing.ts';
 import { parseSnippet, tabOrder } from './snippet.ts';
 import { SnippetFeature } from './snippet-session.ts';
+import { signatureViewOf } from './signature-model.ts';
 
 const cleanup: (() => void)[] = [];
 afterEach(() => {
@@ -219,4 +220,55 @@ test('replacing a parent keeps independent occurrences of a nested field', () =>
     expect(editor.getSelections().map((range) => editor.textInRange(range))).toEqual(['b']);
     type('other');
     expect(editor.getText()).toBe('new and other');
+});
+
+test('Tab after replacing a parent in touching instances follows the primary instance', () => {
+    const mounted = mountEditor({ text: '' });
+    const feature = new SnippetFeature({ editor: mounted.editor, onDispose: (dispose) => cleanup.push(dispose) });
+    cleanup.push(() => mounted.editor.dispose());
+    const parsed = parseSnippet('${1:new ${2:Foo}()}');
+    mounted.editor.setText(parsed.text + parsed.text);
+    feature.begin(
+        [
+            { line: 0, character: 0 },
+            { line: 0, character: parsed.text.length }
+        ],
+        parsed.text,
+        tabOrder(parsed),
+        parsed.fields
+    );
+    expect(mounted.editor.getSelections()).toHaveLength(1);
+    mounted.type('x');
+    expect(() => mounted.press('Tab')).not.toThrow();
+    expect(feature.isActive).toBe(false);
+    expect(mounted.editor.getCaret().character).toBe(mounted.editor.getText().length);
+});
+
+test('Escape closes the signature card before ending a snippet', async () => {
+    const { editor, language, timers, press } = await completion('fo', 'for (${1:item})$0');
+    editor.setCaret({ line: 0, character: 2 });
+    language.completion.invoke();
+    timers.advance(1);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await language.completion.accept(false);
+    language.popups.setState({
+        signature: { anchor: { line: 0, character: 4 }, model: signatureViewOf({ signatures: [{ label: 'f(x)' }] })! }
+    });
+    press('Escape');
+    expect(language.popups.getState().signature).toBeNull();
+    expect(language.snippets.isActive).toBe(true);
+    press('Escape');
+    expect(language.snippets.isActive).toBe(false);
+});
+
+test('a refused completion edit does not start a snippet on unchanged text', async () => {
+    const { editor, language, timers } = await completion('fo', 'for (${1:item})$0');
+    editor.setCaret({ line: 0, character: 2 });
+    editor.setReadOnly(true);
+    language.completion.invoke();
+    timers.advance(1);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await language.completion.accept(false);
+    expect(editor.getText()).toBe('fo');
+    expect(language.snippets.isActive).toBe(false);
 });

@@ -42,7 +42,7 @@ function selectionsOf(field: Field): EditorRange[] {
 }
 
 export class SnippetFeature {
-    private readonly language: Pick<EditorLanguage, 'editor' | 'onDispose'>;
+    private readonly language: Pick<EditorLanguage, 'editor' | 'onDispose'> & Partial<Pick<EditorLanguage, 'popups'>>;
     private instances: Instance[] = [];
     private order: number[] = [];
     private current = 0;
@@ -51,7 +51,7 @@ export class SnippetFeature {
     private visiting = false;
     private generation = 0;
 
-    constructor(language: Pick<EditorLanguage, 'editor' | 'onDispose'>) {
+    constructor(language: Pick<EditorLanguage, 'editor' | 'onDispose'> & Partial<Pick<EditorLanguage, 'popups'>>) {
         this.language = language;
         const { editor } = language;
         const offs = [editor.onKeyDown((event) => this.key(event)), editor.onTextChange((change) => this.edited(change)), editor.onCaret(() => this.moved())];
@@ -105,7 +105,10 @@ export class SnippetFeature {
         this.current = index;
         const stop = this.order[index]!;
         const selections = this.instances.flatMap((instance) => {
-            const field = instance.fields.find((field) => field.index === stop)!;
+            const field = instance.fields.find((field) => field.index === stop);
+            if (field === undefined) {
+                return [];
+            }
             return stop === 0 ? [field.ranges[field.primary]!] : selectionsOf(field);
         });
         const sorted = [...selections].sort((left, right) => comparePositions(left.start, right.start));
@@ -132,6 +135,9 @@ export class SnippetFeature {
             return true;
         }
         if (event.key === 'Escape') {
+            if (Object.values(this.language.popups?.getState() ?? {}).some((popup) => popup !== null)) {
+                return false;
+            }
             const caret = this.language.editor.getCaret();
             this.end();
             this.language.editor.setCaret(caret);
@@ -159,7 +165,7 @@ export class SnippetFeature {
             return;
         }
         const index = this.order[this.current]!;
-        const parents = this.instances[0]?.fields.find((field) => field.index === index)?.parents ?? [];
+        const parents = this.instances.at(-1)?.fields.find((field) => field.index === index)?.parents ?? [];
         for (const instance of this.instances) {
             instance.hull = mapRange(instance.hull, change.changes, true);
             for (const field of instance.fields) {
@@ -181,7 +187,7 @@ export class SnippetFeature {
                 field.ranges = field.ranges.map((range) => mapRange(range, change.changes, field.index === index || parents.includes(field.index)));
             }
         }
-        this.order = this.order.filter((index) => this.instances[0]?.fields.some((field) => field.index === index));
+        this.order = this.order.filter((index) => this.instances.at(-1)?.fields.some((field) => field.index === index));
         this.current = this.order.indexOf(index);
     }
 

@@ -1,9 +1,9 @@
+/* UTF-16 offsets into the inserted text; equal for an empty stop. */
 export interface SnippetRange {
     readonly start: number;
     readonly end: number;
 }
 
-/* UTF-16 offsets into the inserted text; equal for an empty stop. */
 export interface SnippetStop extends SnippetRange {
     readonly index: number;
 }
@@ -29,8 +29,18 @@ export interface ParsedSnippet {
 type Node = { kind: 'text'; text: string } | { kind: 'field'; index: number; body?: Node[]; choices?: string[] } | { kind: 'variable'; body?: Node[] };
 type FieldNode = Extract<Node, { kind: 'field' }>;
 
+const MAX_SNIPPET_TEXT = 100_000;
+const MAX_SNIPPET_NODES = 10_000;
+const MAX_SNIPPET_WORK = 50_000;
+const MAX_SNIPPET_DEPTH = 64;
+
+class SnippetLimitError extends Error {}
+
 class SnippetParser {
     private at = 0;
+    private nodes = 0;
+    private depth = 0;
+    private readonly name = /(?:\d+|[A-Za-z_]\w*)/y;
     private readonly source: string;
 
     constructor(source: string) {
@@ -42,11 +52,14 @@ class SnippetParser {
     }
 
     private sequence(nested: boolean): Node[] {
+        if (++this.depth > MAX_SNIPPET_DEPTH) {
+            throw new SnippetLimitError();
+        }
         const nodes: Node[] = [];
         let text = '';
         const flush = (): void => {
             if (text !== '') {
-                nodes.push({ kind: 'text', text });
+                this.push(nodes, { kind: 'text', text });
                 text = '';
             }
         };
@@ -61,7 +74,7 @@ class SnippetParser {
                     text += '$';
                 } else {
                     flush();
-                    nodes.push(node);
+                    this.push(nodes, node);
                 }
             } else {
                 text += character;
@@ -69,7 +82,15 @@ class SnippetParser {
             }
         }
         flush();
+        this.depth--;
         return nodes;
+    }
+
+    private push(nodes: Node[], node: Node): void {
+        if (++this.nodes > MAX_SNIPPET_NODES) {
+            throw new SnippetLimitError();
+        }
+        nodes.push(node);
     }
 
     private dollar(): Node | null {
@@ -78,7 +99,8 @@ class SnippetParser {
         if (brace) {
             this.at++;
         }
-        const name = /^(?:\d+|[A-Za-z_]\w*)/.exec(this.source.slice(this.at))?.[0];
+        this.name.lastIndex = this.at;
+        const name = this.name.exec(this.source)?.[0];
         if (name === undefined) {
             this.at = start + 1;
             return null;
@@ -126,6 +148,9 @@ class SnippetParser {
             if (character === '\\' && /[\\,|]/.test(this.source[this.at] ?? '')) {
                 values[values.length - 1] += this.source[this.at++]!;
             } else if (character === ',') {
+                if (values.length >= MAX_SNIPPET_NODES) {
+                    throw new SnippetLimitError();
+                }
                 values.push('');
             } else {
                 values[values.length - 1] += character;
@@ -174,10 +199,23 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
     >();
     const stops: SnippetStop[] = [];
     let text = '';
+    let work = 0;
+    const append = (value: string): void => {
+        if (text.length + value.length > MAX_SNIPPET_TEXT) {
+            throw new SnippetLimitError();
+        }
+        text += value;
+    };
     const render = (nodes: readonly Node[], linked: boolean, parents: readonly number[], visiting: ReadonlySet<number>): void => {
+        if (parents.length > MAX_SNIPPET_DEPTH) {
+            throw new SnippetLimitError();
+        }
         for (const node of nodes) {
+            if (++work > MAX_SNIPPET_WORK) {
+                throw new SnippetLimitError();
+            }
             if (node.kind === 'text') {
-                text += node.text;
+                append(node.text);
                 continue;
             }
             if (node.kind === 'variable') {
@@ -188,7 +226,7 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
             const from = text.length;
             if (!visiting.has(node.index)) {
                 if (definition.choices !== undefined) {
-                    text += definition.choices[0] ?? '';
+                    append(definition.choices[0] ?? '');
                 } else {
                     render(definition.body ?? [], linked || node !== definition, [...parents, node.index], new Set([...visiting, node.index]));
                 }
@@ -234,7 +272,18 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
 }
 
 export function parseSnippet(snippet: string): ParsedSnippet {
-    return renderSnippet(new SnippetParser(snippet).parse());
+    if (snippet.length > MAX_SNIPPET_TEXT) {
+        return { text: snippet, stops: [] };
+    }
+    try {
+        return renderSnippet(new SnippetParser(snippet).parse());
+    } catch (error) {
+        if (!(error instanceof SnippetLimitError)) {
+            throw error;
+        }
+        // Language-server snippets may expand exponentially; retain the original text without a session.
+        return { text: snippet, stops: [] };
+    }
 }
 
 /* One defining occurrence per index, then $0 or the end of the inserted text. */

@@ -112,3 +112,19 @@ test('nested fields occur once, with linked projections into parent mirrors', ()
 test('cyclic defaults terminate without recursively expanding their own field', () => {
     expect(parseSnippet('${1:a $1} $1').text).toBe('a  a ');
 });
+
+test('acyclic exponential mirrors fall back to their original text', () => {
+    const source = '${1:x}' + Array.from({ length: 30 }, (_, index) => '${' + (index + 2) + ':$' + (index + 1) + '$' + (index + 1) + '}').join('');
+    expect(parseSnippet(source)).toEqual({ text: source, stops: [] });
+});
+
+test('empty mirror expansion also respects its work budget', () => {
+    const source = '${1:}' + Array.from({ length: 30 }, (_, index) => '${' + (index + 2) + ':$' + (index + 1) + '$' + (index + 1) + '}').join('');
+    expect(parseSnippet(source)).toEqual({ text: source, stops: [] });
+});
+
+test('deeply nested and oversized snippets fall back without recursion or partial output', () => {
+    for (const source of ['${1:'.repeat(2000) + 'x' + '}'.repeat(2000), '$1 '.repeat(40_000), 'x '.repeat(50_001)]) {
+        expect(parseSnippet(source)).toEqual({ text: source, stops: [] });
+    }
+});

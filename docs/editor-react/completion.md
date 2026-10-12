@@ -35,8 +35,10 @@ snippet.text; // 'print(value, count)'
 tabOrder(snippet).map((stop) => stop.index); // [1, 2, 0]
 ```
 
+`ParsedSnippet` keeps its `text` and `stops` shape and adds optional `fields`. A `SnippetField` groups UTF-16 `SnippetRange` offsets by index; `primary` selects the occurrence defining the default, `linked` describes child projections in parent copies, and `parents` names enclosing fields. `choices` preserves the offered strings for a future choice picker. `tabOrder` still returns one `SnippetStop` per index, ending at `$0` or the end of the inserted text. Stops are returned in text order, with an enclosing placeholder before its children.
+
+Snippets exceeding 100,000 source or expanded UTF-16 units, 10,000 syntax nodes or choices, 50,000 rendering visits or 64 nesting levels insert their original text without a snippet session. This bounds expansion from language servers, including acyclic mirror chains. Escape closes an open popup before ending a snippet.
+
 ## Signature help
 
 Typing a trigger character of the service's signature help, such as `(` or `,`, asks for the signatures of the call around the caret. `signature.invoke()` asks at once, as Mod+P does, and `close()` closes the card. `SignatureCard` draws the active signature with the active parameter in bold, its documentation, and which of several signatures it is. Its prop is a `SignatureViewModel`, made by `signatureViewOf` from the service's answer.
-
-`ParsedSnippet` keeps its `text` and `stops` shape and adds optional `fields`. A `SnippetField` groups UTF-16 `SnippetRange` offsets by index; `primary` selects the occurrence defining the default, `linked` describes child projections in parent copies, and `parents` names enclosing fields. `choices` preserves the offered strings for a future choice picker. `tabOrder` still returns one `SnippetStop` per index, ending at `$0` or the end of the inserted text. Stops are returned in text order, with an enclosing placeholder before its children.

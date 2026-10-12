@@ -138,7 +138,9 @@ export class CompletionFeature {
                 .sort((left, right) => comparePositions(right.range.start, left.range.start))
                 .reduce((place, change) => shiftPosition(place, change), insertion.range.start)
         );
-        editor.applyEdits(changes);
+        if (!editor.applyEdits(changes)) {
+            return;
+        }
         const landed = editor.getSelections();
         if (commit === undefined) {
             this.language.snippets.begin(starts, main.text, main.stops, main.fields);
