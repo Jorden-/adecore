@@ -120,3 +120,23 @@ test('syntax errors keep a started worker and malformed replies are refused', as
     await expect(second).rejects.toMatchObject({ kind: 'error' });
     host.client.dispose();
 });
+
+test('an empty batch neither posts nor supersedes a live transform', async () => {
+    const host = setup();
+    const pending = host.client.transform(jobs()).then(
+        (values) => ({ values }),
+        (error) => ({ error })
+    );
+    await Promise.resolve();
+    const empty = host.client.transform([]);
+    await Promise.resolve();
+    const last = host.workers.at(-1)!;
+    if (last.messages.at(-1)!.jobs.length === 0) {
+        last.reply({ type: 'transformed', id: last.messages.at(-1)!.id, values: [] });
+    }
+    expect(await empty).toEqual([]);
+    host.answer(host.workers[0]);
+    expect(await pending).toEqual({ values: ['NAME'] });
+    expect(host.workers).toHaveLength(1);
+    host.client.dispose();
+});

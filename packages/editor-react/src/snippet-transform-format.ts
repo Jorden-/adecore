@@ -6,6 +6,7 @@ import {
     MAX_TRANSFORM_VALUE,
     MAX_TRANSFORM_CHARACTERS,
     MAX_TRANSFORM_MATCHES,
+    MAX_TRANSFORM_WORK,
     type SnippetTransformCase,
     type SnippetTransformFormatNode,
     type SnippetTransformJob
@@ -33,7 +34,7 @@ export function compileSnippetTransformFormat(source: string): readonly SnippetT
     const string = (colon = false): string => {
         let value = '';
         while (at < source.length && source[at] !== '}' && !(colon && source[at] === ':')) {
-            if (source[at] === '\\' && at + 1 < source.length) {
+            if (source[at] === '\\' && (source[at + 1] === '\\' || source[at + 1] === '/')) {
                 at++;
             }
             value += source[at++]!;
@@ -41,7 +42,7 @@ export function compileSnippetTransformFormat(source: string): readonly SnippetT
         return value;
     };
     while (at < source.length) {
-        if (source[at] === '\\' && at + 1 < source.length) {
+        if (source[at] === '\\' && (source[at + 1] === '\\' || source[at + 1] === '/')) {
             at++;
             text += source[at++]!;
             continue;
@@ -124,8 +125,13 @@ function changeCase(value: string, operation?: SnippetTransformCase): string {
         return capitalize(value);
     }
     if (operation === 'camelcase' || operation === 'pascalcase') {
-        const words = value.match(/[\p{L}\p{N}]+/gu) ?? [];
-        return words.map((word, index) => (operation === 'camelcase' && index === 0 ? word.toLowerCase() : capitalize(word.toLowerCase()))).join('');
+        const words = value.match(/[\p{L}0-9]+/gu);
+        if (words === null) {
+            return value;
+        }
+        return words
+            .map((word, index) => (operation === 'camelcase' && index === 0 ? word.slice(0, 1).toLowerCase() + word.slice(1) : capitalize(word)))
+            .join('');
     }
     return value;
 }
@@ -194,40 +200,75 @@ export function validateSnippetTransformJobs(jobs: readonly SnippetTransformJob[
         }
     }
 }
-export function applySnippetTransform(job: SnippetTransformJob, maximum = MAX_TRANSFORM_CHARACTERS, expression = new RegExp(job.pattern, job.flags)): string {
+export interface SnippetTransformBudget {
+    remaining: number;
+    matches: number;
+}
+export function createSnippetTransformBudget(): SnippetTransformBudget {
+    return { remaining: MAX_TRANSFORM_WORK, matches: 0 };
+}
+function spend(budget: SnippetTransformBudget, amount: number): void {
+    budget.remaining -= amount;
+    if (budget.remaining < 0) {
+        throw new RangeError('The snippet transform work budget was exceeded.');
+    }
+}
+export function applySnippetTransform(
+    job: SnippetTransformJob,
+    maximum = MAX_TRANSFORM_CHARACTERS,
+    expression = new RegExp(job.pattern, job.flags),
+    budget = createSnippetTransformBudget()
+): string {
     expression.lastIndex = 0;
+    spend(budget, job.value.length);
     const pieces: string[] = [];
     let at = 0,
         length = 0,
         matches = 0;
     const append = (text: string): void => {
+        if (text === '') {
+            return;
+        }
         length += text.length;
         if (length > maximum) {
             throw new RangeError('The snippet transform output is too large.');
         }
         pieces.push(text);
     };
-    for (let match = expression.exec(job.value); match !== null; match = expression.exec(job.value)) {
-        if (++matches > MAX_TRANSFORM_MATCHES) {
-            throw new RangeError('The snippet transform has too many matches.');
-        }
-        append(job.value.slice(at, match.index));
+    const format = (captures: readonly (string | undefined)[]): void => {
         for (const node of job.format) {
+            spend(budget, 1);
             if (node.kind === 'text') {
                 append(node.text);
             } else {
-                const capture = match[node.index] ?? '';
+                const capture = captures[node.index] ?? '';
+                if (node.kind === 'capture' && node.case !== undefined) {
+                    spend(budget, capture.length);
+                }
                 append(node.kind === 'capture' ? changeCase(capture, node.case) : capture !== '' ? (node.if ?? capture) : (node.else ?? ''));
             }
         }
+    };
+    for (let match = expression.exec(job.value); match !== null; match = expression.exec(job.value)) {
+        if (++budget.matches > MAX_TRANSFORM_MATCHES) {
+            throw new RangeError('The snippet transform batch has too many matches.');
+        }
+        matches++;
+        spend(budget, 1);
+        append(job.value.slice(at, match.index));
+        format(match);
         at = match.index + match[0].length;
         if (!expression.global) {
             break;
         }
         if (match[0].length === 0) {
-            expression.lastIndex += (job.value.codePointAt(expression.lastIndex) ?? 0) > 0xffff ? 2 : 1;
+            expression.lastIndex += expression.unicode && (job.value.codePointAt(expression.lastIndex) ?? 0) > 0xffff ? 2 : 1;
         }
     }
-    append(job.value.slice(at));
+    if (matches === 0 && job.format.some((node) => node.kind === 'conditional' && Boolean(node.else))) {
+        format([]);
+    } else {
+        append(job.value.slice(at));
+    }
     return pieces.join('');
 }

@@ -1,4 +1,4 @@
-import { applySnippetTransform, validateSnippetTransformJobs } from './snippet-transform-format.ts';
+import { applySnippetTransform, createSnippetTransformBudget, validateSnippetTransformJobs } from './snippet-transform-format.ts';
 import { MAX_TRANSFORM_CHARACTERS, type SnippetTransformInput, type SnippetTransformOutput } from './snippet-transform-protocol.ts';
 export {
     createSnippetTransformClient,
@@ -29,6 +29,7 @@ export function serveSnippetTransforms(endpoint: SnippetTransformWorkerEndpoint)
             }
             validateSnippetTransformJobs(request.jobs);
             let remaining = MAX_TRANSFORM_CHARACTERS;
+            const budget = createSnippetTransformBudget();
             const patterns = new Map<string, RegExp>();
             const values = request.jobs.map((job) => {
                 const key = job.flags + '\0' + job.pattern;
@@ -37,7 +38,7 @@ export function serveSnippetTransforms(endpoint: SnippetTransformWorkerEndpoint)
                     expression = new RegExp(job.pattern, job.flags);
                     patterns.set(key, expression);
                 }
-                const value = applySnippetTransform(job, remaining, expression);
+                const value = applySnippetTransform(job, remaining, expression, budget);
                 remaining -= value.length;
                 return value;
             });

@@ -31,3 +31,21 @@ test('the worker returns only values and refuses a batch without partial results
     stop();
     expect(listener).toBeUndefined();
 });
+
+test('matches and capture-case work are bounded across the whole request', () => {
+    let receive: ((event: MessageEvent<SnippetTransformInput>) => void) | undefined;
+    const replies: SnippetTransformOutput[] = [];
+    serveSnippetTransforms({
+        addEventListener: (_type, listener) => {
+            receive = listener;
+        },
+        removeEventListener: () => undefined,
+        postMessage: (reply) => replies.push(reply)
+    });
+    const many = { value: 'x'.repeat(7000), pattern: '(x)', flags: 'g', format: compileSnippetTransformFormat('$1') };
+    receive!({ data: { type: 'transform', id: 1, jobs: [many, many] } } as unknown as MessageEvent<SnippetTransformInput>);
+    expect(replies.at(-1)).toMatchObject({ type: 'error', id: 1, kind: 'range' });
+    const caseWork = { value: '-'.repeat(1600), pattern: '(?=(.*))', flags: 'g', format: compileSnippetTransformFormat('${1:/camelcase}') };
+    receive!({ data: { type: 'transform', id: 2, jobs: [caseWork] } } as unknown as MessageEvent<SnippetTransformInput>);
+    expect(replies.at(-1)).toMatchObject({ type: 'error', id: 2, kind: 'range' });
+});

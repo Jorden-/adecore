@@ -27,18 +27,33 @@ export function createSnippetTransformClient(options: SnippetTransformClientOpti
         failure: (reply) =>
             reply.type === 'error' ? { error: new SnippetTransformError(reply.kind, reply.message), restart: reply.kind === 'error' } : undefined
     });
+    let disposed = false;
+    const failure = (error: unknown): SnippetTransformError =>
+        error instanceof SnippetTransformError
+            ? error
+            : error instanceof WorkerRequestError
+              ? new SnippetTransformError(error.kind, error.message)
+              : new SnippetTransformError(
+                    error instanceof SyntaxError ? 'syntax' : error instanceof RangeError ? 'range' : 'error',
+                    error instanceof Error ? error.message : String(error)
+                );
     return {
         transform(jobs) {
-            let copied: SnippetTransformJob[] = [];
+            if (disposed) {
+                return Promise.reject(new SnippetTransformError('disposed', 'The snippet transform client was disposed.'));
+            }
+            if (Array.isArray(jobs) && jobs.length === 0) {
+                return Promise.resolve([]);
+            }
+            let copied: SnippetTransformJob[];
+            try {
+                validateSnippetTransformJobs(jobs);
+                copied = jobs.map((job) => ({ ...job, format: job.format.map((node) => ({ ...node })) }));
+            } catch (error) {
+                return Promise.reject(failure(error));
+            }
             return transport
-                .request(
-                    (id) => ({ type: 'transform', id, jobs: copied }),
-                    undefined,
-                    () => {
-                        validateSnippetTransformJobs(jobs);
-                        copied = jobs.map((job) => ({ ...job, format: job.format.map((node) => ({ ...node })) }));
-                    }
-                )
+                .request((id) => ({ type: 'transform', id, jobs: copied }))
                 .then((reply) => {
                     if (
                         reply.type !== 'transformed' ||
@@ -52,14 +67,7 @@ export function createSnippetTransformClient(options: SnippetTransformClientOpti
                     return reply.values;
                 })
                 .catch((error) => {
-                    throw error instanceof SnippetTransformError
-                        ? error
-                        : error instanceof WorkerRequestError
-                          ? new SnippetTransformError(error.kind, error.message)
-                          : new SnippetTransformError(
-                                error instanceof SyntaxError ? 'syntax' : error instanceof RangeError ? 'range' : 'error',
-                                error instanceof Error ? error.message : String(error)
-                            );
+                    throw failure(error);
                 });
         },
         cancel() {
@@ -69,6 +77,7 @@ export function createSnippetTransformClient(options: SnippetTransformClientOpti
             transport.release();
         },
         dispose() {
+            disposed = true;
             transport.dispose();
         }
     };
