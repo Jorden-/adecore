@@ -166,3 +166,18 @@ test('unknown-variable chains and huge resolved values respect expansion budgets
     expect(parseSnippet(source)).toEqual({ text: source, stops: [] });
     expect(parseSnippet('$TM_CURRENT_LINE', () => 'x'.repeat(100001))).toEqual({ text: '$TM_CURRENT_LINE', stops: [] });
 });
+
+test('unknown variable indices belong to the template rather than its resolver', () => {
+    const template = compileSnippet('$FOO $BAR $0');
+    expect(template.render((name) => (name === 'FOO' ? 'provided' : undefined)).fields?.map((field) => field.index)).toEqual([2, 0]);
+    expect(template.render().fields?.map((field) => field.index)).toEqual([1, 2, 0]);
+});
+
+for (const transform of ['${1/(.*)/${1:/upcase}/}', '${1/[}]/x/}', '${1/[{]/x/}', '${1/a\\/b/${1:?yes:no}/g}']) {
+    test(`unsupported field transform keeps its mirror and its parent boundary: ${transform}`, () => {
+        const parsed = parseSnippet('${2:${1:foo} ' + transform + ' end} done');
+        expect(parsed.text).toBe('foo foo end done');
+        expect(tabOrder(parsed).map((stop) => stop.index)).toEqual([1, 2, 0]);
+        expect(parsed.fields?.find((field) => field.index === 1)?.ranges).toHaveLength(2);
+    });
+}

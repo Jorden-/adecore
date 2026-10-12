@@ -153,7 +153,8 @@ export class SnippetFeature {
             return true;
         }
         if (event.key === 'Escape') {
-            if (Object.values(this.language.popups?.getState() ?? {}).some((popup) => popup !== null)) {
+            const popups = this.language.popups?.getState();
+            if (popups !== undefined && [popups.completion, popups.signature, popups.hover, popups.pick, popups.peek].some((popup) => popup !== null)) {
                 return false;
             }
             const caret = this.language.editor.getCaret();

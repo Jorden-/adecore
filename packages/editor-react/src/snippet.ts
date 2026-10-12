@@ -145,10 +145,9 @@ class SnippetParser {
             this.at++;
             return { ...field(), choices: this.choices() };
         }
-        if (next === '/' && index === null) {
-            this.at = start;
-            this.skipBraces();
-            return { kind: 'variable', name };
+        if (next === '/') {
+            this.skipTransform();
+            return index === null ? { kind: 'variable', name } : field();
         }
         this.at = start + 1;
         return null;
@@ -173,14 +172,33 @@ class SnippetParser {
         return values;
     }
 
-    private skipBraces(): void {
-        let depth = 0;
+    private skipTransform(): void {
+        // Format markers belong to the transform; they must not become snippet definitions.
+        this.at++;
         while (this.at < this.source.length) {
-            const character = this.source[this.at]!;
-            this.at += character === '\\' ? 2 : 1;
-            if (character === '{') {
-                depth++;
-            } else if (character === '}' && --depth === 0) {
+            const character = this.source[this.at++]!;
+            if (character === '\\') {
+                this.at++;
+            } else if (character === '/') {
+                break;
+            }
+        }
+        let nested = 0;
+        while (this.at < this.source.length) {
+            const character = this.source[this.at++]!;
+            if (character === '\\') {
+                this.at++;
+            } else if (character === '$' && this.source[this.at] === '{') {
+                nested++;
+                this.at++;
+            } else if (character === '}') {
+                if (nested === 0) {
+                    return;
+                }
+                nested--;
+            } else if (character === '/' && nested === 0) {
+                const end = this.source.indexOf('}', this.at);
+                this.at = end < 0 ? this.source.length : end + 1;
                 return;
             }
         }
@@ -288,14 +306,15 @@ function renderSnippet(nodes: readonly Node[]): ParsedSnippet {
     };
 }
 
-function resolveVariables(nodes: readonly Node[], resolve?: SnippetVariableResolver): Node[] {
+function variableIndices(nodes: readonly Node[]): ReadonlyMap<string, number> {
     let highest = 0;
-    const unknown = new Map<string, { index: number; body: Node[]; defaulted: boolean; definition: Node }>();
-    const values = new Map<string, string | undefined>();
+    const names = new Set<string>();
     const scan = (nodes: readonly Node[]): void => {
         for (const node of nodes) {
             if (node.kind === 'field') {
                 highest = Math.max(highest, node.index);
+            } else if (node.kind === 'variable' && !SNIPPET_VARIABLES.has(node.name)) {
+                names.add(node.name);
             }
             if (node.kind !== 'text' && node.body !== undefined) {
                 scan(node.body);
@@ -303,6 +322,19 @@ function resolveVariables(nodes: readonly Node[], resolve?: SnippetVariableResol
         }
     };
     scan(nodes);
+    return new Map(
+        [...names].map((name) => {
+            if (!Number.isSafeInteger(++highest)) {
+                throw new SnippetLimitError();
+            }
+            return [name, highest];
+        })
+    );
+}
+
+function resolveVariables(nodes: readonly Node[], indices: ReadonlyMap<string, number>, resolve?: SnippetVariableResolver): Node[] {
+    const unknown = new Map<string, { index: number; body: Node[]; defaulted: boolean; definition: Node }>();
+    const values = new Map<string, string | undefined>();
     const valueOf = (name: string): string | undefined => {
         if (!values.has(name)) {
             values.set(name, resolve?.(name));
@@ -314,11 +346,8 @@ function resolveVariables(nodes: readonly Node[], resolve?: SnippetVariableResol
             if (node.kind === 'variable' && valueOf(node.name) === undefined && !SNIPPET_VARIABLES.has(node.name)) {
                 const previous = unknown.get(node.name);
                 if (previous === undefined) {
-                    if (!Number.isSafeInteger(++highest)) {
-                        throw new SnippetLimitError();
-                    }
                     unknown.set(node.name, {
-                        index: highest,
+                        index: indices.get(node.name)!,
                         body: node.body ?? [{ kind: 'text', text: node.name }],
                         defaulted: node.body !== undefined,
                         definition: node
@@ -372,13 +401,16 @@ function resolveVariables(nodes: readonly Node[], resolve?: SnippetVariableResol
 
 export function compileSnippet(source: string): SnippetTemplate {
     let nodes: Node[] | null = null;
+    let indices: ReadonlyMap<string, number> = new Map();
     if (source.length <= MAX_SNIPPET_TEXT) {
         try {
             nodes = new SnippetParser(source).parse();
+            indices = variableIndices(nodes);
         } catch (error) {
             if (!(error instanceof SnippetLimitError)) {
                 throw error;
             }
+            nodes = null;
         }
     }
     return {
@@ -388,7 +420,7 @@ export function compileSnippet(source: string): SnippetTemplate {
                 return { text: source, stops: [] };
             }
             try {
-                return renderSnippet(resolveVariables(nodes, resolve));
+                return renderSnippet(resolveVariables(nodes, indices, resolve));
             } catch (error) {
                 if (!(error instanceof SnippetLimitError)) {
                     throw error;

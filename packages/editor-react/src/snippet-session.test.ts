@@ -150,7 +150,7 @@ async function completion(text: string, source: string, imports = false, insertT
         mounted.editor.dispose();
     });
     await language.document.ready;
-    return { ...mounted, language, timers };
+    return { ...mounted, language, timers, service };
 }
 
 test('completion puts mirrors at every caret, after imports and earlier insertions', async () => {
@@ -322,4 +322,39 @@ test('only edits in a parents own child grow that parents left edge', () => {
     press('Tab', { shiftKey: true });
     expect(editor.textInRange(editor.getSelection())).toBe('axq');
     expect(editor.getText()).toBe('xqaxq');
+});
+
+for (const defaults of [false, true]) {
+    test(`mirrored completion preserves newText from ${defaults ? 'list defaults' : 'textEdit'}`, async () => {
+        const { editor, language, timers, service, type } = await completion('fo\nfo', 'unused');
+        const range = { start: { line: 1, character: 0 }, end: { line: 1, character: 2 } };
+        const source = 'for (${1:item} of $1)$0';
+        service.respond('textDocument/completion', () =>
+            defaults
+                ? { isIncomplete: false, itemDefaults: { editRange: range, insertTextFormat: 2 }, items: [{ label: 'for(…)', textEditText: source }] }
+                : [{ label: 'for(…)', insertTextFormat: 2, textEdit: { range, newText: source } }]
+        );
+        editor.setSelections([0, 1].map((line) => ({ start: { line, character: 2 }, end: { line, character: 2 } })));
+        language.completion.invoke();
+        timers.advance(1);
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        await language.completion.accept(false);
+        expect(editor.getText()).toBe('for (item of item)\nfor (item of item)');
+        type('entry');
+        expect(editor.getText()).toBe('for (entry of entry)\nfor (entry of entry)');
+    });
+}
+
+test('Tab aligns unknown names even when a host resolves one at only one caret', async () => {
+    const { editor, language, timers, type } = await completion('fo\nfo', '$FOO $BAR $0');
+    language.project.host.resolveSnippetVariable = (name, context) => (name === 'FOO' && context.cursorIndex === 1 ? 'supplied' : undefined);
+    editor.setSelections([0, 1].map((line) => ({ start: { line, character: 2 }, end: { line, character: 2 } })));
+    language.completion.invoke();
+    timers.advance(1);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await language.completion.accept(false);
+    expect(editor.getText()).toBe('FOO BAR \nsupplied BAR ');
+    expect(editor.getSelections().map((range) => editor.textInRange(range))).toEqual(['BAR', 'BAR']);
+    type('name');
+    expect(editor.getText()).toBe('FOO name \nsupplied name ');
 });

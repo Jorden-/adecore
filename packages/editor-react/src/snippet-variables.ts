@@ -27,7 +27,7 @@ export function createSnippetResolver(
         CURSOR_NUMBER: String(context.cursorIndex + 1),
         TM_FILENAME: filename,
         TM_FILENAME_BASE: filename === undefined ? undefined : filename.replace(/(?<=.)\.[^.]*$/, ''),
-        TM_DIRECTORY: normalized?.slice(0, normalized.lastIndexOf('/')),
+        TM_DIRECTORY: normalized === undefined ? undefined : normalized.includes('/') ? normalized.slice(0, normalized.lastIndexOf('/')) : '',
         TM_FILEPATH: path,
         RELATIVE_FILEPATH: folder !== undefined && normalized?.startsWith(folder + '/') ? normalized.slice(folder.length + 1) : path,
         WORKSPACE_FOLDER: context.folder,
@@ -50,7 +50,12 @@ export function createSnippetResolver(
     const cache = new Map<string, string | undefined>();
     return (name) => {
         if (!cache.has(name)) {
-            const supplied = custom?.(name, context);
+            let supplied: string | undefined;
+            try {
+                supplied = custom?.(name, context);
+            } catch {
+                // A failed host override leaves the built-in or editable variable available.
+            }
             const value =
                 supplied ??
                 (name === 'RANDOM'

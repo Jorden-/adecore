@@ -149,7 +149,10 @@ export class CompletionFeature {
                 project.host.resolveSnippetVariable?.bind(project.host),
                 { now }
             );
-            const atItem = position === caret || item.textEdit === undefined ? item : { ...item, textEdit: undefined };
+            const atItem =
+                position === caret || item.textEdit === undefined
+                    ? item
+                    : { ...item, textEdit: undefined, insertText: item.textEdit?.newText ?? item.insertText };
             // A commit character follows the name, so accepting must not also add a call.
             return insertionOf(atItem, position, line.slice(0, position.character), replace, commit === undefined ? line.slice(position.character) : '(', {
                 template,

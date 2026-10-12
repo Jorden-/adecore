@@ -348,8 +348,7 @@ export function mirroredInsertions(
     primary: EditorRange,
     caret: EditorPosition,
     text: (range: EditorRange) => string,
-    insertion: Insertion,
-    textAt?: (position: EditorPosition, range: EditorRange) => string
+    insertion: Insertion
 ): EditorContentChange[] {
     const before = insertion.range.start.line === caret.line ? caret.character - insertion.range.start.character : -1;
     const after = insertion.range.end.line === caret.line ? insertion.range.end.character - caret.character : -1;
@@ -370,7 +369,7 @@ export function mirroredInsertions(
         const preceding = range.start.character > 0 ? text({ start: { line: at.line, character: range.start.character - 1 }, end: range.start }) : '';
         const startsWord = preceding === '' || !isIdentifierCharacter(preceding);
         const matches = startsWord && text({ start: range.start, end: at }) === typed && text({ start: at, end: range.end }) === replaced;
-        return matches ? [{ range, text: textAt?.(at, range) ?? insertion.text }] : [];
+        return matches ? [{ range, text: insertion.text }] : [];
     });
 }
 

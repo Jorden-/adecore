@@ -94,3 +94,12 @@ test('prototype property names are unknown variables rather than builtin values'
     expect(resolve('__proto__')).toBeUndefined();
     expect(parseSnippet('$toString $__proto__', resolve).text).toBe('toString __proto__');
 });
+
+test('a throwing override delegates to built-ins and a basename has no directory', () => {
+    const resolve = createSnippetResolver({ ...context, path: 'a.ts' }, () => {
+        throw new Error('offline');
+    });
+    expect(resolve('TM_FILENAME')).toBe('a.ts');
+    expect(resolve('TM_DIRECTORY')).toBe('');
+    expect(resolve('UNKNOWN')).toBeUndefined();
+});
