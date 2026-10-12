@@ -31,6 +31,8 @@ export interface HoverInfo {
     readonly word: string;
     /* How many other places use the symbol, once a server has counted them. */
     readonly references: number | null;
+    /* Only the text: no footer for the definition and the references, which a card made of someone else's words has none of. */
+    readonly plain?: boolean;
 }
 
 /* One line of the suggestions list. */

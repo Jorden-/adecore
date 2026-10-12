@@ -40,7 +40,7 @@ test('typing replaces every selection', () => {
 
 ## A fake editor
 
-`FakeEditorEngine` from `@adecore/editor/fake` mounts a `FakeEditor`, which implements `Editor` without a DOM or a document model. It records what the code under test asked: `markers`, `inlayHints`, `widgetsByOwner`, `codeVision`, `findQuery`, `commands` and the rest are public fields. Methods such as `type`, `save`, `blur`, `click`, `press`, `hover` and `pressGutterAction` play the person. `engine.last` is the editor mounted last. `inputPopup`, `announcements`, `lineLabels` and `messages` record what the accessibility methods were given.
+`FakeEditorEngine` from `@adecore/editor/fake` mounts a `FakeEditor`, which implements `Editor` without a DOM or a document model. It records what the code under test asked: `markers`, `inlayHints`, `widgetsByOwner`, `codeVision`, `findQuery`, `commands` and the rest are public fields. Methods such as `type`, `save`, `blur`, `click`, `press`, `hover`, `hoverInlay`, `clickInlay` and `pressGutterAction` play the person. `inlayLink` is the hint `setInlayLink` last drew as a link. `engine.last` is the editor mounted last. `inputPopup`, `announcements`, `lineLabels` and `messages` record what the accessibility methods were given.
 
 ```ts
 import { FakeEditorEngine } from '@adecore/editor/fake';

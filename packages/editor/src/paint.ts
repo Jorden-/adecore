@@ -165,10 +165,22 @@ export function lineElement(
         const span = document.createElement('span');
         span.className = box.inlay.ghost ? 'se-ghost' : box.inlay.composition ? 'se-composition' : 'se-inlay';
         span.dataset.inlayId = box.inlay.id;
-        span.textContent = visibleBidi(box.inlay.text);
-        span.style.left = `${box.x}px`;
+        const { parts } = box.inlay;
+        if (parts === undefined) {
+            span.textContent = visibleBidi(box.inlay.text);
+        } else {
+            parts.forEach((part, index) => {
+                const element = document.createElement('span');
+                element.className = 'se-inlay-part';
+                element.dataset.part = String(index);
+                element.textContent = visibleBidi(part);
+                span.append(element);
+            });
+        }
+        const gapLeft = box.inlay.gapLeft ?? 0;
+        span.style.left = `${box.x + gapLeft}px`;
         span.style.top = `${box.subRow * lineHeight}px`;
-        span.style.width = `${box.width}px`;
+        span.style.width = `${box.width - gapLeft - (box.inlay.gapRight ?? 0)}px`;
         element.append(span);
     }
     return element;

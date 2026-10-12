@@ -418,7 +418,40 @@ export type ScopeColorSource = (theme: EditorTheme) => Promise<ScopeColors | nul
 export interface EditorInlayHint {
     readonly position: EditorPosition;
     readonly label: string;
+    /* Names the hint in `onInlayHover` and `onInlayClick`; `hint-<index>` without one. */
+    readonly id?: string;
+    /* The label cut into pieces that the pointer tells apart; they add up to `label`. */
+    readonly parts?: readonly string[];
+    /* A gap of 4 pixels that keeps the pill off the character before it or the one after it. */
+    readonly paddingLeft?: boolean;
+    readonly paddingRight?: boolean;
 }
+
+/* A hint, or one part of its label, under the pointer. */
+export interface EditorInlayTarget {
+    readonly id: string;
+    /* The index into `parts`, or null for a hint without parts or the padding of one. */
+    readonly part: number | null;
+    /* The hint or part, in screen coordinates. */
+    readonly rect: EditorRect;
+}
+
+/* A press of the primary button on a hint. */
+export interface EditorInlayClick {
+    readonly id: string;
+    readonly part: number | null;
+    /* Cmd on macOS, Ctrl elsewhere. */
+    readonly mod: boolean;
+    readonly alt: boolean;
+    readonly shift: boolean;
+    /* 2 for a second press on the same hint within half a second. */
+    readonly clicks: 1 | 2;
+    /* A finger, which has no hover; a press then stands in for it. */
+    readonly touch: boolean;
+}
+
+/* Returns true when the press was taken; the editor then leaves the caret and the selection where they are. */
+export type EditorInlayClickHandler = (click: EditorInlayClick) => boolean;
 
 /*
  * A suggestion drawn after the caret in the editor's ghost color, which is not part of the document. It
@@ -605,6 +638,12 @@ export interface Editor {
     setSemanticTokens(tokens: readonly EditorSemanticToken[] | null): void;
     /* Hints to draw as soft pills in the text, replacing the ones set before. They follow their text through edits until set again. */
     setInlayHints(hints: readonly EditorInlayHint[]): void;
+    /* The pointer moved onto a hint or one of its parts, or null when it left them. Optional so an editor from before it still fits. */
+    onInlayHover?(listener: (target: EditorInlayTarget | null) => void): () => void;
+    /* Handlers see a press of the primary button on a hint before the editor does, the first to take it winning. */
+    onInlayClick?(handler: EditorInlayClickHandler): () => void;
+    /* Draws a hint or one of its parts as a link, underlined with a pointing hand, until the host sets another or the hints are set again; null takes it away. */
+    setInlayLink?(target: { readonly id: string; readonly part: number | null } | null): void;
     /* A suggestion after the caret, replacing the one before; null takes it away. Any change of the text takes it away as well. */
     setGhostText(ghost: EditorGhostText | null): void;
     /* One button in the gutter, replacing the one before; null takes it away. It stays on its line until the host sets it again. */

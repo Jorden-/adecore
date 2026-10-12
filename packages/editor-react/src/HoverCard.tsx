@@ -108,28 +108,30 @@ export function HoverCard({
                             void language.navigation.goToName(name, anchor, name === (declared ?? info.word) ? info.definition : null);
                         }}
                     />
-                    <div className="flex flex-col gap-0.5 px-3 py-1.5 text-xs">
-                        <div className="flex items-center gap-3 whitespace-nowrap">
-                            {info.definition !== null && (
-                                <button type="button" className="text-accent hover:underline" onClick={() => language.goTo(info.definition!)}>
-                                    {t('language.hover.definition')}
-                                </button>
-                            )}
-                            {info.references !== null && info.references > 0 && (
-                                <button
-                                    type="button"
-                                    className="text-accent hover:underline"
-                                    onClick={() => {
-                                        language.hover.hide();
-                                        void language.peek.open(position);
-                                    }}
-                                >
-                                    {t('language.hover.references', { count: info.references, formatted: formatNumber(info.references) })}
-                                </button>
-                            )}
+                    {info.plain !== true && (
+                        <div className="flex flex-col gap-0.5 px-3 py-1.5 text-xs">
+                            <div className="flex items-center gap-3 whitespace-nowrap">
+                                {info.definition !== null && (
+                                    <button type="button" className="text-accent hover:underline" onClick={() => language.goTo(info.definition!)}>
+                                        {t('language.hover.definition')}
+                                    </button>
+                                )}
+                                {info.references !== null && info.references > 0 && (
+                                    <button
+                                        type="button"
+                                        className="text-accent hover:underline"
+                                        onClick={() => {
+                                            language.hover.hide();
+                                            void language.peek.open(position);
+                                        }}
+                                    >
+                                        {t('language.hover.references', { count: info.references, formatted: formatNumber(info.references) })}
+                                    </button>
+                                )}
+                            </div>
+                            {info.definition !== null && <DefinitionPlace definition={info.definition} uri={language.uri} folder={language.project.folder} />}
                         </div>
-                        {info.definition !== null && <DefinitionPlace definition={info.definition} uri={language.uri} folder={language.project.folder} />}
-                    </div>
+                    )}
                 </>
             )}
             {problems.map((problem, index) => (

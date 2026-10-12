@@ -9,6 +9,9 @@
             "line": "Line {{line}}",
             "none": "No information for this position"
         },
+        "inlay": {
+            "failed": "The hint's action failed: {{message}}"
+        },
         "edit": {
             "staged_one": "{{count}} file changed and not saved yet",
             "staged_other": "{{count}} files changed and not saved yet",

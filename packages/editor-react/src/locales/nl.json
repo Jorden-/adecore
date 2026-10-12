@@ -9,6 +9,9 @@
             "line": "Regel {{line}}",
             "none": "Geen informatie voor deze plek"
         },
+        "inlay": {
+            "failed": "De actie van de hint is mislukt: {{message}}"
+        },
         "edit": {
             "staged_one": "{{count}} bestand gewijzigd en nog niet opgeslagen",
             "staged_other": "{{count}} bestanden gewijzigd en nog niet opgeslagen",

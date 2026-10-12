@@ -23,7 +23,10 @@ import type {
     EditorHover,
     EditorIndentation,
     EditorGhostText,
+    EditorInlayClick,
+    EditorInlayClickHandler,
     EditorInlayHint,
+    EditorInlayTarget,
     EditorKeyHandler,
     EditorInputPopup,
     EditorMarker,
@@ -551,6 +554,35 @@ export class FakeEditor implements Editor {
         this.inlayHints = hints;
     }
 
+    private readonly inlayHovers = new Set<(target: EditorInlayTarget | null) => void>();
+    private readonly inlayHandlers = new Set<EditorInlayClickHandler>();
+
+    /* The hint, or part of one, the last `setInlayLink` drew as a link. */
+    inlayLink: { readonly id: string; readonly part: number | null } | null = null;
+
+    onInlayHover(listener: (target: EditorInlayTarget | null) => void): () => void {
+        return subscribe(this.inlayHovers, listener);
+    }
+
+    /* The pointer resting on a hint or a part of one, or leaving them. */
+    hoverInlay(id: string | null, part: number | null = null): void {
+        emit(this.inlayHovers, id === null ? null : { id, part, rect: { left: 0, top: 0, right: 40, bottom: 20 } });
+    }
+
+    onInlayClick(handler: EditorInlayClickHandler): () => void {
+        return subscribe(this.inlayHandlers, handler);
+    }
+
+    /* A press on a hint as the editor sees it first; true when a handler took it. */
+    clickInlay(click: Partial<EditorInlayClick> & Pick<EditorInlayClick, 'id'>): boolean {
+        const full: EditorInlayClick = { part: null, mod: false, alt: false, shift: false, clicks: 1, touch: false, ...click };
+        return [...this.inlayHandlers].some((handler) => handler(full));
+    }
+
+    setInlayLink(target: { readonly id: string; readonly part: number | null } | null): void {
+        this.inlayLink = target;
+    }
+
     /* The suggestion after the caret now, which any change of the text takes away as the real editor does. */
     ghost: EditorGhostText | null = null;
 
@@ -822,6 +854,8 @@ export class FakeEditor implements Editor {
         this.textChanges.clear();
         this.carets.clear();
         this.hovers.clear();
+        this.inlayHovers.clear();
+        this.inlayHandlers.clear();
         this.attributionHovers.clear();
         this.views.clear();
         this.lineHeights.clear();

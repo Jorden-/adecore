@@ -46,6 +46,11 @@ export interface Inlay {
     at: number;
     text: string;
     tooltip?: string;
+    /* The text cut into pieces drawn as elements of their own; they add up to `text`. */
+    parts?: readonly string[];
+    /* Pixels of space kept clear before and after the pill. */
+    gapLeft?: number;
+    gapRight?: number;
     /* What an input method has composed: drawn as text in the code face, with no padding, so what stands around it does not move. */
     composition?: boolean;
     /* A suggestion the host drew after the caret: text in the code face with no padding, which the caret stays in front of. */
@@ -309,7 +314,10 @@ export function scanDenseLine(
             flushRun(offset);
             const inlay = lineInlays[nextInlay++]!;
             const shown = visibleBidi(inlay.text);
-            const width = inlay.composition || inlay.ghost ? metrics.measureText(shown) : Math.max(8, metrics.measureInlay(shown) + 12);
+            const width =
+                inlay.composition || inlay.ghost
+                    ? metrics.measureText(shown)
+                    : Math.max(8, metrics.measureInlay(shown) + 12) + (inlay.gapLeft ?? 0) + (inlay.gapRight ?? 0);
             geometry.inlays.push({ inlay, x, width, subRow: row });
             x += width;
         }

@@ -730,6 +730,11 @@
     white-space: pre;
     cursor: default;
 }
+.se-inlay-link {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
 .se-composition {
     position: absolute;
     white-space: pre;

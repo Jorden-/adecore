@@ -11,6 +11,8 @@ import { TouchSelection } from './touch.ts';
 import type {
     EditorClick,
     EditorClickHandler,
+    EditorInlayClick,
+    EditorInlayClickHandler,
     EditorContextMenu,
     EditorKeyHandler,
     EditorPosition,
@@ -81,6 +83,8 @@ function selectionSignature(selections: readonly Selection[]): string {
 
 /* Typing in the same stretch is one undo step until a pause this long. */
 const TYPING_PAUSE_MS = 750;
+/* A second press on the same hint within this many milliseconds is a double click. */
+const DOUBLE_PRESS_MS = 500;
 
 /*
  * What a person does to the editor: keys, typing, the clipboard, an input method, the mouse. It turns
@@ -94,6 +98,8 @@ export class InputController {
     private readonly keyHandlers = new Set<EditorKeyHandler>();
     private readonly gesture: DoubleModifierGesture;
     private readonly clickHandlers = new Set<EditorClickHandler>();
+    private readonly inlayHandlers = new Set<EditorInlayClickHandler>();
+    private lastInlayPress: { id: string; at: number } | null = null;
     private readonly contextListeners = new Set<(menu: EditorContextMenu) => void>();
     private readonly subscription: { dispose(): void };
     private historyGroup = 0;
@@ -209,7 +215,10 @@ export class InputController {
         this.listen(viewport, 'scroll', () => this.view.scrolled());
         this.listen(viewport, 'wheel', () => this.view.cancelScroll());
         this.listen(viewport, 'pointermove', (event) => this.view.hoverMoved(event));
-        this.listen(viewport, 'pointerleave', () => this.view.setHover(null));
+        this.listen(viewport, 'pointerleave', () => {
+            this.view.setHover(null);
+            this.view.setInlayHover(null);
+        });
         this.listen(viewport, 'pointerdown', (event) => this.pointerDown(event));
         this.listen(viewport, 'contextmenu', (event) => this.contextMenu(event));
         this.listen(this.view.gutterElement, 'pointerdown', (event) => this.gutterDown(event));
@@ -677,6 +686,10 @@ export class InputController {
         return subscribe(this.clickHandlers, handler);
     }
 
+    onInlayClick(handler: EditorInlayClickHandler): () => void {
+        return subscribe(this.inlayHandlers, handler);
+    }
+
     onContextMenu(listener: (menu: EditorContextMenu) => void): () => void {
         return subscribe(this.contextListeners, listener);
     }
@@ -782,6 +795,9 @@ export class InputController {
         }
         // Cancels the compatibility mouse events, whose focus change would close the keyboard a tap opened; scrolling is not affected.
         event.preventDefault();
+        if (this.takenByInlayHandler(event)) {
+            return;
+        }
         if (event.pointerType === 'touch') {
             this.touch.start(event, 'text', () => this.takenByHost(event));
             return;
@@ -791,6 +807,34 @@ export class InputController {
             return;
         }
         this.pointer.start(event);
+    }
+
+    /* Whether a handler of the host took a press on a hint, which then moves neither the caret nor the focus. */
+    private takenByInlayHandler(event: PointerEvent): boolean {
+        const inlay = this.inlayHandlers.size === 0 ? null : this.view.inlayAt(event.target);
+        if (inlay === null) {
+            return false;
+        }
+        const now = Date.now();
+        const again = this.lastInlayPress?.id === inlay.id && now - this.lastInlayPress.at <= DOUBLE_PRESS_MS;
+        this.lastInlayPress = again ? null : { id: inlay.id, at: now };
+        const touch = event.pointerType === 'touch';
+        const click: EditorInlayClick = {
+            id: inlay.id,
+            part: inlay.part,
+            mod: this.options.apple ? event.metaKey : event.ctrlKey,
+            alt: event.altKey,
+            shift: event.shiftKey,
+            clicks: again ? 2 : 1,
+            touch
+        };
+        if (![...this.inlayHandlers].some((handler) => handler(click))) {
+            return false;
+        }
+        if (!touch) {
+            this.view.focus();
+        }
+        return true;
     }
 
     /* Whether a handler of the host took a press on a character, such as a Mod+click that follows a name. */

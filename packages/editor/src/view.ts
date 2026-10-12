@@ -259,6 +259,9 @@ export class EditorView {
     private frameGeometry: { top: number; left: number; width: number; height: number } | null = null;
     private disposed = false;
     private inlays: Inlay[] = [];
+    private readonly inlayHoverListeners = new Set<(target: { id: string; part: number | null; rect: EditorRect } | null) => void>();
+    private inlayHover: { id: string; part: number | null } | null = null;
+    private inlayLinkElement: HTMLElement | null = null;
     /* The host's widgets by owner, so one owner setting its rows never takes another's away. */
     private readonly blocks = new Map<string, BlockWidget[]>();
     private lenses: BlockWidget[] = [];
@@ -462,7 +465,12 @@ export class EditorView {
     }
 
     setInlays(inlays: readonly Inlay[]): void {
-        this.inlays = inlays.map((inlay) => ({ ...inlay, text: inlay.text.replace(/[\r\n]/g, ' ') }));
+        this.inlays = inlays.map((inlay) => ({
+            ...inlay,
+            text: inlay.text.replace(/[\r\n]/g, ' '),
+            ...(inlay.parts === undefined ? {} : { parts: inlay.parts.map((part) => part.replace(/[\r\n]/g, ' ')) })
+        }));
+        this.inlayLinkElement = null;
         this.configureText();
     }
 
@@ -1649,6 +1657,47 @@ export class EditorView {
             !this.settings.readOnly && event.buttons === 0 && this.selectionAtPoint(event.clientX, event.clientY) !== null
         );
         this.setHover(event.buttons === 0 ? this.characterAtPoint(event.clientX, event.clientY, event.target) : null);
+        this.setInlayHover(event.buttons === 0 ? event.target : null);
+    }
+
+    /* The hint, and the part of its label, an event happened on, or null anywhere else. */
+    inlayAt(target: EventTarget | null): { id: string; part: number | null; element: HTMLElement } | null {
+        const element = (target as HTMLElement | null)?.closest?.<HTMLElement>('.se-inlay');
+        if (!element?.dataset.inlayId) {
+            return null;
+        }
+        const part = (target as HTMLElement).closest<HTMLElement>('[data-part]');
+        return { id: element.dataset.inlayId, part: part === null ? null : Number(part.dataset.part), element: part ?? element };
+    }
+
+    /* Says which hint the pointer is on, or that it left them all. */
+    setInlayHover(target: EventTarget | null): void {
+        const found = this.inlayAt(target);
+        if (found?.id === this.inlayHover?.id && found?.part === this.inlayHover?.part) {
+            return;
+        }
+        this.inlayHover = found === null ? null : { id: found.id, part: found.part };
+        emit(this.inlayHoverListeners, found === null ? null : { id: found.id, part: found.part, rect: found.element.getBoundingClientRect() });
+    }
+
+    onInlayHover(listener: (target: { id: string; part: number | null; rect: EditorRect } | null) => void): () => void {
+        return subscribe(this.inlayHoverListeners, listener);
+    }
+
+    /* Draws a hint or one of its parts as a link, which only the pill on screen can show. */
+    setInlayLink(target: { id: string; part: number | null } | null): void {
+        this.inlayLinkElement?.classList.remove('se-inlay-link');
+        this.inlayLinkElement = null;
+        if (target === null) {
+            return;
+        }
+        const pill = Array.from(this.content.querySelectorAll<HTMLElement>('[data-inlay-id]')).find((element) => element.dataset.inlayId === target.id);
+        const element =
+            target.part === null
+                ? pill
+                : (Array.from(pill?.querySelectorAll<HTMLElement>('[data-part]') ?? []).find((part) => part.dataset.part === String(target.part)) ?? pill);
+        element?.classList.add('se-inlay-link');
+        this.inlayLinkElement = element ?? null;
     }
 
     setHover(offset: number | null): void {
@@ -2650,6 +2699,7 @@ export class EditorView {
         this.viewListeners.clear();
         this.lineHeightListeners.clear();
         this.hoverListeners.clear();
+        this.inlayHoverListeners.clear();
         this.gutterActionListeners.clear();
         this.gutterMarkerListeners.clear();
         this.gutterMarkers.clear();

@@ -24,7 +24,15 @@ The editor draws no message card of its own. [`@adecore/editor-react`](/editor-r
 
 - `setHighlights(highlights)` marks the other uses of the name at the caret, each with a `kind` of `text`, `read` or `write`. The next edit clears them.
 - `setLink(range)` underlines a range as a link under the pointer, such as a name while Mod is held, until the next `setLink` or edit; `null` removes it.
-- `setInlayHints(hints)` draws a `label` as a soft pill between two characters, such as a parameter name or a type. It is not part of the text.
+- `setInlayHints(hints)` draws a `label` as a soft pill between two characters, such as a parameter name or a type. It is not part of the text. A hint may also carry:
+    - `parts`, the label cut into strings that add up to it, each drawn as an element of its own so the pointer can tell them apart. A hint without parts looks the same as one with a single part.
+    - `paddingLeft` and `paddingRight`, a gap of 4 pixels kept clear on that side of the pill. The gap is not part of the pill, so a press in it behaves as a press beside the hint.
+    - `id`, which names the hint in the events below; `hint-<index>` without one.
+- `onInlayHover(listener)` says which hint, and which part of its label, the pointer is on as an `EditorInlayTarget` with its `rect` in page pixels, and `null` when it leaves them.
+- `onInlayClick(handler)` sees a press of the primary button on a hint before the editor does, as an `EditorInlayClick`: the hint's `id`, the `part`, `mod`, `alt`, `shift`, `clicks` (2 for a second press on the same hint within half a second) and `touch`. A handler that returns true takes the press and the caret and focus stay where they are; otherwise the editor treats it like a press beside the hint and puts the caret at the nearest edge. The first handler to take it wins. The editor never puts the caret in a hint, since it is not text.
+- `setInlayLink(target)` underlines a hint or one part of it, with a pointing hand, until the host sets another, takes it away with `null`, or sets the hints again.
+
+All three inlay methods are optional on `Editor`, so an editor from before them still fits. Hints are pointer driven and stay hidden from assistive technology as the text decoration they are; the host decides what a press does and how a keyboard reaches the same thing.
 
 ## Semantic colors
 

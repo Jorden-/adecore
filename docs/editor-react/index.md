@@ -55,7 +55,7 @@ The symbol picker is a dialog with its own input and is not pointed at from the 
 - The view's limits hold: no bidirectional text, and the [performance limits](/editor/#limits) of the editor.
 - Accessibility is [untested with a screen reader](#accessibility), as it is for the editor.
 - Snippets are a subset: tab stops, placeholders and the first value of a choice. Variables insert nothing or their default, and transforms are skipped. Stops with the same number are not edited together.
-- Inlay hints flatten a label with parts to its text and ignore padding, tooltips, commands and edits.
+- Inlay hint actions (follow, command, insert) are for the pointer; only the tooltip has a keyboard path, through Quick Info on the caret. See [inlay hints](/editor-react/hover#inlay-hints).
 - Semantic tokens are asked in full after each pause in typing; the delta and range requests of the protocol are not used.
 - A workspace edit that creates or moves a file over one that is there is refused, a delete needs a host that reports unsaved work, a read only editor is refused up front when it can say so, and a failure halfway does not roll back the steps before it. See [workspace edits](/editor-react/project#workspace-edits).
 - Code vision rows are skipped in files over 20,000 lines.

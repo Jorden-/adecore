@@ -1,14 +1,14 @@
 import type { EditorHover, EditorPosition, EditorRange } from '@adecore/editor';
 import type { EditorLanguage } from './editor-language.ts';
 import { rangeHolds, type Problem } from './diagnostics-model.ts';
-import { hoverTextOf, isEmptyHover, locationsOf } from './hover-content.ts';
+import { hoverTextOf, isEmptyHover, locationsOf, type HoverText } from './hover-content.ts';
 import { lineTextOf } from './line-text.ts';
 import { wordRangeAt } from './rename-model.ts';
 import type { HoverInfo } from './popups.ts';
 import { isShortcut } from './shortcut-keys.ts';
 import { realTimers, type Timers } from './timers.ts';
 
-const SHOW_DELAY_MS = 300;
+export const SHOW_DELAY_MS = 300;
 const HIDE_DELAY_MS = 250;
 /* How long a card has to stay up before the references of its symbol are counted, which can be a request over the whole project. */
 const COUNT_DELAY_MS = 500;
@@ -125,6 +125,17 @@ export class HoverFeature {
         this.present(range.start, [], null, range);
     }
 
+    /* A card of text another feature brings, such as the tooltip of an inlay hint, which goes the way any hover card does. */
+    showText(position: EditorPosition, text: HoverText): void {
+        this.hide();
+        this.present(position, [], { text, definition: null, word: '', references: null, plain: true }, null);
+    }
+
+    /* The pointer left what a card was opened for: it closes unless the pointer reaches the card in time. */
+    release(): void {
+        this.scheduleHide();
+    }
+
     hide(): void {
         this.pinned = false;
         this.held = false;
@@ -214,6 +225,10 @@ export class HoverFeature {
         }
         if (problems.length === 0 && info === null) {
             this.hide();
+            if (pinned && (await this.language.inlayHints.showTooltipAt(position))) {
+                this.pinned = true;
+                return;
+            }
             if (pinned) {
                 this.language.project.host.notify?.({ id: TOAST_ID, kind: 'error', title: this.language.project.i18n.t('editor:language.hover.none') });
             }

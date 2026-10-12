@@ -46,6 +46,7 @@ export class EditorLanguage {
     readonly popups = createPopupStore();
     readonly diagnostics: DiagnosticsFeature;
     readonly hover: HoverFeature;
+    readonly inlayHints: InlayHintsFeature;
     readonly completion: CompletionFeature;
     readonly signature: SignatureFeature;
     readonly snippets: SnippetFeature;
@@ -84,7 +85,7 @@ export class EditorLanguage {
         this.symbols = new SymbolsFeature(this, timers);
         new SelectionRangesFeature(this);
         new SemanticTokensFeature(this, timers);
-        new InlayHintsFeature(this, timers);
+        this.inlayHints = new InlayHintsFeature(this, timers);
         this.codeActions = new CodeActionsFeature(this, timers);
         this.rename = new RenameFeature(this);
         this.navigation = new NavigationFeature(this);

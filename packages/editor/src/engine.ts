@@ -31,7 +31,9 @@ import type {
     EditorHighlight,
     EditorHover,
     EditorGhostText,
+    EditorInlayClickHandler,
     EditorInlayHint,
+    EditorInlayTarget,
     EditorKeyHandler,
     EditorInputPopup,
     EditorMarker,
@@ -59,6 +61,8 @@ import { EditorView, type ViewSettings } from './view.ts';
 const DEFAULT_TAB_SIZE = 4;
 const DEFAULT_LABEL = 'Code editor';
 const DEFAULT_WIDGET_OWNER = 'default';
+/* The space a hint's padding keeps clear; a whole pixel count so the pill stays on the pixel grid. */
+const INLAY_GAP = 4;
 
 class SmartEditor implements Editor {
     private readonly model: DocumentModel;
@@ -371,7 +375,28 @@ class SmartEditor implements Editor {
     }
 
     setInlayHints(hints: readonly EditorInlayHint[]): void {
-        this.view.setInlays(hints.map((hint, index) => ({ id: `hint-${index}`, at: this.offsetAt(hint.position), text: hint.label })));
+        this.view.setInlays(
+            hints.map((hint, index) => ({
+                id: hint.id ?? `hint-${index}`,
+                at: this.offsetAt(hint.position),
+                text: hint.label,
+                ...(hint.parts === undefined ? {} : { parts: hint.parts }),
+                ...(hint.paddingLeft ? { gapLeft: INLAY_GAP } : {}),
+                ...(hint.paddingRight ? { gapRight: INLAY_GAP } : {})
+            }))
+        );
+    }
+
+    onInlayHover(listener: (target: EditorInlayTarget | null) => void): () => void {
+        return this.view.onInlayHover(listener);
+    }
+
+    onInlayClick(handler: EditorInlayClickHandler): () => void {
+        return this.controller.onInlayClick(handler);
+    }
+
+    setInlayLink(target: { readonly id: string; readonly part: number | null } | null): void {
+        this.view.setInlayLink(target);
     }
 
     setGhostText(ghost: EditorGhostText | null): void {
