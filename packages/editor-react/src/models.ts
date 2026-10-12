@@ -119,6 +119,7 @@ export {
 } from './symbol-picker-model.ts';
 export { SYMBOL_LINK_CLASS, isTypeName, linkTypeNames, declaredNameOf, placesOfName } from './symbol-links.ts';
 export { scopesOf, decodeSemanticTokens } from './semantic-model.ts';
+export { applySemanticEdits } from './semantic-delta.ts';
 export {
     type ActionGroup,
     ACTION_GROUPS,

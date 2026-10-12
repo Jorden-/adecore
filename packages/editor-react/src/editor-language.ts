@@ -24,12 +24,18 @@ import { createPopupStore } from './popups.ts';
 import { realTimers, type Timers } from './timers.ts';
 import { InlayHintsFeature } from './inlay-hints.ts';
 import { SelectionRangesFeature } from './selection-ranges.ts';
-import { SemanticTokensFeature } from './semantic-tokens.ts';
+import { SemanticTokensFeature, type SemanticTokensOptions } from './semantic-tokens.ts';
 import { SignatureFeature } from './signature.ts';
 import { SnippetFeature } from './snippet-session.ts';
 import { SymbolsFeature } from './symbols.ts';
 import type { Place } from './navigation-history.ts';
 import type { LanguageDocumentHandle, ProjectLanguage } from './project-language.ts';
+
+/* What an app tunes about the features of one editor. */
+export interface EditorLanguageOptions {
+    /* Where a document counts as large for semantic tokens. */
+    semanticTokens?: SemanticTokensOptions;
+}
 
 /*
  * The one place that connects an editor to the language servers: it opens the file's document for
@@ -69,7 +75,7 @@ export class EditorLanguage {
     private readonly disposers: Array<() => void> = [];
     private disposed = false;
 
-    constructor(project: ProjectLanguage, editor: Editor, uri: string, languageId: string, timers: Timers = realTimers) {
+    constructor(project: ProjectLanguage, editor: Editor, uri: string, languageId: string, timers: Timers = realTimers, options: EditorLanguageOptions = {}) {
         this.editor = editor;
         this.apple = project.host.apple ?? false;
         this.keymap = project.host.keymap ?? KEYMAP;
@@ -86,7 +92,7 @@ export class EditorLanguage {
         this.highlights = new HighlightsFeature(this, timers);
         this.symbols = new SymbolsFeature(this, timers);
         new SelectionRangesFeature(this);
-        new SemanticTokensFeature(this, timers);
+        new SemanticTokensFeature(this, timers, options.semanticTokens);
         this.inlayHints = new InlayHintsFeature(this, timers);
         this.codeActions = new CodeActionsFeature(this, timers);
         this.rename = new RenameFeature(this);

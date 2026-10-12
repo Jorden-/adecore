@@ -1,4 +1,5 @@
-export { EditorLanguage } from './editor-language.ts';
+export { EditorLanguage, type EditorLanguageOptions } from './editor-language.ts';
+export { DEFAULT_RANGE_LINES, DEFAULT_RANGE_CHARACTERS, type SemanticTokensOptions } from './semantic-tokens.ts';
 export { ProjectLanguage, type FileOperationTarget } from './project-language.ts';
 export type { LanguageDocumentHandle } from './project-language.ts';
 export type {
