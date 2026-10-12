@@ -1,6 +1,6 @@
 import type { CompletionItem, CompletionList, Range } from './protocol.ts';
 
-function validRange(range: Range): boolean {
+function validRange(range: Range, singleLine = true): boolean {
     if (range === null || typeof range !== 'object') {
         return false;
     }
@@ -13,17 +13,17 @@ function validRange(range: Range): boolean {
         end !== null &&
         typeof end === 'object' &&
         [start.line, start.character, end.line, end.character].every((value) => Number.isSafeInteger(value) && value >= 0) &&
-        start.line === end.line &&
-        start.character <= end.character
+        (!singleLine || start.line === end.line) &&
+        (start.line < end.line || (start.line === end.line && start.character <= end.character))
     );
 }
 
-function validEditRange(range: Range | { insert: Range; replace: Range }): boolean {
+function validEditRange(range: Range | { insert: Range; replace: Range }, singleLine = true): boolean {
     if (range === null || typeof range !== 'object' || Array.isArray(range)) {
         return false;
     }
     if ('start' in range) {
-        return validRange(range);
+        return validRange(range, singleLine);
     }
     return (
         validRange(range.insert) &&
@@ -49,7 +49,12 @@ export function applyCompletionDefaults(
     }
     if (item.textEdit !== undefined) {
         const edit = item.textEdit;
-        if (edit === null || typeof edit !== 'object' || typeof edit.newText !== 'string' || !validEditRange('range' in edit ? edit.range : edit)) {
+        if (
+            edit === null ||
+            typeof edit !== 'object' ||
+            typeof edit.newText !== 'string' ||
+            !('range' in edit ? validEditRange(edit.range, false) : validEditRange(edit))
+        ) {
             throw new RangeError('Invalid completion item edit.');
         }
     }

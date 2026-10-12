@@ -712,3 +712,23 @@ test('replacing an indented parent removes its trailing empty child', async () =
     expect(mounted.language.snippets.isActive).toBe(false);
     expect(mounted.editor.getCaret()).toEqual({ line: 0, character: 5 });
 });
+
+test('explicit multiline completion edits keep fields and the edit-start indentation', async () => {
+    const mounted = await completion('  old\n  fo', 'unused');
+    mounted.editor.setCaret({ line: 1, character: 4 });
+    mounted.service.respond('textDocument/completion', () => [
+        {
+            label: 'foo',
+            insertTextFormat: 2,
+            insertTextMode: 2,
+            textEdit: { range: { start: { line: 0, character: 2 }, end: { line: 1, character: 4 } }, newText: 'first\n${1:second}$0' }
+        },
+        { label: 'food' }
+    ]);
+    mounted.language.completion.invoke();
+    mounted.timers.advance(1);
+    await new Promise<void>((done) => setImmediate(done));
+    await mounted.language.completion.accept(false);
+    expect(mounted.editor.getText()).toBe('  first\n  second');
+    expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('second');
+});

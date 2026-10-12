@@ -61,3 +61,11 @@ test('invalid ranges can be reported and ignored without dropping the other defa
     expect(errors).toHaveLength(1);
     expect(() => applyCompletionDefaults({ label: 1 } as never)).toThrow(TypeError);
 });
+
+test('explicit multiline edits remain compatible while their coordinates are validated', () => {
+    const edit = { range: { start: { line: 0, character: 2 }, end: { line: 1, character: 1 } }, newText: 'value' };
+    expect(applyCompletionDefaults({ label: 'value', textEdit: edit }).textEdit).toEqual(edit);
+    expect(() =>
+        applyCompletionDefaults({ label: 'x', textEdit: { range: { start: { line: 2, character: 0 }, end: { line: 1, character: 0 } }, newText: 'x' } })
+    ).toThrow(RangeError);
+});
