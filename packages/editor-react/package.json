@@ -49,6 +49,11 @@
         "./locales/*.json": {
             "source": "./src/locales/*.json",
             "default": "./dist/locales/*.json"
+        },
+        "./snippet-transform-worker": {
+            "source": "./src/snippet-transform-worker.ts",
+            "types": "./dist/snippet-transform-worker.d.ts",
+            "default": "./dist/snippet-transform-worker.js"
         }
     },
     "scripts": {

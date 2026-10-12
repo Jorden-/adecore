@@ -60,3 +60,15 @@ There are at most eight frames and 1,000 ranges across frames and instances. Exc
 ## Signature help
 
 Typing a trigger character of the service's signature help, such as `(` or `,`, asks for the signatures of the call around the caret. `signature.invoke()` asks at once, as Mod+P does, and `close()` closes the card. `SignatureCard` draws the active signature with the active parameter in bold, its documentation, and which of several signatures it is. Its prop is a `SignatureViewModel`, made by `signatureViewOf` from the service's answer.
+
+### Isolated snippet transforms
+
+`@adecore/editor-react/snippet-transform-worker` exports `serveSnippetTransforms`, `createSnippetTransformClient`, `compileSnippetTransformFormat`, `SnippetTransformError` and their protocol, job, client and endpoint types. `SnippetTransformJob` carries a value, pattern, flags and `SnippetTransformFormatNode` AST; `SnippetTransformCase` names the supported case operations. `SnippetTransformInput` and `SnippetTransformOutput` are the request/reply unions. `SnippetTransformWorkerEndpoint` is the port served by the worker. `SnippetTransformClientOptions` injects the factory, deadline and timer; `SnippetTransformClient` owns the request lifecycle. `SnippetTransformErrorKind` distinguishes protocol errors, timeouts and lifecycle failures. The entrypoint imports no React or models barrel. A host worker calls `serveSnippetTransforms(self)` explicitly.
+
+The format compiler returns a flat AST for numeric captures, five case operations (`upcase`, `downcase`, `capitalize`, `camelcase`, `pascalcase`) and conditional/default strings. Capture indices stop at 99. Patterns support `gimsu`; compilation checks syntax on the page, while execution and captures stay in the worker. Empty global matches advance by a Unicode code point. No match preserves the original value.
+
+`client.transform(jobs)` sends one batch and returns only strings. The batch permits at most 1,000 jobs, 100,000 UTF-16 units per input value, 1,024 per pattern, 10,000 per format, 1,000 format nodes and two million input/program or output units in total. More than 10,000 matches or any exceeded output limit refuses the whole batch. The client copies jobs before posting, rejects malformed replies, and keeps the worker after deterministic syntax/range errors.
+
+This client uses the shared worker lifecycle. Its provisional default deadline is 1,500 ms, including startup and posting; hosts can supply `deadline` and an injected `schedule`. A timeout terminates the worker. `cancel` supersedes the request, `release` frees the worker while keeping the client reusable, and `dispose` is final. Allocate a separate client from find. Tightening the deadline requires cold-start and warm-roundtrip measurements in each supported runtime.
+
+The worker is a standalone building block in this release. Snippet insertion and field-exit transforms are not wired to it yet.
