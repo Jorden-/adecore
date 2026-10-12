@@ -1,4 +1,6 @@
-import { createSnippetTransformClient, SnippetTransformError, type SnippetTransformClient } from './snippet-transform-client.ts';
+import { SnippetTransformError } from './snippet-transform-client.ts';
+import { acquireSnippetTransforms, type SnippetTransformLease } from './snippet-transform-queue.ts';
+import { realTimers, type Timers } from './timers.ts';
 import type { SnippetTransformJob } from './snippet-transform-protocol.ts';
 import type { EditorContentChange, EditorPosition, EditorRange, EditorTextChange } from '@adecore/editor';
 import { comparePositions, rangeHolds, shiftPosition } from './diagnostics-model.ts';
@@ -155,10 +157,11 @@ export class SnippetFeature {
     private extras: readonly EditorContentChange[] = [];
     private generation = 0;
     private choicePrefix: string | null = null;
-    private transforms: SnippetTransformClient | null = null;
+    private readonly transforms: SnippetTransformLease | null;
 
-    constructor(language: SnippetHost) {
+    constructor(language: SnippetHost, timers: Timers = realTimers) {
         this.language = language;
+        this.transforms = language.project === undefined ? null : acquireSnippetTransforms(language.project, timers);
         const { editor } = language;
         const offs = [editor.onKeyDown((event) => this.key(event)), editor.onTextChange((change) => this.edited(change)), editor.onCaret(() => this.moved())];
         language.onDispose(() => {
@@ -170,14 +173,12 @@ export class SnippetFeature {
         });
     }
 
-    async transformVariables(jobs: readonly SnippetTransformJob[]): Promise<readonly string[] | null> {
-        const factory = this.language.project?.host.snippetTransformWorker;
-        if (factory === undefined) {
+    async transformVariables(jobs: readonly SnippetTransformJob[], current: () => boolean = () => true): Promise<readonly string[] | null> {
+        if (this.transforms === null) {
             return null;
         }
-        this.transforms ??= createSnippetTransformClient({ workerFactory: factory });
         try {
-            return await this.transforms.transform(jobs);
+            return await this.transforms.request(jobs, { current });
         } catch (error) {
             if (error instanceof SnippetTransformError && ['timeout', 'unavailable', 'superseded', 'disposed'].includes(error.kind)) {
                 return null;

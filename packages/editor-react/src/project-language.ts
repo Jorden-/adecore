@@ -1,3 +1,4 @@
+import { disposeSnippetTransforms } from './snippet-transform-queue.ts';
 import i18next, { type i18n } from 'i18next';
 import { fileUriToPath, type ApplyWorkspaceEditResult, type ContentChange, type LanguageService, type WorkspaceEdit } from '@adecore/lsp';
 import type { Editor, EditorPosition } from '@adecore/editor';
@@ -211,6 +212,7 @@ export class ProjectLanguage {
             return;
         }
         this.disposed = true;
+        disposeSnippetTransforms(this);
         for (const [uri, holder] of this.holders) {
             holder.sync.dispose();
             void holder.sync.ready

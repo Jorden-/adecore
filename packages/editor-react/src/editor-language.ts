@@ -74,7 +74,7 @@ export class EditorLanguage {
         this.diagnostics = new DiagnosticsFeature(this);
         this.hover = new HoverFeature(this, timers);
         this.completion = new CompletionFeature(this, timers);
-        this.snippets = new SnippetFeature(this);
+        this.snippets = new SnippetFeature(this, timers);
         this.signature = new SignatureFeature(this, timers);
         this.highlights = new HighlightsFeature(this, timers);
         this.symbols = new SymbolsFeature(this, timers);

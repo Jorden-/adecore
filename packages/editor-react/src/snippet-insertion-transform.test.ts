@@ -55,7 +55,7 @@ async function mount(source: string, text = 'fo', mode: 1 | 2 = 1, host: Languag
         await settle();
         return language.completion.accept(false);
     };
-    return { ...mounted, port, language, accept, notices };
+    return { ...mounted, port, language, project, timers, accept, notices };
 }
 
 test('variable transforms wait once for every caret and insert with fields in one undo step', async () => {
@@ -152,6 +152,9 @@ test('a newer accept supersedes a waiting accept without inserting its raw fallb
     const second = mounted.accept();
     await settle();
     expect(mounted.editor.getText()).toBe('fo');
+    expect(mounted.port.requests).toHaveLength(1);
+    mounted.port.answer(['old']);
+    await settle();
     expect(mounted.port.requests).toHaveLength(2);
     mounted.port.answer(['new']);
     await Promise.all([first, second]);
@@ -215,4 +218,29 @@ test('a selection-only move also invalidates a waiting transform', async () => {
     await pending;
     expect(mounted.editor.getText()).toBe('fo');
     expect(mounted.editor.getCaret()).toEqual({ line: 0, character: 0 });
+});
+
+test('editors of one project share the client and closing one preserves the other', async () => {
+    const mounted = await mount('${TM_FILENAME/(.*)/$1/}$1');
+    const other = mountEditor({ text: 'other' });
+    const language = new EditorLanguage(mounted.project, other.editor, 'file:///other.ts', 'typescript', mounted.timers);
+    cleanup.push(() => {
+        language.dispose();
+        other.editor.dispose();
+    });
+    await language.document.ready;
+    const job = (value: string) => [{ value, pattern: '(.)', flags: '', format: [{ kind: 'capture' as const, index: 1 }] }];
+    const first = mounted.language.snippets.transformVariables(job('a'));
+    const second = language.snippets.transformVariables(job('b'));
+    await settle();
+    expect(mounted.port.requests).toHaveLength(1);
+    mounted.port.answer(['A']);
+    expect(await first).toEqual(['A']);
+    await settle();
+    mounted.language.dispose();
+    expect(mounted.port.stops).toBe(0);
+    mounted.port.answer(['B']);
+    expect(await second).toEqual(['B']);
+    language.dispose();
+    expect(mounted.port.stops).toBe(1);
 });

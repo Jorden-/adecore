@@ -277,7 +277,7 @@ export class CompletionFeature {
                 throw new CompletionLimitError();
             }
             if (jobs.length > 0 && project.host.snippetTransformWorker !== undefined) {
-                const values = await snippets.transformVariables(jobs);
+                const values = await snippets.transformVariables(jobs, current);
                 if (!current()) {
                     return;
                 }
@@ -338,6 +338,9 @@ export class CompletionFeature {
             this.afterInsert(item, commit, lineBefore);
             editor.focus();
         } catch (error) {
+            if (!current()) {
+                return;
+            }
             if (error instanceof CompletionLimitError || (error instanceof SnippetTransformError && error.kind === 'range')) {
                 this.refuseLargeCompletion();
             } else if (error instanceof SnippetTransformError) {
