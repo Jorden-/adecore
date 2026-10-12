@@ -63,6 +63,8 @@ export interface EditorOptions {
     readonly smartKeys?: Partial<EditorSmartKeys>;
     /* A line at each indentation level, the one of the scope around the caret stronger; on unless false. */
     readonly guides?: boolean;
+    /* The headers of the blocks scrolled out of sight stay pinned on top; on unless false. */
+    readonly stickyScroll?: boolean;
     /* Spaces drawn as dots and tabs as arrows; off unless true. */
     readonly whitespace?: boolean;
     /* The column to draw a line at, such as the `max_line_length` of a project; none by default. */
@@ -615,6 +617,7 @@ export interface Editor {
     /* Changes what it does as a person types; the keys left out stay as they are. */
     setSmartKeys(keys: Partial<EditorSmartKeys>): void;
     setGuides(guides: boolean): void;
+    setStickyScroll(sticky: boolean): void;
     setWhitespace(whitespace: boolean): void;
     /* The column to draw a line at; null takes it away. */
     setRightMargin(column: number | null): void;

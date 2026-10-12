@@ -106,6 +106,7 @@ class SmartEditor implements Editor {
             messages: options.messages ?? {},
             label: options.label ?? DEFAULT_LABEL,
             guides: options.guides !== false,
+            stickyScroll: options.stickyScroll !== false,
             whitespace: options.whitespace === true,
             rightMargin: options.rightMargin ?? null,
             foldOutline: options.foldOutline ?? 'hover',
@@ -803,6 +804,11 @@ class SmartEditor implements Editor {
 
     setGuides(guides: boolean): void {
         this.settings.guides = guides;
+        this.view.applySettings();
+    }
+
+    setStickyScroll(sticky: boolean): void {
+        this.settings.stickyScroll = sticky;
         this.view.applySettings();
     }
 

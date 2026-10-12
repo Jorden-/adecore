@@ -114,6 +114,8 @@ export interface ViewSettings {
     /* When the arrow that folds a block shows in the gutter. */
     foldOutline: 'off' | 'hover' | 'always';
     folding?: boolean;
+    /* The headers of the blocks scrolled out of sight stay pinned on top; on unless false. */
+    stickyScroll?: boolean;
 }
 
 /* The lines past the visible ones that are colored ahead of the scroll, and how long one slice of that work may take. */
@@ -2654,6 +2656,9 @@ export class EditorView {
     }
 
     private stickyAt(scrollTop: number): StickyPlacement[] {
+        if (this.settings.stickyScroll === false) {
+            return [];
+        }
         const { layout } = this;
         const bottomOf = (line: number): number => {
             const row = layout.rowForLine(line);

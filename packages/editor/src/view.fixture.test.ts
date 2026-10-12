@@ -22,8 +22,9 @@ const SETTINGS: ViewSettings = {
 function mount(text: string, settings: Partial<ViewSettings> = {}) {
     const page = createPage();
     const model = new DocumentModel(text);
-    const view = new EditorView(page.host, model, { ...SETTINGS, ...settings });
-    return { ...page, model, view };
+    const resolved = { ...SETTINGS, ...settings };
+    const view = new EditorView(page.host, model, resolved);
+    return { ...page, model, view, settings: resolved };
 }
 
 const rendered = (host: HTMLElement): string[] =>

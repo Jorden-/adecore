@@ -61,6 +61,21 @@ describe('sticky scroll', () => {
         expect(rows[1]!.querySelector('.se-run')!.textContent).toBe('  function inner() {');
     });
 
+    test('draws no headers and covers no rows while sticky scroll is off', () => {
+        const { host, view, settings } = mount(text, { stickyScroll: false });
+        view.refreshFolds();
+        view.viewport.scrollTop = 20 * 20;
+        view.render();
+        expect(host.querySelectorAll('.se-sticky-row').length).toBe(0);
+        expect(host.querySelector('.se-sticky')!.hasAttribute('hidden')).toBe(true);
+        settings.stickyScroll = true;
+        view.applySettings();
+        expect(host.querySelectorAll('.se-sticky-row').length).toBe(2);
+        settings.stickyScroll = false;
+        view.applySettings();
+        expect(host.querySelectorAll('.se-sticky-row').length).toBe(0);
+    });
+
     test('uses source labels and refreshes them while a header is pinned', () => {
         const { host, view } = mount(text);
         view.refreshFolds();

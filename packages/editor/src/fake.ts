@@ -509,11 +509,16 @@ export class FakeEditor implements Editor {
     smartKeys: Partial<EditorSmartKeys>;
 
     guides = true;
+    stickyScroll = true;
     whitespace = false;
     rightMargin: number | null = null;
 
     setGuides(guides: boolean): void {
         this.guides = guides;
+    }
+
+    setStickyScroll(sticky: boolean): void {
+        this.stickyScroll = sticky;
     }
 
     setWhitespace(whitespace: boolean): void {

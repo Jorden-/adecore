@@ -41,6 +41,13 @@ describe('FakeEditorEngine', () => {
         expect(editor.getContentHeight()).toBe(280);
     });
 
+    test('follows the sticky scroll it is set to', () => {
+        const editor = new FakeEditorEngine().mount(element, { text: '', theme: 'light', stickyScroll: false });
+        expect(editor.stickyScroll).toBe(true);
+        editor.setStickyScroll(false);
+        expect(editor.stickyScroll).toBe(false);
+    });
+
     test('follows the wrap it is set to', () => {
         const editor = new FakeEditorEngine().mount(element, { text: '', theme: 'light', wrap: true });
         editor.setWrap(false);
