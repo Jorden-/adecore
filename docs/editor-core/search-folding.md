@@ -12,7 +12,7 @@
 | `from`, `to`    | whole   | Keep only matches inside these offsets; the expression still sees the rest   |
 | `maxResults`    | none    | Stop after this many                                                         |
 
-`iterateMatches(text, query, revision, options?)` yields the same results one at a time, including captures and groups. Validation and regex execution begin on the first advance; stopping iteration releases the remaining scan without collecting an array. `findMatches` eagerly collects this iterator and keeps its existing exceptions and result shape.
+`iterateMatches(text, query, revision, options?)` yields the same results one at a time, including captures and groups. Options are captured on the first advance. Validation and regex execution begin then; stopping iteration releases the remaining scan without collecting an array. `findMatches` eagerly collects this iterator and keeps its existing exceptions and result shape.
 
 `findMatchFrom(text, query, revision, offset, options?)` is the standalone form of `findNext`, retaining only a few matches. It clamps `offset` into the text, scans from the query's original bounds and respects `maxResults`, `backwards` and `wrap`. Searching `aa` in `aaaa` from offset 1 returns `[2, 4]`, not a new overlapping `[1, 3]` match. Backward search stops once the preceding result is known; wrapping without a preceding result scans to the end while keeping only the last result. `DocumentModel.findNext` uses this helper.
 

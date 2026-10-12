@@ -133,3 +133,13 @@ test('DocumentModel.findNext no longer collects every match through find', () =>
         find.mockRestore();
     }
 });
+
+test('an active iterator keeps its options and capture metadata stable between advances', () => {
+    const options: FindOptions = { regex: true, wholeWord: false };
+    const iterator = iterateMatches('cat cats', '(cat)', 0, options);
+    expect(iterator.next().value).toMatchObject({ from: 0, to: 3, regex: true, captures: ['cat'] });
+    options.regex = false;
+    options.wholeWord = true;
+    expect(iterator.next().value).toMatchObject({ from: 4, to: 7, regex: true, captures: ['cat'] });
+    expect(iterator.next().done).toBe(true);
+});

@@ -46,6 +46,7 @@ export function findMatches(text: string, query: string, revision: number, optio
 
 /* Validation and regex execution start when the iterator advances. */
 export function* iterateMatches(text: string, query: string, revision: number, options: FindOptions = {}): Generator<FindMatch, void, unknown> {
+    options = { ...options };
     if (!query && !options.regex) {
         return;
     }
