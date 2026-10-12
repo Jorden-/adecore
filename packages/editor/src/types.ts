@@ -1,3 +1,4 @@
+import type { EditorSearchClientOptions } from './search-client.ts';
 import type { Keymap } from './keymap-table.ts';
 import type { EditorCommand, FoldRole } from '@adecore/editor-core';
 
@@ -447,7 +448,7 @@ export interface EditorFindQuery {
 
 export interface EditorFindState {
     readonly count: number;
-    /* Zero-based; null without a match. */
+    /* Zero-based in the marked cache; null with no match or a current match beyond that cache. */
     readonly current: number | null;
     /* The search is in the selection and nothing was selected. */
     readonly noSelection?: boolean;
@@ -456,6 +457,8 @@ export interface EditorFindState {
     readonly searching?: boolean;
     readonly failed?: 'invalid' | 'timeout' | 'unavailable' | 'error';
     readonly captureFailed?: 'timeout' | 'unavailable' | 'error';
+    readonly replaceFailed?: 'limit' | 'timeout' | 'unavailable' | 'error';
+    readonly replaced?: number;
     /* Regex searches in large documents start only on an explicit step. */
     readonly large?: boolean;
 }
@@ -507,6 +510,8 @@ export interface Editor {
     replace(replacement: string, options?: EditorReplaceOptions): boolean;
     /* Replaces every match in one undo step, and says how many there were. */
     replaceAll(replacement: string, options?: EditorReplaceOptions): number;
+    /* Atomic, one undo step; excessive output or matches are refused through onFind. */
+    replaceAllAsync(replacement: string, options?: EditorReplaceOptions): Promise<number>;
     /* What a regular expression replacement writes for the match the find is on, drawn under it while the find is open; null takes it away. */
     setReplacePreview(replacement: string | null, options?: EditorReplaceOptions): void;
     /* Ends the find with a caret on every match, the one the find was on last, and says how many there were. */
@@ -701,6 +706,8 @@ export interface LineTokenizer {
 export type TokenizerSource = (language: string | undefined, theme: EditorTheme, text?: string) => Promise<LineTokenizer | null>;
 
 export interface SmartEditorEngineOptions {
+    /* One lazy search worker per mounted editor; regex search is unavailable without it. */
+    readonly searchWorker?: EditorSearchClientOptions['workerFactory'];
     readonly keymap?: Keymap;
     readonly tokenizer: TokenizerSource;
     /* Without it semantic tokens are ignored and the grammar's colors stand. */

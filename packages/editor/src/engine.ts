@@ -1,4 +1,5 @@
-import { changedSpans, DocumentModel, type EditorSnapshot, type FoldHints } from '@adecore/editor-core';
+import { changedSpans, DocumentModel, type EditorSnapshot, type FoldHints, replacementText } from '@adecore/editor-core';
+import { MAX_REPLACEMENT_CHARACTERS } from './search-protocol.ts';
 import { GrammarPreparation } from './grammar-preparation.ts';
 import { InputController } from './controller.ts';
 import { resolveSmartKeys } from './smart-keys.ts';
@@ -86,6 +87,7 @@ class SmartEditor implements Editor {
         this.language = options.language;
         this.theme = options.theme;
         this.settings = {
+            searchWorker: engine.searchWorker,
             language: options.language,
             tabSize: options.indentation?.tabSize ?? DEFAULT_TAB_SIZE,
             insertSpaces: options.indentation?.insertSpaces ?? true,
@@ -418,7 +420,17 @@ class SmartEditor implements Editor {
     replace(replacement: string, replaceOptions: EditorReplaceOptions = {}): boolean {
         const { find } = this.view;
         const match = find.currentMatch;
-        if (match === null || this.blockedByReadOnly()) {
+        if (this.blockedByReadOnly()) {
+            return false;
+        }
+        if (find.activeQuery?.regex === true) {
+            if (find.currentMark === null) {
+                return false;
+            }
+            void find.replaceOne(replacement, replaceOptions.preserveCase === true, () => !this.disposed && !this.settings.readOnly);
+            return true;
+        }
+        if (match === null) {
             return false;
         }
         try {
@@ -446,18 +458,39 @@ class SmartEditor implements Editor {
         try {
             const matches = find.completeMatches;
             if (matches !== null) {
-                return this.model.replaceMatches(matches, replacement, { preserveCase: options.preserveCase });
+                let characters = 0;
+                for (const match of matches) {
+                    characters += replacementText('', match, replacement, false, options.preserveCase, MAX_REPLACEMENT_CHARACTERS).length;
+                    if (characters > MAX_REPLACEMENT_CHARACTERS) {
+                        find.reportReplaceFailed('limit');
+                        return 0;
+                    }
+                }
+                const count = this.model.replaceMatches(matches, replacement, { preserveCase: options.preserveCase });
+                find.reportReplaced(count);
+                return count;
             }
-            return this.model.replaceAll(query.text, replacement, {
-                caseSensitive: query.caseSensitive,
-                wholeWord: query.wholeWord,
-                regex: query.regex,
-                preserveCase: options.preserveCase,
-                ...this.view.find.scope
-            });
-        } catch {
+            void this.replaceAllAsync(replacement, options);
+            return 0;
+        } catch (error) {
+            find.reportReplaceFailed(error instanceof RangeError ? 'limit' : 'error');
             return 0;
         }
+    }
+
+    async replaceAllAsync(replacement: string, options: EditorReplaceOptions = {}): Promise<number> {
+        const { find } = this.view;
+        if (this.disposed || this.blockedByReadOnly() || find.activeQuery === null || find.state.noSelection) {
+            return 0;
+        }
+        if (find.state.limited) {
+            find.reportReplaceFailed('limit');
+            return 0;
+        }
+        if (find.completeMatches !== null) {
+            return this.replaceAll(replacement, options);
+        }
+        return find.replaceAll(replacement, options.preserveCase === true, () => !this.disposed && !this.settings.readOnly);
     }
 
     setReplacePreview(replacement: string | null, options: EditorReplaceOptions = {}): void {
@@ -485,24 +518,39 @@ class SmartEditor implements Editor {
         if (query.text === '') {
             return false;
         }
-        let matches;
+        const { anchor, head } = this.model.getPrimary();
+        const offset = direction === 1 ? Math.max(anchor, head) : Math.min(anchor, head);
+        const reveal = (target: { from: number; to: number } | null): boolean => {
+            if (target === null || this.disposed) {
+                return false;
+            }
+            this.view.ensureVisible(target.from);
+            this.model.setSelections([direction === 1 ? { anchor: target.from, head: target.to } : { anchor: target.to, head: target.from }]);
+            this.view.revealCaret(target.from > head ? 'centerDown' : 'centerUp');
+            return true;
+        };
+        if (query.regex) {
+            const revision = this.model.getRevision();
+            void this.view.find.nextFromCursor(query, offset, direction).then((target) => {
+                const current = this.model.getPrimary();
+                if (this.model.getRevision() === revision && current.anchor === anchor && current.head === head) {
+                    reveal(target);
+                }
+            });
+            return true;
+        }
         try {
-            matches = this.model.find(query.text, { caseSensitive: query.caseSensitive, wholeWord: query.wholeWord, regex: query.regex });
+            return reveal(
+                this.model.findNext(query.text, offset, {
+                    caseSensitive: query.caseSensitive,
+                    wholeWord: query.wholeWord,
+                    backwards: direction === -1,
+                    wrap: true
+                })
+            );
         } catch {
             return false;
         }
-        if (matches.length === 0) {
-            return false;
-        }
-        const { anchor, head } = this.model.getPrimary();
-        const from = Math.min(anchor, head);
-        const to = Math.max(anchor, head);
-        const target =
-            direction === 1 ? (matches.find((match) => match.from >= to) ?? matches[0]!) : (matches.findLast((match) => match.to <= from) ?? matches.at(-1)!);
-        this.view.ensureVisible(target.from);
-        this.model.setSelections([direction === 1 ? { anchor: target.from, head: target.to } : { anchor: target.to, head: target.from }]);
-        this.view.revealCaret(target.from > head ? 'centerDown' : 'centerUp');
-        return true;
     }
 
     private blockedByReadOnly(): boolean {

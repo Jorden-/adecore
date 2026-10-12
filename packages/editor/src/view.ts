@@ -11,6 +11,7 @@ import {
     type BracketIndex,
     type Selection as EditorSelection
 } from '@adecore/editor-core';
+import { createSearchClient, type EditorSearchClientOptions } from './search-client.ts';
 import { FindController } from './find.ts';
 import { type BlockWidget, EditorLayout, type FoldState, type Inlay, type LayoutRect, type LayoutRow, RIGHT_PADDING, type TextRow } from './layout.ts';
 import { createMetrics, type EditorFont, readEditorFont } from './metrics.ts';
@@ -78,6 +79,7 @@ function mapFoldHints(hints: FoldHints, map: (offset: number) => number): FoldHi
 }
 
 export interface ViewSettings {
+    searchWorker?: EditorSearchClientOptions['workerFactory'];
     language: string | undefined;
     tabSize: number;
     insertSpaces: boolean;
@@ -344,7 +346,20 @@ export class EditorView {
 
         this.font = readEditorFont(this.root);
         this.layout = new EditorLayout(model, createMetrics(this.font, settings.tabSize, document));
-        this.find = new FindController(model);
+        this.find = new FindController(model, {
+            createClient: () => (settings.searchWorker === undefined ? null : createSearchClient({ workerFactory: settings.searchWorker })),
+            changed: (reveal) => {
+                if (this.disposed) {
+                    return;
+                }
+                this.announceFind();
+                if (reveal) {
+                    this.revealFind();
+                }
+                this.paintPreview();
+                this.requestRender();
+            }
+        });
         this.tokens = new TokenCache({ getLineCount: () => model.getLineCount(), getLineText: (line) => model.getLine(line).text });
         const ResizeObserverClass = document.defaultView?.ResizeObserver;
         this.blockObserver = ResizeObserverClass
@@ -1694,6 +1709,7 @@ export class EditorView {
     /* What a regular expression replacement writes for the match the find is on, drawn under that match; null takes it away. */
     setReplacePreview(replacement: string | null, preserveCase = false): void {
         this.replacePreview = replacement === null ? null : { text: replacement, preserveCase };
+        this.find.setPreview(replacement !== null);
         this.paintPreview();
     }
 
@@ -1704,7 +1720,10 @@ export class EditorView {
         let shown: string | null = null;
         if (wanted !== null && match?.regex === true) {
             try {
-                const text = replacementText(this.model.getText(), match, wanted.text, false, wanted.preserveCase);
+                if (wanted.text.length > 10000) {
+                    throw new RangeError('The replacement preview is too large.');
+                }
+                const text = replacementText(this.model.getText(), match, wanted.text, false, wanted.preserveCase, 10000);
                 shown = text === wanted.text ? null : text;
             } catch {
                 shown = null;
@@ -1953,9 +1972,20 @@ export class EditorView {
         const textRows = rows.filter((candidate) => candidate.kind === 'text');
         const visibleFrom = textRows.length > 0 ? this.model.getLine(textRows[0]!.line).start : 0;
         const visibleTo = textRows.length > 0 ? this.model.getLine(textRows.at(-1)!.line).next : 0;
-        for (const mark of this.find.matchesBetween(visibleFrom, visibleTo)) {
+        const found = this.find.matchesBetween(visibleFrom, visibleTo);
+        const spans =
+            current !== null &&
+            !found.some((mark) => mark.from === current.from && mark.to === current.to) &&
+            current.to >= visibleFrom &&
+            current.from <= visibleTo
+                ? [...found, current]
+                : found;
+        for (const mark of spans) {
             if (mark.to > mark.from) {
-                marks.push({ className: mark === current ? 'se-find-current' : 'se-find-match', rects: this.layout.rectangles(mark.from, mark.to, rows) });
+                marks.push({
+                    className: mark.from === current?.from && mark.to === current.to ? 'se-find-current' : 'se-find-match',
+                    rects: this.layout.rectangles(mark.from, mark.to, rows)
+                });
             }
         }
         const seen = new Set<number>();
@@ -2512,6 +2542,7 @@ export class EditorView {
         }
         this.disposed = true;
         this.cancelScroll();
+        this.find.dispose();
         this.subscription.dispose();
         this.resizeObserver?.disconnect();
         this.blockObserver?.disconnect();

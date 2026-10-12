@@ -26,15 +26,28 @@ export function FindReplace({ editor, className, onClose }: { editor: Editor; cl
         },
         [editor]
     );
+    const failure = state.failed ?? state.captureFailed;
     const label =
         compiled.kind === 'invalid'
             ? t('find.invalid')
-            : state.noSelection
-              ? t('find.noSelection')
-              : t(state.limited ? 'find.countLimited' : 'find.count', {
-                    total: formatNumber(state.count),
-                    current: state.current === null ? '0' : formatNumber(state.current + 1)
-                });
+            : state.replaceFailed !== undefined
+              ? t(`find.replace.failed.${state.replaceFailed}`, { edits: formatNumber(10000), characters: formatNumber(4000000) })
+              : failure !== undefined
+                ? t(`find.failed.${failure}`)
+                : state.searching
+                  ? t('find.searching')
+                  : state.large
+                    ? t('find.large')
+                    : state.noSelection
+                      ? t('find.noSelection')
+                      : state.replaced !== undefined
+                        ? t('find.replaced', { count: formatNumber(state.replaced) })
+                        : state.limited && state.current === null
+                          ? t('find.countMore', { total: formatNumber(state.count) })
+                          : t(state.limited ? 'find.countLimited' : 'find.count', {
+                                total: formatNumber(state.count),
+                                current: state.current === null ? '0' : formatNumber(state.current + 1)
+                            });
     return (
         <div className={`adecore-editor-find ${className ?? ''}`} role="search" aria-label={t('find.label')}>
             <div className="adecore-editor-find-row">
@@ -53,6 +66,8 @@ export function FindReplace({ editor, className, onClose }: { editor: Editor; cl
                         }
                         if (event.key === 'Escape') {
                             event.preventDefault();
+                            editor.endFind();
+                            editor.setReplacePreview(null);
                             onClose?.();
                             editor.focus();
                         }
@@ -80,10 +95,10 @@ export function FindReplace({ editor, className, onClose }: { editor: Editor; cl
                     <input type="checkbox" checked={preserveCase} onChange={(event) => setPreserveCase(event.target.checked)} />
                     {t('find.replace.preserveCase')}
                 </label>
-                <Button size="xs" onClick={() => editor.replace(replacement, { preserveCase })}>
+                <Button size="xs" disabled={state.searching === true} onClick={() => editor.replace(replacement, { preserveCase })}>
                     {t('find.replace.one')}
                 </Button>
-                <Button size="xs" onClick={() => editor.replaceAll(replacement, { preserveCase })}>
+                <Button size="xs" disabled={state.searching === true} onClick={() => void editor.replaceAllAsync(replacement, { preserveCase })}>
                     {t('find.replace.allLabel')}
                 </Button>
             </div>

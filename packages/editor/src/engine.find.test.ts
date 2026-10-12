@@ -1,7 +1,10 @@
 import { describe, expect, test, spyOn } from 'bun:test';
 import { DocumentModel } from '@adecore/editor-core';
 import type { EditorFindQuery, EditorFindState } from './types.ts';
-import { setup } from './engine.fixture.test.ts';
+import { setup as mount } from './engine.fixture.test.ts';
+import { searchWorker, findAsync, findEvent } from './search.fixture.test.ts';
+
+const setup: typeof mount = (options, engineOptions) => mount(options, { searchWorker, ...engineOptions });
 
 describe('find', () => {
     const query = (text: string, extra = {}) => ({ text, caseSensitive: false, wholeWord: false, regex: false, ...extra });
@@ -28,7 +31,7 @@ describe('find', () => {
         expect(state.current).toBe(0);
     });
 
-    test('follows the options of the query', () => {
+    test('follows the options of the query', async () => {
         const { editor } = setup({ text: 'Cat cat concat' });
         let state: EditorFindState = { count: 0, current: null };
         editor.onFind((next) => (state = next));
@@ -36,16 +39,16 @@ describe('find', () => {
         expect(state.count).toBe(2);
         editor.find(query('cat', { wholeWord: true }));
         expect(state.count).toBe(2);
-        editor.find(query('c.t', { regex: true }));
+        await findAsync(editor, query('c.t', { regex: true }));
         expect(state.count).toBe(3);
     });
 
-    test('finds nothing for a pattern that does not parse', () => {
+    test('finds nothing for a pattern that does not parse', async () => {
         const { editor } = setup({ text: 'a(b' });
         let state: EditorFindState = { count: 9, current: 0 };
         editor.onFind((next) => (state = next));
-        editor.find(query('(', { regex: true }));
-        expect(state).toEqual({ count: 0, current: null });
+        await findAsync(editor, query('(', { regex: true }));
+        expect(state).toEqual({ count: 0, current: null, failed: 'invalid' });
     });
 
     test('counts again when an edit changes the matches', () => {
@@ -105,10 +108,10 @@ describe('replace', () => {
         expect(editor.getText()).toBe('aa aa');
     });
 
-    test('expands the groups of a regular expression and replaces every match as one undo step', () => {
+    test('expands the groups of a regular expression and replaces every match as one undo step', async () => {
         const { editor, press } = setup({ text: 'ab1 cd2' });
-        editor.find(query('([a-z]+)(\\d)', { regex: true }));
-        expect(editor.replaceAll('$2$1')).toBe(2);
+        await findAsync(editor, query('([a-z]+)(\\d)', { regex: true }));
+        expect(await editor.replaceAllAsync('$2$1')).toBe(2);
         expect(editor.getText()).toBe('1ab 2cd');
         press('z', { ctrlKey: true });
         expect(editor.getText()).toBe('ab1 cd2');
@@ -195,10 +198,12 @@ describe('find in the selection and the rest of the find', () => {
         expect(editor.getText()).toBe('x b x b x');
     });
 
-    test('draws what a regular expression writes under the current match, and only when it differs from the replacement', () => {
+    test('draws what a regular expression writes under the current match, and only when it differs from the replacement', async () => {
         const { editor, host } = setup({ text: 'ab1 cd2' });
-        editor.find(query('([a-z]+)(\\d)', { regex: true }));
+        await findAsync(editor, query('([a-z]+)(\\d)', { regex: true }));
+        const preview = findEvent(editor, () => host.querySelector('.se-preview')?.textContent === '1ab');
         editor.setReplacePreview('$2$1');
+        await preview;
         expect(host.querySelector('.se-preview')!.textContent).toBe('1ab');
         expect(host.querySelector('.se-preview')!.hasAttribute('hidden')).toBe(false);
         editor.setReplacePreview('x');
@@ -227,38 +232,38 @@ describe('find in the selection and the rest of the find', () => {
     });
 });
 
-test('preview and repaint reuse captures and replacement searches only the new revision', () => {
+test('regex previews and replacements never search the model on the page', async () => {
     const pattern = '([a-z]+)(\\d+)';
-    const original = DocumentModel.prototype.find;
-    const revisions: number[] = [];
-    const search = spyOn(DocumentModel.prototype, 'find').mockImplementation(function (this: DocumentModel, text, options) {
-        if (text === pattern) {
-            revisions.push(this.getRevision());
-        }
-        return original.call(this, text, options);
-    });
+    const mainSearch = spyOn(DocumentModel.prototype, 'find');
     const { editor, host } = setup({ text: 'cat12 cat34' });
     try {
-        editor.find({ text: pattern, caseSensitive: false, wholeWord: false, regex: true });
+        await findAsync(editor, { text: pattern, caseSensitive: false, wholeWord: false, regex: true });
+        const preview = findEvent(editor, () => host.querySelector('.se-preview')?.textContent === 'cat:34');
         editor.setReplacePreview('$1:$2');
         editor.setWrap(true);
         editor.setWrap(false);
         editor.findStep(1);
-        expect(revisions).toEqual([0]);
-        expect(host.querySelector('.se-preview')?.textContent).toBe('cat:34');
+        await preview;
+        expect(mainSearch).not.toHaveBeenCalled();
+        const changed = new Promise<void>((resolve) => {
+            const off = editor.onChange(() => {
+                off();
+                resolve();
+            });
+        });
         expect(editor.replace('$2')).toBe(true);
+        await changed;
         expect(editor.getText()).toBe('cat12 34');
-        expect(revisions).toEqual([0, 1]);
-        expect(editor.replaceAll('$2')).toBe(1);
+        expect(await editor.replaceAllAsync('$2')).toBe(1);
         expect(editor.getText()).toBe('12 34');
-        expect(revisions).toEqual([0, 1, 2]);
+        expect(mainSearch).not.toHaveBeenCalled();
     } finally {
         editor.dispose();
-        search.mockRestore();
+        mainSearch.mockRestore();
     }
 });
 
-test('limited replace-all performs one full run while an empty selection replaces nothing', () => {
+test('limited replace-all refuses excess edits atomically while an empty selection replaces nothing', async () => {
     const original = DocumentModel.prototype.find;
     const revisions: number[] = [];
     const search = spyOn(DocumentModel.prototype, 'find').mockImplementation(function (this: DocumentModel, text, options) {
@@ -270,9 +275,11 @@ test('limited replace-all performs one full run while an empty selection replace
     const { editor } = setup({ text: 'a '.repeat(10001) });
     try {
         editor.find({ text: 'a', caseSensitive: false, wholeWord: false, regex: false });
-        expect(editor.replaceAll('b')).toBe(10001);
-        expect(editor.getText()).toBe('b '.repeat(10001));
-        expect(revisions).toEqual([0, 0, 1]);
+        const state = findEvent(editor, (value) => value.replaceFailed === 'limit' && !value.searching);
+        expect(await editor.replaceAllAsync('b')).toBe(0);
+        await state;
+        expect(editor.getText()).toBe('a '.repeat(10001));
+        expect(revisions).toEqual([0]);
         editor.setText('a a');
         editor.setCaret({ line: 0, character: 0 });
         editor.find({ text: 'a', caseSensitive: false, wholeWord: false, regex: false, inSelection: true });
@@ -294,5 +301,81 @@ test('the replacement anchor maps once and does not skip an adjacent match', () 
     expect(editor.replace('aaa')).toBe(true);
     expect(editor.getText()).toBe('aaa a');
     expect(state.current).toBe(3);
+    editor.dispose();
+});
+
+for (const regex of [false, true]) {
+    test(`navigation and replacement work beyond the marked cache, regex=${regex}`, async () => {
+        const { editor, host } = setup({ text: 'a\n'.repeat(10001) });
+        const query = { text: 'a', regex, caseSensitive: true, wholeWord: false };
+        editor.setCaret({ line: 10000, character: 0 });
+        const state = await findAsync(editor, query);
+        expect(state).toMatchObject({ count: 10000, current: null, limited: true });
+        editor.setScrollTop(editor.getContentHeight() - 200);
+        expect(host.querySelectorAll('.se-find-current')).toHaveLength(1);
+        const previous = findEvent(editor, (value) => !value.searching && value.current === 9999);
+        editor.findStep(-1);
+        await previous;
+        const outside = findEvent(editor, (value) => !value.searching && value.current === null);
+        editor.findStep(1);
+        await outside;
+        const changed = new Promise<void>((resolve) => {
+            const off = editor.onChange(() => {
+                off();
+                resolve();
+            });
+        });
+        expect(editor.replace('z')).toBe(true);
+        await changed;
+        expect(editor.getText()).toBe('a\n'.repeat(10000) + 'z\n');
+        editor.dispose();
+    });
+}
+
+test('zero-width steps beyond the cache wrap at EOF and skip their current position backwards', async () => {
+    const { editor } = setup({ text: '😀'.repeat(10000) + 'x' });
+    editor.setCaret({ line: 0, character: 20001 });
+    await findAsync(editor, { text: '(?=)', regex: true, caseSensitive: true, wholeWord: false });
+    const back = findEvent(editor, (value) => !value.searching);
+    editor.findStep(-1);
+    await back;
+    editor.endFind();
+    expect(editor.getCaret().character).toBe(20000);
+    await findAsync(editor, { text: '(?=)', regex: true, caseSensitive: true, wholeWord: false });
+    const end = findEvent(editor, (value) => !value.searching);
+    editor.findStep(1);
+    await end;
+    const wrap = findEvent(editor, (value) => !value.searching && value.current === 0);
+    editor.findStep(1);
+    await wrap;
+    editor.endFind();
+    expect(editor.getCaret().character).toBe(0);
+    editor.dispose();
+});
+
+test('regex find without a worker stays unavailable without searching the model', async () => {
+    const { editor } = mount({ text: 'word' });
+    const search = spyOn(DocumentModel.prototype, 'find');
+    try {
+        const state = await findAsync(editor, { text: 'word', regex: true, caseSensitive: true, wholeWord: false });
+        expect(state.failed).toBe('unavailable');
+        expect(search).not.toHaveBeenCalled();
+    } finally {
+        editor.dispose();
+        search.mockRestore();
+    }
+});
+
+test('replacement output refusal leaves the text and undo history untouched', async () => {
+    const { editor } = setup({ text: 'a a' });
+    let state: EditorFindState = { count: 0, current: null };
+    editor.onFind((value) => {
+        state = value;
+    });
+    editor.find({ text: 'a', regex: false, caseSensitive: true, wholeWord: false });
+    expect(await editor.replaceAllAsync('x'.repeat(2_000_001))).toBe(0);
+    expect(state.replaceFailed).toBe('limit');
+    expect(editor.getText()).toBe('a a');
+    expect(editor.runCommand('undo')).toBe(false);
     editor.dispose();
 });

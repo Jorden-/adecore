@@ -417,3 +417,26 @@ test('release rejects an active multi-page job and prevents its later client cal
     expect(host.searches).toHaveLength(1);
     queue.dispose();
 });
+
+test('an obsolete explicit command yields to the latest live query', async () => {
+    const host = setup();
+    const queue = new FindSearchQueue(host.options);
+    let valid = true;
+    const command = queue
+        .request(
+            (client) => client.search({ revision: 0, text: 'word' }, query),
+            'command',
+            () => valid
+        )
+        .catch((error: EditorSearchError) => error.kind);
+    await flush();
+    valid = false;
+    const live = queue.request((client) => client.search({ revision: 1, text: 'new' }, { ...query, text: 'new' }), 'live');
+    host.fire(200);
+    expect(await command).toBe('superseded');
+    await flush();
+    expect(host.searches).toHaveLength(2);
+    host.reply([0, 3]);
+    expect((await live).revision).toBe(1);
+    queue.dispose();
+});

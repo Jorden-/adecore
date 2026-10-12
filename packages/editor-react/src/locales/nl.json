@@ -167,7 +167,23 @@
             "allLabel": "Alles vervangen",
             "preserveCase": "Hoofdletters behouden",
             "toggle": "Vervangen tonen",
-            "hide": "Vervangen verbergen"
+            "hide": "Vervangen verbergen",
+            "failed": {
+                "limit": "Te veel om ineens te vervangen ({{edits}} edits of {{characters}} uitvoertekens)",
+                "timeout": "Vervangen duurde te lang; de tekst is niet gewijzigd",
+                "unavailable": "Vervangen vereist de zoekworker",
+                "error": "Vervangen is niet gelukt; de tekst is niet gewijzigd"
+            }
+        },
+        "countMore": "{{total}}+ resultaten",
+        "searching": "Zoeken…",
+        "large": "Groot document: druk op Enter om te zoeken",
+        "replaced": "{{count}} resultaten vervangen",
+        "failed": {
+            "timeout": "Zoeken duurde te lang; druk op Enter om opnieuw te proberen",
+            "unavailable": "Zoeken met regex is niet beschikbaar",
+            "invalid": "Ongeldige reguliere expressie",
+            "error": "Zoeken kon niet worden voltooid"
         }
     },
     "diff": {

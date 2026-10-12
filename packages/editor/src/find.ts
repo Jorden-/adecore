@@ -1,9 +1,9 @@
-import type { DocumentChange, DocumentModel, FindMatch } from '@adecore/editor-core';
+import type { DocumentChange, DocumentModel, FindMatch, TextEdit } from '@adecore/editor-core';
 import { mapOffset } from './offsets.ts';
 import { FindSearchQueue, scheduleFind, type FindSearchOptions } from './find-search.ts';
 import { EditorSearchError } from './search-client.ts';
 import type { EditorSearchSnapshot } from './search-protocol.ts';
-import { SEARCH_LIMIT } from './search-protocol.ts';
+import { SEARCH_LIMIT, MAX_REPLACEMENT_PAGE, MAX_REPLACEMENT_CHARACTERS } from './search-protocol.ts';
 import type { EditorFindQuery, EditorFindState } from './types.ts';
 
 export interface FindMark {
@@ -15,7 +15,7 @@ export const FIND_LIMIT = SEARCH_LIMIT;
 const LIVE_REGEX_LIMIT = 8_000_000;
 
 export interface FindControllerOptions extends FindSearchOptions {
-    readonly changed: () => void;
+    readonly changed: (reveal?: boolean) => void;
 }
 
 /*
@@ -27,6 +27,12 @@ export class FindController {
     private marks: readonly FindMark[] = [];
     private cache?: { revision: number; key: string; matches: FindMatch[]; complete: boolean };
     private index: number | null = null;
+    private outside: FindMark | null = null;
+    private seeking = false;
+    private replacing = 0;
+    private replaceEpoch = -1;
+    private replaced: number | undefined;
+    private replaceFailed: EditorFindState['replaceFailed'];
     /* The text a search in the selection is held to, which follows the text through edits; null when nothing was selected. */
     private bounds: { from: number; to: number } | null = null;
     /* Where the next refresh looks for the current match from, once: right after what a replace wrote. */
@@ -75,7 +81,9 @@ export class FindController {
             count: this.marks.length,
             current: this.index,
             ...(this.cache?.complete === false || (this.failed === undefined && this.regexCache?.complete === false) ? { limited: true } : {}),
-            ...(this.searching ? { searching: true } : {}),
+            ...(this.searching || this.seeking || (this.replacing > 0 && this.replaceEpoch === this.epoch) ? { searching: true } : {}),
+            ...(this.replaced === undefined ? {} : { replaced: this.replaced }),
+            ...(this.replaceFailed === undefined ? {} : { replaceFailed: this.replaceFailed }),
             ...(this.failed === undefined ? {} : { failed: this.failed }),
             ...(this.captureFailed === undefined ? {} : { captureFailed: this.captureFailed }),
             ...(this.search !== undefined && this.query?.regex && this.model.getLength() > LIVE_REGEX_LIMIT && !this.freshRegex ? { large: true } : {}),
@@ -89,7 +97,7 @@ export class FindController {
     }
 
     get currentMark(): FindMark | null {
-        return this.index === null ? null : (this.marks[this.index] ?? null);
+        return this.outside ?? (this.index === null ? null : (this.marks[this.index] ?? null));
     }
 
     matchesBetween(from: number, to: number): readonly FindMark[] {
@@ -122,6 +130,15 @@ export class FindController {
             return this.freshRegex && this.retained?.from === mark?.from && this.retained?.to === mark?.to ? this.retained : null;
         }
         const matches = this.cachedMatches;
+        if (this.outside !== null && matches !== null) {
+            return {
+                ...this.outside,
+                text: this.model.slice(this.outside.from, this.outside.to),
+                captures: [],
+                regex: false,
+                revision: this.model.getRevision()
+            };
+        }
         return this.index === null || matches === null ? null : (matches[this.index] ?? null);
     }
 
@@ -164,6 +181,9 @@ export class FindController {
         if (this.cacheKey() !== oldKey) {
             this.pendingAnchor = undefined;
             this.pendingStep = undefined;
+            this.outside = null;
+            this.replaceFailed = undefined;
+            this.replaced = undefined;
         }
         this.refresh();
     }
@@ -222,11 +242,14 @@ export class FindController {
         const selection = this.model.getPrimary();
         const anchor = this.pendingAnchor ?? previous?.from ?? Math.min(selection.anchor, selection.head);
         this.pendingAnchor = undefined;
-        const next = found.findIndex((mark) => mark.from >= anchor);
-        this.index = found.length === 0 ? null : Math.max(0, next);
+        this.chooseCurrent(anchor, 1, !this.cache.complete);
     }
 
     step(direction: 1 | -1): void {
+        if (this.seeking) {
+            this.pendingStep = direction;
+            return;
+        }
         if (this.search !== undefined && this.query?.regex && !this.freshRegex) {
             this.pendingStep = direction;
             if (!this.searching) {
@@ -238,6 +261,25 @@ export class FindController {
         if (count === 0) {
             return;
         }
+        const incomplete = this.regexCache?.complete === false || this.cache?.complete === false;
+        const current = this.currentMark;
+        if (
+            this.search !== undefined &&
+            incomplete &&
+            current !== null &&
+            (this.outside !== null || (direction === 1 ? this.index === count - 1 : this.index === 0))
+        ) {
+            let offset = direction === -1 ? current.from : current.to;
+            if (direction === 1 && current.from === current.to) {
+                offset += (this.model.getText().codePointAt(offset) ?? 0) > 0xffff ? 2 : 1;
+            }
+            if (offset > this.model.getLength()) {
+                offset = 0;
+            }
+            this.seek(offset, direction);
+            return;
+        }
+        this.outside = null;
         this.index = this.index === null ? (direction === 1 ? 0 : count - 1) : (this.index + direction + count) % count;
         this.captureFailed = undefined;
         this.preparePreview();
@@ -256,6 +298,8 @@ export class FindController {
         this.cancelMatch?.();
         this.cancelMatch = undefined;
         this.regexCache = undefined;
+        this.outside = null;
+        this.seeking = false;
         this.snapshotMemo = undefined;
         this.retained = null;
         this.searching = false;
@@ -295,6 +339,8 @@ export class FindController {
             return;
         }
         if (!explicit && this.model.getLength() > LIVE_REGEX_LIMIT) {
+            this.pendingStep = undefined;
+            this.pendingAnchor = undefined;
             return;
         }
         const epoch = this.epoch;
@@ -314,7 +360,8 @@ export class FindController {
                         }
                         return client.search(snapshot, query, { ...this.scope, maxResults: FIND_LIMIT, ...(explicit ? { deadline: 10000 } : {}) });
                     },
-                    explicit ? 'command' : 'live'
+                    explicit ? 'command' : 'live',
+                    () => epoch === this.epoch && revision === this.model.getRevision() && !this.disposed
                 )
                     .then((result) => {
                         if (epoch !== this.epoch || revision !== this.model.getRevision() || this.disposed) {
@@ -331,17 +378,9 @@ export class FindController {
                         this.pendingAnchor = undefined;
                         const direction = this.pendingStep;
                         this.pendingStep = undefined;
-                        this.index =
-                            marks.length === 0
-                                ? null
-                                : direction === -1
-                                  ? (marks.findLastIndex((mark) => mark.from < anchor) + marks.length) % marks.length
-                                  : Math.max(
-                                        0,
-                                        marks.findIndex((mark) => mark.from >= anchor)
-                                    );
                         this.searching = false;
-                        this.options?.changed();
+                        this.chooseCurrent(anchor, direction ?? 1, result.limited);
+                        this.options?.changed(true);
                         this.preparePreview();
                     })
                     .catch((error) => {
@@ -449,9 +488,227 @@ export class FindController {
         }
     }
 
+    private chooseCurrent(anchor: number, direction: 1 | -1, limited: boolean): void {
+        if (this.marks.length === 0) {
+            this.index = null;
+            return;
+        }
+        const next = direction === 1 ? this.marks.findIndex((mark) => mark.from >= anchor) : this.marks.findLastIndex((mark) => mark.from < anchor);
+        if (next === -1 && limited && this.search !== undefined) {
+            this.index = null;
+            this.seek(anchor, direction);
+        } else {
+            this.index = next === -1 ? (direction === 1 ? 0 : this.marks.length - 1) : next;
+        }
+    }
+
+    private seek(offset: number, direction: 1 | -1): void {
+        const query = this.query;
+        if (this.search === undefined || query === null) {
+            return;
+        }
+        const epoch = this.epoch;
+        const snapshot = this.snapshot();
+        const scope = this.scope;
+        const valid = (): boolean => !this.disposed && epoch === this.epoch && snapshot.revision === this.model.getRevision();
+        this.seeking = true;
+        this.failed = undefined;
+        this.retained = null;
+        this.captureFailed = undefined;
+        void this.search
+            .request((client) => client.next(snapshot, query, offset, { ...scope, backwards: direction === -1, wrap: true, deadline: 10000 }), 'command', valid)
+            .then((range) => {
+                if (!valid()) {
+                    return;
+                }
+                this.seeking = false;
+                this.outside = null;
+                this.index = range === null ? null : this.marks.findIndex((mark) => mark.from === range.from && mark.to === range.to);
+                if (this.index === -1) {
+                    this.index = null;
+                    this.outside = range;
+                }
+                this.options?.changed(true);
+                this.preparePreview();
+                const pending = this.pendingStep;
+                this.pendingStep = undefined;
+                if (pending !== undefined) {
+                    this.step(pending);
+                }
+            })
+            .catch((error) => {
+                if (valid()) {
+                    this.seeking = false;
+                    this.failed = searchFailure(error);
+                    this.options?.changed();
+                }
+            });
+    }
+
+    async nextFromCursor(query: EditorFindQuery, offset: number, direction: 1 | -1): Promise<FindMark | null> {
+        if (this.search === undefined) {
+            return null;
+        }
+        const snapshot = this.snapshot();
+        const epoch = this.epoch;
+        const valid = (): boolean => !this.disposed && epoch === this.epoch && snapshot.revision === this.model.getRevision();
+        try {
+            const range = await this.search.request(
+                (client) => client.next(snapshot, query, offset, { backwards: direction === -1, wrap: true, deadline: 10000 }),
+                'command',
+                valid
+            );
+            return valid() ? range : null;
+        } catch (error) {
+            if (valid()) {
+                this.failed = searchFailure(error);
+                this.options?.changed();
+            }
+            return null;
+        }
+    }
+
+    reportReplaceFailed(failure: NonNullable<EditorFindState['replaceFailed']>): void {
+        this.replaceFailed = failure;
+        this.replaced = undefined;
+        this.options?.changed();
+    }
+
+    reportReplaced(count: number): void {
+        this.replaced = count;
+        this.replaceFailed = undefined;
+        this.options?.changed();
+    }
+
+    async replaceOne(replacement: string, preserveCase: boolean, canApply: () => boolean): Promise<boolean> {
+        const query = this.query,
+            mark = this.currentMark;
+        if (query === null || mark === null || this.search === undefined || !canApply()) {
+            return false;
+        }
+        const snapshot = this.snapshot();
+        const epoch = this.epoch;
+        const valid = (): boolean =>
+            !this.disposed &&
+            epoch === this.epoch &&
+            snapshot.revision === this.model.getRevision() &&
+            canApply() &&
+            this.currentMark?.from === mark.from &&
+            this.currentMark?.to === mark.to;
+        this.replacing++;
+        this.replaceEpoch = epoch;
+        this.replaceFailed = undefined;
+        this.options?.changed();
+        try {
+            const page = await this.search.request(
+                (client) =>
+                    client.replacements(snapshot, query, replacement, {
+                        from: mark.from,
+                        to: mark.to,
+                        preserveCase,
+                        maxEdits: 1,
+                        maxCharacters: MAX_REPLACEMENT_CHARACTERS,
+                        deadline: 10000
+                    }),
+                'command',
+                valid
+            );
+            if (!valid() || page.ranges.length !== 3 || page.ranges[0] !== mark.from || page.ranges[1] !== mark.to || page.next !== null) {
+                return false;
+            }
+            this.pendingAnchor = mark.to;
+            const changed = this.model.applyEdits([{ from: mark.from, to: mark.to, text: page.text }], {
+                source: 'command',
+                expectedRevision: snapshot.revision
+            });
+            this.reportReplaced(changed ? 1 : 0);
+            return changed;
+        } catch (error) {
+            if (valid()) {
+                const failure = searchFailure(error);
+                this.reportReplaceFailed(error instanceof EditorSearchError && error.kind === 'range' ? 'limit' : failure === 'invalid' ? 'error' : failure);
+            }
+            return false;
+        } finally {
+            this.replacing--;
+            if (!this.disposed) {
+                this.options?.changed();
+            }
+        }
+    }
+
+    async replaceAll(replacement: string, preserveCase: boolean, canApply: () => boolean): Promise<number> {
+        const query = this.query;
+        if (query === null || this.search === undefined || this.state.noSelection || !canApply()) {
+            return 0;
+        }
+        const snapshot = this.snapshot();
+        const epoch = this.epoch;
+        const scope = this.scope;
+        const valid = (): boolean => !this.disposed && epoch === this.epoch && snapshot.revision === this.model.getRevision() && canApply();
+        this.replacing++;
+        this.replaceEpoch = epoch;
+        this.replaceFailed = undefined;
+        this.replaced = undefined;
+        this.options?.changed();
+        try {
+            const page = await this.search.request(
+                (client) =>
+                    client.replacements(snapshot, query, replacement, {
+                        ...scope,
+                        preserveCase,
+                        maxEdits: MAX_REPLACEMENT_PAGE,
+                        maxCharacters: MAX_REPLACEMENT_CHARACTERS,
+                        deadline: 10000
+                    }),
+                'command',
+                valid
+            );
+            if (!valid()) {
+                return 0;
+            }
+            if (page.next !== null) {
+                this.replaceFailed = 'limit';
+                return 0;
+            }
+            const edits: TextEdit[] = [];
+            let position = 0;
+            for (let index = 0; index < page.ranges.length; index += 3) {
+                const length = page.ranges[index + 2]!;
+                edits.push({ from: page.ranges[index]!, to: page.ranges[index + 1]!, text: page.text.slice(position, position + length) });
+                position += length;
+            }
+            const changed = this.model.applyEdits(edits, { source: 'command', expectedRevision: snapshot.revision });
+            const count = changed ? edits.length : 0;
+            this.reportReplaced(count);
+            return count;
+        } catch (error) {
+            if (!this.disposed && epoch === this.epoch) {
+                const failure = searchFailure(error);
+                this.replaceFailed = error instanceof EditorSearchError && error.kind === 'range' ? 'limit' : failure === 'invalid' ? 'error' : failure;
+            }
+            return 0;
+        } finally {
+            this.replacing--;
+            if (!this.disposed) {
+                this.options?.changed();
+            }
+        }
+    }
+
     dispose(): void {
         this.disposed = true;
         this.resetRegex(false);
         this.search?.dispose();
     }
+}
+
+function searchFailure(error: unknown): NonNullable<EditorFindState['failed']> {
+    return error instanceof EditorSearchError
+        ? error.kind === 'syntax'
+            ? 'invalid'
+            : error.kind === 'timeout' || error.kind === 'unavailable'
+              ? error.kind
+              : 'error'
+        : 'error';
 }

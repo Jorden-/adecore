@@ -53,11 +53,21 @@ function searchReply(request: EditorSearchInput, snapshot: EditorSearchSnapshot)
     const options = findOptions(request);
     const header = { id: request.id, revision: request.revision };
     if (request.type === 'next') {
-        const found = findMatchFrom(text, request.query.text, request.revision, request.offset, {
-            ...options,
-            backwards: request.backwards,
-            wrap: request.wrap
-        });
+        let found: FindMatch | null = null;
+        if (request.backwards) {
+            let last: FindMatch | null = null;
+            for (const match of iterateMatches(text, request.query.text, request.revision, options)) {
+                last = match;
+                if (match.from < request.offset) {
+                    found = match;
+                } else if (found !== null || request.wrap === false) {
+                    break;
+                }
+            }
+            found ??= request.wrap === false ? null : last;
+        } else {
+            found = findMatchFrom(text, request.query.text, request.revision, request.offset, { ...options, wrap: request.wrap });
+        }
         return { type: 'next', ...header, range: found === null ? null : { from: found.from, to: found.to } };
     }
     if (request.type === 'match') {
@@ -85,7 +95,7 @@ function searchReply(request: EditorSearchInput, snapshot: EditorSearchSnapshot)
                 next = resume;
                 break;
             }
-            const replacement = replacementText(text, match, request.replacement, false, request.preserveCase);
+            const replacement = replacementText(text, match, request.replacement, false, request.preserveCase, request.maxCharacters);
             if (characters + replacement.length > request.maxCharacters) {
                 if (pieces.length === 0) {
                     throw new RangeError('One replacement exceeds the response size limit.');

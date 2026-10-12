@@ -114,13 +114,33 @@ export function findMatchFrom(text: string, query: string, revision: number, off
 }
 
 /* Expands the JavaScript `$` patterns of a regex replacement, and gives it the case of the match when asked. Literal replacements are returned as they are. */
-export function replacementText(text: string, match: FindMatch, replacement: string, literal = false, preserveCase = false): string {
-    const expanded = literal || !match.regex ? replacement : expandPatterns(text, match, replacement);
-    return preserveCase ? replaceWithCaseRespect(expanded, match.text) : expanded;
+export function replacementText(text: string, match: FindMatch, replacement: string, literal = false, preserveCase = false, maxCharacters = Infinity): string {
+    if (maxCharacters !== Infinity && (!Number.isSafeInteger(maxCharacters) || maxCharacters < 0)) {
+        throw new RangeError('The replacement character limit must be nonnegative.');
+    }
+    const expanded = literal || !match.regex ? replacement : expandPatterns(text, match, replacement, maxCharacters);
+    if (expanded.length > maxCharacters) {
+        throw new RangeError('Replacement output exceeds its character limit.');
+    }
+    const result = preserveCase ? replaceWithCaseRespect(expanded, match.text) : expanded;
+    if (result.length > maxCharacters) {
+        throw new RangeError('Replacement output exceeds its character limit.');
+    }
+    return result;
 }
 
-function expandPatterns(text: string, match: FindMatch, replacement: string): string {
-    return replacement.replace(/\$(\$|&|`|'|\d{1,2}|<[^>]*>)/g, (token: string, group: string) => {
+function expandPatterns(text: string, match: FindMatch, replacement: string, maxCharacters: number): string {
+    const pieces: string[] = [];
+    let characters = 0,
+        cursor = 0;
+    const append = (value: string): void => {
+        characters += value.length;
+        if (characters > maxCharacters) {
+            throw new RangeError('Replacement output exceeds its character limit.');
+        }
+        pieces.push(value);
+    };
+    const expand = (token: string, group: string): string => {
         if (group === '$') {
             return '$';
         }
@@ -145,5 +165,12 @@ function expandPatterns(text: string, match: FindMatch, replacement: string): st
             return (match.captures[first - 1] ?? '') + group[1];
         }
         return token;
-    });
+    };
+    for (const found of replacement.matchAll(/\$(\$|&|`|'|\d{1,2}|<[^>]*>)/g)) {
+        append(replacement.slice(cursor, found.index));
+        append(expand(found[0], found[1]!));
+        cursor = found.index + found[0].length;
+    }
+    append(replacement.slice(cursor));
+    return pieces.join('');
 }

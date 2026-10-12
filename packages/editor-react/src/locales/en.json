@@ -167,7 +167,23 @@
             "allLabel": "Replace all",
             "preserveCase": "Preserve case",
             "toggle": "Show replace",
-            "hide": "Hide replace"
+            "hide": "Hide replace",
+            "failed": {
+                "limit": "Too much to replace at once ({{edits}} edits or {{characters}} output characters)",
+                "timeout": "Replacement timed out; the text was not changed",
+                "unavailable": "Replacement needs the search worker",
+                "error": "Could not replace; the text was not changed"
+            }
+        },
+        "countMore": "{{total}}+ matches",
+        "searching": "Searching…",
+        "large": "Large document: press Enter to search",
+        "replaced": "Replaced {{count}} matches",
+        "failed": {
+            "timeout": "Search timed out; press Enter to retry",
+            "unavailable": "Regex search is unavailable",
+            "invalid": "Invalid regular expression",
+            "error": "Could not finish the search"
         }
     },
     "diff": {

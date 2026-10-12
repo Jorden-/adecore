@@ -251,6 +251,10 @@ export class FakeEditor implements Editor {
         return this.readOnly ? 0 : this.findState.count;
     }
 
+    async replaceAllAsync(replacement: string, options: EditorReplaceOptions = {}): Promise<number> {
+        return this.replaceAll(replacement, options);
+    }
+
     setReplacePreview(replacement: string | null): void {
         this.replacePreview = replacement;
     }

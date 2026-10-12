@@ -76,6 +76,15 @@ The editor reads the blocks of a document, the stretches with a header line such
 
 Call `release()` when a search session ends to free the worker and its snapshot. The client remains usable; the next request starts a fresh worker. `dispose()` ends its lifetime.
 
-The find state reserves optional `searching`, `failed` (`invalid`, `timeout`, `unavailable`, or `error`), and `large` fields for worker-backed searches. The DOM engine still uses the synchronous find cache; the worker client and async controller are separate building blocks until the engine and find-bar wiring is complete.
+The find state reserves optional `searching`, `failed` (`invalid`, `timeout`, `unavailable`, or `error`), and `large` fields for worker-backed searches. The DOM engine uses this worker route for regex searches, previews and replacements. Without a worker factory regex search reports unavailable and never executes on the page.
 
 Explicit worker requests may override `deadline` in milliseconds without changing the client default. A queued user command cannot be displaced by live searches or previews. Ending the session rejects active jobs and prevents subsequent page requests. Capture errors use `captureFailed` separately from the marks search, so stepping through existing marks remains available.
+
+
+Set `searchWorker` on `createSmartEditorEngine` to a factory for an entry that calls `serveEditorSearch(self)`. Each mounted editor owns one lazy client. Literal searches stay synchronous; regex searches debounce and serialize on the worker. Above 8 million UTF-16 units a regex starts only on Enter or a find step. Explicit requests allow 10 seconds, live requests 1.5 seconds; Escape ends the session and releases its worker.
+
+`replaceAllAsync` resolves to the number replaced, or zero on refusal. It accepts at most 10,000 edits and 4 million output units, applies nothing on overflow or a changed revision, and records one undo step. The existing `replaceAll` keeps its number return: a complete literal cache is synchronous; other searches start the async method and return zero, then report `replaced` or `replaceFailed` through `onFind`. Regex `replace` returns true when its worker operation starts and reports the final outcome through the same listener.
+
+Stepping beyond the 10,000 marked matches uses directional worker search. `limited: true` with `current: null` means the current span is outside the marked cache. The view still highlights and reveals that span. Backward worker search chooses the last match that begins before its offset, including zero-width matches; the synchronous editor-core API retains its existing semantics.
+
+Replacement expansion can use a `maxCharacters` limit in editor-core `replacementText`. Worker output is bounded before concatenation. Previews are limited to 10,000 units of template and output, so context substitutions cannot allocate an unbounded string on the page.

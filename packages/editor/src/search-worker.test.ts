@@ -186,7 +186,8 @@ test('an invalid request still retains the supplied snapshot for the next valid 
 
 for (const fixture of [
     { offset: 1, backwards: false, wrap: true, expected: { from: 2, to: 4 } },
-    { offset: 3, backwards: true, wrap: true, expected: { from: 0, to: 2 } },
+    { offset: 3, backwards: true, wrap: true, expected: { from: 2, to: 4 } },
+    { offset: 2, backwards: true, wrap: true, expected: { from: 0, to: 2 } },
     { offset: 0, backwards: true, wrap: true, expected: { from: 2, to: 4 } },
     { offset: 0, backwards: true, wrap: false, expected: null },
     { offset: 5, backwards: false, wrap: false, expected: null }
@@ -357,5 +358,20 @@ test('an invalid revision cannot overwrite the retained snapshot', () => {
     expect(wire.sent[1]).toMatchObject({ type: 'error', kind: 'range' });
     wire.send(request(undefined));
     expect(wire.sent[2]).toMatchObject({ type: 'matches', revision: 0, ranges: new Uint32Array([0, 4]) });
+    dispose();
+});
+
+test('backward worker stepping skips the current zero-width match and wraps', () => {
+    const wire = endpoint();
+    const dispose = serveEditorSearch(wire.port);
+    const query = { text: 'a*', regex: true, caseSensitive: true, wholeWord: false };
+    for (const [offset, expected] of [
+        [3, { from: 2, to: 2 }],
+        [2, { from: 0, to: 2 }],
+        [0, { from: 3, to: 3 }]
+    ] as const) {
+        wire.send({ type: 'next', id: 1, revision: 0, text: 'aab', query, offset, backwards: true, wrap: true });
+        expect(wire.sent.at(-1)).toMatchObject({ type: 'next', range: expected });
+    }
     dispose();
 });

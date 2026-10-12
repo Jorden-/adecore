@@ -1,4 +1,5 @@
-import { describe, expect, it, spyOn } from 'bun:test';
+import { describe, expect, it, spyOn, test } from 'bun:test';
+import { findMatches, replacementText } from './search.ts';
 import { DocumentModel } from './document.ts';
 
 describe('find and replace', () => {
@@ -184,4 +185,13 @@ it('refuses duplicate retained match ranges before counting or applying replacem
     expect(() => model.replaceMatches([match, { ...match }], 'entry')).toThrow(RangeError);
     expect(model.getText()).toBe('cat');
     expect(model.getSnapshot().canUndo).toBe(false);
+});
+
+test('replacement output budgets reject context expansion before concatenating it', () => {
+    const text = 'prefix-match-suffix';
+    const match = findMatches(text, '(match)', 0, { regex: true })[0]!;
+    expect(replacementText(text, match, '$1', false, false, 5)).toBe('match');
+    expect(() => replacementText(text, match, "$`$'", false, false, 5)).toThrow(RangeError);
+    expect(() => replacementText(text, match, '$1'.repeat(1000), false, false, 100)).toThrow(RangeError);
+    expect(() => replacementText(text, match, 'abc', false, false, NaN)).toThrow(RangeError);
 });

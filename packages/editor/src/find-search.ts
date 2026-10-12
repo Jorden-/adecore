@@ -10,6 +10,7 @@ type SearchKind = 'live' | 'preview' | 'command';
 
 interface SearchJob {
     readonly kind: SearchKind;
+    readonly valid?: () => boolean;
     readonly run: (client: EditorSearchClient, isCurrent: () => boolean) => Promise<unknown>;
     readonly resolve: (value: unknown) => void;
     readonly reject: (error: unknown) => void;
@@ -40,7 +41,11 @@ export class FindSearchQueue {
         this.options = options;
     }
 
-    request<Result>(run: (client: EditorSearchClient, isCurrent: () => boolean) => Promise<Result>, kind: SearchKind = 'live'): Promise<Result> {
+    request<Result>(
+        run: (client: EditorSearchClient, isCurrent: () => boolean) => Promise<Result>,
+        kind: SearchKind = 'live',
+        valid?: () => boolean
+    ): Promise<Result> {
         if (this.disposed) {
             return Promise.reject(new EditorSearchError('disposed', 'The find session was disposed.'));
         }
@@ -53,15 +58,19 @@ export class FindSearchQueue {
                 }
                 return true;
             });
-            this.pending.push({ kind, run, resolve: (value) => resolve(value as Result), reject, cancelled: false });
+            this.pending.push({ kind, valid, run, resolve: (value) => resolve(value as Result), reject, cancelled: false });
             this.pending.sort((left, right) => priority(left.kind) - priority(right.kind));
             if (this.active === undefined) {
                 this.pump();
-            } else if (kind !== 'preview' && this.active.kind !== 'command' && this.cancelTimer === undefined) {
+            } else if (
+                (kind !== 'preview' || this.active.valid?.() === false) &&
+                (this.active.kind !== 'command' || this.active.valid?.() === false) &&
+                this.cancelTimer === undefined
+            ) {
                 this.cancelTimer = (this.options.schedule ?? scheduleFind)(
                     () => {
                         this.cancelTimer = undefined;
-                        if (this.pending.length > 0 && this.active !== undefined && this.active.kind !== 'command') {
+                        if (this.pending.length > 0 && this.active !== undefined && (this.active.kind !== 'command' || this.active.valid?.() === false)) {
                             this.active.cancelled = true;
                             this.active.reject(superseded());
                             this.client?.cancel();
@@ -88,7 +97,8 @@ export class FindSearchQueue {
         this.active = job;
         this.started = this.now();
         const epoch = this.epoch;
-        const isCurrent = (): boolean => !this.disposed && epoch === this.epoch && !job.cancelled;
+        const alive = (): boolean => !this.disposed && epoch === this.epoch && !job.cancelled;
+        const isCurrent = (): boolean => alive() && job.valid?.() !== false;
         void Promise.resolve()
             .then(() => {
                 if (!isCurrent()) {
@@ -111,7 +121,7 @@ export class FindSearchQueue {
                 return job.run(guarded, isCurrent);
             })
             .then((value) => {
-                if (isCurrent()) {
+                if (alive()) {
                     job.resolve(value);
                 } else {
                     job.reject(superseded());
