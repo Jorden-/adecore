@@ -58,7 +58,7 @@ These helpers preserve patch text rather than normalizing its line endings. Git 
 
 ## Parsed patches and diff rows
 
-`parsePatch(patch)` reads one file's unified patch into a `ParsedPatch`. File headers are optional. Each `Hunk` holds zero-based `oldStart` and `newStart` positions, counts, section text and `PatchLine` entries (`context`, `delete` or `insert`). A zero-count range is an insertion anchor. The parser retains carriage returns in source text and attaches `noNewline: true` to the line before a final newline marker.
+`parseHunkHeader(line)` reads one `@@ -a,b +c,d @@ section` line into a `HunkHeader` with one-based starts and a count that is one when omitted, or returns `undefined`. `parsePatch(patch)` reads one file's unified patch into a `ParsedPatch`. File headers are optional. Each `Hunk` holds zero-based `oldStart` and `newStart` positions, counts, section text and `PatchLine` entries (`context`, `delete` or `insert`). A zero-count range is an insertion anchor. The parser retains carriage returns in source text and attaches `noNewline: true` to the line before a final newline marker.
 
 The parser preserves recognized lines when a hunk is truncated or malformed and sets `partial: true`. It also marks overlapping hunks and multi-file patches partial. It never throws for malformed patch text. An empty context line may omit its space prefix. It does not parse combined diffs, binary patches, rename metadata or quoted paths.
 

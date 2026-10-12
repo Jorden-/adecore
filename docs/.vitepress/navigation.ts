@@ -352,6 +352,7 @@ export const sidebar: DefaultTheme.SidebarMulti = {
             ['Format on type', '/editor-react/format-on-type'],
             ['FindReplace', '/editor-react/find-replace'],
             ['Reviews and agents', '/editor-react/change-review'],
+            ['Patch files', '/editor-react/patch-files'],
             ['Code vision', '/editor-react/code-vision']
         ]),
         group('Reference', [

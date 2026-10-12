@@ -76,3 +76,5 @@ export type { DiffViewProps } from './DiffView.tsx';
 export type { DiffLimits } from './diff-expansion.ts';
 export { diffSyntaxDocument } from './diff-syntax.ts';
 export type { DiffSourceSide, DiffSourceTokens, DiffSyntaxSources } from './diff-syntax.ts';
+export { decoratePatch, usePatchDecorations } from './patch-decorations.ts';
+export type { PatchDecoration, PatchDecorationOptions, PatchLineLabels } from './patch-decorations.ts';

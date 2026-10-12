@@ -48,6 +48,7 @@ The features are built on pure functions without React or an editor, which `@ade
 | `diffSegments`, `emphasisOf`, `replacedWords`                    | The segments and changed words `ChangeReview` draws                    |
 | `replaceLines`, `replaceAllLines`                                | Replacing whole lines                                                  |
 | `planConflict`                                                   | The stretches of a three-way merge that need a person                  |
+| `patchLayoutOf`                                                  | The role, numbers and files of every line of a [patch](/editor-react/patch-files) |
 
 ````ts
 import { parseAnswer } from '@adecore/editor-react/models';

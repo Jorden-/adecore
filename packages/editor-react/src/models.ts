@@ -182,3 +182,14 @@ export {
 } from './find-query.ts';
 export { type PopupSize, type PopupPlacement, type PlaceOptions, placePopup, placeBeside } from './popup-placement.ts';
 export { planConflict, type ConflictStretch, type ConflictPlan } from './conflict-model.ts';
+export {
+    patchLayoutOf,
+    DEFAULT_PATCH_LIMITS,
+    type PatchLayout,
+    type PatchLayoutLine,
+    type PatchLineRole,
+    type PatchFileLayout,
+    type PatchFileStatus,
+    type PatchHunkLayout,
+    type PatchLimits
+} from './patch-layout.ts';

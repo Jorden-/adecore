@@ -23,6 +23,30 @@ export interface ParsedPatch {
 
 const HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: ?(.*))?$/;
 
+/* The numbers of a hunk header as written: one-based starts, and a count that is one when omitted. */
+export interface HunkHeader {
+    readonly oldStart: number;
+    readonly oldCount: number;
+    readonly newStart: number;
+    readonly newCount: number;
+    readonly section: string;
+}
+
+/* Reads one `@@ -a,b +c,d @@ section` line without its line ending; undefined when it is not a hunk header. */
+export function parseHunkHeader(line: string): HunkHeader | undefined {
+    const match = HEADER.exec(line);
+    if (match === null) {
+        return undefined;
+    }
+    return {
+        oldStart: Number(match[1]),
+        oldCount: Number(match[2] ?? 1),
+        newStart: Number(match[3]),
+        newCount: Number(match[4] ?? 1),
+        section: match[5] ?? ''
+    };
+}
+
 export function parsePatch(patch: string): ParsedPatch {
     const hunks: Hunk[] = [];
     const lines = patch.split('\n');
@@ -44,15 +68,15 @@ export function parsePatch(patch: string): ParsedPatch {
         const metadata = line.replace(/\r$/, '');
         if (metadata.startsWith('@@')) {
             finish();
-            const match = HEADER.exec(metadata);
-            if (match === null) {
+            const match = parseHunkHeader(metadata);
+            if (match === undefined) {
                 partial = true;
                 continue;
             }
-            const oldLength = Number(match[2] ?? 1);
-            const newLength = Number(match[4] ?? 1);
-            const oldStart = Number(match[1]) - (oldLength === 0 ? 0 : 1);
-            const newStart = Number(match[3]) - (newLength === 0 ? 0 : 1);
+            const oldLength = match.oldCount;
+            const newLength = match.newCount;
+            const oldStart = match.oldStart - (oldLength === 0 ? 0 : 1);
+            const newStart = match.newStart - (newLength === 0 ? 0 : 1);
             if (
                 ![oldStart, newStart, oldLength, newLength, oldStart + oldLength, newStart + newLength].every(
                     (value) => Number.isSafeInteger(value) && value >= 0
@@ -65,7 +89,7 @@ export function parsePatch(patch: string): ParsedPatch {
             if (previous !== undefined && (oldStart < previous.oldStart + previous.oldCount || newStart < previous.newStart + previous.newCount)) {
                 partial = true;
             }
-            current = { oldStart, oldCount: oldLength, newStart, newCount: newLength, section: match[5] ?? '', lines: [] };
+            current = { oldStart, oldCount: oldLength, newStart, newCount: newLength, section: match.section, lines: [] };
             hunks.push(current);
             oldCount = 0;
             newCount = 0;
