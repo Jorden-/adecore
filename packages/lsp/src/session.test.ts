@@ -17,6 +17,33 @@ describe('capabilities and server requests', () => {
         await session.shutdown();
     });
 
+    it('advertises completion modes and list defaults only when the consumer supports them', async () => {
+        const transport = new ScriptedTransport();
+        transport.autoInitialize = {};
+        const session = new LspSession(transport, {
+            snippetSupport: true,
+            insertTextModes: [1, 2],
+            completionItemDefaults: ['commitCharacters', 'editRange', 'insertTextFormat', 'insertTextMode']
+        });
+        await session.initialize();
+        const initialize = transport.request('initialize').params as { capabilities: { textDocument: { completion: unknown } } };
+        expect(initialize.capabilities.textDocument.completion).toMatchObject({
+            completionItem: { snippetSupport: true, insertTextModeSupport: { valueSet: [1, 2] } },
+            completionList: { itemDefaults: ['commitCharacters', 'editRange', 'insertTextFormat', 'insertTextMode'] }
+        });
+        await session.shutdown();
+    });
+
+    it('keeps optional completion capabilities absent by default', async () => {
+        const { session, transport } = await sessionWith({});
+        const initialize = transport.request('initialize').params as {
+            capabilities: { textDocument: { completion: { completionItem: Record<string, unknown>; completionList?: unknown } } };
+        };
+        expect(initialize.capabilities.textDocument.completion.completionItem.insertTextModeSupport).toBeUndefined();
+        expect(initialize.capabilities.textDocument.completion.completionList).toBeUndefined();
+        await session.shutdown();
+    });
+
     it('asks a server to shut down without params, which some refuse as a null', async () => {
         const { session, transport } = await sessionWith({});
         await session.shutdown();

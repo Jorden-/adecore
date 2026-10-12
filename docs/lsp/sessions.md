@@ -53,9 +53,13 @@ child.stderr.on('data', (chunk) => log(String(chunk)));
 | `configuration`          | `{}`               | Settings, sent after the handshake and answered to `workspace/configuration` |
 | `timeoutMs`              | 30 seconds         | The deadline of a request; `0` turns it off                                |
 | `snippetSupport`         | `false`            | Whether completion items may be snippets                                   |
+| `insertTextModes`        | not advertised     | Supported completion insertion modes: `1` as-is, `2` adjusted indentation   |
+| `completionItemDefaults` | not advertised     | Completion-list default fields the consumer applies to each item           |
 | `onConfiguration(item)`  |                    | Answers each configuration item instead of `configuration`                 |
 | `onApplyEdit(params)`    | refuses            | Applies a `workspace/applyEdit` of the server                              |
 | `onShowMessage(params)`  | `null`             | Answers a `window/showMessageRequest`                                      |
+
+Advertise insertion modes and list defaults only when the completion consumer implements them. Empty lists leave the capabilities absent.
 
 Without `onConfiguration`, a configuration query without a section gets all settings, and a section gets the key or the dotted path, or `null`. `setConfiguration(settings)` replaces them and tells the server. Answer `onApplyEdit` with `applied: true` only once the edit is made.
 

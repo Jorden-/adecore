@@ -38,6 +38,8 @@ export interface LspSessionOptions {
     clientInfo?: { name: string; version?: string };
     timeoutMs?: number;
     snippetSupport?: boolean;
+    insertTextModes?: readonly (1 | 2)[];
+    completionItemDefaults?: readonly string[];
     onConfiguration?: (item: ConfigurationItem) => unknown | Promise<unknown>;
     onApplyEdit?: (params: ApplyWorkspaceEditParams) => ApplyWorkspaceEditResult | Promise<ApplyWorkspaceEditResult>;
     onShowMessage?: (params: { type: number; message: string; actions?: { title: string }[] }) => { title: string } | null | Promise<{ title: string } | null>;
@@ -506,8 +508,10 @@ function clientCapabilities(options: LspSessionOptions): object {
             completion: {
                 ...dynamic,
                 contextSupport: true,
+                ...(options.completionItemDefaults?.length ? { completionList: { itemDefaults: [...options.completionItemDefaults] } } : {}),
                 completionItem: {
                     snippetSupport: options.snippetSupport ?? false,
+                    ...(options.insertTextModes?.length ? { insertTextModeSupport: { valueSet: [...options.insertTextModes] } } : {}),
                     commitCharactersSupport: true,
                     documentationFormat: ['markdown', 'plaintext'],
                     deprecatedSupport: true,
