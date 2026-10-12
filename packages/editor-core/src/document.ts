@@ -526,13 +526,14 @@ export class DocumentModel {
         const after = this.state();
         const changes = changed.map((edit) => ({ from: edit.from, to: edit.to, insertedLength: edit.text.length }));
         const last = this.undoStack.at(-1);
-        if (
+        const joinsGroup =
             options.historyGroup &&
             this.groupOpen &&
             last?.group === options.historyGroup &&
             last.after.rope === before.rope &&
-            sameSelections(last.after.selections, before.selections)
-        ) {
+            sameSelections(last.after.selections, before.selections);
+        const joinsPrevious = options.joinPrevious === true && last !== undefined && last.after.rope === before.rope;
+        if (last !== undefined && (joinsGroup || joinsPrevious)) {
             last.after = after;
             last.changes.push(changes);
         } else {
@@ -541,9 +542,14 @@ export class DocumentModel {
         if (this.undoStack.length > historyLimit) {
             this.undoStack.shift();
         }
-        this.groupOpen = Boolean(options.historyGroup);
+        this.groupOpen = Boolean(options.historyGroup) && !joinsPrevious;
         this.redoStack = [];
-        this.emit([changes], options.source ?? 'external', () => (rebuild ? stretchEdits(previous, next, [changes]) : editsOf(previous, changed)));
+        this.emit(
+            [changes],
+            options.source ?? 'external',
+            () => (rebuild ? stretchEdits(previous, next, [changes]) : editsOf(previous, changed)),
+            options.typed
+        );
         return true;
     }
 
@@ -1578,7 +1584,7 @@ export class DocumentModel {
         }
         return this.applySelectionEdits(
             plans.map((entry) => ({ from: entry.from, to: entry.to, text: entry.text, anchor: entry.caret, head: entry.caret })),
-            { source: 'command' }
+            { source: 'command', typed: mode === 'enter' }
         );
     }
 
@@ -2212,11 +2218,19 @@ export class DocumentModel {
     }
 
     /* `contentEdits` is worked out when a listener asks, since most listeners never do and a restore of a large text would otherwise read all of it. */
-    private emit(changes?: readonly (readonly DocumentChange[])[], source?: EditorSnapshot['source'], contentEdits?: () => ContentEdit[]): void {
+    private emit(
+        changes?: readonly (readonly DocumentChange[])[],
+        source?: EditorSnapshot['source'],
+        contentEdits?: () => ContentEdit[],
+        typed?: boolean
+    ): void {
         const snapshot = this.getSnapshot();
         if (changes) {
             snapshot.changes = changes.map((transaction) => transaction.map((change) => ({ ...change })));
             snapshot.source = source;
+            if (typed) {
+                snapshot.typed = true;
+            }
             if (contentEdits) {
                 let edits: ContentEdit[] | undefined;
                 Object.defineProperty(snapshot, 'contentEdits', { get: () => (edits ??= contentEdits()), enumerable: true });

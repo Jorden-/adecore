@@ -26,7 +26,7 @@ export function LanguagePopups({ language, contextMenuItems }: { language: Edito
     const pick = useStore(language.popups, (state) => state.pick);
     const rename = useStore(language.popups, (state) => state.rename);
     const peek = useStore(language.popups, (state) => state.peek);
-    const callHierarchy = useStore(language.popups, (state) => state.callHierarchy);
+    const callHierarchy = useStore(language.popups, (state) => state.callHierarchy ?? null);
     const symbols = useStore(language.popups, (state) => state.symbols);
     const menu = useStore(language.popups, (state) => state.menu);
     const authors = useStore(language.popups, (state) => state.authors);

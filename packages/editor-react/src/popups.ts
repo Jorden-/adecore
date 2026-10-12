@@ -201,7 +201,8 @@ export interface PopupState {
     readonly pick: PickView | null;
     readonly rename: RenameView | null;
     readonly peek: PeekView | null;
-    readonly callHierarchy: CallHierarchyView | null;
+    /* Optional so a host that builds a `PopupState` literal from before the call hierarchy still fits; absent reads as closed. */
+    readonly callHierarchy?: CallHierarchyView | null;
     readonly symbols: SymbolsView | null;
     readonly menu: MenuView | null;
     readonly authors: AuthorsView | null;

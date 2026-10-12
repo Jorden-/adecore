@@ -64,7 +64,7 @@ describe('format on type', () => {
         expect(asked(service)[0]!.params).toEqual({ position: { line: 0, character: 6 }, ch: ';', options: { tabSize: 2, insertSpaces: false } });
     });
 
-    test('applies the edits the server answers as a step of their own after the typed character', async () => {
+    test('applies the edits the server answers as a command of the host after the typed character', async () => {
         const { editor, service } = await setup(() => [indent('    ')]);
         const changes: string[] = [];
         editor.onTextChange((change) => changes.push(change.source));

@@ -41,6 +41,7 @@ import type {
     EditorFolds,
     EditorSemanticToken,
     EditorSmartKeys,
+    EditorApplyEditsOptions,
     EditorTextChange,
     EditorTrackedRange,
     EditorTheme,
@@ -746,8 +747,8 @@ export class FakeEditor implements Editor {
         return [...this.keys].some((handler) => handler(full));
     }
 
-    /* The fake keeps no selection direction, so a test of `mapSelections` keeping a backward selection needs the real editor. */
-    applyEdits(edits: readonly EditorContentChange[], options: { readonly mapSelections?: (range: EditorRange) => EditorRange } = {}): boolean {
+    /* The fake keeps no undo history, so `mergeUndo` changes nothing here. It keeps no selection direction either, so a test of `mapSelections` keeping a backward selection needs the real editor. */
+    applyEdits(edits: readonly EditorContentChange[], options: EditorApplyEditsOptions = {}): boolean {
         if (this.readOnly || edits.length === 0) {
             return false;
         }

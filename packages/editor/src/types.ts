@@ -260,11 +260,18 @@ export interface EditorContentChange {
     readonly text: string;
 }
 
+export interface EditorApplyEditsOptions {
+    readonly mapSelections?: (range: EditorRange) => EditorRange;
+    readonly mergeUndo?: boolean;
+}
+
 export interface EditorTextChange {
     /* In order, so a language server can follow them one by one. */
     readonly changes: readonly EditorContentChange[];
     /* A person typing, one of the editor's own commands such as undo, or a change from outside. */
     readonly source: 'input' | 'command' | 'external';
+    /* Set when a person's typing made the change though it ran as a command, as Enter does; every change from the keyboard has source `input` without it. */
+    readonly typed?: boolean;
 }
 
 export type EditorMarkerSeverity = 'error' | 'warning' | 'info' | 'hint';
@@ -670,8 +677,8 @@ export interface Editor {
     setSelectionRanges(provider: EditorSelectionRanges | null): void;
     /* Follows a range through every change of the text, `setText` and undo included, until it is disposed. Costs one mapping of two offsets per change. */
     trackRange(range: EditorRange): EditorTrackedRange;
-    /* Replaces ranges of the current text at once, as one step of the undo history. `mapSelections` places each selection in the new text, keeping its direction, and redo restores it. */
-    applyEdits(edits: readonly EditorContentChange[], options?: { readonly mapSelections?: (range: EditorRange) => EditorRange }): boolean;
+    /* Replaces ranges of the current text at once, as one step of the undo history. `mapSelections` places each selection in the new text, keeping its direction, and redo restores it. `mergeUndo` joins the step before it when the text is exactly as that step left it, so one undo takes both back. */
+    applyEdits(edits: readonly EditorContentChange[], options?: EditorApplyEditsOptions): boolean;
     setTheme(theme: EditorTheme): void;
     /* Reads the code face off the page again, after the page changed its size, family or ligatures. */
     refreshFont(): void;

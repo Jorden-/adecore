@@ -8,17 +8,17 @@ The language server tidies the code around the caret as a person types: a `}` th
 
 The request goes out after the change that typed a trigger character, with the caret behind it, the character as `ch` and the indentation of the editor (`tabSize` and `insertSpaces`) as the formatting options. All of these must hold:
 
-- The change comes from the keyboard (`source` is `'input'`) and is the only change of that edit. Undo, redo, a command of the host, a reload from outside and a completion do not ask.
-- The text is the trigger character alone, or for `\n` a line break with the indentation after it. A paste of several characters, a text from an input method that commits more than one character, and an Enter that also inserts a closing line do not ask. A single character pasted looks like a typed one and asks.
+- The change comes from the keyboard (`source` is `'input'`) or is marked `typed` (Enter runs as a command, and says so), and is the only change of that edit. Undo, redo, a command of the host, a reload from outside and a completion do not ask.
+- The text is the trigger character alone, the closer the editor moved back to its opener's indentation (whitespace and one trigger character), or for `\n` a line break with the indentation after it, also with the closing line Enter adds between braces. A paste of several characters, a text from an input method that commits more than one character, do not ask. A single character pasted looks like a typed one and asks.
 - The editor has one caret, is not read only and is not in a [snippet](/editor-react/completion) session. A session is skipped altogether instead of mapping the edits onto its tab stops.
 
-The feature follows the editor's reports of changed text, so a character the editor absorbs instead of inserting, such as a closer that is already there, asks only if the editor reports a change for it.
+The feature follows the editor's reports of changed text, so a character the editor absorbs instead of inserting, such as a closer typed over one that is already there, asks nothing: the editor reports no change for it.
 
 ## What happens to the answer
 
 The answer is applied only while the text is exactly the one it was asked about and the caret has not moved. Every later change of the text cancels the request that is out, and an answer that arrives anyway, or a `StaleResultError` of the service, is dropped. Edits that overlap each other, an empty answer and a failing server change nothing and say nothing: the next trigger character asks again.
 
-The edits are applied with `editor.applyEdits`, which is one undo step of its own, directly after the step of the typed character. Undo takes the formatting away first and the character second. The editor has no way to join an edit of the host to the typing before it, so the two cannot share a step.
+The edits are applied with `editor.applyEdits(edits, { mergeUndo: true })`, which joins the undo step of the typed character, so one undo takes the formatting and the character away together and redo brings both back.
 
 ## Turning it off
 

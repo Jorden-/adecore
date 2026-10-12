@@ -490,7 +490,10 @@ export class SnippetFeature {
         }
         if (event.key === 'Escape') {
             const popups = this.language.popups?.getState();
-            if (popups !== undefined && [popups.completion, popups.signature, popups.hover, popups.pick, popups.peek].some((popup) => popup !== null)) {
+            if (
+                popups !== undefined &&
+                [popups.completion, popups.signature, popups.hover, popups.pick, popups.peek, popups.callHierarchy ?? null].some((popup) => popup !== null)
+            ) {
                 return false;
             }
             const active = this.isActive;

@@ -51,6 +51,7 @@ export type {
     EditorPosition,
     EditorRemoteCursor,
     EditorRange,
+    EditorApplyEditsOptions,
     EditorTextChange,
     EditorTrackedRange,
     EditorRunCommand,

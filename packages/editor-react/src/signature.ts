@@ -31,7 +31,7 @@ export class SignatureFeature {
             editor.onCaret(() => this.retrigger()),
             editor.onBlur(() => this.close()),
             editor.onKeyDown((event) => {
-                if (event.key === 'Escape' && this.isOpen) {
+                if (event.key === 'Escape' && this.isOpen && this.language.popups.getState().callHierarchy == null) {
                     this.close();
                     return true;
                 }

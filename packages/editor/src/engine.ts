@@ -46,6 +46,7 @@ import type {
     EditorSelectionRanges,
     EditorSemanticToken,
     EditorSmartKeys,
+    EditorApplyEditsOptions,
     EditorTextChange,
     EditorTrackedRange,
     EditorTheme,
@@ -122,7 +123,7 @@ class SmartEditor implements Editor {
                 this.revision = snapshot.revision;
                 this.grammarPreparation.edited(snapshot.changes ?? []);
                 if (snapshot.contentEdits !== undefined && snapshot.contentEdits.length > 0) {
-                    this.announceTextChange(snapshot.contentEdits, snapshot.source ?? 'external');
+                    this.announceTextChange(snapshot.contentEdits, snapshot.source ?? 'external', snapshot.typed === true);
                 }
                 if (!this.settingText) {
                     emit(this.changes);
@@ -206,9 +207,10 @@ class SmartEditor implements Editor {
         return subscribe(this.textChanges, listener);
     }
 
-    private announceTextChange(edits: NonNullable<EditorSnapshot['contentEdits']>, source: EditorTextChange['source']): void {
+    private announceTextChange(edits: NonNullable<EditorSnapshot['contentEdits']>, source: EditorTextChange['source'], typed: boolean): void {
         const change: EditorTextChange = {
             source,
+            ...(typed ? { typed } : {}),
             changes: edits.map((edit) => ({
                 range: { start: { line: edit.start.line, character: edit.start.column }, end: { line: edit.end.line, character: edit.end.column } },
                 text: edit.text
@@ -323,7 +325,7 @@ class SmartEditor implements Editor {
         this.controller.setSelectionRanges(provider);
     }
 
-    applyEdits(edits: readonly EditorContentChange[], options: { readonly mapSelections?: (range: EditorRange) => EditorRange } = {}): boolean {
+    applyEdits(edits: readonly EditorContentChange[], options: EditorApplyEditsOptions = {}): boolean {
         if (this.settings.readOnly || edits.length === 0) {
             return false;
         }
@@ -333,6 +335,7 @@ class SmartEditor implements Editor {
                 edits.map((edit) => ({ from: this.offsetAt(edit.range.start), to: this.offsetAt(edit.range.end), text: edit.text })),
                 {
                     source: 'command',
+                    joinPrevious: options.mergeUndo === true,
                     selectionPositions:
                         mapSelections &&
                         this.model.getSelections().map((selection) => {

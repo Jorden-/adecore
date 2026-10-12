@@ -55,12 +55,14 @@ document.applyEdits(
 
 It returns `true` when the text changed. It returns `false`, with nothing changed, for a batch that leaves the text as it was or for an `expectedRevision` the document moved past. It throws a `RangeError` for an offset outside the document, a range with `to` before `from`, an edge inside a surrogate pair, or two edits that overlap; two different insertions at one offset count as overlapping. A non-string `text` throws a `TypeError`. Nothing changes when it throws.
 
-| `DocumentEditOptions` | Meaning                                                                                 |
-| --------------------- | --------------------------------------------------------------------------------------- |
-| `expectedRevision`    | Refuse the batch unless the document is at this revision                                |
+| `DocumentEditOptions` | Meaning                                                                                |
+| --------------------- | -------------------------------------------------------------------------------------- |
+| `expectedRevision`    | Refuse the batch unless the document is at this revision                               |
 | `selections`          | The selections after the edit; without them the current ones move along with the edits |
 | `source`              | `'input'`, `'command'` or `'external'` (the default), passed on to listeners           |
-| `historyGroup`        | Joins this batch to the previous undo step of the same group                            |
+| `historyGroup`        | Joins this batch to the previous undo step of the same group                           |
+| `joinPrevious`        | Joins the previous undo step when the text is exactly as that step left it             |
+| `typed`               | Marks the change as a person's typing though it ran as a command; the snapshot says so |
 
 `setText(text)` replaces everything as one undoable `external` edit. It keeps the history; to start over without one, make a new model.
 

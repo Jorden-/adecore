@@ -5,7 +5,9 @@ import type { EditorLanguage } from './editor-language.ts';
 
 const METHOD = 'textDocument/onTypeFormatting';
 /* A line break with the indentation the editor put after it, which is how Enter reaches the server. */
-const LINE_BREAK = /^\r?\n[ \t]*$/;
+const LINE_BREAK = /^\r?\n[ \t]*(\r?\n[ \t]*)?$/;
+/* A closer with the whitespace the editor replaced in front of it when it moved the closer back to its opener's indentation. */
+const DEDENTED = /^[ \t]+(\S)$/u;
 
 /* The overlapping edits of a server answer have no single meaning, so an answer that has them is not applied. */
 function overlaps(edits: readonly TextEdit[]): boolean {
@@ -18,13 +20,13 @@ function overlaps(edits: readonly TextEdit[]): boolean {
  * `firstTriggerCharacter` and `moreTriggerCharacter`, the server is asked what to change around the caret, and its
  * edits are applied.
  *
- * Only typing counts: one change from the keyboard that is the trigger character alone, or a line break with its
- * indentation for `\n`. A paste, undo, a completion or an external change does not ask, and neither does a
+ * Only typing counts: one change that is the trigger character alone, the closer the editor moved back to its
+ * opener's indentation, or a line break with its indentation for `\n`, which the editor reports as typed though
+ * Enter runs as a command. A character the editor types over an existing closer changes no text and asks nothing. A paste, undo, a completion or an external change does not ask, and neither does a
  * second caret, a read-only editor or a snippet session, whose tab stops an edit could move. An answer is applied
  * only while the text is exactly what it was asked about, and the caret where it was.
  *
- * The edits are one undo step of their own, right after the one of the typed character: the editor has no way to
- * join an edit of the host to the typing before it. On by default where the server offers it; `configure(false)`
+ * The edits join the undo step of the typed character, so one undo takes both back. On by default where the server offers it; `configure(false)`
  * turns it off for a host that has a setting for it.
  */
 export class FormatOnTypeFeature {
@@ -71,12 +73,12 @@ export class FormatOnTypeFeature {
     private typed(change: EditorTextChange): void {
         const revision = ++this.revision;
         this.controller.abort();
-        if (!this.enabled || change.source !== 'input' || change.changes.length !== 1 || !this.supported) {
+        if (!this.enabled || (change.source !== 'input' && change.typed !== true) || change.changes.length !== 1 || !this.supported) {
             return;
         }
         const { editor, snippets } = this.language;
         const { text } = change.changes[0]!;
-        const typed = LINE_BREAK.test(text) ? '\n' : Array.from(text).length === 1 ? text : null;
+        const typed = LINE_BREAK.test(text) ? '\n' : Array.from(text).length === 1 ? text : (DEDENTED.exec(text)?.[1] ?? null);
         if (typed === null || !this.triggerCharacters().includes(typed)) {
             return;
         }
@@ -98,7 +100,10 @@ export class FormatOnTypeFeature {
             if (stale || edits === null || edits.length === 0 || overlaps(edits)) {
                 return;
             }
-            editor.applyEdits(edits.map((edit) => ({ range: edit.range, text: edit.newText })));
+            editor.applyEdits(
+                edits.map((edit) => ({ range: edit.range, text: edit.newText })),
+                { mergeUndo: true }
+            );
         } catch {
             // A refusal or a failing server is not worth a notice per keystroke; the next trigger character asks again.
         }

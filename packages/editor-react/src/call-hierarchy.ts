@@ -1,7 +1,19 @@
 import { StaleResultError, type CallHierarchyItem } from '@adecore/lsp';
 import type { EditorPosition } from '@adecore/editor';
 import type { EditorLanguage } from './editor-language.ts';
-import { CALL_LEVEL_LIMIT, childrenOf, rootsOf, rowsOf, stepsOf, targetOf, type CallDirection, type CallNode, type CallRow } from './call-hierarchy-model.ts';
+import {
+    CALL_LEVEL_LIMIT,
+    childrenOf,
+    moreIdOf,
+    rootsOf,
+    rowsOf,
+    statusIdOf,
+    stepsOf,
+    targetOf,
+    type CallDirection,
+    type CallNode,
+    type CallRow
+} from './call-hierarchy-model.ts';
 import { PEEK_HEIGHT } from './peek.ts';
 import { snippetOf } from './peek-model.ts';
 import { isShortcut } from './shortcut-keys.ts';
@@ -60,7 +72,7 @@ export class CallHierarchyFeature {
     }
 
     get isOpen(): boolean {
-        return this.language.popups.getState().callHierarchy !== null;
+        return (this.language.popups.getState().callHierarchy ?? null) !== null;
     }
 
     /* Whether a server of this document answers the three requests the tree is made of. */
@@ -122,7 +134,7 @@ export class CallHierarchyFeature {
 
     close(): void {
         this.reset();
-        if (this.language.popups.getState().callHierarchy === null) {
+        if (this.language.popups.getState().callHierarchy == null) {
             return;
         }
         this.language.popups.setState({ callHierarchy: null });
@@ -133,7 +145,7 @@ export class CallHierarchyFeature {
 
     /* Starts the tree over from the same symbols for the other direction. */
     setDirection(direction: CallDirection): void {
-        const view = this.language.popups.getState().callHierarchy;
+        const view = this.language.popups.getState().callHierarchy ?? null;
         if (view === null || view.direction === direction) {
             return;
         }
@@ -158,7 +170,7 @@ export class CallHierarchyFeature {
         }
         if (node.expanded) {
             this.patch(id, { expanded: false });
-            const view = this.language.popups.getState().callHierarchy;
+            const view = this.language.popups.getState().callHierarchy ?? null;
             if (view !== null && this.hasAncestor(view.active, id)) {
                 this.select(id);
             }
@@ -180,21 +192,28 @@ export class CallHierarchyFeature {
     /* Brings the next stretch of calls of a level. */
     showMore(parent: string): void {
         const node = this.nodes.get(parent);
-        if (node !== undefined) {
-            this.patch(parent, { shown: Math.min(node.children.length, node.shown + CALL_LEVEL_LIMIT) });
+        if (node === undefined) {
+            return;
+        }
+        this.patch(parent, { shown: Math.min(node.children.length, node.shown + CALL_LEVEL_LIMIT) });
+        const first = node.children[node.shown];
+        const view = this.language.popups.getState().callHierarchy ?? null;
+        // The row that offered more is gone once everything shows, so the selection moves on to what it brought.
+        if (first !== undefined && view?.active === moreIdOf(parent)) {
+            this.select(first);
         }
     }
 
     /* Makes a row the active one and shows the code of its call. */
     select(id: string, site = 0): void {
-        const view = this.language.popups.getState().callHierarchy;
+        const view = this.language.popups.getState().callHierarchy ?? null;
         const node = this.nodes.get(id);
         if (view === null || !view.rows.some((row) => row.id === id)) {
             return;
         }
         const sites = node?.sites.length ?? view.sites;
         const next = node === undefined ? view.site : Math.max(0, Math.min(Math.max(0, sites - 1), site));
-        this.language.popups.setState({ callHierarchy: { ...view, active: id, site: next, sites, preview: view.preview } });
+        this.language.popups.setState({ callHierarchy: { ...view, active: id, site: next, sites, preview: node === undefined ? view.preview : null } });
         if (node !== undefined) {
             void this.preview(node, next);
         }
@@ -202,7 +221,7 @@ export class CallHierarchyFeature {
 
     /* Steps through the places a call is made from when the active one has more than one. */
     stepSite(direction: 1 | -1): void {
-        const view = this.language.popups.getState().callHierarchy;
+        const view = this.language.popups.getState().callHierarchy ?? null;
         if (view !== null && view.sites > 1) {
             this.select(view.active, (view.site + direction + view.sites) % view.sites);
         }
@@ -210,7 +229,7 @@ export class CallHierarchyFeature {
 
     /* Goes to the call of a row, or to the symbol of a root, and closes the tree. */
     go(id: string): void {
-        const view = this.language.popups.getState().callHierarchy;
+        const view = this.language.popups.getState().callHierarchy ?? null;
         const node = this.nodes.get(id);
         if (view === null || node === undefined) {
             return;
@@ -237,7 +256,7 @@ export class CallHierarchyFeature {
     }
 
     private mounted(container: HTMLElement): void {
-        const view = this.language.popups.getState().callHierarchy;
+        const view = this.language.popups.getState().callHierarchy ?? null;
         if (view !== null && view.container !== container) {
             this.language.popups.setState({ callHierarchy: { ...view, container } });
         }
@@ -245,7 +264,7 @@ export class CallHierarchyFeature {
 
     private patch(id: string, change: Partial<CallNode>): void {
         const node = this.nodes.get(id);
-        const view = this.language.popups.getState().callHierarchy;
+        const view = this.language.popups.getState().callHierarchy ?? null;
         if (node === undefined || view === null) {
             return;
         }
@@ -293,7 +312,12 @@ export class CallHierarchyFeature {
         const { uri, range } = targetOf(node, site);
         let text = this.texts.get(uri);
         if (text === undefined) {
-            text = (await project.readText(uri)) ?? undefined;
+            try {
+                text = (await project.readText(uri)) ?? undefined;
+            } catch {
+                // A file that cannot be read shows no code, as one that is no text file does.
+                text = undefined;
+            }
             if (epoch !== this.previewEpoch) {
                 return;
             }
@@ -301,7 +325,7 @@ export class CallHierarchyFeature {
                 this.texts.set(uri, text);
             }
         }
-        const view = this.language.popups.getState().callHierarchy;
+        const view = this.language.popups.getState().callHierarchy ?? null;
         if (view === null || view.active !== node.id) {
             return;
         }
@@ -309,7 +333,14 @@ export class CallHierarchyFeature {
         this.language.popups.setState({ callHierarchy: { ...view, preview: snippet === null ? null : { ...snippet, uri } } });
     }
 
+    /* Whether a row stands under a node; the `more` and `status` rows belong to the node they are about. */
     private hasAncestor(id: string, ancestor: string): boolean {
+        const owner = [moreIdOf(''), statusIdOf('')]
+            .map((suffix) => (id.endsWith(suffix) ? id.slice(0, -suffix.length) : null))
+            .find((found) => found !== null);
+        if (owner !== undefined && owner !== null) {
+            return owner === ancestor || this.hasAncestor(owner, ancestor);
+        }
         for (let node = this.nodes.get(id); node !== undefined && node.parent !== null; node = this.nodes.get(node.parent)) {
             if (node.parent === ancestor) {
                 return true;
@@ -319,8 +350,8 @@ export class CallHierarchyFeature {
     }
 
     private key(event: KeyboardEvent): boolean {
-        const view = this.language.popups.getState().callHierarchy;
-        if (view === null || event.metaKey || event.ctrlKey || event.altKey || event.isComposing) {
+        const view = this.language.popups.getState().callHierarchy ?? null;
+        if (view === null || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.isComposing) {
             return false;
         }
         const steps = stepsOf(view.rows);
@@ -389,7 +420,7 @@ export class CallHierarchyFeature {
             this.toggle(row.id);
             return;
         }
-        const parent = row.kind === 'more' ? row.parent : (this.nodes.get(row.id)?.parent ?? null);
+        const parent = row.kind === 'node' ? (this.nodes.get(row.id)?.parent ?? null) : row.parent;
         if (parent !== null) {
             this.select(parent);
         }

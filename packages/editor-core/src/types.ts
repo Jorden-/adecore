@@ -49,6 +49,8 @@ export interface EditorSnapshot {
     /* The same change in order, as a sequence a language server can follow; present when the text changed. */
     contentEdits?: readonly ContentEdit[];
     source?: ChangeSource;
+    /* The edit is what a person's typing did, a line break from Enter included, though it ran as a command. */
+    typed?: boolean;
 }
 
 export interface EditOptions {
@@ -57,6 +59,10 @@ export interface EditOptions {
     source?: ChangeSource;
     /* Edits with the same group join one undo step until a selection change or an undo closes it. */
     historyGroup?: string;
+    /* Joins the undo step before it when the document is exactly as that step left it, so one undo takes both back. */
+    joinPrevious?: boolean;
+    /* Reported on the snapshot: the edit is what a person's typing did, though it ran as a command. */
+    typed?: boolean;
 }
 
 export type EditorCommand =
