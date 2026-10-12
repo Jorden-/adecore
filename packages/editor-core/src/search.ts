@@ -1,3 +1,4 @@
+import { clampInteger } from './rope.ts';
 import { replaceWithCaseRespect } from './preserve-case.ts';
 
 export interface FindOptions {
@@ -40,8 +41,13 @@ function characterBefore(text: string, offset: number): string {
 
 /* Invalid bounds throw `RangeError`, an invalid expression `SyntaxError`. A zero-width match advances by one code point. */
 export function findMatches(text: string, query: string, revision: number, options: FindOptions = {}): FindMatch[] {
+    return Array.from(iterateMatches(text, query, revision, options));
+}
+
+/* Validation and regex execution start when the iterator advances. */
+export function* iterateMatches(text: string, query: string, revision: number, options: FindOptions = {}): Generator<FindMatch, void, unknown> {
     if (!query && !options.regex) {
-        return [];
+        return;
     }
     const from = options.from ?? 0;
     const to = options.to ?? text.length;
@@ -55,8 +61,8 @@ export function findMatches(text: string, query: string, revision: number, optio
     const source = options.regex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const expression = new RegExp(source, `gmu${options.caseSensitive ? '' : 'i'}`);
     expression.lastIndex = from;
-    const matches: FindMatch[] = [];
-    while (matches.length < maximum) {
+    let count = 0;
+    while (count < maximum) {
         const match = expression.exec(text);
         if (!match || match.index > to) {
             break;
@@ -66,7 +72,8 @@ export function findMatches(text: string, query: string, revision: number, optio
             !options.wholeWord ||
             (!wordCharacter.test(characterBefore(text, match.index)) && !wordCharacter.test(String.fromCodePoint(text.codePointAt(end) ?? 0)));
         if (match.index >= from && end <= to && !splitsSurrogate(text, match.index) && !splitsSurrogate(text, end) && wholeWord) {
-            matches.push({
+            count++;
+            yield {
                 from: match.index,
                 to: end,
                 text: match[0],
@@ -74,13 +81,35 @@ export function findMatches(text: string, query: string, revision: number, optio
                 groups: match.groups ? { ...match.groups } : undefined,
                 regex: options.regex === true,
                 revision
-            });
+            };
         }
         if (!match[0].length) {
             expression.lastIndex = match.index + ((text.codePointAt(match.index) ?? 0) > 0xffff ? 2 : 1);
         }
     }
-    return matches;
+}
+
+/* Keeps the original match grid; starting RegExp at the caret would create overlapping matches. */
+export function findMatchFrom(text: string, query: string, revision: number, offset: number, options: FindNextOptions = {}): FindMatch | null {
+    const position = clampInteger(offset, text.length);
+    let first: FindMatch | null = null;
+    let last: FindMatch | null = null;
+    let previous: FindMatch | null = null;
+    for (const match of iterateMatches(text, query, revision, options)) {
+        first ??= match;
+        last = match;
+        if (!options.backwards && match.from >= position) {
+            return match;
+        }
+        if (options.backwards) {
+            if (match.to <= position) {
+                previous = match;
+            } else if (previous !== null || options.wrap === false) {
+                return previous;
+            }
+        }
+    }
+    return options.backwards ? (previous ?? (options.wrap === false ? null : last)) : options.wrap === false ? null : first;
 }
 
 /* Expands the JavaScript `$` patterns of a regex replacement, and gives it the case of the match when asked. Literal replacements are returned as they are. */

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { DocumentModel } from '@adecore/editor-core';
+import { DocumentModel, iterateMatches, findMatchFrom } from '@adecore/editor-core';
 import { createSmartEditorEngine } from '@adecore/editor';
 import { FakeEditorEngine } from '@adecore/editor/fake';
 import { resolveKeymap, chordOf } from '@adecore/editor/keymap';
@@ -22,6 +22,14 @@ assert.equal(model.replaceMatches(model.find('before'), 'after'), 1);
 assert.equal(model.getText(), 'after');
 assert.equal(model.undo(), true);
 assert.equal(model.getText(), 'before');
+assert.deepEqual(
+    [...iterateMatches('aaaa', 'aa', 0)].map(({ from, to }) => [from, to]),
+    [
+        [0, 2],
+        [2, 4]
+    ]
+);
+assert.equal(findMatchFrom('aaaa', 'aa', 0, 1).from, 2);
 assert.equal(typeof createSmartEditorEngine, 'function');
 assert.equal(typeof shikiTokenizers, 'function');
 assert.equal(typeof createSearchClient, 'function');

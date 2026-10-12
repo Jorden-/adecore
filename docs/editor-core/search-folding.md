@@ -4,13 +4,17 @@
 
 `find(query, options?)` returns every `FindMatch` in the document: `from`, `to`, `text`, the regular expression's `captures` and named `groups`, and the `revision` it was found in. `findNext(query, from?, options?)` returns the first match at or after `from`, the primary caret by default, and wraps around unless `wrap` is `false`; `backwards: true` searches the other way.
 
-| `FindOptions`   | Default | Meaning                                                                     |
-| --------------- | ------- | --------------------------------------------------------------------------- |
-| `caseSensitive` | `false` |                                                                             |
-| `wholeWord`     | `false` | A match may not touch a letter, digit, `_` or `$` on either side                 |
+| `FindOptions`   | Default | Meaning                                                                      |
+| --------------- | ------- | ---------------------------------------------------------------------------- |
+| `caseSensitive` | `false` |                                                                              |
+| `wholeWord`     | `false` | A match may not touch a letter, digit, `_` or `$` on either side             |
 | `regex`         | `false` | The query is a JavaScript regular expression, run with the `m` and `u` flags |
-| `from`, `to`    | whole   | Keep only matches inside these offsets; the expression still sees the rest |
-| `maxResults`    | none    | Stop after this many                                                        |
+| `from`, `to`    | whole   | Keep only matches inside these offsets; the expression still sees the rest   |
+| `maxResults`    | none    | Stop after this many                                                         |
+
+`iterateMatches(text, query, revision, options?)` yields the same results one at a time, including captures and groups. Validation and regex execution begin on the first advance; stopping iteration releases the remaining scan without collecting an array. `findMatches` eagerly collects this iterator and keeps its existing exceptions and result shape.
+
+`findMatchFrom(text, query, revision, offset, options?)` is the standalone form of `findNext`, retaining only a few matches. It clamps `offset` into the text, scans from the query's original bounds and respects `maxResults`, `backwards` and `wrap`. Searching `aa` in `aaaa` from offset 1 returns `[2, 4]`, not a new overlapping `[1, 3]` match. Backward search stops once the preceding result is known; wrapping without a preceding result scans to the end while keeping only the last result. `DocumentModel.findNext` uses this helper.
 
 An empty plain query finds nothing. Bounds outside the document throw a `RangeError` and an invalid expression a `SyntaxError`. A regular expression has no time limit.
 
@@ -33,17 +37,17 @@ With a regular expression the replacement expands `$1`, `$<name>`, `$&` and the 
 
 `getFoldingRanges(options?)` reads the folds of the document. Without options it returns bracket pairs and block comments that span more than one line. Pass a `language` for the rest:
 
-| `kind`          | What folds                                                         | Needs              |
-| --------------- | ------------------------------------------------------------------ | ------------------ |
-| `bracket`       | A `{}`, `[]` or `()` pair over several lines                       |                    |
-| `comment`       | A block comment                                                    |                    |
-| `indentation`   | Lines indented deeper than the one above them                      | `indentation: true` |
-| `imports`       | A run of import lines                                              | a language         |
-| `line-comments` | A run of line comments                                             | a language         |
-| `region`        | What stands between `// region` and `// endregion` markers         | a language         |
-| `block`         | A Markdown front matter, code fence or table, a PHP heredoc or `<?php ?>` block | a language |
-| `section`       | What a Markdown heading holds                                      | a language         |
-| `server`        | A range a language server named that the text has no fold for      | `hints`            |
+| `kind`          | What folds                                                                      | Needs               |
+| --------------- | ------------------------------------------------------------------------------- | ------------------- |
+| `bracket`       | A `{}`, `[]` or `()` pair over several lines                                    |                     |
+| `comment`       | A block comment                                                                 |                     |
+| `indentation`   | Lines indented deeper than the one above them                                   | `indentation: true` |
+| `imports`       | A run of import lines                                                           | a language          |
+| `line-comments` | A run of line comments                                                          | a language          |
+| `region`        | What stands between `// region` and `// endregion` markers                      | a language          |
+| `block`         | A Markdown front matter, code fence or table, a PHP heredoc or `<?php ?>` block | a language          |
+| `section`       | What a Markdown heading holds                                                   | a language          |
+| `server`        | A range a language server named that the text has no fold for                   | `hints`             |
 
 `brackets`, `comments`, `imports`, `regions` and `lineComments` turn one kind off with `false`. `minLines`, `1` by default, is how many lines past its first a range spans before it folds. Lines are zero-based and inclusive; `from` and `to` are the offsets of the folded stretch.
 

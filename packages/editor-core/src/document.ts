@@ -18,7 +18,7 @@ import type { BracketIndex } from './brackets.ts';
 import { hasSmartSemicolon, isPhp } from './lexical.ts';
 import { clampInteger, TextRope } from './rope.ts';
 import type { DocumentLine } from './rope.ts';
-import { findMatches, replacementText, splitsSurrogate } from './search.ts';
+import { findMatches, findMatchFrom, replacementText, splitsSurrogate } from './search.ts';
 import type { FindMatch, FindNextOptions, FindOptions } from './search.ts';
 import { dedupeFoldingRanges, deriveFoldingRanges, indentationColumn, scanStructure, tabWidth } from './structure.ts';
 import type { FoldingOptions, FoldingRange, StructureRange } from './structure.ts';
@@ -576,11 +576,7 @@ export class DocumentModel {
 
     /* Includes a match that starts at `from`, or ends there when searching backwards. */
     findNext(query: string, from = this.selections.at(-1)!.head, options: FindNextOptions = {}): FindMatch | null {
-        const matches = this.find(query, options);
-        const offset = clampInteger(from, this.rope.length);
-        const ordered = options.backwards ? matches.reverse() : matches;
-        const found = ordered.find((match) => (options.backwards ? match.to <= offset : match.from >= offset));
-        return found ?? (options.wrap === false ? null : (ordered[0] ?? null));
+        return findMatchFrom(this.getText(), query, this.revision, from, options);
     }
 
     /* Refuses a match from an earlier revision, or one whose text no longer sits there. */

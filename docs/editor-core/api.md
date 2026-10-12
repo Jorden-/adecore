@@ -45,6 +45,10 @@ scanBrackets('call(items[0]').pairs; // Map { 10 => 12, 12 => 10 }
 
 `isWordBoundary(text, offset, camel, isStart)` says whether a word starts or ends at an offset, where a run of punctuation counts as a word. `isHumpBoundary(text, offset, isStart)` says whether the offset splits a camel hump, a digit run or an underscore from the word around it. `wordBoundary(text, offset, direction, camel?)` returns the next stop in a direction, never inside a surrogate pair or between `\r` and `\n`. `text` is a string or any `WordText`: an object with `length` and `charAt`.
 
+## Search helpers
+
+`findMatches`, `iterateMatches`, `findMatchFrom` and `replacementText` work with an immutable string and revision instead of a model. See [Search and folding](/editor-core/search-folding) for iteration, direction and replacement semantics.
+
 ## Other helpers
 
 - `replaceWithCaseRespect(replacement, found)` gives `replacement` the case of `found`: `'bar'` for `'FOO'` becomes `'BAR'`.
@@ -52,12 +56,12 @@ scanBrackets('call(items[0]').pairs; // Map { 10 => 12, 12 => 10 }
 
 ## Types
 
-| Type                                                                         | What it is                                                                 |
-| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `Selection`, `TextEdit`, `Position`, `OffsetRange`, `DocumentLine`           | Offsets, ranges and lines; see [Coordinates](/editor-core/#coordinates)    |
-| `EditOptions`, `DocumentEditOptions`, `ChangeSource`                         | Options of `applyEdits`                                                    |
-| `EditorSnapshot`, `DocumentChange`, `ContentEdit`, `Disposable`              | What `subscribe` hands out                                                 |
-| `EditorCommand`, `CommandOptions`, `TypeTextOptions`                         | Commands and their options                                                 |
-| `FindOptions`, `FindNextOptions`, `FindMatch`, `ReplaceOptions`, `ReplaceAllOptions` | Search                                                             |
-| `FoldingOptions`, `FoldingRange`, `FoldRole`, `FoldHints`, `FoldSymbolHint`, `FoldRangeHint` | Folding                                                    |
-| `TextSpan`, `BracketIndex`, `WordText`                                       | Helper results and inputs                                                  |
+| Type                                                                                         | What it is                                                              |
+| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `Selection`, `TextEdit`, `Position`, `OffsetRange`, `DocumentLine`                           | Offsets, ranges and lines; see [Coordinates](/editor-core/#coordinates) |
+| `EditOptions`, `DocumentEditOptions`, `ChangeSource`                                         | Options of `applyEdits`                                                 |
+| `EditorSnapshot`, `DocumentChange`, `ContentEdit`, `Disposable`                              | What `subscribe` hands out                                              |
+| `EditorCommand`, `CommandOptions`, `TypeTextOptions`                                         | Commands and their options                                              |
+| `FindOptions`, `FindNextOptions`, `FindMatch`, `ReplaceOptions`, `ReplaceAllOptions`         | Search                                                                  |
+| `FoldingOptions`, `FoldingRange`, `FoldRole`, `FoldHints`, `FoldSymbolHint`, `FoldRangeHint` | Folding                                                                 |
+| `TextSpan`, `BracketIndex`, `WordText`                                                       | Helper results and inputs                                               |
