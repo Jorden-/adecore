@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import type { WorkerRequestPort } from '@adecore/editor/worker-client';
-import { SnippetTransforms } from './snippet-transform-queue.ts';
+import { acquireSnippetTransforms, SnippetTransformQueueError, SnippetTransforms } from './snippet-transform-queue.ts';
 import { ManualTimers } from './timers.ts';
 import type { SnippetTransformInput, SnippetTransformOutput } from './snippet-transform-protocol.ts';
 const settle = async (): Promise<void> => {
@@ -134,7 +134,48 @@ test('the queued work and total input budgets refuse before starting a worker', 
     expect(await lease.request(values).catch((error) => error)).toMatchObject({ kind: 'range' });
     expect(host.workers).toHaveLength(0);
     const waiting = Array.from({ length: 16 }, () => lease.request(job('a'), { kind: 'exit' }).catch((error) => error));
-    expect(await lease.request(job('overflow'), { kind: 'exit' }).catch((error) => error)).toMatchObject({ kind: 'range' });
+    expect(await lease.request(job('overflow'), { kind: 'exit' }).catch((error) => error)).toBeInstanceOf(SnippetTransformQueueError);
     host.queue.dispose();
     await Promise.all(waiting);
+});
+
+test('a project queue keeps its first clock while another editor retains the lease', async () => {
+    const { ProjectLanguage } = await import('./project-language.ts');
+    const { FakeLanguageService } = await import('./testing.ts');
+    const a = new ManualTimers(),
+        b = new ManualTimers(),
+        port = new Port();
+    const project = new ProjectLanguage(new FakeLanguageService(), { snippetTransformWorker: () => port });
+    const first = acquireSnippetTransforms(project, a)!,
+        second = acquireSnippetTransforms(project, b)!;
+    first.dispose();
+    const pending = second.request(job('a'));
+    await settle();
+    port.answer('A');
+    await pending;
+    await settle();
+    b.advance(1000);
+    expect(port.stops).toBe(0);
+    a.advance(1000);
+    expect(port.stops).toBe(1);
+    second.dispose();
+    project.dispose();
+});
+
+test('disposing the active exit owner lets another editor continue on a new worker', async () => {
+    const host = setup(),
+        first = host.queue.acquire(),
+        second = host.queue.acquire();
+    const a = first.request(job('a'), { kind: 'exit' }).catch((error) => error);
+    await settle();
+    const b = second.request(job('b'));
+    first.dispose();
+    expect(await a).toMatchObject({ kind: 'disposed' });
+    await settle();
+    expect(host.workers[0]!.stops).toBe(1);
+    expect(host.workers).toHaveLength(2);
+    host.workers[0]!.answer('late');
+    host.workers[1]!.answer('B');
+    expect(await b).toEqual(['B']);
+    second.dispose();
 });

@@ -21,6 +21,8 @@ interface Job {
     readonly resolve: (values: readonly string[]) => void;
     readonly reject: (error: unknown) => void;
 }
+export class SnippetTransformQueueError extends Error {}
+
 const IDLE_RELEASE_MS = 1000;
 const MAX_PENDING = 16;
 
@@ -80,7 +82,7 @@ export class SnippetTransforms {
             });
         }
         if (this.pending.length >= MAX_PENDING) {
-            return Promise.reject(new SnippetTransformError('range', 'Too many queued snippet transforms.'));
+            return Promise.reject(new SnippetTransformQueueError('Too many queued snippet transforms.'));
         }
         this.timers.clear(this.idle);
         return new Promise((resolve, reject) => {

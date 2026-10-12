@@ -1,3 +1,4 @@
+import { SnippetTransformQueueError } from './snippet-transform-queue.ts';
 import { SnippetTransformError } from './snippet-transform-client.ts';
 import { MAX_TRANSFORM_JOBS, MAX_TRANSFORM_WORK, type SnippetTransformJob } from './snippet-transform-protocol.ts';
 import { fileUriToPath, StaleResultError, type CompletionContext, type CompletionItem } from '@adecore/lsp';
@@ -44,6 +45,32 @@ const MAX_COMPLETION_CHARACTERS = 2_000_000;
 const MAX_COMPLETION_RANGES = 1_000;
 
 class CompletionLimitError extends Error {}
+
+function mapCompletionEdits(item: CompletionItem, changes: readonly EditorContentChange[]): CompletionItem | null {
+    let valid = true;
+    const map = (range: EditorRange): EditorRange => {
+        let { start, end } = range;
+        for (const change of changes) {
+            if (comparePositions(start, change.range.end) < 0 && comparePositions(change.range.start, end) < 0) {
+                valid = false;
+            }
+            start = shiftPosition(start, change);
+            end = shiftPosition(end, change);
+        }
+        return { start, end };
+    };
+    const edit = item.textEdit;
+    const mapped = {
+        ...item,
+        ...(edit === undefined
+            ? {}
+            : { textEdit: 'range' in edit ? { ...edit, range: map(edit.range) } : { ...edit, insert: map(edit.insert), replace: map(edit.replace) } }),
+        ...(item.additionalTextEdits === undefined
+            ? {}
+            : { additionalTextEdits: item.additionalTextEdits.map((edit) => ({ ...edit, range: map(edit.range) })) })
+    };
+    return valid ? mapped : null;
+}
 
 /*
  * The suggestions that open while a word is typed. A single typed identifier character or a trigger
@@ -130,6 +157,18 @@ export class CompletionFeature {
         const acceptSequence = ++this.acceptSequence;
         const snippetToken = snippets.token;
         const inSnippet = snippets.isActive;
+        const exitChanges: (readonly EditorContentChange[])[] = [];
+        if (snippets.hasPendingTransforms) {
+            this.close();
+            if (
+                !(await snippets.settleTransforms(
+                    () => !this.disposed && acceptSequence === this.acceptSequence && snippets.token === snippetToken,
+                    (changes) => exitChanges.push(changes)
+                ))
+            ) {
+                return;
+            }
+        }
         const acceptedSelections = editor.getSelections();
         const revision = this.textRevision;
         const current = (): boolean => {
@@ -156,6 +195,13 @@ export class CompletionFeature {
         }
         if (!current()) {
             return;
+        }
+        for (const changes of exitChanges) {
+            const mapped = mapCompletionEdits(item, changes);
+            if (mapped === null) {
+                return;
+            }
+            item = mapped;
         }
         const caret = editor.getCaret();
         const lineBefore = textBeforeOf(editor, caret);
@@ -341,7 +387,9 @@ export class CompletionFeature {
             if (!current()) {
                 return;
             }
-            if (error instanceof CompletionLimitError || (error instanceof SnippetTransformError && error.kind === 'range')) {
+            if (error instanceof SnippetTransformQueueError) {
+                project.host.notify?.({ id: TOAST_ID, kind: 'error', title: project.i18n.t('editor:language.completion.transformBusy') });
+            } else if (error instanceof CompletionLimitError || (error instanceof SnippetTransformError && error.kind === 'range')) {
                 this.refuseLargeCompletion();
             } else if (error instanceof SnippetTransformError) {
                 project.host.notify?.({ id: TOAST_ID, kind: 'error', title: project.i18n.t('editor:language.completion.transformFailed') });

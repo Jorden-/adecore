@@ -135,6 +135,7 @@
             "replace": "Replace",
             "details": "Details",
             "none": "No suggestions",
+            "transformBusy": "Snippet transforms are busy; try again",
             "transformFailed": "Snippet transform could not be applied"
         },
         "history": {

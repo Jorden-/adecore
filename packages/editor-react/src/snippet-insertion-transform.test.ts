@@ -244,3 +244,31 @@ test('editors of one project share the client and closing one preserves the othe
     language.dispose();
     expect(mounted.port.stops).toBe(1);
 });
+
+test('a worker crash after ready refuses insertion and reports failure', async () => {
+    const mounted = await mount('${TM_FILENAME/(.*)/$1/}$1');
+    const pending = mounted.accept();
+    await settle();
+    mounted.port.events.dispatchEvent(Object.assign(new Event('message'), { data: { type: 'ready' } }));
+    mounted.port.fail();
+    await pending;
+    expect(mounted.editor.getText()).toBe('fo');
+    expect(mounted.notices).toEqual(['Snippet transform could not be applied']);
+});
+
+test('a full project queue reports busy separately from completion size', async () => {
+    const { acquireSnippetTransforms } = await import('./snippet-transform-queue.ts');
+    const mounted = await mount('${TM_FILENAME/(.*)/$1/}$1');
+    const lease = acquireSnippetTransforms(mounted.project, mounted.timers)!;
+    const job = [{ value: 'a', pattern: '(.*)', flags: '', format: [{ kind: 'capture' as const, index: 1 }] }];
+    const pending = [lease.request(job, { kind: 'exit' }).catch((error) => error)];
+    await settle();
+    for (let index = 0; index < 16; index++) {
+        pending.push(lease.request(job, { kind: 'exit' }).catch((error) => error));
+    }
+    await mounted.accept();
+    expect(mounted.editor.getText()).toBe('fo');
+    expect(mounted.notices).toEqual(['Snippet transforms are busy; try again']);
+    lease.dispose();
+    await Promise.all(pending);
+});

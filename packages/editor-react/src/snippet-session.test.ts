@@ -1,6 +1,7 @@
 import './test-setup.ts';
 import { afterEach, expect, test } from 'bun:test';
 import { mountEditor } from '@adecore/editor/testing';
+import { FakeEditorEngine } from '@adecore/editor/fake';
 import { EditorLanguage } from './editor-language.ts';
 import { ProjectLanguage } from './project-language.ts';
 import { FakeLanguageService, ManualTimers } from './testing.ts';
@@ -744,4 +745,18 @@ test('a touching parent does not consume the next occurrences indentation', asyn
     mounted.type('x');
     expect(mounted.editor.getSelections()).toHaveLength(2);
     expect(mounted.editor.getText()).toBe('  x  x  ');
+});
+
+test('snippet tracking metadata stays out of the public editor selections', () => {
+    const editor = new FakeEditorEngine().mount({} as HTMLElement, { text: 'foo foo z', theme: 'light' });
+    const feature = new SnippetFeature({ editor, onDispose: (dispose) => cleanup.push(dispose) });
+    cleanup.push(() => editor.dispose());
+    const parsed = parseSnippet('${1:foo} ${1/(.*)/$1/} ${2:z}$0');
+    feature.begin({ line: 0, character: 0 }, parsed.text, tabOrder(parsed), parsed.fields);
+    expect(editor.getSelections()).toEqual([
+        { start: { line: 0, character: 4 }, end: { line: 0, character: 7 } },
+        { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } }
+    ]);
+    editor.press({ key: 'Tab' });
+    expect(editor.getSelection()).toEqual({ start: { line: 0, character: 8 }, end: { line: 0, character: 9 } });
 });

@@ -135,6 +135,7 @@
             "replace": "Vervangen",
             "details": "Details",
             "none": "Geen suggesties",
+            "transformBusy": "Snippettransformaties zijn bezig; probeer het opnieuw",
             "transformFailed": "Snippettransformatie kon niet worden toegepast"
         },
         "history": {
