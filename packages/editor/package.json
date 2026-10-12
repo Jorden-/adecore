@@ -41,6 +41,11 @@
             "source": "./src/search-worker.ts",
             "types": "./dist/search-worker.d.ts",
             "default": "./dist/search-worker.js"
+        },
+        "./worker-client": {
+            "source": "./src/worker-client.ts",
+            "types": "./dist/worker-client.d.ts",
+            "default": "./dist/worker-client.js"
         }
     },
     "scripts": {

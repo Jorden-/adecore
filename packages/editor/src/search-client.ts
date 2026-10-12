@@ -1,3 +1,4 @@
+import { createWorkerRequestClient, WorkerRequestError } from './worker-client.ts';
 import type { FindMatch } from '@adecore/editor-core';
 import type { EditorFindQuery } from './types.ts';
 import {
@@ -57,15 +58,6 @@ export interface EditorSearchClient {
 
 type SearchReply = Exclude<EditorSearchOutput, { type: 'ready' | 'error' }>;
 
-interface Request {
-    readonly deadline: number;
-    readonly message: EditorSearchInput;
-    readonly resolve: (result: SearchReply) => void;
-    readonly reject: (error: EditorSearchError) => void;
-}
-
-type SearchWorker = ReturnType<EditorSearchClientOptions['workerFactory']>;
-
 function validateSearch(snapshot: EditorSearchSnapshot, query: EditorFindQuery, options: EditorSearchOptions): void {
     const from = options.from ?? 0;
     const to = options.to ?? snapshot.text.length;
@@ -103,142 +95,25 @@ function splitsSurrogate(text: string, offset: number): boolean {
     return previous >= 0xd800 && previous <= 0xdbff && current >= 0xdc00 && current <= 0xdfff;
 }
 
-function scheduleTimer(callback: () => void, delay: number): () => void {
-    const timer = setTimeout(callback, delay);
-    return () => clearTimeout(timer);
-}
-
 export function createSearchClient(options: EditorSearchClientOptions): EditorSearchClient {
-    const deadline = options.deadline ?? 1500;
-    if (!Number.isFinite(deadline) || deadline <= 0 || deadline > 2147483647) {
-        throw new RangeError('The search deadline must be a positive duration that fits a browser timer.');
-    }
-    const schedule = options.schedule ?? scheduleTimer;
-    let worker: SearchWorker | undefined;
-    let detach: (() => void) | undefined;
     let revision: number | undefined;
-    let cancelTimer: (() => void) | undefined;
-    let active: Request | undefined;
-    let pending: Request | undefined;
-    let nextId = 0;
-    let disposed = false;
-    let unavailable: EditorSearchError | undefined;
-
-    const stopWorker = (): void => {
-        cancelTimer?.();
-        cancelTimer = undefined;
-        detach?.();
-        detach = undefined;
-        const previous = worker;
-        worker = undefined;
-        revision = undefined;
-        previous?.terminate();
-    };
-    const fail = (request: Request, error: EditorSearchError, restart = true): void => {
-        if (active !== request) {
-            return;
-        }
-        active = undefined;
-        if (restart) {
-            stopWorker();
-        } else {
-            cancelTimer?.();
-            cancelTimer = undefined;
-        }
-        request.reject(error);
-    };
-    const startWorker = (): SearchWorker => {
-        if (worker !== undefined) {
-            return worker;
-        }
-        let created: SearchWorker;
-        try {
-            created = options.workerFactory();
-        } catch (error) {
-            unavailable = new EditorSearchError('unavailable', error instanceof Error ? error.message : String(error));
-            throw unavailable;
-        }
-        worker = created;
-        let received = false;
-        const onMessage = (event: Event): void => {
-            const result = (event as MessageEvent<EditorSearchOutput>).data;
-            if (worker !== created) {
-                return;
-            }
-            received = true;
-            if (result.type === 'ready') {
-                return;
-            }
-            const request = active;
-            if (worker !== created || request === undefined || request.message.id !== result.id || request.message.revision !== result.revision) {
-                return;
-            }
-            if (result.type === 'error') {
-                fail(request, new EditorSearchError(result.kind, result.message), result.kind !== 'syntax' && result.kind !== 'range');
-                return;
-            }
-            active = undefined;
-            cancelTimer?.();
-            cancelTimer = undefined;
-            request.resolve(result);
-        };
-        const onError = (event: Event): void => {
-            if (worker !== created) {
-                return;
-            }
-            const error = new EditorSearchError(received ? 'error' : 'unavailable', (event as ErrorEvent).message || 'The search worker failed.');
-            if (!received) {
-                unavailable = error;
-            }
-            if (active !== undefined) {
-                fail(active, error);
-            } else if (worker === created) {
-                stopWorker();
-            }
-        };
-        const onMessageError = (): void => {
-            if (worker === created && active !== undefined) {
-                fail(active, new EditorSearchError('error', 'The search worker response could not be decoded.'));
-            } else if (worker === created) {
-                stopWorker();
-            }
-        };
-        detach = () => {
-            created.removeEventListener('message', onMessage);
-            created.removeEventListener('error', onError);
-            created.removeEventListener('messageerror', onMessageError);
-        };
-        created.addEventListener('message', onMessage);
-        created.addEventListener('error', onError);
-        created.addEventListener('messageerror', onMessageError);
-        return created;
-    };
-    const pump = (): void => {
-        const request = pending;
-        if (disposed || request === undefined) {
-            return;
-        }
-        pending = undefined;
-        active = request;
-        try {
-            const target = startWorker();
-            cancelTimer = schedule(() => fail(request, new EditorSearchError('timeout', 'The search exceeded its time limit.')), request.deadline);
-            const { text, ...input } = request.message;
-            const message: EditorSearchInput = { ...input, ...(revision !== input.revision ? { text } : {}) };
+    const transport = createWorkerRequestClient<EditorSearchInput, Exclude<EditorSearchOutput, { type: 'ready' }>>({
+        ...options,
+        accepts: (reply, input) => reply.revision === input.revision,
+        failure: (reply) =>
+            reply.type === 'error'
+                ? { error: new EditorSearchError(reply.kind, reply.message), restart: reply.kind !== 'syntax' && reply.kind !== 'range' }
+                : undefined,
+        prepare: (input) => {
+            const { text, ...rest } = input;
+            const message = { ...rest, ...(revision !== input.revision ? { text } : {}) };
             revision = input.revision;
-            target.postMessage(message);
-        } catch (error) {
-            fail(request, error instanceof EditorSearchError ? error : new EditorSearchError('error', error instanceof Error ? error.message : String(error)));
+            return message;
+        },
+        stopped: () => {
+            revision = undefined;
         }
-    };
-    const cancel = (kind: 'superseded' | 'disposed'): void => {
-        const error = new EditorSearchError(kind, kind === 'disposed' ? 'The search client was disposed.' : 'A newer search superseded this request.');
-        pending?.reject(error);
-        pending = undefined;
-        if (active !== undefined) {
-            fail(active, error);
-        }
-    };
+    });
     const run = <Result>(
         snapshot: EditorSearchSnapshot,
         query: EditorFindQuery,
@@ -247,37 +122,24 @@ export function createSearchClient(options: EditorSearchClientOptions): EditorSe
         read: (reply: SearchReply) => Result,
         validate?: () => void
     ): Promise<Result> => {
-        if (disposed) {
-            return Promise.reject(new EditorSearchError('disposed', 'The search client was disposed.'));
-        }
-        if (unavailable !== undefined) {
-            return Promise.reject(unavailable);
-        }
-        cancel('superseded');
-        try {
-            validateSearch(snapshot, query, bounds);
-            validate?.();
-        } catch (error) {
-            return Promise.reject(error);
-        }
-        return new Promise((resolve, reject) => {
-            pending = {
-                message: input(++nextId),
-                deadline: bounds.deadline ?? deadline,
-                reject,
-                resolve(reply) {
-                    try {
-                        resolve(read(reply));
-                    } catch (error) {
-                        reject(
-                            error instanceof EditorSearchError ? error : new EditorSearchError('error', error instanceof Error ? error.message : String(error))
-                        );
-                    }
+        return transport
+            .request(input, bounds.deadline, () => {
+                validateSearch(snapshot, query, bounds);
+                validate?.();
+            })
+            .then((reply) => {
+                if (reply.type === 'error') {
+                    throw new EditorSearchError(reply.kind, reply.message);
                 }
-            };
-            // A burst before the next microtask starts only its newest request.
-            queueMicrotask(pump);
-        });
+                return read(reply);
+            })
+            .catch((error) => {
+                throw error instanceof WorkerRequestError
+                    ? new EditorSearchError(error.kind, error.message)
+                    : error instanceof EditorSearchError
+                      ? error
+                      : new EditorSearchError('error', error instanceof Error ? error.message : String(error));
+            });
     };
     return {
         search(snapshot, query, bounds = {}) {
@@ -432,16 +294,13 @@ export function createSearchClient(options: EditorSearchClientOptions): EditorSe
             );
         },
         cancel() {
-            cancel('superseded');
+            transport.cancel();
         },
         release() {
-            cancel('superseded');
-            stopWorker();
+            transport.release();
         },
         dispose() {
-            disposed = true;
-            cancel('disposed');
-            stopWorker();
+            transport.dispose();
         }
     };
 }
