@@ -760,3 +760,15 @@ test('snippet tracking metadata stays out of the public editor selections', () =
     editor.press({ key: 'Tab' });
     expect(editor.getSelection()).toEqual({ start: { line: 0, character: 8 }, end: { line: 0, character: 9 } });
 });
+
+test('announces the field a snippet moves to, with the count of a choice list', async () => {
+    const { editor, language, page, press } = await languageSnippet('${1|a,b,c|} ${2:end} $0');
+    const live = (): string | null => page.host.querySelector('.se-live')!.textContent;
+    expect(live()).toBe('Field 1 of 2, 3 choices');
+    press('Tab');
+    expect(live()).toBe('Field 2 of 2');
+    expect(editor.textInRange(editor.getSelection())).toBe('end');
+    press('Tab');
+    expect(language.snippets.isActive).toBe(false);
+    expect(live()).toBe('Field 2 of 2');
+});

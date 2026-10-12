@@ -6,27 +6,27 @@
 
 `engine.mount(element, options)` takes `EditorOptions`. Most options have a setter on the `Editor` that changes them later without a remount.
 
-| Option           | Default              | Setter           | Meaning                                                                                                     |
-| ---------------- | -------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------- |
-| `text`           | required             | `setText`        | The document                                                                                                |
-| `theme`          | required             | `setTheme`       | The syntax theme id, handed to the tokenizer                                                                |
-| `language`       | plain text           |                  | The language id, for the tokenizer and the editing commands                                                 |
-| `path`           |                      |                  | The file's path or name, for a language service to read a dialect off                                       |
-| `handBack`       | `[]`                 |                  | Extra host chords for this mount, combined with the engine shortcuts                                        |
-| `readOnly`       | `false`              | `setReadOnly`    | With `readOnlyReason`, what a person is told when typing into it                                            |
-| `wrap`           | `false`              | `setWrap`        | Wrap long lines                                                                                             |
-| `indentation`    | 4, spaces            | `setIndentation` | `{ tabSize, insertSpaces }`                                                                                 |
-| `smartKeys`      | `DEFAULT_SMART_KEYS` | `setSmartKeys`   | What happens as a person types; see below                                                                   |
-| `guides`         | `true`               | `setGuides`      | A line at each indentation level                                                                            |
-| `whitespace`     | `false`              | `setWhitespace`  | Spaces as dots and tabs as arrows                                                                           |
-| `rightMargin`    | none                 | `setRightMargin` | A column to draw a line at; `null` removes it                                                               |
-| `foldOutline`    | `'hover'`            | `setFoldOutline` | When the fold arrows show in the gutter: `'off'`, `'hover'` or `'always'`                                   |
-| `messages`       | none                 |                  | `{ noMoreOccurrences }`, said when select next occurrence finds no more; without it the editor says nothing |
-| `label`          | `Code editor`        | `setLabel`       | The accessible name of the editor, such as `Commit message`, in the app's language                          |
-| `folds`          |                      |                  | Folds kept from the last time; see [folding](/editor/find-folding#folding)                                  |
-| `foldDefaults`   |                      |                  | Fold roles to collapse when a file opens without kept folds                                                 |
-| `line`, `column` |                      |                  | One-based, where the caret starts                                                                           |
-| `scrollTop`      |                      |                  | In pixels, where the view starts; without it the caret's line is in view                                    |
+| Option           | Default              | Setter           | Meaning                                                                                                                                                                                                            |
+| ---------------- | -------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `text`           | required             | `setText`        | The document                                                                                                                                                                                                       |
+| `theme`          | required             | `setTheme`       | The syntax theme id, handed to the tokenizer                                                                                                                                                                       |
+| `language`       | plain text           |                  | The language id, for the tokenizer and the editing commands                                                                                                                                                        |
+| `path`           |                      |                  | The file's path or name, for a language service to read a dialect off                                                                                                                                              |
+| `handBack`       | `[]`                 |                  | Extra host chords for this mount, combined with the engine shortcuts                                                                                                                                               |
+| `readOnly`       | `false`              | `setReadOnly`    | With `readOnlyReason`, what a person is told when typing into it                                                                                                                                                   |
+| `wrap`           | `false`              | `setWrap`        | Wrap long lines                                                                                                                                                                                                    |
+| `indentation`    | 4, spaces            | `setIndentation` | `{ tabSize, insertSpaces }`                                                                                                                                                                                        |
+| `smartKeys`      | `DEFAULT_SMART_KEYS` | `setSmartKeys`   | What happens as a person types; see below                                                                                                                                                                          |
+| `guides`         | `true`               | `setGuides`      | A line at each indentation level                                                                                                                                                                                   |
+| `whitespace`     | `false`              | `setWhitespace`  | Spaces as dots and tabs as arrows                                                                                                                                                                                  |
+| `rightMargin`    | none                 | `setRightMargin` | A column to draw a line at; `null` removes it                                                                                                                                                                      |
+| `foldOutline`    | `'hover'`            | `setFoldOutline` | When the fold arrows show in the gutter: `'off'`, `'hover'` or `'always'`                                                                                                                                          |
+| `messages`       | none                 |                  | `{ noMoreOccurrences, fold, unfold }`: the first is said when select next occurrence finds no more (without it the editor says nothing); the others name the fold controls with `{start}` and `{end}` placeholders |
+| `label`          | `Code editor`        | `setLabel`       | The accessible name of the editor, such as `Commit message`, in the app's language                                                                                                                                 |
+| `folds`          |                      |                  | Folds kept from the last time; see [folding](/editor/find-folding#folding)                                                                                                                                         |
+| `foldDefaults`   |                      |                  | Fold roles to collapse when a file opens without kept folds                                                                                                                                                        |
+| `line`, `column` |                      |                  | One-based, where the caret starts                                                                                                                                                                                  |
+| `scrollTop`      |                      |                  | In pixels, where the view starts; without it the caret's line is in view                                                                                                                                           |
 
 `setReadOnly` stops typing, commands and `applyEdits`. `setText` still works, since a reload from disk is not a person typing.
 

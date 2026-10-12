@@ -91,6 +91,18 @@ export interface EditorOptions {
 export interface EditorMessages {
     /* Select next occurrence went past the last one. */
     readonly noMoreOccurrences: string;
+    /* The name of a gutter control that folds a block; `{start}` and `{end}` are the one-based first and last line. `Fold lines {start} to {end}` without one. */
+    readonly fold: string;
+    /* The same for the control that unfolds it; `Unfold lines {start} to {end}` without one. */
+    readonly unfold: string;
+}
+
+/* The list a host opens beside the text that the keyboard picks from, such as suggestions, as the input points at it for assistive technology. */
+export interface EditorInputPopup {
+    /* The id of the element that holds the options. */
+    readonly controls: string;
+    /* The id of the option that Enter takes; none while the list has no active option. */
+    readonly activeDescendant?: string;
 }
 
 /* What the editor does by itself as a person types. Every one is on, except the camel humps. */
@@ -554,6 +566,12 @@ export interface Editor {
     setLineHighlights(highlights: readonly EditorLineHighlight[]): void;
     /* Source labels for zero-based document lines; a null label hides the number. Null restores document numbering. */
     setLineNumbers(labels: ((line: number) => string | null) | null): void;
+    /*
+     * A visually hidden sentence for zero-based document lines that assistive technology reads with the line
+     * number, such as "Added, new line 12". A line with one hides its drawn number from assistive
+     * technology, so the sentence carries the number too. Null removes them.
+     */
+    setLineLabels(labels: ((line: number) => string | null) | null): void;
     /* Prepared colors for displayed lines. Unknown or null results stay plain; null restores grammar tokenization. Keep the same array while a line is unchanged; call again when results change. */
     setLineTokens(tokens: ((line: number) => readonly LineToken[] | null | undefined) | null): void;
     /*
@@ -608,6 +626,12 @@ export interface Editor {
     setSelection(range: EditorRange, reveal?: EditorReveal): void;
     /* Replaces the selections with these, in the order given: the last is the primary one, as for the newest caret, and is scrolled into view. An empty list changes nothing. */
     setSelections(ranges: readonly EditorRange[], reveal?: EditorReveal): void;
+    /* Points the input at a list the host shows, so assistive technology reads its active option while focus stays in the text; null when the list closes. */
+    setInputPopup(popup: EditorInputPopup | null): void;
+    /* Says a sentence politely to assistive technology without drawing anything. Saying the same sentence again is heard again. */
+    announce(message: string): void;
+    /* Replaces the sentences the editor says on its own, such as the names of the fold controls. */
+    setMessages(messages: Partial<EditorMessages>): void;
     /* The caret moved or the text under it changed. */
     onCaret(listener: (position: EditorPosition) => void): () => void;
     /* The pointer moved onto another character, or null when it left the text. */

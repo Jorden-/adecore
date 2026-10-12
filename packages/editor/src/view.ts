@@ -1,4 +1,5 @@
 import { offsetOfStop, xOfStop } from './geometry-stops.ts';
+import { visibleBidi } from './bidi.ts';
 import {
     type DocumentChange,
     type DocumentModel,
@@ -59,6 +60,7 @@ import type {
     EditorFindQuery,
     EditorFindState,
     EditorHighlightKind,
+    EditorInputPopup,
     EditorLineHighlight,
     EditorMarkerSeverity,
     EditorMessages,
@@ -194,6 +196,7 @@ export class EditorView {
     private readonly preview: HTMLElement;
     private readonly signs: HTMLElement;
     private readonly notice: HTMLElement;
+    private readonly live: HTMLElement;
     private readonly sticky: HTMLElement;
     private readonly overview: HTMLElement;
     private readonly tickTip: HTMLElement;
@@ -285,6 +288,8 @@ export class EditorView {
     private foldTimer: ReturnType<typeof setTimeout> | undefined;
     private colorTimer: ReturnType<typeof setTimeout> | undefined;
     private noticeTimer: ReturnType<typeof setTimeout> | undefined;
+    private liveTimer: ReturnType<typeof setTimeout> | undefined;
+    private lineLabelProvider: ((line: number) => string | null) | null = null;
     private bracketCache: { revision: number; language: string | undefined; index: BracketIndex } | undefined;
     private wrapWidth: number | null = null;
     /* The offset a click past the end of a wrapped visual line chose, which its caret is drawn at the end of that line for. */
@@ -341,6 +346,8 @@ export class EditorView {
         for (const name of ['autocapitalize', 'autocomplete', 'autocorrect']) {
             this.input.setAttribute(name, 'off');
         }
+        this.input.setAttribute('enterkeyhint', 'enter');
+        this.input.setAttribute('inputmode', 'text');
         this.input.setAttribute('aria-multiline', 'true');
         this.sticky.setAttribute('aria-hidden', 'true');
         this.sticky.hidden = true;
@@ -351,7 +358,11 @@ export class EditorView {
         this.notice = make('div', 'se-notice');
         this.notice.setAttribute('role', 'status');
         this.notice.hidden = true;
-        this.root.append(this.viewport, this.overview, this.tickTip, this.input, this.notice);
+        this.live = make('div', 'se-live');
+        this.live.setAttribute('role', 'status');
+        this.live.setAttribute('aria-live', 'polite');
+        this.live.setAttribute('aria-atomic', 'true');
+        this.root.append(this.viewport, this.overview, this.tickTip, this.input, this.notice, this.live);
         this.wireOverview();
         this.wireAttribution();
         container.append(this.root);
@@ -406,6 +417,11 @@ export class EditorView {
         this.root.dataset.foldOutline = this.settings.foldOutline;
         this.layoutVersion++;
         this.layout.configure({ metrics: createMetrics(this.font, this.settings.tabSize, this.document) });
+        this.render();
+    }
+
+    /* Words the gutter draws changed, not a metric: the lines keep their layout. */
+    repaint(): void {
         this.render();
     }
 
@@ -574,6 +590,45 @@ export class EditorView {
         this.noticeTimer = setTimeout(() => {
             this.notice.hidden = true;
         }, NOTICE_MS);
+    }
+
+    private foldName(line: number, collapsed: boolean): string {
+        const template =
+            (collapsed ? this.settings.messages.unfold : this.settings.messages.fold) ??
+            (collapsed ? 'Unfold lines {start} to {end}' : 'Fold lines {start} to {end}');
+        const end = this.foldAt(line)?.endLine ?? line;
+        return template.replace('{start}', String(line + 1)).replace('{end}', String(end + 1));
+    }
+
+    /* A new child each time, since a region only speaks what is added to it and a repeated sentence would otherwise stay silent. */
+    announce(message: string): void {
+        const sentence = this.document.createElement('span');
+        sentence.textContent = message;
+        this.live.replaceChildren(sentence);
+        clearTimeout(this.liveTimer);
+        this.liveTimer = setTimeout(() => this.live.replaceChildren(), NOTICE_MS);
+    }
+
+    setInputPopup(popup: EditorInputPopup | null): void {
+        if (popup === null) {
+            for (const name of ['aria-expanded', 'aria-controls', 'aria-autocomplete', 'aria-activedescendant']) {
+                this.input.removeAttribute(name);
+            }
+            return;
+        }
+        this.input.setAttribute('aria-expanded', 'true');
+        this.input.setAttribute('aria-autocomplete', 'list');
+        this.input.setAttribute('aria-controls', popup.controls);
+        if (popup.activeDescendant === undefined) {
+            this.input.removeAttribute('aria-activedescendant');
+        } else {
+            this.input.setAttribute('aria-activedescendant', popup.activeDescendant);
+        }
+    }
+
+    setLineLabels(labels: ((line: number) => string | null) | null): void {
+        this.lineLabelProvider = labels;
+        this.render();
     }
 
     get gutterElement(): HTMLElement {
@@ -781,7 +836,7 @@ export class EditorView {
                           height: rest.length * this.layout.metrics.lineHeight,
                           render: (container) => {
                               container.classList.add('se-widget', 'se-ghost-rows');
-                              renderCodeBlock(container, rest.join('\n'), null, this.settings.tabSize, {});
+                              renderCodeBlock(container, visibleBidi(rest.join('\n')), null, this.settings.tabSize, {});
                           }
                       }
                   ]
@@ -1953,6 +2008,8 @@ export class EditorView {
             highlights: highlighted,
             activeLines: new Set(selections.map((selection) => this.model.positionAt(selection.head).line)),
             foldable,
+            lineLabel: (line) => this.lineLabelProvider?.(line) ?? null,
+            foldName: (line, collapsed) => this.foldName(line, collapsed),
             action: this.gutterAction,
             markers: this.markersByLine()
         });
@@ -2583,6 +2640,7 @@ export class EditorView {
         clearTimeout(this.foldTimer);
         clearTimeout(this.colorTimer);
         clearTimeout(this.noticeTimer);
+        clearTimeout(this.liveTimer);
         clearTimeout(this.caretTimer);
         if (this.frame !== undefined) {
             this.document.defaultView?.cancelAnimationFrame?.(this.frame);

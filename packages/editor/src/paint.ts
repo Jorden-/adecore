@@ -1,4 +1,4 @@
-import { offsetOfStop, rowOfStop, stopCount, xOfStop } from './geometry-stops.ts';
+import { offsetOfStop, rowOfStop, stopAtOffset, stopCount, xOfStop } from './geometry-stops.ts';
 import { type AttributedLines, colorValue } from './attribution.ts';
 import {
     type BlockWidget,
@@ -13,6 +13,7 @@ import {
     type TextRow
 } from './layout.ts';
 import type { EditorChangeKind, LineToken } from './types.ts';
+import { BIDI_CONTROLS, BIDI_PATTERN, visibleBidi } from './bidi.ts';
 
 const ITALIC = 1;
 const BOLD = 2;
@@ -156,6 +157,7 @@ export function lineElement(
     if (whitespace) {
         appendTabSigns(element, geometry, lineHeight, band);
     }
+    appendBidiSigns(element, geometry, lineHeight, band);
     for (const box of geometry.inlays) {
         if (box.subRow < band.first || box.subRow > band.last) {
             continue;
@@ -163,7 +165,7 @@ export function lineElement(
         const span = document.createElement('span');
         span.className = box.inlay.ghost ? 'se-ghost' : box.inlay.composition ? 'se-composition' : 'se-inlay';
         span.dataset.inlayId = box.inlay.id;
-        span.textContent = box.inlay.text;
+        span.textContent = visibleBidi(box.inlay.text);
         span.style.left = `${box.x}px`;
         span.style.top = `${box.subRow * lineHeight}px`;
         span.style.width = `${box.width}px`;
@@ -306,6 +308,7 @@ export class RowPainter {
             fillRun(span, geometry, geometry.start + run.from, geometry.start + run.to, tokens, false, lineStart);
             element.append(span);
         }
+        appendBidiSigns(element, geometry, this.layout.metrics.lineHeight, { first: 0, last: 0 }, left, (header.subRows - 1) * this.layout.metrics.lineHeight);
     }
 
     private paintBlock(row: Extract<LayoutRow, { kind: 'block' }>, paint: RowPaint): boolean {
@@ -380,6 +383,10 @@ export interface GutterPaint {
     highlights: ReadonlyMap<number, AttributedLines>;
     /* Lines a fold can start at, and whether each is collapsed. */
     foldable: ReadonlyMap<number, boolean>;
+    /* What the fold control of a line is called, from its line and whether it is collapsed. */
+    foldName(line: number, collapsed: boolean): string;
+    /* A sentence read with the line, which then stands in for the drawn number and sign. */
+    lineLabel(line: number): string | null;
     /* The line that carries the host's button, and what it is called. */
     action: { line: number; label: string } | null;
     /* The host's markers by line. */
@@ -413,7 +420,17 @@ export function paintGutter(container: HTMLElement, layout: EditorLayout, rows: 
         }
         const number = document.createElement('span');
         number.textContent = paint.lineNumber(row.line);
+        const label = paint.lineLabel(row.line);
+        if (label !== null) {
+            number.setAttribute('aria-hidden', 'true');
+        }
         item.append(number);
+        if (label !== null) {
+            const hidden = document.createElement('span');
+            hidden.className = 'se-sr-only';
+            hidden.textContent = label;
+            item.append(hidden);
+        }
         if (paint.action?.line === row.line) {
             const button = gutterButton(document, 'se-gutter-action', paint.action.label);
             button.dataset.gutterAction = String(row.line);
@@ -430,6 +447,9 @@ export function paintGutter(container: HTMLElement, layout: EditorLayout, rows: 
             const mark = document.createElement('span');
             mark.className = 'se-line-sign';
             mark.textContent = sign;
+            if (label !== null) {
+                mark.setAttribute('aria-hidden', 'true');
+            }
             mark.style.color = colorValue(paint.highlights.get(row.line)!.color);
             item.append(mark);
         }
@@ -454,7 +474,8 @@ export function paintGutter(container: HTMLElement, layout: EditorLayout, rows: 
         }
         const collapsed = paint.foldable.get(row.line);
         if (collapsed !== undefined) {
-            const button = gutterButton(document, collapsed ? 'se-fold-toggle se-folded' : 'se-fold-toggle', collapsed ? 'Expand' : 'Collapse');
+            const button = gutterButton(document, collapsed ? 'se-fold-toggle se-folded' : 'se-fold-toggle', paint.foldName(row.line, collapsed));
+            button.setAttribute('aria-expanded', String(!collapsed));
             button.dataset.foldLine = String(row.line);
             item.append(button);
         }
@@ -627,6 +648,36 @@ function appendTabSigns(element: HTMLElement, geometry: LineGeometry, lineHeight
         const sign = arrowSign(document, right - left - 2, lineHeight, 'se-tab-sign');
         sign.style.left = `${left + 1}px`;
         sign.style.top = `${rowOfStop(geometry, stop) * lineHeight}px`;
+        element.append(sign);
+    }
+}
+
+/*
+ * A boxed label over each bidirectional control character, which no run carries, so the control never reaches the text nodes
+ * where it would reorder the line. `top` and `originX` place a line that is drawn as part of another one.
+ */
+function appendBidiSigns(element: HTMLElement, geometry: LineGeometry, lineHeight: number, band: SubRowBand, originX = 0, top?: number): void {
+    if (geometry.uniform !== undefined) {
+        return;
+    }
+    const document = element.ownerDocument;
+    const from = offsetOfStop(geometry, geometry.rowStarts[band.first]!);
+    const to = geometry.rowStarts[band.last + 1] === undefined ? geometry.text.length : offsetOfStop(geometry, geometry.rowStarts[band.last + 1]!);
+    const pattern = new RegExp(BIDI_PATTERN.source, 'g');
+    pattern.lastIndex = from;
+    for (let match = pattern.exec(geometry.text); match !== null && match.index < to; match = pattern.exec(geometry.text)) {
+        const stop = stopAtOffset(geometry, match.index);
+        const row = rowOfStop(geometry, stop);
+        const control = BIDI_CONTROLS[match[0] as keyof typeof BIDI_CONTROLS];
+        const left = xOfStop(geometry, stop);
+        const right = rowOfStop(geometry, stop + 1) === row ? xOfStop(geometry, stop + 1) : geometry.rowEnds[row]!;
+        const sign = document.createElement('span');
+        sign.className = 'se-bidi';
+        sign.textContent = control.label;
+        sign.style.left = `${originX + left}px`;
+        sign.style.top = `${top ?? row * lineHeight}px`;
+        sign.style.width = `${right - left}px`;
+        sign.style.height = `${lineHeight}px`;
         element.append(sign);
     }
 }

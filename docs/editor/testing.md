@@ -26,21 +26,21 @@ test('typing replaces every selection', () => {
 });
 ```
 
-| `MountedEditor` member         | What it does                                                         |
-| ------------------------------ | -------------------------------------------------------------------- |
-| `editor`, `input`, `viewport`  | The editor, its textarea and its scroll container                    |
-| `page`                         | The `document`, `window` and `host` element of the page              |
-| `type(text)`                   | Types through `beforeinput`, as a keyboard does                      |
-| `press(key, modifiers?)`       | A `keydown`; returns whether the editor took the key                 |
-| `release(key, modifiers?)`     | The `keyup` after it                                                 |
-| `clip(type, text?)`            | A `copy`, `cut` or `paste`; returns the text a copy or cut left      |
-| `click(x, y, modifiers?)`      | A press and release at a point                                       |
+| `MountedEditor` member        | What it does                                                    |
+| ----------------------------- | --------------------------------------------------------------- |
+| `editor`, `input`, `viewport` | The editor, its textarea and its scroll container               |
+| `page`                        | The `document`, `window` and `host` element of the page         |
+| `type(text)`                  | Types through `beforeinput`, as a keyboard does                 |
+| `press(key, modifiers?)`      | A `keydown`; returns whether the editor took the key            |
+| `release(key, modifiers?)`    | The `keyup` after it                                            |
+| `clip(type, text?)`           | A `copy`, `cut` or `paste`; returns the text a copy or cut left |
+| `click(x, y, modifiers?)`     | A press and release at a point                                  |
 
 `createPage`, `press`, `release`, `typeInto`, `clipboard` and `pointer` are the lower-level helpers behind it. LinkeDOM has no layout, so every box has the editor's fallback size. The page checks keys, commands, the clipboard and the history; it says nothing about fonts, scrolling, input methods or accessibility.
 
 ## A fake editor
 
-`FakeEditorEngine` from `@adecore/editor/fake` mounts a `FakeEditor`, which implements `Editor` without a DOM or a document model. It records what the code under test asked: `markers`, `inlayHints`, `widgetsByOwner`, `codeVision`, `findQuery`, `commands` and the rest are public fields. Methods such as `type`, `save`, `blur`, `click`, `press`, `hover` and `pressGutterAction` play the person. `engine.last` is the editor mounted last.
+`FakeEditorEngine` from `@adecore/editor/fake` mounts a `FakeEditor`, which implements `Editor` without a DOM or a document model. It records what the code under test asked: `markers`, `inlayHints`, `widgetsByOwner`, `codeVision`, `findQuery`, `commands` and the rest are public fields. Methods such as `type`, `save`, `blur`, `click`, `press`, `hover` and `pressGutterAction` play the person. `engine.last` is the editor mounted last. `inputPopup`, `announcements`, `lineLabels` and `messages` record what the accessibility methods were given.
 
 ```ts
 import { FakeEditorEngine } from '@adecore/editor/fake';

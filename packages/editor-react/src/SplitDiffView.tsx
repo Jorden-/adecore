@@ -47,14 +47,13 @@ export function SplitDiffView({
     const emphasis = useMemo(() => wordMarks(document), [document]);
     const oldElement = useRef<HTMLDivElement>(null);
     const newElement = useRef<HTMLDivElement>(null);
-    const labels = { old: `${label}: ${t('diff.oldSide')}`, new: `${label}: ${t('diff.newSide')}` };
-    const current = useRef({ display, tokens, theme, wrap, label, labels });
-    const applied = useRef({ theme, wrap, labels });
+    const current = useRef({ display, tokens, theme, wrap, label });
+    const applied = useRef({ theme, wrap, label });
     const [failure, setFailure] = useState<{ error: unknown } | null>(null);
     const [mounted, setMounted] = useState<MountedSplit | null>(null);
     const [height, setHeight] = useState(0);
     useLayoutEffect(() => {
-        current.current = { display, tokens, theme, wrap, label, labels };
+        current.current = { display, tokens, theme, wrap, label };
     });
     useLayoutEffect(() => {
         const oldHost = oldElement.current;
@@ -63,14 +62,14 @@ export function SplitDiffView({
             return;
         }
         const initial = current.current;
-        applied.current = { theme: initial.theme, wrap: initial.wrap, labels: initial.labels };
+        applied.current = { theme: initial.theme, wrap: initial.wrap, label: initial.label };
         const mount = (side: DiffSourceSide, host: HTMLElement): MountedDiff => {
             const initial = current.current;
             const editor = engine.mount(host, {
                 text: initial.display[side].text,
                 theme: initial.theme,
                 wrap: initial.wrap,
-                label: initial.labels[side],
+                label: initial.label,
                 readOnly: true,
                 guides: false,
                 folding: false,
@@ -210,6 +209,20 @@ export function SplitDiffView({
         if (mounted === null || mounted.old.engine !== engine) {
             return;
         }
+        for (const side of SIDES) {
+            mounted[side].editor.setLineLabels((line) => {
+                const row = display[side].rows[line];
+                if (row === undefined || row.change === 'context') {
+                    return null;
+                }
+                return t(side === 'old' ? 'diff.removed' : 'diff.added', { number: row[side]!.number });
+            });
+        }
+    }, [mounted, engine, display, t]);
+    useLayoutEffect(() => {
+        if (mounted === null || mounted.old.engine !== engine) {
+            return;
+        }
         mounted.update(() => {
             for (const side of SIDES) {
                 const previous = applied.current;
@@ -219,14 +232,13 @@ export function SplitDiffView({
                 if (previous.wrap !== wrap) {
                     mounted[side].editor.setWrap(wrap);
                 }
-                const nextLabel = `${label}: ${t(`diff.${side}Side`)}`;
-                if (previous.labels[side] !== nextLabel) {
-                    mounted[side].editor.setLabel(nextLabel);
+                if (previous.label !== label) {
+                    mounted[side].editor.setLabel(label);
                 }
             }
         });
-        applied.current = { theme, wrap, labels: { old: `${label}: ${t('diff.oldSide')}`, new: `${label}: ${t('diff.newSide')}` } };
-    }, [mounted, engine, theme, wrap, label, t]);
+        applied.current = { theme, wrap, label };
+    }, [mounted, engine, theme, wrap, label]);
     useLayoutEffect(() => {
         if (mounted === null || mounted.old.engine !== engine) {
             return;
@@ -289,6 +301,8 @@ export function SplitDiffView({
         <div
             className={`adecore-editor-diff adecore-editor-diff-split ${className ?? ''}`}
             ref={ref}
+            role="group"
+            aria-label={label}
             data-scroll={fill || height > limit}
             style={{ height: fill ? '100%' : Math.min(height, limit) }}
         >
@@ -297,6 +311,8 @@ export function SplitDiffView({
                     key={side}
                     className="adecore-editor-diff-side"
                     data-side={side}
+                    role="group"
+                    aria-label={t(`diff.${side}Side`)}
                     onWheelCapture={() => {
                         mounted?.drive(side);
                     }}

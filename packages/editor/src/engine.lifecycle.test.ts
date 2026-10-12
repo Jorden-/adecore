@@ -1,7 +1,22 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, jest, test } from 'bun:test';
+import { EditorView } from './view.ts';
 import { parseChord } from './keymap-table.ts';
 import type { KeyChord } from './types.ts';
 import { setup } from './engine.fixture.test.ts';
+
+describe('messages', () => {
+    test('rename the fold controls without laying the text out again', () => {
+        const { editor, host } = setup({ text: 'function a() {\n    one();\n}\n' });
+        (editor as unknown as { view: EditorView }).view.refreshFolds();
+        const toggle = (): HTMLElement => host.querySelector('.se-fold-toggle') as HTMLElement;
+        const relayout = jest.spyOn(EditorView.prototype, 'applySettings');
+        editor.setMessages({ fold: 'Close {start}-{end}' });
+        expect(toggle().getAttribute('aria-label')).toBe('Close 1-3');
+        expect(relayout).toHaveBeenCalledTimes(0);
+        relayout.mockRestore();
+        editor.dispose();
+    });
+});
 
 describe('mounting', () => {
     test('draws the lines and their numbers', () => {
@@ -30,6 +45,17 @@ describe('mounting', () => {
         expect(label(host)).toBe('Commit message');
         editor.setLabel('Commitbericht');
         expect(label(host)).toBe('Commitbericht');
+        editor.dispose();
+    });
+
+    test('speaks, points its input at a list and takes new messages through the editor', () => {
+        const { editor, host } = setup();
+        editor.announce('Field 1 of 2');
+        expect(host.querySelector('.se-live')!.textContent).toBe('Field 1 of 2');
+        editor.setInputPopup({ controls: 'list', activeDescendant: 'list-0' });
+        expect(host.querySelector('.se-input')!.getAttribute('aria-activedescendant')).toBe('list-0');
+        editor.setInputPopup(null);
+        expect(host.querySelector('.se-input')!.hasAttribute('aria-controls')).toBe(false);
         editor.dispose();
     });
 

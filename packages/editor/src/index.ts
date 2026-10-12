@@ -41,6 +41,7 @@ export type {
     EditorLineAction,
     EditorLineHighlight,
     EditorMarker,
+    EditorInputPopup,
     EditorMessages,
     EditorMarkerSeverity,
     EditorReveal,

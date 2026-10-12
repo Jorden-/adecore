@@ -37,10 +37,23 @@ The demos on these pages run over [`FakeLanguageService`](/editor-react/testing)
 | `@adecore/editor-react/editor-react.css`           | The styles of the cards                                                        |
 | `@adecore/editor-react/locales/en.json`, `nl.json` | The words of the `editor` namespace                                            |
 
+## Accessibility
+
+The features work through the editor's [accessibility methods](/editor/#accessibility) and the words of the `editor` namespace, in English and Dutch:
+
+- The suggestions list and the list of a snippet's choices are listboxes with stable option ids. While one is open the editor's textarea names it with `aria-controls` and its active option with `aria-activedescendant`, so the active option is read while focus stays in the text.
+- Moving to the next or previous problem says the severity and message, such as `Error: Cannot find name`.
+- A snippet session says `Field 2 of 3` when it moves to a field, and `Field 1 of 3, 4 choices` when the field opens a choice list. Accepting a suggestion that inserts a snippet says nothing extra.
+- `EditorView` gives the fold controls their names from `language.fold`.
+- [`DiffView`](/editor-react/change-review#accessibility) marks changed lines in text.
+
+The symbol picker is a dialog with its own input and is not pointed at from the editor. Nothing here has been tested with a screen reader, so how a pairing of browser and screen reader reads these attributes is unknown.
+
 ## Limits
 
 - What works depends on what the service supports. A feature asks only for methods the service supports; a command for one it does not support tells the person so through the app's `notify`.
-- The view's limits hold: no bidirectional text, no tested screen reader support, and the [performance limits](/editor/#limits) of the editor.
+- The view's limits hold: no bidirectional text, and the [performance limits](/editor/#limits) of the editor.
+- Accessibility is [untested with a screen reader](#accessibility), as it is for the editor.
 - Snippets are a subset: tab stops, placeholders and the first value of a choice. Variables insert nothing or their default, and transforms are skipped. Stops with the same number are not edited together.
 - Inlay hints flatten a label with parts to its text and ignore padding, tooltips, commands and edits.
 - Semantic tokens are asked in full after each pause in typing; the delta and range requests of the protocol are not used.

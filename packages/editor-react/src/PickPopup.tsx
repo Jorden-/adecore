@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useId, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { EditorRect } from '@adecore/editor';
 import type { EditorLanguage } from './editor-language.ts';
@@ -39,6 +39,7 @@ function PreviewLines({ preview }: { preview: PickPreview }) {
  * the focus from the editor, so the keys keep going to it while the list is open.
  */
 export function PickPopup({ language, view, rect }: { language: EditorLanguage; view: PickView; rect: EditorRect }) {
+    const listId = useId();
     const card = useRef<HTMLDivElement>(null);
     const activeRow = useRef<HTMLButtonElement>(null);
 
@@ -64,16 +65,31 @@ export function PickPopup({ language, view, rect }: { language: EditorLanguage; 
         activeRow.current?.scrollIntoView({ block: 'nearest' });
     }, [view.active]);
 
+    const optionIds = new Map<string, string>();
+    for (const group of view.groups) {
+        for (const row of group.rows) {
+            optionIds.set(row.id, `${listId}-option-${optionIds.size}`);
+        }
+    }
+    const activeId = optionIds.get(view.active);
+
+    // The focus stays in the text, so the input is what names the list and its active option.
+    useLayoutEffect(() => {
+        language.editor.setInputPopup({ controls: listId, activeDescendant: activeId });
+        return () => language.editor.setInputPopup(null);
+    }, [language, listId, activeId]);
+
     return createPortal(
         <div ref={card} className={CARD} style={{ visibility: 'hidden' }} onPointerDown={(event) => event.preventDefault()}>
             {view.title !== null && <div className="border-b border-border px-3 py-1.5 text-xs text-text-muted">{view.title}</div>}
-            <div role="listbox" className="min-h-0 flex-1 overflow-y-auto p-1">
+            <div id={listId} role="listbox" className="min-h-0 flex-1 overflow-y-auto p-1">
                 {view.groups.map((group, groupIndex) => (
                     <div key={group.title ?? groupIndex} role="group" className="flex flex-col">
                         {group.title !== null && <div className="px-2 pt-1.5 pb-0.5 text-xs font-medium text-text-faint">{group.title}</div>}
                         {group.rows.map((row) => (
                             <button
                                 key={row.id}
+                                id={optionIds.get(row.id)}
                                 ref={row.id === view.active ? activeRow : undefined}
                                 type="button"
                                 role="option"

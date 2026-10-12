@@ -10,16 +10,16 @@ Resting the pointer on a name for 300 milliseconds asks the service for its hove
 
 ## Problems
 
-The `DiagnosticsFeature` (`language.diagnostics`) turns the service's diagnostics into [markers](/editor/decorations#problems). A report replaces the earlier one of the same `source`, so two servers of a document do not erase each other. The markers follow the text until the next report. Diagnostic tags draw unused code faded and deprecated code struck through.
+The `DiagnosticsFeature` (`language.diagnostics`) turns the service's diagnostics into [markers](/editor/decorations#problems). A report replaces the earlier one of the same `source`, so two servers of a document do not erase each other. The markers follow the text until the next report. Diagnostic tags draw unused code faded and deprecated code struck through. `step` and `goToFirst` also announce the severity and message of the problem they land on through [`announce`](/editor/#accessibility).
 
-| Member                        | What it does                                               |
-| ----------------------------- | ---------------------------------------------------------- |
-| `problems`                    | The problems of the file, as `Problem`s                    |
-| `counts()`                    | `{ error, warning, info }`                                 |
-| `at(position)`                | The problems at a position                                 |
-| `step(direction)`             | Puts the caret on the next or previous problem, as F2 and Alt+Shift+F2 do |
-| `goToFirst()`                 | Puts the caret on the first problem                        |
-| `onChange(listener)`          | Called when the problems change                            |
+| Member               | What it does                                                              |
+| -------------------- | ------------------------------------------------------------------------- |
+| `problems`           | The problems of the file, as `Problem`s                                   |
+| `counts()`           | `{ error, warning, info }`                                                |
+| `at(position)`       | The problems at a position                                                |
+| `step(direction)`    | Puts the caret on the next or previous problem, as F2 and Alt+Shift+F2 do |
+| `goToFirst()`        | Puts the caret on the first problem                                       |
+| `onChange(listener)` | Called when the problems change                                           |
 
 `useProblemCounts(language)` reads `counts()` in a component and renders again when it changes; `null` gives zeros. For the problems of the whole project, see [`ProjectProblems`](/editor-react/project#problems).
 

@@ -2,7 +2,7 @@ import type { Diagnostic } from '@adecore/lsp';
 import type { EditorContentChange, EditorPosition, EditorReveal } from '@adecore/editor';
 import type { EditorLanguage } from './editor-language.ts';
 import { isShortcut } from './shortcut-keys.ts';
-import { comparePositions, markerOf, neighborProblem, problemCountsOf, problemsAt, shiftRange, type Problem } from './diagnostics-model.ts';
+import { comparePositions, markerOf, neighborProblem, problemCountsOf, problemsAt, severityOf, shiftRange, type Problem } from './diagnostics-model.ts';
 
 export interface ProblemCounts {
     readonly error: number;
@@ -69,7 +69,7 @@ export class DiagnosticsFeature {
             return false;
         }
         const { start } = target.diagnostic.range;
-        this.reveal(start, comparePositions(start, caret) > 0 ? 'centerDown' : 'centerUp');
+        this.reveal(target, comparePositions(start, caret) > 0 ? 'centerDown' : 'centerUp');
         return true;
     }
 
@@ -79,7 +79,7 @@ export class DiagnosticsFeature {
         if (target === null) {
             return false;
         }
-        this.reveal(target.diagnostic.range.start, 'center');
+        this.reveal(target, 'center');
         return true;
     }
 
@@ -90,11 +90,13 @@ export class DiagnosticsFeature {
         };
     }
 
-    private reveal(position: EditorPosition, reveal: EditorReveal): void {
-        const { editor } = this.language;
-        editor.setCaret(position, reveal);
+    private reveal(problem: Problem, reveal: EditorReveal): void {
+        const { editor, project } = this.language;
+        editor.setCaret(problem.diagnostic.range.start, reveal);
         editor.focus();
         this.language.hover.showProblemsAt(editor.getCaret());
+        const severity = project.i18n.t(`editor:language.announce.severity.${severityOf(problem.diagnostic)}`);
+        editor.announce(project.i18n.t('editor:language.announce.problem', { severity, message: problem.diagnostic.message }));
     }
 
     private shift(changes: readonly EditorContentChange[]): void {

@@ -25,7 +25,9 @@ import type {
     EditorGhostText,
     EditorInlayHint,
     EditorKeyHandler,
+    EditorInputPopup,
     EditorMarker,
+    EditorMessages,
     EditorOptions,
     EditorPosition,
     EditorRemoteCursor,
@@ -319,6 +321,32 @@ export class FakeEditor implements Editor {
 
     setLineNumbers(labels: ((line: number) => string | null) | null): void {
         this.lineNumbers = labels;
+    }
+
+    lineLabels: ((line: number) => string | null) | null = null;
+
+    setLineLabels(labels: ((line: number) => string | null) | null): void {
+        this.lineLabels = labels;
+    }
+
+    /* What the input points at, as the last call left it. */
+    inputPopup: EditorInputPopup | null = null;
+
+    setInputPopup(popup: EditorInputPopup | null): void {
+        this.inputPopup = popup;
+    }
+
+    /* Every sentence said, oldest first. */
+    announcements: string[] = [];
+
+    announce(message: string): void {
+        this.announcements.push(message);
+    }
+
+    messages: Partial<EditorMessages> = {};
+
+    setMessages(messages: Partial<EditorMessages>): void {
+        this.messages = { ...this.messages, ...messages };
     }
 
     setLineTokens(tokens: ((line: number) => readonly LineToken[] | null | undefined) | null): void {

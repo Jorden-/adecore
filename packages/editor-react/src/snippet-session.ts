@@ -401,6 +401,9 @@ export class SnippetFeature {
         } finally {
             this.visiting = false;
         }
+        if (choices && stop !== 0) {
+            this.announceField(frame, index);
+        }
         if (stop === 0 || index === frame.order.length - 1) {
             this.pop();
         } else if (choices) {
@@ -408,8 +411,28 @@ export class SnippetFeature {
         }
     }
 
+    /* Says which field the caret moved to, with the number of choices when the field is a list. */
+    private announceField(frame: Frame, index: number): void {
+        const i18n = this.language.project?.i18n;
+        if (i18n === undefined) {
+            return;
+        }
+        const total = frame.order.filter((stop) => stop !== 0).length;
+        const options = { current: index + 1, total };
+        const choices = this.fieldOf(frame)?.choices?.length ?? 0;
+        this.language.editor.announce(
+            choices > 0 && index < frame.order.length - 1
+                ? i18n.t('editor:language.announce.fieldChoices', { ...options, count: choices })
+                : i18n.t('editor:language.announce.field', options)
+        );
+    }
+
+    private fieldOf(frame: Frame): Frame['instances'][number]['fields'][number] | undefined {
+        return frame.instances.at(-1)?.fields.find((field) => field.index === frame.order[frame.current]);
+    }
+
     private openChoices(frame: Frame, activeChoice?: number): void {
-        const field = frame.instances.at(-1)?.fields.find((field) => field.index === frame.order[frame.current]);
+        const field = this.fieldOf(frame);
         if (field?.choices === undefined || field.choices.length === 0 || this.language.pick === undefined) {
             return;
         }

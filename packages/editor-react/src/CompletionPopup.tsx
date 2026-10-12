@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { EditorRect } from '@adecore/editor';
@@ -64,6 +64,7 @@ const ROW_CHROME = 72;
  */
 export function CompletionPopup({ language, view, rect }: { language: EditorLanguage; view: CompletionView; rect: EditorRect }) {
     const { t } = useTranslation('editor');
+    const listId = useId();
     const list = useRef<HTMLDivElement>(null);
     const docs = useRef<HTMLDivElement>(null);
     const activeRow = useRef<HTMLButtonElement>(null);
@@ -114,6 +115,14 @@ export function CompletionPopup({ language, view, rect }: { language: EditorLang
 
     const total = view.rows.length;
     const { first, last } = rowWindow(listTop, view.active, total, ROW_HEIGHT, VISIBLE_ROWS, OVERSCAN_ROWS, LIST_PADDING);
+    const optionId = (index: number): string => `${listId}-option-${index}`;
+    const activeId = view.active >= first && view.active < last ? optionId(view.active) : undefined;
+
+    // The focus stays in the text, so the input is what names the list and its active option.
+    useLayoutEffect(() => {
+        language.editor.setInputPopup({ controls: listId, activeDescendant: activeId });
+        return () => language.editor.setInputPopup(null);
+    }, [language, listId, activeId]);
 
     return createPortal(
         <>
@@ -132,6 +141,7 @@ export function CompletionPopup({ language, view, rect }: { language: EditorLang
                     }}
                 />
                 <div
+                    id={listId}
                     role="listbox"
                     className="w-0 min-w-full overflow-y-auto p-1"
                     style={{ maxHeight: ROW_HEIGHT * VISIBLE_ROWS + 8 }}
@@ -143,6 +153,7 @@ export function CompletionPopup({ language, view, rect }: { language: EditorLang
                         return (
                             <button
                                 key={`${index}:${row.label}`}
+                                id={optionId(index)}
                                 ref={index === view.active ? activeRow : undefined}
                                 type="button"
                                 role="option"

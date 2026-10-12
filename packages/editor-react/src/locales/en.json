@@ -149,6 +149,22 @@
         },
         "history": {
             "recent": "Recent locations"
+        },
+        "announce": {
+            "problem": "{{severity}}: {{message}}",
+            "severity": {
+                "error": "Error",
+                "warning": "Warning",
+                "info": "Information",
+                "hint": "Hint"
+            },
+            "field": "Field {{current}} of {{total}}",
+            "fieldChoices_one": "Field {{current}} of {{total}}, {{count}} choice",
+            "fieldChoices_other": "Field {{current}} of {{total}}, {{count}} choices"
+        },
+        "fold": {
+            "fold": "Fold lines {{start}} to {{end}}",
+            "unfold": "Unfold lines {{start}} to {{end}}"
         }
     },
     "commands": {
@@ -204,8 +220,11 @@
     "diff": {
         "hidden": "Show {{count}} hidden lines",
         "contextLimit": "Context limit reached",
-        "oldSide": "Old version",
-        "newSide": "New version",
-        "noNewline": "No final newline"
+        "oldSide": "Before",
+        "newSide": "After",
+        "noNewline": "No final newline",
+        "added": "Added, new line {{number}}",
+        "removed": "Removed, old line {{number}}",
+        "unchanged": "Old line {{old}}, new line {{new}}"
     }
 }

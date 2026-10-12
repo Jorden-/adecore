@@ -33,7 +33,9 @@ import type {
     EditorGhostText,
     EditorInlayHint,
     EditorKeyHandler,
+    EditorInputPopup,
     EditorMarker,
+    EditorMessages,
     EditorOptions,
     EditorPosition,
     EditorRemoteCursor,
@@ -612,6 +614,23 @@ class SmartEditor implements Editor {
 
     setLineHighlights(highlights: readonly EditorLineHighlight[]): void {
         this.view.setLineHighlights(highlights);
+    }
+
+    setLineLabels(labels: ((line: number) => string | null) | null): void {
+        this.view.setLineLabels(labels);
+    }
+
+    setInputPopup(popup: EditorInputPopup | null): void {
+        this.view.setInputPopup(popup);
+    }
+
+    announce(message: string): void {
+        this.view.announce(message);
+    }
+
+    setMessages(messages: Partial<EditorMessages>): void {
+        this.settings.messages = { ...this.settings.messages, ...messages };
+        this.view.repaint();
     }
 
     setLineNumbers(labels: ((line: number) => string | null) | null): void {

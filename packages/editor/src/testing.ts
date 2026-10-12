@@ -52,6 +52,8 @@ export interface KeyOptions {
     metaKey?: boolean;
     altKey?: boolean;
     shiftKey?: boolean;
+    /* 'touch', 'pen' or 'mouse' for a pointer event. */
+    pointerType?: string;
 }
 
 /* Fires a keydown at the element and says whether the editor took the key. */

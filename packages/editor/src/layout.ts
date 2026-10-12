@@ -1,6 +1,7 @@
 import type { DocumentChange, Position } from '@adecore/editor-core';
 
 import { offsetOfStop, rowOfStop, stopAtOffset, stopCount, xOfStop } from './geometry-stops.ts';
+import { BIDI_COLUMNS, bidiControl, visibleBidi } from './bidi.ts';
 import { uniformGeometry } from './uniform-geometry.ts';
 import { lineChangeMapper } from './layout-changes.ts';
 
@@ -193,7 +194,10 @@ function characterWidth(metrics: LayoutMetrics, text: string, x: number): number
         const tab = metrics.tabSize * metrics.charWidth;
         return (Math.floor(x / tab) + 1) * tab - x;
     }
-    return text.length === 1 && text >= ' ' && text <= '~' ? metrics.charWidth : metrics.measureText(text);
+    if (text.length === 1 && text >= ' ' && text <= '~') {
+        return metrics.charWidth;
+    }
+    return bidiControl(text) !== null ? BIDI_COLUMNS * metrics.charWidth : metrics.measureText(text);
 }
 
 /* Where the continuation rows of a wrapped line start, kept to half the row so a deep indent never leaves no room for text. */
@@ -304,7 +308,8 @@ export function scanDenseLine(
         while (nextInlay < lineInlays.length && lineInlays[nextInlay]!.at - line.start <= offset) {
             flushRun(offset);
             const inlay = lineInlays[nextInlay++]!;
-            const width = inlay.composition || inlay.ghost ? metrics.measureText(inlay.text) : Math.max(8, metrics.measureInlay(inlay.text) + 12);
+            const shown = visibleBidi(inlay.text);
+            const width = inlay.composition || inlay.ghost ? metrics.measureText(shown) : Math.max(8, metrics.measureInlay(shown) + 12);
             geometry.inlays.push({ inlay, x, width, subRow: row });
             x += width;
         }
@@ -314,7 +319,7 @@ export function scanDenseLine(
         }
         const character = text.slice(offset, offsets[stop + 1]!);
         const width = characterWidth(metrics, character, x);
-        if (character === '\t') {
+        if (character === '\t' || bidiControl(character) !== null) {
             flushRun(offset);
         } else if (runStart < 0) {
             runStart = offset;

@@ -29,7 +29,7 @@ Import the theme of [`@adecore/ui`](/ui/guide/theme) first and the editor's styl
 @import '@adecore/editor/editor.css';
 ```
 
-An app without that theme defines the tokens itself: `--surface`, `--surface-raised`, `--surface-hover`, `--border`, `--text`, `--text-muted`, `--text-faint`, `--accent`, the four `--status-*` colors, the radii, `--font-sans`, `--font-mono` and the `--text-xs` and `--text-code` sizes. See [Theme and syntax](/editor/theme).
+An app without that theme defines the tokens itself: `--surface`, `--surface-raised`, `--surface-hover`, `--border`, `--text`, `--text-muted`, `--text-faint`, `--accent`, `--status-error`, `--status-idle`, `--status-needs-you` (find matches and warnings) and `--status-running`, the radii, `--font-sans`, `--font-mono` and the `--text-xs` and `--text-code` sizes. See [Theme and syntax](/editor/theme).
 
 ## Mount an editor
 
@@ -59,13 +59,13 @@ Mod+S, which is Cmd+S on a Mac and Ctrl+S elsewhere, calls `onSave` listeners an
 
 One engine can mount any number of editors. Each editor has its own document, history and decorations; the engine holds what they share.
 
-| `SmartEditorEngineOptions` | Default    | Meaning                                                                                    |
-| -------------------------- | ---------- | ------------------------------------------------------------------------------------------ |
-| `tokenizer`                | required   | Returns the `LineTokenizer` for a language and theme, or `null` for plain text             |
-| `scopeColors`              |            | The colors of a theme by TextMate scope; without it semantic tokens are ignored            |
-| `keymap`                   | `KEYMAP`   | The key table; see [keymaps](/editor/options#keymaps)                                      |
-| `handBack`                 | `[]`       | `KeyChord`s the editor leaves alone, so the app's own shortcuts work from inside it        |
-| `apple`                    | `false`    | Read Ctrl and Meta the way macOS does                                                       |
+| `SmartEditorEngineOptions` | Default  | Meaning                                                                             |
+| -------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| `tokenizer`                | required | Returns the `LineTokenizer` for a language and theme, or `null` for plain text      |
+| `scopeColors`              |          | The colors of a theme by TextMate scope; without it semantic tokens are ignored     |
+| `keymap`                   | `KEYMAP` | The key table; see [keymaps](/editor/options#keymaps)                               |
+| `handBack`                 | `[]`     | `KeyChord`s the editor leaves alone, so the app's own shortcuts work from inside it |
+| `apple`                    | `false`  | Read Ctrl and Meta the way macOS does                                               |
 
 The tokenizer loads while the editor is already on screen and editable. A tokenizer that fails, or answers after a newer theme was set, is ignored.
 

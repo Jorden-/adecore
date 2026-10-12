@@ -1,5 +1,5 @@
 import './test-setup.ts';
-import { expect, test } from 'bun:test';
+import { expect, spyOn, test } from 'bun:test';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createSmartEditorEngine, type Editor } from '@adecore/editor';
@@ -117,6 +117,52 @@ test('the view hands its language to the rows the app adds to the context menu',
             } else {
                 Object.defineProperty(globalThis, name, descriptor);
             }
+        }
+    }
+});
+
+test('the view lets the host name the fold controls and does not lay the text out a second time', async () => {
+    const page = createPage();
+    const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', { value: page.window, configurable: true });
+    const globals = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
+    const previousAct = globals.IS_REACT_ACT_ENVIRONMENT;
+    globals.IS_REACT_ACT_ENVIRONMENT = true;
+    const root = createRoot(page.host);
+    const real = createSmartEditorEngine({ tokenizer: async () => null });
+    let relayout: ReturnType<typeof spyOn> | null = null;
+    const engine = {
+        ...real,
+        mount: (...args: Parameters<typeof real.mount>) => {
+            const mounted = real.mount(...args);
+            relayout = spyOn((mounted as unknown as { view: { applySettings(): void } }).view, 'applySettings');
+            return mounted;
+        }
+    } as typeof real;
+    let editor: Editor | null = null;
+    try {
+        await act(async () =>
+            root.render(
+                createElement(EditorView, {
+                    engine,
+                    options: { text: 'function a() {\n    one();\n}\n', theme: 'light', messages: { fold: 'Host {start} to {end}' } },
+                    onMount: (mounted) => {
+                        editor = mounted;
+                    }
+                })
+            )
+        );
+        (editor as unknown as { view: { refreshFolds(): void } }).view.refreshFolds();
+        expect(page.host.querySelector('.se-fold-toggle')!.getAttribute('aria-label')).toBe('Host 1 to 3');
+        expect(relayout).toHaveBeenCalledTimes(0);
+    } finally {
+        (relayout as ReturnType<typeof spyOn> | null)?.mockRestore();
+        await act(async () => root.unmount());
+        globals.IS_REACT_ACT_ENVIRONMENT = previousAct;
+        if (previousWindow === undefined) {
+            Reflect.deleteProperty(globalThis, 'window');
+        } else {
+            Object.defineProperty(globalThis, 'window', previousWindow);
         }
     }
 });

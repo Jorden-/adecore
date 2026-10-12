@@ -18,6 +18,12 @@ Removed and added lines are both document text: keyboard selection, copy, find, 
 
 The view keeps the same editor when its document, tokens, theme or wrap setting changes. Fold arrows, sticky blocks and indentation guides are disabled because combined source lines do not form one program. Ordinary folding commands are disabled. Replaced words use stronger tints when the bounded word comparison succeeds; coarse differences skip word marks. Whitespace-only ranges are omitted when the document ignores whitespace.
 
+### Accessibility
+
+A changed line is not told by color alone. The gutter of each line holds visually hidden text that a screen reader reads with the line: `Added, new line 12` or `Removed, old line 8`, and in a unified view `Old line 3, new line 3` for an unchanged line, so both numbers are available. The drawn number and sign are hidden from assistive technology on a line that has one. The split layout wraps the whole view in a group named by `label` and each side in a group named `Before` or `After`, which also names each side's textarea (`label: Before`). Only the rows the editor draws carry the text, so virtualization is unchanged. The structure is not a table or grid, and no table roles are used.
+
+No screen reader has tested this. The text and roles are checked in LinkeDOM tests only.
+
 ### Source tokens
 
 Optional `tokens` implements `DiffSourceTokens`: `get(side, index)` returns the immutable `LineToken` array for that zero-based source line, `undefined` while pending, or `null` for plain text. `DiffSourceSide` is `old` or `new`. `subscribe(listener)` reports token changes and returns an unsubscribe function. Keep the same array while that source line is unchanged. The view pauses local grammar tokenization so interleaved old and new lines never share syntax state.
@@ -30,15 +36,15 @@ Optional `tokens` implements `DiffSourceTokens`: `get(side, index)` returns the 
 
 `ChangeReview` draws a proposed change to a stretch of the file as a diff in the editor's own font and colors: unchanged lines, removed lines faded with `-`, added lines with `+`, and the replaced words in a stronger tint. It is meant for an [editor row](#rows-and-actions-in-react) under the stretch.
 
-| Prop        | Type        | Meaning                                                                 |
-| ----------- | ----------- | ----------------------------------------------------------------------- |
-| `editor`    | `Editor`    | The editor whose `renderCode` draws the lines                           |
-| `selected`  | `string`    | The text as it stands                                                   |
-| `proposal`  | `string`    | The text as proposed                                                    |
-| `startLine` | `number`    | The one-based number of the first line; `1` by default                  |
-| `label`     | `string`    | The accessible name of the review                                       |
-| `actions`   | `ReactNode` | Drawn under the diff, such as Accept and Reject                         |
-| `className` | `string`    | On the outer `section`                                                  |
+| Prop        | Type        | Meaning                                                |
+| ----------- | ----------- | ------------------------------------------------------ |
+| `editor`    | `Editor`    | The editor whose `renderCode` draws the lines          |
+| `selected`  | `string`    | The text as it stands                                  |
+| `proposal`  | `string`    | The text as proposed                                   |
+| `startLine` | `number`    | The one-based number of the first line; `1` by default |
+| `label`     | `string`    | The accessible name of the review                      |
+| `actions`   | `ReactNode` | Drawn under the diff, such as Accept and Reject        |
+| `className` | `string`    | On the outer `section`                                 |
 
 The component accepts nothing itself. To accept, guard the stretch with a [tracked range](/editor/editing#tracked-ranges) while the proposal is out, and apply the proposal over it:
 
@@ -58,15 +64,15 @@ if (current !== null && editor.textInRange(current) === selected) {
 
 `AttributionCard` is a card about a run of lines an agent wrote, placed by the `rect` that [`onAttributionHover`](/editor/agents#attribution-marks) reports.
 
-| Prop                  | Meaning                                                            |
-| --------------------- | ------------------------------------------------------------------ |
-| `rect`                | Where the bar is, in page pixels                                   |
-| `title`, `subtitle`   | Such as the agent's name and what it did                           |
-| `metadata`            | A line of the app's own under the title                            |
-| `prompt`              | What the agent was asked, quoted                                   |
-| `color`, `icon`       | The agent's color and an icon; a dot in that color by default      |
-| `actions`             | Buttons under the card                                             |
-| `onHold(inside)`      | The pointer entered or left the card, to keep it open meanwhile    |
+| Prop                | Meaning                                                         |
+| ------------------- | --------------------------------------------------------------- |
+| `rect`              | Where the bar is, in page pixels                                |
+| `title`, `subtitle` | Such as the agent's name and what it did                        |
+| `metadata`          | A line of the app's own under the title                         |
+| `prompt`            | What the agent was asked, quoted                                |
+| `color`, `icon`     | The agent's color and an icon; a dot in that color by default   |
+| `actions`           | Buttons under the card                                          |
+| `onHold(inside)`    | The pointer entered or left the card, to keep it open meanwhile |
 
 ## Rows and actions in React
 
@@ -95,10 +101,8 @@ Pass `layout="split"` to `DiffView` for two read-only editors. Each side contain
 
 `HostedRow.fixed` supplies an exact height and `HostedRow.filler` draws a noninteractive hatched spacer without a portal. Changing height or either flag updates the row.
 
-
 Context expansion is bounded by `unfoldLimits: { rows, characters, lineLength }`. The limits count unified source rows, UTF-16 characters including separators, and the longest visible line. Defaults are 20,000 rows, 2,000,000 characters and 10,000 characters per line. These limits control additional context; callers must separately bound the initial changes. When a gap cannot reveal more text within the limits, its button is disabled. Initial changed rows remain visible. Expansion keeps the current editor, selection and scroll anchor.
 
 Split scrolling follows the side last driven by wheel, pointer, focus or keyboard input. A programmatic reveal can also change the leading side. A delayed scroll event from a clamped follower does not move the leader backward. Asynchronous alignment failures are thrown during React rendering so a surrounding error boundary can replace the view.
-
 
 `diffSyntaxDocument` prepares a side only when its complete source fits 20,000 rows, 2,000,000 UTF-16 code units including separators, and 10,000 code units per line. An oversize side has no blocks or locations and renders plain; the other side remains independent. Hidden lines count too: skipping a long line would lose the grammar state needed by later hunks. Prepared snapshots retain state from line zero; partial hunks retain their documented resets. Plain sides make no syntax requests.

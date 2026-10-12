@@ -64,7 +64,7 @@ The editor reads the [folding ranges of the model](/editor-core/search-folding#f
 
 `setFoldHints(hints)` hands over what a language server knows: `symbols` with their `range` and `body` kind, and `ranges` (`EditorFoldRangeHint`) with their `kind`. They name the function, method and class bodies the text cannot tell apart. A range with a `startCharacter` or an `endCharacter`, as LSP gives them, folds from within its first line up to within its last: a collapsed import list of `use A;` to `use C;` with `3` and `5` reads `use …;`. The fold the text has of the same lines takes them too. `null` forgets them.
 
-The fold commands go through [`runCommand`](/editor/editing#commands).
+The fold commands go through [`runCommand`](/editor/editing#commands). The arrows in the gutter are buttons with `aria-expanded` and a name from `messages.fold` and `messages.unfold`; see [accessibility](/editor/#accessibility).
 
 ## Blocks and sticky scroll
 
@@ -79,7 +79,6 @@ Call `release()` when a search session ends to free the worker and its snapshot.
 The find state reserves optional `searching`, `failed` (`invalid`, `timeout`, `unavailable`, or `error`), and `large` fields for worker-backed searches. The DOM engine uses this worker route for regex searches, previews and replacements. Without a worker factory regex search reports unavailable and never executes on the page.
 
 Explicit worker requests may override `deadline` in milliseconds without changing the client default. A queued user command cannot be displaced by live searches or previews. Ending the session rejects active jobs and prevents subsequent page requests. Capture errors use `captureFailed` separately from the marks search, so stepping through existing marks remains available.
-
 
 Set `searchWorker` on `createSmartEditorEngine` to a factory for an entry that calls `serveEditorSearch(self)`. Each mounted editor owns one lazy client. Literal searches stay synchronous; regex searches debounce and serialize on the worker. Above 8 million UTF-16 units a regex starts only on Enter or a find step. Explicit requests allow 10 seconds, live requests 1.5 seconds; Escape ends the session and releases its worker.
 

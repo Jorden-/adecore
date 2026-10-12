@@ -1,4 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState, type Ref } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Editor, EditorEngine, EditorLineHighlight, EditorTheme } from '@adecore/editor';
 import { parseChord } from '@adecore/editor/keymap';
 import { diffDisplay, diffSplit, type DiffDocument, type DiffDisplay } from '@adecore/merge';
@@ -52,6 +53,7 @@ function UnifiedDiffView({
     ref,
     onMount
 }: UnifiedViewProps) {
+    const { t } = useTranslation('editor');
     const emphasis = useMemo(() => wordMarks(document), [document]);
     const element = useRef<HTMLDivElement>(null);
     const current = useRef({ display, tokens, theme, wrap, label });
@@ -133,6 +135,22 @@ function UnifiedDiffView({
         );
         actions.set(display.rows.flatMap((row, line) => (row.noNewline === undefined ? [] : [{ id: `no-newline-${line}`, line }])));
     }, [mounted, engine, display, emphasis]);
+    useLayoutEffect(() => {
+        if (mounted === null || mounted.engine !== engine) {
+            return;
+        }
+        // The color of a changed line is not the only thing that says so: the gutter carries a sentence with the numbers it reads from.
+        mounted.editor.setLineLabels((line) => {
+            const row = display.rows[line];
+            if (row?.change === 'delete') {
+                return t('diff.removed', { number: row.old!.number });
+            }
+            if (row?.change === 'insert') {
+                return t('diff.added', { number: row.new!.number });
+            }
+            return row?.old !== undefined && row.new !== undefined ? t('diff.unchanged', { old: row.old.number, new: row.new.number }) : null;
+        });
+    }, [mounted, engine, display, t]);
     useLayoutEffect(() => {
         if (mounted === null || mounted.engine !== engine) {
             return;

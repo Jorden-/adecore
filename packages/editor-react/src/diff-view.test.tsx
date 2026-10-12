@@ -460,3 +460,48 @@ test('a gap blocked by a long hidden line stays disabled when another gap unfold
         expect(buttons()[0]!.disabled).toBe(true);
     });
 });
+
+test('unified review says added and removed lines in text with their numbers, not by color alone', async () => {
+    await pageTest(async (page, root) => {
+        const document = snapshots('keep\nold\ntail', 'keep\nfresh\ntail');
+        const engine = createSmartEditorEngine({ tokenizer: async () => null });
+        await act(async () => root.render(createElement(DiffView, { engine, document, theme: 'dark', label: 'Review' })));
+        const spoken = [...page.host.querySelectorAll('.se-line-number')].map((item) => item.querySelector('.se-sr-only')?.textContent ?? null);
+        expect(spoken).toContain('Removed, old line 2');
+        expect(spoken).toContain('Added, new line 2');
+        expect(spoken).toContain('Old line 1, new line 1');
+        const removed = [...page.host.querySelectorAll('.se-line-number')].find(
+            (item) => item.querySelector('.se-sr-only')?.textContent === 'Removed, old line 2'
+        )!;
+        expect(removed.querySelector('.se-line-sign')!.getAttribute('aria-hidden')).toBe('true');
+    });
+});
+
+test('split review names its sides Before and After and labels only the changed lines of each', async () => {
+    await pageTest(async (page, root) => {
+        const document = snapshots('keep\nold\ntail', 'keep\nfresh\ntail');
+        const engine = createSmartEditorEngine({ tokenizer: async () => null });
+        await act(async () => root.render(createElement(DiffView, { engine, document, layout: 'split', theme: 'dark', label: 'Review' })));
+        const sides = [...page.host.querySelectorAll('.adecore-editor-diff-side')];
+        expect(sides.map((side) => side.getAttribute('aria-label'))).toEqual(['Before', 'After']);
+        expect(sides.every((side) => side.getAttribute('role') === 'group')).toBe(true);
+        expect(page.host.querySelector('.adecore-editor-diff-split')!.getAttribute('aria-label')).toBe('Review');
+        const spoken = (side: Element): (string | undefined)[] => [...side.querySelectorAll('.se-sr-only')].map((item) => item.textContent ?? undefined);
+        expect(spoken(sides[0]!)).toEqual(['Removed, old line 2']);
+        expect(spoken(sides[1]!)).toEqual(['Added, new line 2']);
+        expect(sides[0]!.querySelector('textarea')!.getAttribute('aria-label')).toBe('Review');
+    });
+});
+
+test('review shows a bidirectional control as a placeholder and keeps the character out of the line text', async () => {
+    await pageTest(async (page, root) => {
+        const document = snapshots('if (admin) {', 'if (admin\u202E) {');
+        const engine = createSmartEditorEngine({ tokenizer: async () => null });
+        await act(async () => root.render(createElement(DiffView, { engine, document, theme: 'github-dark', label: 'Review' })));
+        const signs = [...page.host.querySelectorAll('.se-bidi')];
+        expect(signs.map((sign) => sign.textContent)).toEqual(['RLO']);
+        expect(signs.some((sign) => sign.hasAttribute('aria-label'))).toBe(false);
+        expect(/\u202E/.test(page.host.querySelector('.se-line')!.textContent!)).toBe(false);
+        expect(/\u202E/.test([...page.host.querySelectorAll('.se-line')].map((line) => line.textContent).join(''))).toBe(false);
+    });
+});

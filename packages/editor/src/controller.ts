@@ -7,6 +7,7 @@ import { DoubleModifierGesture } from './modifier-gesture.ts';
 import { NativeInput } from './native-input.ts';
 import { columnSelections, sameCell } from './column-selection.ts';
 import { PointerSelection } from './pointer.ts';
+import { TouchSelection } from './touch.ts';
 import type {
     EditorClick,
     EditorClickHandler,
@@ -88,6 +89,7 @@ const TYPING_PAUSE_MS = 750;
 export class InputController {
     private readonly native: NativeInput;
     private readonly pointer: PointerSelection;
+    private readonly touch: TouchSelection;
     private readonly cleanup: (() => void)[] = [];
     private readonly keyHandlers = new Set<EditorKeyHandler>();
     private readonly gesture: DoubleModifierGesture;
@@ -146,6 +148,16 @@ export class InputController {
             focus: () => view.focus(),
             scrolled: () => view.requestRender()
         });
+        this.touch = new TouchSelection({
+            model,
+            offsetAt: (x, y) => view.offsetAtPoint(x, y),
+            camelHumps: () => view.settings.smartKeys.camelHumps,
+            lineAt: (offset) => {
+                const row = view.layout.rowForLine(model.positionAt(offset).line);
+                return row.kind === 'text' ? { from: model.getLine(row.line).start, to: model.getLine(row.lastLine).next } : { from: offset, to: offset };
+            },
+            focus: () => view.focus()
+        });
         this.subscription = model.subscribe(() => {
             if (!this.keepDesiredXs) {
                 this.desiredXs = [];
@@ -196,22 +208,42 @@ export class InputController {
         this.listen(input, 'cut', (event) => this.copy(event, true));
         this.listen(viewport, 'scroll', () => this.view.scrolled());
         this.listen(viewport, 'wheel', () => this.view.cancelScroll());
-        this.listen(viewport, 'touchstart', () => this.view.cancelScroll());
         this.listen(viewport, 'pointermove', (event) => this.view.hoverMoved(event));
         this.listen(viewport, 'pointerleave', () => this.view.setHover(null));
         this.listen(viewport, 'pointerdown', (event) => this.pointerDown(event));
         this.listen(viewport, 'contextmenu', (event) => this.contextMenu(event));
         this.listen(this.view.gutterElement, 'pointerdown', (event) => this.gutterDown(event));
         this.listen(this.view.stickyElement, 'pointerdown', (event) => this.stickyDown(event));
-        const move = (event: Event): void => this.pointer.move(event as PointerEvent);
+        const move = (event: Event): void => {
+            this.pointer.move(event as PointerEvent);
+            this.touch.move(event as PointerEvent);
+        };
         const end = (event: Event): void => {
             this.pointer.end(event as PointerEvent);
+            this.touch.end(event as PointerEvent);
             this.historyGroup++;
         };
         document.addEventListener('pointermove', move);
         document.addEventListener('pointerup', end);
         document.addEventListener('pointercancel', end);
+        // The on-screen keyboard shrinks the visual viewport and not the layout one, which would leave the caret behind it.
+        const visualViewport = document.defaultView?.visualViewport;
+        let keyboardHeight = visualViewport?.height ?? 0;
+        let keyboardScale = visualViewport?.scale ?? 1;
+        const keyboard = (): void => {
+            const height = visualViewport?.height ?? 0;
+            const scale = visualViewport?.scale ?? 1;
+            // Zooming in shrinks the visual viewport too, and must not pull the view back to the caret.
+            const shrunk = height < keyboardHeight && scale === keyboardScale;
+            keyboardHeight = height;
+            keyboardScale = scale;
+            if (shrunk && this.view.focused) {
+                this.view.revealCaret();
+            }
+        };
+        visualViewport?.addEventListener('resize', keyboard);
         this.cleanup.push(() => {
+            visualViewport?.removeEventListener('resize', keyboard);
             document.removeEventListener('pointermove', move);
             document.removeEventListener('pointerup', end);
             document.removeEventListener('pointercancel', end);
@@ -221,6 +253,7 @@ export class InputController {
     dispose(): void {
         this.subscription.dispose();
         this.pointer.dispose();
+        this.touch.dispose();
         for (const remove of this.cleanup) {
             remove();
         }
@@ -747,7 +780,12 @@ export class InputController {
         if (event.button !== 0 || target.closest('button, a, input, textarea, [contenteditable], .se-block, .se-gutter, .se-sticky')) {
             return;
         }
+        // Cancels the compatibility mouse events, whose focus change would close the keyboard a tap opened; scrolling is not affected.
         event.preventDefault();
+        if (event.pointerType === 'touch') {
+            this.touch.start(event, 'text', () => this.takenByHost(event));
+            return;
+        }
         if (this.takenByHost(event)) {
             this.view.focus();
             return;
@@ -779,6 +817,10 @@ export class InputController {
     }
 
     private contextMenu(event: MouseEvent): void {
+        if (this.contextListeners.size === 0 && this.touch.pressed) {
+            event.preventDefault();
+            return;
+        }
         if (this.contextListeners.size === 0 || (event.target as HTMLElement | null)?.closest?.('.se-sticky')) {
             return;
         }
@@ -804,6 +846,7 @@ export class InputController {
 
     /* A press on a line number selects the line. */
     private gutterDown(event: PointerEvent): void {
+        this.view.cancelScroll();
         if (event.button !== 0) {
             return;
         }
@@ -823,6 +866,10 @@ export class InputController {
         if (foldLine !== null) {
             this.view.toggleFold(foldLine);
             this.view.focus();
+            return;
+        }
+        if (event.pointerType === 'touch') {
+            this.touch.start(event, 'gutter');
             return;
         }
         this.pointer.start(event, 'gutter');

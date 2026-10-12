@@ -149,6 +149,22 @@
         },
         "history": {
             "recent": "Recente plekken"
+        },
+        "announce": {
+            "problem": "{{severity}}: {{message}}",
+            "severity": {
+                "error": "Fout",
+                "warning": "Waarschuwing",
+                "info": "Informatie",
+                "hint": "Hint"
+            },
+            "field": "Veld {{current}} van {{total}}",
+            "fieldChoices_one": "Veld {{current}} van {{total}}, {{count}} keuze",
+            "fieldChoices_other": "Veld {{current}} van {{total}}, {{count}} keuzes"
+        },
+        "fold": {
+            "fold": "Regels {{start}} tot {{end}} invouwen",
+            "unfold": "Regels {{start}} tot {{end}} uitvouwen"
         }
     },
     "commands": {
@@ -204,8 +220,11 @@
     "diff": {
         "hidden": "Toon {{count}} verborgen regels",
         "contextLimit": "Limiet voor context bereikt",
-        "oldSide": "Oude versie",
-        "newSide": "Nieuwe versie",
-        "noNewline": "Geen afsluitende nieuwe regel"
+        "oldSide": "Voor de wijziging",
+        "newSide": "Na de wijziging",
+        "noNewline": "Geen afsluitende nieuwe regel",
+        "added": "Toegevoegd, nieuwe regel {{number}}",
+        "removed": "Verwijderd, oude regel {{number}}",
+        "unchanged": "Oude regel {{old}}, nieuwe regel {{new}}"
     }
 }

@@ -12,6 +12,7 @@
     --editor-guide-active: color-mix(in srgb, var(--text) 24%, transparent);
     --editor-margin: color-mix(in srgb, var(--text) 14%, transparent);
     --editor-whitespace: color-mix(in srgb, var(--text) 30%, transparent);
+    --editor-bidi: var(--status-needs-you);
     --editor-hatch: color-mix(in srgb, var(--text) 12%, transparent);
     --editor-added: var(--status-idle);
     --editor-modified: var(--accent);
@@ -69,6 +70,7 @@
     overflow: auto;
     overflow-anchor: none;
     overscroll-behavior: contain;
+    touch-action: pan-x pan-y pinch-zoom;
     scrollbar-width: thin;
     scrollbar-color: color-mix(in srgb, var(--text) 25%, transparent) transparent;
 }
@@ -177,10 +179,23 @@
     white-space: pre;
     letter-spacing: 0;
     direction: ltr;
+    unicode-bidi: bidi-override;
 }
 .se-run {
     position: absolute;
     white-space: pre;
+    unicode-bidi: bidi-override;
+}
+.se-bidi {
+    position: absolute;
+    box-sizing: border-box;
+    overflow: hidden;
+    border-radius: var(--radius-xs);
+    box-shadow: inset 0 0 0 1px var(--editor-bidi);
+    color: var(--editor-bidi);
+    text-align: center;
+    user-select: none;
+    pointer-events: none;
 }
 
 .se-gutter {
@@ -793,6 +808,18 @@
     overflow: hidden;
     white-space: pre;
     pointer-events: none;
+}
+.se-sr-only,
+.se-live {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
 }
 .se-notice {
     position: absolute;
