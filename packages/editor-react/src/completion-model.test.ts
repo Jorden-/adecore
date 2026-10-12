@@ -384,3 +384,16 @@ test('a malformed default edit range retains suggestions and their other default
     ]);
     expect(result.incomplete).toBe(false);
 });
+
+test('malformed ranking fields and explicit edits do not reach a completion list', () => {
+    const malformed = [
+        { label: 'bad', filterText: 1 },
+        { label: 'bad', sortText: {} },
+        { label: 'bad', insertText: [] },
+        { label: 'bad', textEdit: { newText: 'bad', range: {} } },
+        { label: 'bad', textEdit: { newText: 1, range: { start: at(0, 0), end: at(0, 0) } } }
+    ];
+    const result = itemsOf([...malformed, item('good')] as CompletionItem[]);
+    expect(result.items).toEqual([item('good')]);
+    expect(rankCompletions(result.items, () => '').map((entry) => entry.item.label)).toEqual(['good']);
+});

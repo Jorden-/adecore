@@ -18,6 +18,22 @@ function validRange(range: Range): boolean {
     );
 }
 
+function validEditRange(range: Range | { insert: Range; replace: Range }): boolean {
+    if (range === null || typeof range !== 'object' || Array.isArray(range)) {
+        return false;
+    }
+    if ('start' in range) {
+        return validRange(range);
+    }
+    return (
+        validRange(range.insert) &&
+        validRange(range.replace) &&
+        range.insert.start.line === range.replace.start.line &&
+        range.insert.start.character === range.replace.start.character &&
+        range.insert.end.character <= range.replace.end.character
+    );
+}
+
 export function applyCompletionDefaults(
     item: CompletionItem,
     defaults?: CompletionList['itemDefaults'],
@@ -25,6 +41,17 @@ export function applyCompletionDefaults(
 ): CompletionItem {
     if (typeof item?.label !== 'string') {
         throw new TypeError('A completion item must have a string label.');
+    }
+    for (const value of [item.filterText, item.sortText, item.insertText, item.textEditText]) {
+        if (value !== undefined && typeof value !== 'string') {
+            throw new TypeError('Completion ranking and insertion text must be strings.');
+        }
+    }
+    if (item.textEdit !== undefined) {
+        const edit = item.textEdit;
+        if (edit === null || typeof edit !== 'object' || typeof edit.newText !== 'string' || !validEditRange('range' in edit ? edit.range : edit)) {
+            throw new RangeError('Invalid completion item edit.');
+        }
     }
     if (defaults === undefined) {
         return item;
@@ -56,26 +83,10 @@ export function applyCompletionDefaults(
             options.onInvalidRange(error);
             return next;
         };
-        if (range === null || typeof range !== 'object' || Array.isArray(range)) {
+        if (!validEditRange(range)) {
             return invalid('Invalid completion default edit range.');
         }
-        if ('start' in range) {
-            if (!validRange(range)) {
-                return invalid('Invalid completion default edit range.');
-            }
-            next.textEdit = { range, newText };
-        } else {
-            if (
-                !validRange(range.insert) ||
-                !validRange(range.replace) ||
-                range.insert.start.line !== range.replace.start.line ||
-                range.insert.start.character !== range.replace.start.character ||
-                range.insert.end.character > range.replace.end.character
-            ) {
-                return invalid('Invalid completion default insert/replace ranges.');
-            }
-            next.textEdit = { insert: range.insert, replace: range.replace, newText };
-        }
+        next.textEdit = 'start' in range ? { range, newText } : { insert: range.insert, replace: range.replace, newText };
     }
     return next;
 }

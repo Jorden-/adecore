@@ -499,12 +499,12 @@ export class CompletionFeature {
         let normalized: ReturnType<typeof itemsOf>;
         try {
             const result = await project.service.completion(uri, position, context, { signal: controller.signal });
-            if (request !== this.request) {
+            if (request !== this.request || this.controller !== controller || controller.signal.aborted) {
                 return;
             }
             normalized = itemsOf(result);
         } catch {
-            if (request === this.request) {
+            if (request === this.request && this.controller === controller && !controller.signal.aborted) {
                 this.close();
             }
             return;

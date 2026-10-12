@@ -667,3 +667,34 @@ test('a single server with invalid range defaults still supplies a usable snippe
     expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('x');
     expect(mounted.language.snippets.isActive).toBe(true);
 });
+
+test('an aborted incomplete refresh cannot close its newer refresh', async () => {
+    const mounted = await completion('f', 'unused');
+    const replies: (() => void)[] = [];
+    let first = true;
+    const result = { isIncomplete: true, items: [{ label: 'for' }, { label: 'format' }] };
+    mounted.service.respond('textDocument/completion', () => {
+        if (first) {
+            first = false;
+            return result;
+        }
+        return new Promise((resolve) => replies.push(() => resolve(result)));
+    });
+    mounted.editor.setCaret({ line: 0, character: 1 });
+    mounted.language.completion.invoke();
+    mounted.timers.advance(1);
+    await new Promise<void>((done) => setImmediate(done));
+    mounted.type('o');
+    mounted.timers.advance(151);
+    mounted.type('r');
+    mounted.timers.advance(151);
+    expect(replies).toHaveLength(4);
+    replies[2]!();
+    await new Promise<void>((done) => setImmediate(done));
+    expect(mounted.language.completion.isOpen).toBe(true);
+    replies[3]!();
+    await new Promise<void>((done) => setImmediate(done));
+    expect(mounted.language.completion.isOpen).toBe(true);
+    replies[0]!();
+    replies[1]!();
+});
