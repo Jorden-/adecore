@@ -8,7 +8,7 @@ The callers of a symbol, or the symbols it calls, as a tree between the lines of
 
 The tree asks only when the service has `prepareCallHierarchy`, `incomingCalls` and `outgoingCalls` (all three are optional on [`LanguageService`](/lsp/language-service)) and `supports('textDocument/prepareCallHierarchy', uri)` is true, which is a server announcing `callHierarchyProvider`. `language.callHierarchy.supported` says so. Otherwise `open` shows a notification and asks nothing.
 
-A node asks the server for its calls when it is opened, once; folding it and opening it again uses the answer it has. The roots are opened as the tree opens. Requests of different nodes run side by side (`parallel: true`). The calls of a level are listed by name. A level draws at most `CALL_LEVEL_LIMIT` (50) calls and ends with a row that brings the next 50.
+A node asks the server for its calls when it is opened, once; folding it and opening it again uses the answer it has. The roots are opened as the tree opens. Requests of different nodes run side by side (`parallel: true`). The calls of a level keep the order the server gave them. A level draws at most `CALL_LEVEL_LIMIT` (50) calls and ends with a row that brings the next 50.
 
 An answer for a tree that was closed, restarted in the other direction or opened again is dropped. When the service says the text moved on (`StaleResultError`) the tree closes, as it does when the text changes: a position into text that is gone leads nowhere.
 

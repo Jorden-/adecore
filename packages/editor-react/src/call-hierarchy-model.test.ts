@@ -15,15 +15,25 @@ function tree(nodes: CallNode[]): Map<string, CallNode> {
 }
 
 describe('call hierarchy model', () => {
-    test('lists the calls of a node by name and finds the call sites in the right file', () => {
+    test('keeps the order the server gave the calls in', () => {
+        const [root] = rootsOf([item('run')]);
+        const calls = [
+            { from: item('b', 'file:///work/b.ts'), fromRanges: [at(1)] },
+            { from: item('a', 'file:///work/a.ts'), fromRanges: [at(2)] }
+        ];
+        expect(childrenOf('incoming', root!, calls).map((node) => node.item.name)).toEqual(['b', 'a']);
+        expect(rootsOf([item('b'), item('a')]).map((node) => node.item.name)).toEqual(['b', 'a']);
+    });
+
+    test('lists the calls of a node in the server order and finds the call sites in the right file', () => {
         const [root] = rootsOf([item('run', 'file:///work/run.ts')]);
         const calls = [
             { from: item('zeta', 'file:///work/z.ts'), fromRanges: [at(4)] },
             { from: item('alpha', 'file:///work/a.ts'), fromRanges: [at(1), at(2)] }
         ];
         const callers = childrenOf('incoming', root!, calls);
-        expect(callers.map((node) => node.item.name)).toEqual(['alpha', 'zeta']);
-        expect(callers.map((node) => node.siteUri)).toEqual(['file:///work/a.ts', 'file:///work/z.ts']);
+        expect(callers.map((node) => node.item.name)).toEqual(['zeta', 'alpha']);
+        expect(callers.map((node) => node.siteUri)).toEqual(['file:///work/z.ts', 'file:///work/a.ts']);
         expect(callers.map((node) => node.level)).toEqual([2, 2]);
         const callees = childrenOf('outgoing', root!, [{ to: item('helper', 'file:///work/h.ts'), fromRanges: [at(3)] }]);
         // The call is made in the file of the node that was asked about.

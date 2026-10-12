@@ -86,7 +86,7 @@ describe('call hierarchy in the real editor', () => {
     test('shows no code while the code of the new row is on its way', async () => {
         let release: (value: { text: string; mtime: number }) => void = () => undefined;
         const { language, view } = await setup(
-            (name) => (name === 'run' ? [{ from: item('far', other, 3), fromRanges: [at(3)] }, ...callers(1)] : []),
+            (name) => (name === 'run' ? [...callers(1), { from: item('far', other, 3), fromRanges: [at(3)] }] : []),
             () => new Promise((resolve) => (release = resolve))
         );
         expect(view().preview).not.toBeNull();

@@ -82,8 +82,8 @@ function calls(service: FakeLanguageService, method: string) {
 
 const callers: Record<string, CallHierarchyIncomingCall[]> = {
     run: [
-        { from: item('zebra', 'file:///work/src/z.ts', 4), fromRanges: [at(5, 2)] },
-        { from: item('alpha', uri, 1), fromRanges: [at(1), at(2)] }
+        { from: item('alpha', uri, 1), fromRanges: [at(1), at(2)] },
+        { from: item('zebra', 'file:///work/src/z.ts', 4), fromRanges: [at(5, 2)] }
     ]
 };
 
@@ -117,7 +117,7 @@ describe('call hierarchy', () => {
         expect(scrolled).toEqual([{ block: 'nearest' }]);
     });
 
-    test('opens on the callers of the symbol at the caret, listed by name', async () => {
+    test('opens on the callers of the symbol at the caret, in the server order', async () => {
         const { service, language, editor } = await setup({ incoming: (parent) => callers[parent.name] ?? [] });
         editor.setCaret({ line: 0, character: 10 });
         await language.callHierarchy.open();

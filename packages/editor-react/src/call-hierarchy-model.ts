@@ -81,32 +81,25 @@ export function rootsOf(items: readonly CallHierarchyItem[]): CallNode[] {
     }));
 }
 
-function compareItems(left: CallHierarchyItem, right: CallHierarchyItem): number {
-    return left.name.localeCompare(right.name) || left.uri.localeCompare(right.uri) || left.range.start.line - right.range.start.line;
-}
-
 /*
- * The children of a node made from the calls a server returned, listed by name the way the symbols of a
- * file are. The call sites of a caller are in its own file; those of a callee are in the file of the node
+ * The children of a node made from the calls a server returned, in the order the server gave them. The call sites of a caller are in its own file; those of a callee are in the file of the node
  * that was asked about.
  */
 export function childrenOf(direction: CallDirection, parent: CallNode, calls: readonly (CallHierarchyIncomingCall | CallHierarchyOutgoingCall)[]): CallNode[] {
     const entries = calls.map((call) => ({ item: 'from' in call ? call.from : call.to, sites: call.fromRanges }));
-    return entries
-        .sort((left, right) => compareItems(left.item, right.item))
-        .map((entry, index) => ({
-            id: `${parent.id}.${index}`,
-            parent: parent.id,
-            level: parent.level + 1,
-            item: entry.item,
-            sites: entry.sites,
-            siteUri: direction === 'incoming' ? entry.item.uri : parent.item.uri,
-            expanded: false,
-            load: 'idle',
-            error: null,
-            children: [],
-            shown: 0
-        }));
+    return entries.map((entry, index) => ({
+        id: `${parent.id}.${index}`,
+        parent: parent.id,
+        level: parent.level + 1,
+        item: entry.item,
+        sites: entry.sites,
+        siteUri: direction === 'incoming' ? entry.item.uri : parent.item.uri,
+        expanded: false,
+        load: 'idle',
+        error: null,
+        children: [],
+        shown: 0
+    }));
 }
 
 /* The lines the tree draws: every root, and under an expanded node its status, its calls and the row that shows more. */
