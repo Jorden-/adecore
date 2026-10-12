@@ -632,3 +632,45 @@ describe('linked read-only layouts', () => {
         editor.dispose();
     });
 });
+
+describe('long wrapped lines', () => {
+    test('draws only a scrolling band while selection and copy retain the whole document', () => {
+        const text = 'word '.repeat(20000) + 'end';
+        const { editor, host, clip, viewport } = setup({ text, wrap: true, whitespace: true });
+        Object.defineProperties(viewport, { clientWidth: { value: 220 }, clientHeight: { value: 100 } });
+        editor.setWrap(true);
+        const runs = (): Element[] => [...host.querySelectorAll('.se-code .se-run')];
+        const first = host.querySelector('.se-code .se-line');
+        expect(runs().length).toBeGreaterThan(0);
+        expect(runs().length).toBeLessThan(256);
+        editor.setScrollTop(10);
+        expect(host.querySelector('.se-code .se-line')).toBe(first);
+        editor.setScrollTop(5000);
+        expect(host.querySelector('.se-code .se-line') === first).toBe(false);
+        expect(Math.min(...runs().map((run) => Number.parseFloat((run as HTMLElement).style.top)))).toBeGreaterThan(0);
+        expect(runs().length).toBeLessThan(256);
+        editor.runCommand('selectAll');
+        expect(clip('copy')).toBe(text);
+        expect(host.querySelectorAll('.se-selection').length).toBeLessThan(200);
+        editor.setScrollTop(editor.getContentHeight() - 200);
+        expect(runs().at(-1)?.textContent).toContain('end');
+        expect(editor.getText()).toBe(text);
+        editor.dispose();
+    });
+
+    test('clips whitespace signs, inlays and find marks to the visible part of one line', () => {
+        const text = 'cat\t'.repeat(10000);
+        const { editor, host, viewport } = setup({ text, wrap: true, whitespace: true });
+        Object.defineProperties(viewport, { clientWidth: { value: 220 }, clientHeight: { value: 100 } });
+        editor.setWrap(true);
+        editor.setInlayHints([{ position: { line: 0, character: text.length - 1 }, label: 'hint' }]);
+        editor.find({ text: 'cat', regex: false, caseSensitive: false, wholeWord: false });
+        expect(host.querySelectorAll('.se-find-match').length).toBeLessThan(400);
+        expect(host.querySelectorAll('.se-tab-sign').length).toBeLessThan(2000);
+        expect(host.querySelector('[data-inlay-id="hint-0"]')).toBeNull();
+        editor.setScrollTop(editor.getContentHeight() - 200);
+        expect(host.querySelector('[data-inlay-id="hint-0"]')).not.toBeNull();
+        expect(host.querySelectorAll('.se-find-match').length).toBeLessThan(400);
+        editor.dispose();
+    });
+});

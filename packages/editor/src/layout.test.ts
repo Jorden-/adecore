@@ -288,3 +288,26 @@ describe('visual lines', () => {
         expect(layout.visualLine(4)).toMatchObject({ start: 2, end: 5, next: 6 });
     });
 });
+
+describe('visible range geometry', () => {
+    test('clips a full selection to the viewport without changing its visible boxes', () => {
+        const text = 'word '.repeat(2000);
+        const { layout } = layoutOf(text, 100);
+        layout.syncRows(layout.rows);
+        const window = { top: 2003, bottom: 2117 };
+        const all = layout.rectangles(0, text.length, layout.rows);
+        const visible = layout.rectangles(0, text.length, layout.rows, window);
+        expect(visible).toEqual(all.filter((rect) => rect.y < window.bottom && rect.y + rect.height > window.top));
+        expect(visible.length).toBeLessThanOrEqual(7);
+        expect(layout.rectangles(0, 4, layout.rows, window)).toEqual([]);
+    });
+
+    test('keeps affinity around inlays when the viewport clips a range', () => {
+        const { layout } = layoutOf('word '.repeat(100), 100);
+        layout.configure({ inlays: [{ id: 'hint', at: 205, text: 'hint' }] });
+        layout.syncRows(layout.rows);
+        const window = { top: 380, bottom: 460 };
+        const all = layout.rectangles(202, 231, layout.rows);
+        expect(layout.rectangles(202, 231, layout.rows, window)).toEqual(all.filter((rect) => rect.y < window.bottom && rect.y + rect.height > window.top));
+    });
+});

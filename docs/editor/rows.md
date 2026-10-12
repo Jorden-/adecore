@@ -70,3 +70,6 @@ The row is one code line high and stands at the declaration's indentation. It ke
 `getLineHeight(line)` returns the intrinsic text height of a zero-based line, excluding widgets. Wrapped lines outside the viewport use an estimate until drawn; hidden or absent lines return zero. `onLineHeights(listener)` reports changes after rendering, so the listener can safely adjust widgets. Widget height changes alone do not trigger it. Use `setScrollTop(top)` to synchronize viewports immediately; it cancels an animated scroll and repaints before returning.
 
 A widget with `fixed: true` uses its `height` as exact pixels and is never measured. This keeps spacer and gap rows identical across linked layouts. Omitted height uses the normal initial widget height.
+
+
+Long wrapped lines keep their full layout and text for selection, copying and hit testing. The text DOM draws a band of visual rows around the viewport, in blocks of 64 rows. Selection, find marks and wrap signs are clipped to the same viewport and overscan. This bounds painting; measuring a line still reads its full text.

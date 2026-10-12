@@ -2,6 +2,25 @@ import type { Position } from '@adecore/editor-core';
 
 export type Affinity = 'before' | 'after';
 
+export interface VerticalWindow {
+    top: number;
+    bottom: number;
+}
+
+export interface SubRowBand {
+    first: number;
+    last: number;
+}
+
+export function subRowBand(top: number, subRows: number, lineHeight: number, window: VerticalWindow, block = 1): SubRowBand {
+    const first = Math.max(0, Math.min(subRows - 1, Math.floor((window.top - top) / lineHeight)));
+    const last = Math.max(first, Math.min(subRows - 1, Math.ceil((window.bottom - top) / lineHeight) - 1));
+    return {
+        first: Math.floor(first / block) * block,
+        last: Math.min(subRows - 1, Math.ceil((last + 1) / block) * block - 1)
+    };
+}
+
 export interface LayoutDocument {
     getLineCount(): number;
     getLine(line: number): { start: number; end: number; next: number; text: string };
@@ -702,11 +721,11 @@ export class EditorLayout {
     }
 
     /* The boxes a range is drawn in, one per visual line it touches, among the rows given. */
-    rectangles(from: number, to: number, rows: readonly LayoutRow[]): LayoutRect[] {
+    rectangles(from: number, to: number, rows: readonly LayoutRow[], window?: VerticalWindow): LayoutRect[] {
         const result: LayoutRect[] = [];
         const lineHeight = this.metrics.lineHeight;
         for (const row of rows) {
-            if (row.kind !== 'text') {
+            if (row.kind !== 'text' || (window !== undefined && (row.top >= window.bottom || row.top + row.height <= window.top))) {
                 continue;
             }
             const geometry = this.geometry(row);
@@ -716,7 +735,8 @@ export class EditorLayout {
             const lastStop = geometry.offsets.length - 1;
             const fromStop = this.stopOf(geometry, Math.max(from, geometry.start));
             const toStop = this.stopOf(geometry, Math.min(to, geometry.end));
-            for (let subRow = 0; subRow < geometry.subRows; subRow++) {
+            const band = window === undefined ? { first: 0, last: geometry.subRows - 1 } : subRowBand(row.top, geometry.subRows, lineHeight, window);
+            for (let subRow = band.first; subRow <= band.last; subRow++) {
                 const last = subRow + 1 === geometry.subRows;
                 const rowFirst = geometry.rowStarts[subRow]!;
                 const rowEnd = last ? lastStop : geometry.rowStarts[subRow + 1]!;

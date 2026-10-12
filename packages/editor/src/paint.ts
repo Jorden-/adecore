@@ -1,5 +1,16 @@
 import { type AttributedLines, colorValue } from './attribution.ts';
-import { type BlockWidget, type EditorLayout, type LayoutRect, type LayoutRow, type LineGeometry, scanLine, type TextRow } from './layout.ts';
+import {
+    type BlockWidget,
+    type EditorLayout,
+    type LayoutRect,
+    type LayoutRow,
+    type LineGeometry,
+    scanLine,
+    subRowBand,
+    type SubRowBand,
+    type VerticalWindow,
+    type TextRow
+} from './layout.ts';
 import type { EditorChangeKind, LineToken } from './types.ts';
 
 const ITALIC = 1;
@@ -19,6 +30,7 @@ interface PaintedRow {
     tailTokens: readonly LineToken[] | null;
     /* The revision of the widget a block row was drawn from. */
     revision: number;
+    band?: SubRowBand;
 }
 
 /* The gap around a collapsed fold's placeholder, so it reads as `{…}` and not as three separate things. */
@@ -32,6 +44,7 @@ export interface RowPaint {
     whitespace: boolean;
     tokensOf(line: number): readonly LineToken[] | null;
     viewportWidth: number;
+    window: VerticalWindow;
     /* Where a row of the host's own DOM starts and how wide it is: the whole width of the editor, over the gutter, wherever the text is scrolled to. */
     hostLeft: number;
     hostWidth: number;
@@ -106,21 +119,31 @@ function fillRun(
     }
 }
 
-/* One line of text as absolutely placed runs and inlays. `firstRowOnly` leaves out what a wrapped line carries onto later visual lines. */
 export function lineElement(
     document: Document,
     geometry: LineGeometry,
     tokens: readonly LineToken[] | null,
     lineHeight: number,
-    firstRowOnly: boolean,
+    band: SubRowBand,
     whitespace = false
 ): HTMLElement {
     const element = document.createElement('div');
     element.className = 'se-line';
     element.style.width = `${geometry.width}px`;
-    for (const run of geometry.runs) {
-        if (firstRowOnly && run.subRow > 0) {
-            continue;
+    let first = 0;
+    let last = geometry.runs.length;
+    while (first < last) {
+        const middle = (first + last) >>> 1;
+        if (geometry.runs[middle]!.subRow < band.first) {
+            first = middle + 1;
+        } else {
+            last = middle;
+        }
+    }
+    for (let index = first; index < geometry.runs.length; index++) {
+        const run = geometry.runs[index]!;
+        if (run.subRow > band.last) {
+            break;
         }
         const span = document.createElement('span');
         span.className = 'se-run';
@@ -130,10 +153,10 @@ export function lineElement(
         element.append(span);
     }
     if (whitespace) {
-        appendTabSigns(element, geometry, lineHeight, firstRowOnly);
+        appendTabSigns(element, geometry, lineHeight, band);
     }
     for (const box of geometry.inlays) {
-        if (firstRowOnly && box.subRow > 0) {
+        if (box.subRow < band.first || box.subRow > band.last) {
             continue;
         }
         const span = document.createElement('span');
@@ -189,6 +212,11 @@ export class RowPainter {
     private paintText(row: TextRow, paint: RowPaint): void {
         const geometry = this.layout.geometry(row);
         const tokens = paint.tokensOf(row.line);
+        // Block boundaries keep a scroll within the band from rebuilding its text DOM.
+        const band =
+            geometry.subRows <= 64
+                ? { first: 0, last: geometry.subRows - 1 }
+                : subRowBand(row.top, geometry.subRows, this.layout.metrics.lineHeight, paint.window, 64);
         const folded = row.lastLine > row.line;
         const lastLine = folded && row.tail !== null ? this.layout.document.getLine(row.lastLine) : null;
         const tail = lastLine === null ? '' : lastLine.text.slice(row.tail! - lastLine.start);
@@ -202,9 +230,11 @@ export class RowPainter {
             entry.whitespace !== paint.whitespace ||
             entry.folded !== folded ||
             entry.tail !== tail ||
-            entry.tailTokens !== tailTokens
+            entry.tailTokens !== tailTokens ||
+            entry.band?.first !== band.first ||
+            entry.band?.last !== band.last
         ) {
-            const element = this.buildText(row, geometry, tokens, paint, tail, tailTokens);
+            const element = this.buildText(row, geometry, tokens, paint, tail, tailTokens, band);
             if (entry) {
                 entry.element.replaceWith(element);
             } else {
@@ -219,7 +249,8 @@ export class RowPainter {
                 folded,
                 tail,
                 tailTokens,
-                revision: 0
+                revision: 0,
+                band
             };
             this.rows.set(row.key, entry);
         }
@@ -234,12 +265,13 @@ export class RowPainter {
         tokens: readonly LineToken[] | null,
         paint: RowPaint,
         tail: string,
-        tailTokens: readonly LineToken[] | null
+        tailTokens: readonly LineToken[] | null,
+        band: SubRowBand
     ): HTMLElement {
         const document = this.code.ownerDocument;
         const lineHeight = this.layout.metrics.lineHeight;
-        const element = lineElement(document, geometry, tokens, lineHeight, false, paint.whitespace);
-        if (row.lastLine > row.line) {
+        const element = lineElement(document, geometry, tokens, lineHeight, band, paint.whitespace);
+        if (row.lastLine > row.line && band.last === geometry.subRows - 1) {
             const chip = document.createElement('button');
             chip.type = 'button';
             chip.className = 'se-fold-chip';
@@ -542,7 +574,7 @@ export function paintSticky(container: HTMLElement, entries: readonly StickyEntr
             number.textContent = entry.label;
             const code = document.createElement('div');
             code.className = 'se-sticky-code';
-            code.append(lineElement(document, entry.geometry, entry.tokens, lineHeight, true));
+            code.append(lineElement(document, entry.geometry, entry.tokens, lineHeight, { first: 0, last: 0 }));
             row.append(number, code);
             return row;
         })
@@ -576,10 +608,11 @@ export function arrowSign(document: Document, width: number, lineHeight: number,
 }
 
 /* An arrow over each tab of a line. */
-function appendTabSigns(element: HTMLElement, geometry: LineGeometry, lineHeight: number, firstRowOnly: boolean): void {
+function appendTabSigns(element: HTMLElement, geometry: LineGeometry, lineHeight: number, band: SubRowBand): void {
     const document = element.ownerDocument;
-    for (let stop = 0; stop < geometry.offsets.length - 1; stop++) {
-        if (geometry.text[geometry.offsets[stop]!] !== '\t' || (firstRowOnly && geometry.rowOf[stop]! > 0)) {
+    const end = geometry.rowStarts[band.last + 1] ?? geometry.offsets.length - 1;
+    for (let stop = geometry.rowStarts[band.first]!; stop < end; stop++) {
+        if (geometry.text[geometry.offsets[stop]!] !== '\t') {
             continue;
         }
         const left = geometry.before[stop]!;

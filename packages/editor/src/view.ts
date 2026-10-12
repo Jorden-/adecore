@@ -13,7 +13,18 @@ import {
 } from '@adecore/editor-core';
 import { createSearchClient, type EditorSearchClientOptions } from './search-client.ts';
 import { FindController } from './find.ts';
-import { type BlockWidget, EditorLayout, type FoldState, type Inlay, type LayoutRect, type LayoutRow, RIGHT_PADDING, type TextRow } from './layout.ts';
+import {
+    type BlockWidget,
+    EditorLayout,
+    type FoldState,
+    type Inlay,
+    type LayoutRect,
+    type LayoutRow,
+    RIGHT_PADDING,
+    type TextRow,
+    subRowBand,
+    type VerticalWindow
+} from './layout.ts';
 import { createMetrics, type EditorFont, readEditorFont } from './metrics.ts';
 import { type AttributedLines, AttributionRuns, colorValue, tintValue } from './attribution.ts';
 import { renderCodeBlock } from './code-block.ts';
@@ -1357,6 +1368,23 @@ export class EditorView {
         return ranges;
     }
 
+    private get paintWindow(): VerticalWindow {
+        return { top: this.scrollTop - this.overscan, bottom: this.scrollTop + this.viewportHeight + this.overscan };
+    }
+
+    private paintRectangles(from: number, to: number, rows: readonly LayoutRow[]): LayoutRect[] {
+        return this.layout.rectangles(from, to, rows, this.paintWindow);
+    }
+
+    private visibleTextBounds(row: TextRow): { from: number; to: number } {
+        const geometry = this.layout.geometry(row);
+        const band = subRowBand(row.top, geometry.subRows, this.layout.metrics.lineHeight, this.paintWindow);
+        return {
+            from: geometry.start + geometry.offsets[geometry.rowStarts[band.first]!]!,
+            to: band.last + 1 === geometry.subRows ? this.model.getLine(row.line).next : geometry.start + geometry.offsets[geometry.rowStarts[band.last + 1]!]!
+        };
+    }
+
     /* The arrows of the soft wraps in the rows on screen. */
     private wrapSigns(rows: readonly LayoutRow[]): WrapSign[] {
         if (!this.layout.wrapping) {
@@ -1369,7 +1397,8 @@ export class EditorView {
                 continue;
             }
             const geometry = this.layout.geometry(row);
-            for (let subRow = 0; subRow < geometry.subRows; subRow++) {
+            const band = subRowBand(row.top, geometry.subRows, lineHeight, this.paintWindow);
+            for (let subRow = band.first; subRow <= band.last; subRow++) {
                 const y = row.top + subRow * lineHeight;
                 if (subRow + 1 < geometry.subRows) {
                     const x = geometry.rowEnds[subRow]!;
@@ -1866,6 +1895,7 @@ export class EditorView {
                 whitespace: this.settings.whitespace,
                 tokensOf: (line: number) => this.styledTokensOf(line),
                 viewportWidth: this.viewportWidth - RIGHT_PADDING,
+                window: this.paintWindow,
                 hostLeft: this.scrollLeft - this.gutterWidth,
                 hostWidth: this.viewportWidth + this.gutterWidth,
                 onUnfold: (line: number) => this.toggleFold(line, false)
@@ -1933,7 +1963,7 @@ export class EditorView {
             if (group.length > 0) {
                 marks.push({
                     className: kind === 'write' ? 'se-occurrence se-occurrence-write' : 'se-occurrence',
-                    rects: group.flatMap((mark) => this.layout.rectangles(mark.from, mark.to, rows))
+                    rects: group.flatMap((mark) => this.paintRectangles(mark.from, mark.to, rows))
                 });
             }
         }
@@ -1949,7 +1979,7 @@ export class EditorView {
         paintSigns(this.signs, this.wrapSigns(rows), this.layout.metrics.lineHeight);
         const alike = this.selectionOccurrences();
         if (alike.length > 0) {
-            marks.push({ className: 'se-occurrence', rects: alike.flatMap((range) => this.layout.rectangles(range.from, range.to, rows)) });
+            marks.push({ className: 'se-occurrence', rects: alike.flatMap((range) => this.paintRectangles(range.from, range.to, rows)) });
         }
         const faded: LayoutRect[] = [];
         const struck: LayoutRect[] = [];
@@ -1957,7 +1987,7 @@ export class EditorView {
             if (marker.to <= marker.from) {
                 continue;
             }
-            const rects = this.layout.rectangles(marker.from, marker.to, rows);
+            const rects = this.paintRectangles(marker.from, marker.to, rows);
             if (marker.severity !== 'hint') {
                 marks.push({ className: `se-squiggle se-squiggle-${marker.severity}`, rects });
             }
@@ -1970,8 +2000,8 @@ export class EditorView {
         }
         const current = this.find.currentMark;
         const textRows = rows.filter((candidate) => candidate.kind === 'text');
-        const visibleFrom = textRows.length > 0 ? this.model.getLine(textRows[0]!.line).start : 0;
-        const visibleTo = textRows.length > 0 ? this.model.getLine(textRows.at(-1)!.line).next : 0;
+        const visibleFrom = textRows.length > 0 ? this.visibleTextBounds(textRows[0]!).from : 0;
+        const visibleTo = textRows.length > 0 ? this.visibleTextBounds(textRows.at(-1)!).to : 0;
         const found = this.find.matchesBetween(visibleFrom, visibleTo);
         const spans =
             current !== null &&
@@ -1984,7 +2014,7 @@ export class EditorView {
             if (mark.to > mark.from) {
                 marks.push({
                     className: mark.from === current?.from && mark.to === current.to ? 'se-find-current' : 'se-find-match',
-                    rects: this.layout.rectangles(mark.from, mark.to, rows)
+                    rects: this.paintRectangles(mark.from, mark.to, rows)
                 });
             }
         }
@@ -1996,27 +2026,27 @@ export class EditorView {
             }
             if (bracket.mate === undefined) {
                 if (this.unmatchedBracket(bracket.at)) {
-                    marks.push({ className: 'se-bracket-unmatched', rects: this.layout.rectangles(bracket.at, bracket.at + 1, rows) });
+                    marks.push({ className: 'se-bracket-unmatched', rects: this.paintRectangles(bracket.at, bracket.at + 1, rows) });
                 }
                 continue;
             }
             for (const offset of [bracket.at, bracket.mate]) {
                 if (!seen.has(offset)) {
                     seen.add(offset);
-                    marks.push({ className: 'se-bracket-match', rects: this.layout.rectangles(offset, offset + 1, rows) });
+                    marks.push({ className: 'se-bracket-match', rects: this.paintRectangles(offset, offset + 1, rows) });
                 }
             }
         }
         const selected = selections.flatMap((selection) =>
             selection.anchor === selection.head
                 ? []
-                : this.layout.rectangles(Math.min(selection.anchor, selection.head), Math.max(selection.anchor, selection.head), rows)
+                : this.paintRectangles(Math.min(selection.anchor, selection.head), Math.max(selection.anchor, selection.head), rows)
         );
         paintOverlays(this.overlays, { currentLine, selections: selected, focused, marks });
         paintOver(this.over, [
             { className: 'se-faded', rects: faded },
             { className: 'se-struck', rects: struck },
-            { className: 'se-link', rects: this.link === null ? [] : this.layout.rectangles(this.link.from, this.link.to, rows) }
+            { className: 'se-link', rects: this.link === null ? [] : this.paintRectangles(this.link.from, this.link.to, rows) }
         ]);
         const top = this.scrollTop;
         const caretRects = focused
@@ -2203,7 +2233,7 @@ export class EditorView {
                     const emphasisBackground = `color-mix(in srgb, ${colorValue(highlight.color)} 22%, transparent)`;
                     const emphasized = emphasisByColor.get(emphasisBackground) ?? [];
                     for (const range of highlight.emphasis) {
-                        emphasized.push(...this.layout.rectangles(Math.max(bounds.start, range.from), Math.min(bounds.end, range.to), [row]));
+                        emphasized.push(...this.paintRectangles(Math.max(bounds.start, range.from), Math.min(bounds.end, range.to), [row]));
                     }
                     emphasisByColor.set(emphasisBackground, emphasized);
                 }
