@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@adecore/ui';
 import { formatNumber } from '@adecore/ui/format';
@@ -11,6 +11,7 @@ export function FindReplace({ editor, className, onClose }: { editor: Editor; cl
     const [replacement, setReplacement] = useState('');
     const [preserveCase, setPreserveCase] = useState(false);
     const [state, setState] = useState<EditorFindState>({ count: 0, current: null });
+    const root = useRef<HTMLDivElement>(null);
     const compiled = useMemo(() => compileFind(query), [query]);
     useEffect(() => editor.onFind(setState), [editor]);
     useEffect(() => {
@@ -23,6 +24,15 @@ export function FindReplace({ editor, className, onClose }: { editor: Editor; cl
         () => () => {
             editor.endFind();
             editor.setReplacePreview(null);
+        },
+        [editor]
+    );
+    // The host closes the widget by unmounting it, with the keyboard in it or not; only a keyboard in it is handed back.
+    useLayoutEffect(
+        () => () => {
+            if (root.current?.contains(root.current.ownerDocument.activeElement) === true) {
+                editor.focus();
+            }
         },
         [editor]
     );
@@ -52,7 +62,21 @@ export function FindReplace({ editor, className, onClose }: { editor: Editor; cl
                                 current: state.current === null ? '0' : formatNumber(state.current + 1)
                             });
     return (
-        <div className={`adecore-editor-find ${className ?? ''}`} role="search" aria-label={t('find.label')}>
+        <div
+            ref={root}
+            className={`adecore-editor-find ${className ?? ''}`}
+            role="search"
+            aria-label={t('find.label')}
+            onKeyDown={(event) => {
+                if (event.key === 'Escape' && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    editor.endFind();
+                    editor.setReplacePreview(null);
+                    onClose?.();
+                    editor.focus();
+                }
+            }}
+        >
             <div className="adecore-editor-find-row">
                 <input
                     type="text"
@@ -66,13 +90,6 @@ export function FindReplace({ editor, className, onClose }: { editor: Editor; cl
                         if (event.key === 'Enter') {
                             event.preventDefault();
                             editor.findStep(event.shiftKey ? -1 : 1);
-                        }
-                        if (event.key === 'Escape') {
-                            event.preventDefault();
-                            editor.endFind();
-                            editor.setReplacePreview(null);
-                            onClose?.();
-                            editor.focus();
                         }
                     }}
                 />
