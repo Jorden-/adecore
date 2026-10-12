@@ -508,6 +508,7 @@ function clientCapabilities(options: LspSessionOptions): object {
             completion: {
                 ...dynamic,
                 contextSupport: true,
+                insertTextMode: 1,
                 ...(options.completionItemDefaults?.length ? { completionList: { itemDefaults: [...options.completionItemDefaults] } } : {}),
                 completionItem: {
                     snippetSupport: options.snippetSupport ?? false,

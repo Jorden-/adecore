@@ -1,4 +1,5 @@
 export { ErrorCodes, JsonRpcConnection, LspError, StaleResultError, type RequestHandler } from './connection.ts';
+export { applyCompletionDefaults } from './completion-defaults.ts';
 export { LspDocument } from './document.ts';
 export {
     applyContentChanges,

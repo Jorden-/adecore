@@ -1,5 +1,5 @@
 import type { EditorContentChange, EditorPosition, EditorRange } from '@adecore/editor';
-import type { CompletionItem, CompletionList, CompletionResult, MarkupContent } from '@adecore/lsp';
+import { applyCompletionDefaults, type CompletionItem, type CompletionResult, type MarkupContent } from '@adecore/lsp';
 import { comparePositions } from './diagnostics-model.ts';
 import { escapeMarkdown, isEmptyHover, splitSignatures, type HoverText } from './hover-content.ts';
 import type { CompletionDocs } from './popups.ts';
@@ -156,34 +156,7 @@ export function itemsOf(result: CompletionResult): { items: CompletionItem[]; in
     if (Array.isArray(result)) {
         return { items: result, incomplete: false };
     }
-    const list: CompletionList = result;
-    const defaults = list.itemDefaults;
-    if (defaults === undefined) {
-        return { items: list.items, incomplete: list.isIncomplete };
-    }
-    return {
-        incomplete: list.isIncomplete,
-        items: list.items.map((item) => {
-            const next: CompletionItem = { ...item };
-            if (defaults.insertTextFormat !== undefined && next.insertTextFormat === undefined) {
-                next.insertTextFormat = defaults.insertTextFormat;
-            }
-            if (defaults.insertTextMode !== undefined && next.insertTextMode === undefined) {
-                next.insertTextMode = defaults.insertTextMode;
-            }
-            if (defaults.commitCharacters !== undefined && next.commitCharacters === undefined) {
-                next.commitCharacters = defaults.commitCharacters;
-            }
-            if (next.textEdit === undefined && defaults.editRange !== undefined) {
-                const text = item.textEditText ?? item.insertText ?? item.label;
-                next.textEdit =
-                    'start' in defaults.editRange
-                        ? { range: defaults.editRange, newText: text }
-                        : { insert: defaults.editRange.insert, replace: defaults.editRange.replace, newText: text };
-            }
-            return next;
-        })
-    };
+    return { incomplete: result.isIncomplete, items: result.items.map((item) => applyCompletionDefaults(item, result.itemDefaults)) };
 }
 
 /*

@@ -28,6 +28,7 @@ describe('capabilities and server requests', () => {
         await session.initialize();
         const initialize = transport.request('initialize').params as { capabilities: { textDocument: { completion: unknown } } };
         expect(initialize.capabilities.textDocument.completion).toMatchObject({
+            insertTextMode: 1,
             completionItem: { snippetSupport: true, insertTextModeSupport: { valueSet: [1, 2] } },
             completionList: { itemDefaults: ['commitCharacters', 'editRange', 'insertTextFormat', 'insertTextMode'] }
         });

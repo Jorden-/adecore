@@ -65,6 +65,10 @@ Without `onConfiguration`, a configuration query without a section gets all sett
 
 `state` goes from `new` to `initializing`, `ready`, `closing` and `closed`. A closed session does not start again.
 
+## Completion defaults
+
+`applyCompletionDefaults(item, defaults?)` fills completion-list defaults without changing the item. Explicit item fields win. A default edit range uses `textEditText`, then `label`; `insertText` does not supply a default edit. Malformed ranges throw `RangeError`. The session advertises mode `1` (as-is) as the completion default, matching the editor consumer; explicit item or list modes override it.
+
 ## Capabilities
 
 `supports(method, document?)` says whether the server answers a method, from its static capabilities and from what it registered since, filtered by the document selector of a registration. `providerOptions(method, document?)` returns the options of that provider, such as trigger characters or a semantic tokens legend. Ask for the exact method: `completionItem/resolve` needs `resolveProvider`, `textDocument/prepareRename` needs `prepareProvider`.
