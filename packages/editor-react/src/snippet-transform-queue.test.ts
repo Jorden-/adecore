@@ -179,3 +179,22 @@ test('disposing the active exit owner lets another editor continue on a new work
     expect(await b).toEqual(['B']);
     second.dispose();
 });
+
+test('expired exits free their FIFO slots before admitting a new accept', async () => {
+    const host = setup(),
+        lease = host.queue.acquire();
+    const active = lease.request(job('active'));
+    await settle();
+    let current = true;
+    const old = Array.from({ length: 16 }, () => lease.request(job('old'), { kind: 'exit', current: () => current }).catch((error) => error));
+    current = false;
+    const next = lease.request(job('new')).catch((error) => error);
+    host.workers[0]!.answer('ACTIVE');
+    await active;
+    await settle();
+    expect(host.workers[0]!.messages).toHaveLength(2);
+    host.workers[0]!.answer('NEW');
+    expect(await next).toEqual(['NEW']);
+    expect((await Promise.all(old)).every((error) => error.kind === 'superseded')).toBe(true);
+    lease.dispose();
+});

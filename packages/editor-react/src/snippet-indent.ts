@@ -1,3 +1,4 @@
+import { snippetOrderOf, withSnippetOrder } from './snippet-range-order.ts';
 import { MAX_SNIPPET_TEXT, type ParsedSnippet, type SnippetRange } from './snippet.ts';
 
 /* Indentation edits map the offsets once, including child projections in copied parents. */
@@ -26,11 +27,15 @@ export function indentSnippet(parsed: ParsedSnippet, before: string): ParsedSnip
         }
         return offset + low * prefix.length;
     };
-    const range = <Range extends SnippetRange>(range: Range): Range => ({
-        ...range,
-        start: shift(range.start),
-        end: shift(range.end, range.start === range.end || range.tail === true)
-    });
+    const range = <Range extends SnippetRange>(range: Range): Range =>
+        withSnippetOrder(
+            {
+                ...range,
+                start: shift(range.start),
+                end: shift(range.end, range.start === range.end || range.tail === true)
+            },
+            snippetOrderOf(range)
+        );
     return {
         text: parsed.text.replace(/\n/g, '\n' + prefix),
         stops: parsed.stops.map((stop) => range(stop)),

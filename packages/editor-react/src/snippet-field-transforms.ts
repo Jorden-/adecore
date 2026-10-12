@@ -11,6 +11,9 @@ export interface FieldTransformTarget {
     readonly transform: SnippetTransform;
     readonly parents?: readonly number[];
     readonly owner: object;
+    readonly frame: object;
+    readonly order: readonly number[];
+    readonly ancestors?: readonly symbol[];
 }
 interface Entry {
     readonly targets: FieldTransformTarget[];
@@ -106,7 +109,7 @@ export class SnippetFieldTransforms {
         this.entries.delete(entry);
         entry.finish();
     }
-    edited(changes: readonly EditorContentChange[]): void {
+    edited(changes: readonly EditorContentChange[], detached?: <Range extends EditorRange>(range: Range) => Range): void {
         for (const entry of this.entries) {
             if (entry === this.applying) {
                 continue;
@@ -123,7 +126,7 @@ export class SnippetFieldTransforms {
                         : empty
                           ? comparePositions(change.range.start, start) <= 0 && comparePositions(start, change.range.end) < 0
                           : comparePositions(change.range.start, end) < 0 && comparePositions(start, change.range.end) < 0;
-                    if (overlaps) {
+                    if (overlaps && !(detached !== undefined && empty && insert)) {
                         this.cancel(entry);
                         break;
                     }
@@ -131,7 +134,7 @@ export class SnippetFieldTransforms {
                     start = shiftPosition(start, change);
                     end = insertAtEnd ? end : shiftPosition(end, change);
                 }
-                target.range = { start, end };
+                target.range = detached === undefined ? { start, end } : detached({ ...target.range, order: target.order });
                 if (entry.cancelled) {
                     break;
                 }

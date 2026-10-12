@@ -131,7 +131,7 @@ export class FakeEditor implements Editor {
     }
 
     /* The text becomes `text`, and listeners of the text hear the one stretch that differs, as the real editor reports it. */
-    private replaceText(text: string, source: EditorTextChange['source'] = 'external'): void {
+    private replaceText(text: string, source: EditorTextChange['source'] = 'external', selections?: readonly EditorRange[]): void {
         const span = changedSpan(this.text, text);
         const before = this.text;
         this.text = text;
@@ -140,7 +140,11 @@ export class FakeEditor implements Editor {
         }
         // As in the real editor the caret lands behind what was typed, and listeners of the caret hear it before those of the text.
         if (source !== 'external') {
-            this.moveCaret(positionIn(text, span.start + span.text.length));
+            if (selections === undefined) {
+                this.moveCaret(positionIn(text, span.start + span.text.length));
+            } else {
+                this.setSelections(selections);
+            }
         }
         this.followTracked(span.start, span.end, span.text.length);
         this.ghost = null;
@@ -714,7 +718,8 @@ export class FakeEditor implements Editor {
         return [...this.keys].some((handler) => handler(full));
     }
 
-    applyEdits(edits: readonly EditorContentChange[]): boolean {
+    /* The fake keeps no selection direction, so a test of `mapSelections` keeping a backward selection needs the real editor. */
+    applyEdits(edits: readonly EditorContentChange[], options: { readonly mapSelections?: (range: EditorRange) => EditorRange } = {}): boolean {
         if (this.readOnly || edits.length === 0) {
             return false;
         }
@@ -741,11 +746,14 @@ export class FakeEditor implements Editor {
             return offset + delta;
         };
         const moved = others.map((range) => ({ anchor: follow(range.anchor), head: follow(range.head) }));
-        this.replaceText(text, 'command');
-        this.otherSelections = moved.map((range) => ({
-            start: positionIn(text, Math.min(range.anchor, range.head)),
-            end: positionIn(text, Math.max(range.anchor, range.head))
-        }));
+        const mapped = options.mapSelections && this.getSelections().map((range) => options.mapSelections!(range));
+        this.replaceText(text, 'command', mapped);
+        if (mapped === undefined) {
+            this.otherSelections = moved.map((range) => ({
+                start: positionIn(text, Math.min(range.anchor, range.head)),
+                end: positionIn(text, Math.max(range.anchor, range.head))
+            }));
+        }
         emit(this.changes);
         return true;
     }

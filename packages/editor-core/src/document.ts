@@ -46,6 +46,8 @@ export interface OffsetRange {
 }
 
 export interface DocumentEditOptions extends EditOptions {
+    /* Positions in the resulting text, committed with the edit and its undo state. */
+    selectionPositions?: readonly { readonly anchor: Position; readonly head: Position }[];
     /* The edit is refused, with nothing changed, unless the document is still at this revision. */
     expectedRevision?: number;
 }
@@ -493,16 +495,23 @@ export class DocumentModel {
             }
         }
         const map = offsetMapper(unique);
-        const nextSelections = options.selections ?? this.selections.map((selection) => ({ anchor: map(selection.anchor), head: map(selection.head) }));
+        const at = (position: Position): number => {
+            const line = next.lineBounds(position.line);
+            return offsetIn(next, line.start + clampInteger(position.column, line.end - line.start));
+        };
         // Several edits can cancel each other out, like moving a character and moving it back.
         const unchanged =
             next === this.rope || (changed.length > 1 && next.length === this.rope.length && next.equalsRange(this.rope, changed[0]!.from, changed.at(-1)!.to));
         if (unchanged) {
             if (options.selections) {
-                this.setSelections(nextSelections);
+                this.setSelections(options.selections);
             }
             return false;
         }
+        const nextSelections =
+            options.selections ??
+            options.selectionPositions?.map((selection) => ({ anchor: at(selection.anchor), head: at(selection.head) })) ??
+            this.selections.map((selection) => ({ anchor: map(selection.anchor), head: map(selection.head) }));
 
         const before = this.state();
         const firstLine = this.rope.lineAt(changed[0]!.from);

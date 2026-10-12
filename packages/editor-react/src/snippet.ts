@@ -1,3 +1,4 @@
+import { withSnippetOrder } from './snippet-range-order.ts';
 import { scanSnippetTransform } from './snippet-transform-format.ts';
 import type { SnippetTransformJob } from './snippet-transform-protocol.ts';
 import { SNIPPET_VARIABLES } from './snippet-variable-names.ts';
@@ -224,6 +225,7 @@ function renderSnippet(nodes: readonly Node[], variableTransforms?: readonly str
     let text = '';
     let work = 0;
     let ranges = 0;
+    let occurrence = 0;
     let tailEvent = 0;
     let tailOffset = -1;
     const recordTail = (range: SnippetRange): void => {
@@ -246,6 +248,7 @@ function renderSnippet(nodes: readonly Node[], variableTransforms?: readonly str
             if (++work > MAX_SNIPPET_WORK) {
                 throw new SnippetLimitError();
             }
+            const order = occurrence++;
             if (node.kind === 'text') {
                 const start = text.length;
                 const value = node.transform === undefined || variableTransforms === undefined ? node.text : variableTransforms[transforms.length];
@@ -258,6 +261,7 @@ function renderSnippet(nodes: readonly Node[], variableTransforms?: readonly str
                         throw new SnippetLimitError();
                     }
                     const range = { start, end: text.length, transform: node.transform, ...(parents.length === 0 ? {} : { parents: [...parents] }) };
+                    withSnippetOrder(range, order);
                     transforms.push(range);
                     recordTail(range);
                 }
@@ -287,6 +291,7 @@ function renderSnippet(nodes: readonly Node[], variableTransforms?: readonly str
                 ...(node.transform === undefined ? {} : { transform: node.transform }),
                 ...(tailEvent !== beforeTail && tailOffset === text.length ? { tail: true as const } : {})
             };
+            withSnippetOrder(range, order);
             recordTail(range);
             const field = fields.get(node.index) ?? {
                 index: node.index,
@@ -304,13 +309,18 @@ function renderSnippet(nodes: readonly Node[], variableTransforms?: readonly str
                     field.primary = field.ranges.length;
                 }
                 field.ranges.push(range);
-                stops.push({
-                    index: node.index,
-                    start: range.start,
-                    end: range.end,
-                    ...(node.transform === undefined ? {} : { transform: node.transform }),
-                    ...(range.tail === undefined ? {} : { tail: range.tail })
-                });
+                stops.push(
+                    withSnippetOrder(
+                        {
+                            index: node.index,
+                            start: range.start,
+                            end: range.end,
+                            ...(node.transform === undefined ? {} : { transform: node.transform }),
+                            ...(range.tail === undefined ? {} : { tail: range.tail })
+                        },
+                        order
+                    )
+                );
             }
             fields.set(node.index, field);
         }

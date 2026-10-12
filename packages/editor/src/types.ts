@@ -640,8 +640,8 @@ export interface Editor {
     setSelectionRanges(provider: EditorSelectionRanges | null): void;
     /* Follows a range through every change of the text, `setText` and undo included, until it is disposed. Costs one mapping of two offsets per change. */
     trackRange(range: EditorRange): EditorTrackedRange;
-    /* Replaces ranges of the current text at once, as one step of the undo history. */
-    applyEdits(edits: readonly EditorContentChange[]): boolean;
+    /* Replaces ranges of the current text at once, as one step of the undo history. `mapSelections` places each selection in the new text, keeping its direction, and redo restores it. */
+    applyEdits(edits: readonly EditorContentChange[], options?: { readonly mapSelections?: (range: EditorRange) => EditorRange }): boolean;
     setTheme(theme: EditorTheme): void;
     /* Reads the code face off the page again, after the page changed its size, family or ligatures. */
     refreshFont(): void;

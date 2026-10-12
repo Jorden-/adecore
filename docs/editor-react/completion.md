@@ -8,14 +8,14 @@ Typing an identifier character, or a trigger character the service lists in the 
 
 `CompletionPopup` draws the list: the matched letters, a letter and color per kind, and the documentation of the active row beside it, resolved through `completionItem/resolve` when the service supports it. The keys while it is open:
 
-| Key                    | What it does                                               |
-| ---------------------- | ---------------------------------------------------------- |
-| Up, Down               | Moves through the list, round at the ends                  |
-| Page Up, Page Down     | Moves eight rows                                           |
-| Enter                  | Inserts the active row                                     |
-| Tab                    | Replaces the word after the caret with the active row     |
-| Escape                 | Closes the list                                            |
-| A commit character     | Inserts the row and types the character, once a person moved in the list or asked with the keyboard |
+| Key                | What it does                                                                                        |
+| ------------------ | --------------------------------------------------------------------------------------------------- |
+| Up, Down           | Moves through the list, round at the ends                                                           |
+| Page Up, Page Down | Moves eight rows                                                                                    |
+| Enter              | Inserts the active row                                                                              |
+| Tab                | Replaces the word after the caret with the active row                                               |
+| Escape             | Closes the list                                                                                     |
+| A commit character | Inserts the row and types the character, once a person moved in the list or asked with the keyboard |
 
 `completion.accept(replace, index?)`, `move(delta)` and `close()` do the same from code. A row the person picked before ranks higher next time. Accepting applies the item's `additionalTextEdits` too, such as an import, and runs its command when it has one.
 
@@ -83,8 +83,12 @@ A full transform queue refuses an accept with a busy notice, separately from the
 
 ### Field-exit transforms
 
-Ordinary and transformed occurrences share the raw value while their field is active. Tab or Shift+Tab sends the transformed occurrences as one batch, deduplicating identical jobs across carets. Each occurrence supplies its own value. A transform-only field stays navigable; returning to it selects its transformed text, and the next exit transforms that value again. A replacement removes only nested projections inside that occurrence, preserving independent stops at the same boundary.
+Ordinary and transformed occurrences share the raw value while their field is active. Tab or Shift+Tab sends the transformed occurrences as one batch, deduplicating identical jobs across carets. Each occurrence supplies its own value. A transform-only field stays navigable; returning to it selects its transformed text, and the next exit transforms that value again. Leaving a transformed parent immediately unlinks child projections inside that occurrence, preserving independent stops at the same boundary. Those projections remain unlinked if the exit is cancelled or fails; the text stays raw.
 
-Navigation continues immediately. A choice picker in the next field retains its active row when an earlier field transform applies. Tracked targets survive a normal pop to `$0`. A revisit invalidates the previous exit for that field; editing a target invalidates the entire batch. Other input shifts its ranges. The answer must still match the expected raw text and the latest exit sequence, and may not overwrite the current field. Escape, undo, external edits and disposal cancel pending targets. Even after the final frame pops, Escape cancels its pending transforms. Missing workers, queue overflow, budget, syntax and worker failures leave field values raw without a notice or retry.
+Navigation continues immediately. A choice picker in the next field retains its active row when an earlier field transform applies. Tracked targets survive a normal pop to `$0`. A revisit invalidates the previous exit for that field; editing a target invalidates the entire batch. Other input shifts its ranges. The answer must still match the expected raw text and the latest exit sequence, and may not overwrite the current field. Escape, undo, external edits and disposal cancel pending targets. Even after the final frame pops, Escape cancels its pending transforms and preserves the existing carets. Missing workers, queue overflow, budget, syntax and worker failures leave field values raw without a notice or retry.
 
 Applying an exit is one owned edit batch and a separate undo step. The first undo restores the raw mirrors; the next restores the preceding typing. Completion waits for its own pending exits before capturing its insertion revision and maps explicit item/import ranges through those exits. A user edit, selection change, blur or newer accept during that wait still cancels the accept. No server pattern runs on the page. The existing 1,000-range limit counts pending targets and active frames together. Output, including added indentation, is checked against the two-million-unit batch limit before applying any edit.
+
+Detached replacements keep adjacent sibling endpoints outside the output. Empty stops follow their source order, including stops between outputs at the same point and targets in separate queued exits. The editor selections are committed with the edit to match the tracked boundaries, including after redo. A nested exit can finish after returning to its parent, and its enclosing fields follow the replacement. Expired requests are removed before testing the FIFO limit.
+
+Limitation: the generated final stop carries no nested order, so inside a nested snippet it sorts after a target of an enclosing snippet at the same point. This only happens when `$0` was removed by unlinking.

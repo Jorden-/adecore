@@ -46,18 +46,27 @@ const MAX_COMPLETION_RANGES = 1_000;
 
 class CompletionLimitError extends Error {}
 
-function mapCompletionEdits(item: CompletionItem, changes: readonly EditorContentChange[]): CompletionItem | null {
-    let valid = true;
-    const map = (range: EditorRange): EditorRange => {
+function mapCompletionEdits(
+    item: CompletionItem,
+    changes: readonly EditorContentChange[],
+    mapRange: (range: EditorRange) => EditorRange
+): CompletionItem | null {
+    // Changes apply one after another, so each is checked against the range as the earlier ones left it.
+    const overlapsChange = (range: EditorRange): boolean => {
         let { start, end } = range;
         for (const change of changes) {
             if (comparePositions(start, change.range.end) < 0 && comparePositions(change.range.start, end) < 0) {
-                valid = false;
+                return true;
             }
             start = shiftPosition(start, change);
             end = shiftPosition(end, change);
         }
-        return { start, end };
+        return false;
+    };
+    let valid = true;
+    const map = (range: EditorRange): EditorRange => {
+        valid &&= !overlapsChange(range);
+        return mapRange(range);
     };
     const edit = item.textEdit;
     const mapped = {
@@ -157,13 +166,13 @@ export class CompletionFeature {
         const acceptSequence = ++this.acceptSequence;
         const snippetToken = snippets.token;
         const inSnippet = snippets.isActive;
-        const exitChanges: (readonly EditorContentChange[])[] = [];
+        const exitChanges: { changes: readonly EditorContentChange[]; map: (range: EditorRange) => EditorRange }[] = [];
         if (snippets.hasPendingTransforms) {
             this.close();
             if (
                 !(await snippets.settleTransforms(
                     () => !this.disposed && acceptSequence === this.acceptSequence && snippets.token === snippetToken,
-                    (changes) => exitChanges.push(changes)
+                    (changes, map) => exitChanges.push({ changes, map })
                 ))
             ) {
                 return;
@@ -196,8 +205,8 @@ export class CompletionFeature {
         if (!current()) {
             return;
         }
-        for (const changes of exitChanges) {
-            const mapped = mapCompletionEdits(item, changes);
+        for (const { changes, map } of exitChanges) {
+            const mapped = mapCompletionEdits(item, changes, map);
             if (mapped === null) {
                 return;
             }

@@ -358,3 +358,38 @@ describe('content edits', () => {
         expect(seen).toEqual([{ start: { line: 0, column: 5 }, end: { line: 0, column: 6 }, text: '' }]);
     });
 });
+
+it('commits final positional selections with multiline edits and restores them on redo', () => {
+    const model = new DocumentModel('barfoo');
+    model.setSelections([{ anchor: 0, head: 3 }]);
+    model.applyEdits([{ from: 3, to: 6, text: '-foo\nnext' }], {
+        selectionPositions: [
+            { anchor: { line: 0, column: 0 }, head: { line: 0, column: 3 } },
+            { anchor: { line: 1, column: 0 }, head: { line: 1, column: 4 } }
+        ]
+    });
+    const expected = [
+        { anchor: 0, head: 3 },
+        { anchor: 8, head: 12 }
+    ];
+    expect(model.getSelections()).toEqual(expected);
+    model.undo();
+    expect(model.getSelections()).toEqual([{ anchor: 0, head: 3 }]);
+    model.redo();
+    expect(model.getSelections()).toEqual(expected);
+});
+
+it('ignores positional selections when the edits cancel out', () => {
+    const model = new DocumentModel('xay');
+    model.setSelections([{ anchor: 0, head: 0 }]);
+    const changed = model.applyEdits(
+        [
+            { from: 1, to: 1, text: 'a' },
+            { from: 1, to: 2, text: '' }
+        ],
+        { selectionPositions: [{ anchor: { line: 0, column: 3 }, head: { line: 0, column: 3 } }] }
+    );
+    expect(changed).toBe(false);
+    expect(model.getText()).toBe('xay');
+    expect(model.getSelections()).toEqual([{ anchor: 0, head: 0 }]);
+});

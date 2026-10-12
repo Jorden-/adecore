@@ -1,3 +1,4 @@
+import { compareSnippetOrder, snippetOrderOf } from './snippet-range-order.ts';
 import { SnippetFieldTransforms, type FieldTransformTarget } from './snippet-field-transforms.ts';
 import { SnippetTransformError } from './snippet-transform-client.ts';
 import { acquireSnippetTransforms, type SnippetTransformLease } from './snippet-transform-queue.ts';
@@ -17,6 +18,8 @@ export function positionInInsertion(start: EditorPosition, text: string, offset:
 
 interface SessionRange extends EditorRange {
     readonly id: symbol;
+    readonly order: readonly number[];
+    readonly ancestors?: readonly symbol[];
     readonly transform?: SnippetTransform;
     readonly parents?: readonly number[];
 }
@@ -82,6 +85,8 @@ const MAX_RANGES = 1000;
 
 function frameOf(insertions: readonly SnippetInsertion[]): Frame | null {
     const primary = insertions.at(-1);
+    const positions = [...insertions].sort((left, right) => comparePositions(left.start, right.start));
+    const instanceOrder = new Map(positions.map((insertion, index) => [insertion.start, index]));
     if (primary === undefined || primary.stops.length === 0) {
         return null;
     }
@@ -101,6 +106,7 @@ function frameOf(insertions: readonly SnippetInsertion[]): Frame | null {
                     choices: field?.choices,
                     ranges: [...(field?.ranges ?? [stop]), ...(field?.linked ?? [])].map((range) => ({
                         id: Symbol('snippet-range'),
+                        order: [instanceOrder.get(at)!, snippetOrderOf(range) ?? (stop.index === 0 ? Infinity : stops.indexOf(stop))],
                         ...(range.transform === undefined ? {} : { transform: range.transform }),
                         start: positionInInsertion(at, text, range.start),
                         end: positionInInsertion(at, text, range.end),
@@ -159,6 +165,7 @@ function activeOwners(active: readonly SessionRange[], changes: readonly EditorC
 export class SnippetFeature {
     private readonly language: SnippetHost;
     private frames: Frame[] = [];
+    private placed: SessionRange[] = [];
     private visiting = false;
     private applying = false;
     private extras: readonly EditorContentChange[] = [];
@@ -167,7 +174,11 @@ export class SnippetFeature {
     private readonly transforms: SnippetTransformLease | null;
     private readonly fieldTransforms: SnippetFieldTransforms;
     private exitGeneration = 0;
-    private detached: { targets: readonly FieldTransformTarget[]; ranges: ReadonlyMap<symbol, EditorRange> } | null = null;
+    private detached: {
+        targets: readonly FieldTransformTarget[];
+        ranges: ReadonlyMap<symbol, EditorRange>;
+        map: <Range extends EditorRange>(range: Range, parent?: (target: FieldTransformTarget) => boolean) => Range;
+    } | null = null;
 
     constructor(language: SnippetHost, timers: Timers = realTimers) {
         this.language = language;
@@ -202,15 +213,18 @@ export class SnippetFeature {
         return this.fieldTransforms.pending;
     }
 
-    async settleTransforms(current: () => boolean, edited?: (changes: readonly EditorContentChange[]) => void): Promise<boolean> {
+    async settleTransforms(
+        current: () => boolean,
+        edited?: (changes: readonly EditorContentChange[], map: (range: EditorRange) => EditorRange) => void
+    ): Promise<boolean> {
         let selections = this.language.editor.getSelections(),
             valid = true;
         const off = this.language.editor.onTextChange((change) => {
             if (this.detached === null) {
                 valid = false;
             } else {
-                selections = selections.map((range) => mapRange(range, change.changes, false));
-                edited?.(change.changes);
+                selections = selections.map((range) => this.detached!.map(range));
+                edited?.(change.changes, this.detached.map);
             }
         });
         try {
@@ -271,6 +285,30 @@ export class SnippetFeature {
                     parent.selected.some((range) => rangeHolds(range, instance.hull.start) && rangeHolds(range, instance.hull.end))
                 )
             );
+        if (nested && parent !== undefined) {
+            const selectedParents = new Set(this.frames.flatMap((frame) => frame.instances.flatMap((parent) => parent.selected.map((range) => range.id))));
+            for (const instance of frame.instances) {
+                const enclosing = parent.instances
+                    .flatMap((parent) => parent.selected)
+                    .find((range) => rangeHolds(range, instance.hull.start) && rangeHolds(range, instance.hull.end));
+                const emptyHull = comparePositions(instance.hull.start, instance.hull.end) === 0;
+                const ancestors = this.frames
+                    .flatMap((frame) => frame.instances.flatMap((parent) => parent.fields.flatMap((field) => field.ranges)))
+                    .filter(
+                        (range) =>
+                            (comparePositions(range.start, range.end) < 0 || selectedParents.has(range.id)) &&
+                            rangeHolds(range, instance.hull.start) &&
+                            rangeHolds(range, instance.hull.end) &&
+                            (!emptyHull ||
+                                range.id === enclosing?.id ||
+                                (comparePositions(range.start, instance.hull.start) < 0 && comparePositions(instance.hull.end, range.end) < 0))
+                    )
+                    .map((range) => range.id);
+                for (const field of instance.fields) {
+                    field.ranges = field.ranges.map((range) => ({ ...range, order: [...(enclosing?.order ?? []), ...range.order], ancestors }));
+                }
+            }
+        }
         if (!nested || this.frames.length >= MAX_FRAMES || this.frames.reduce((total, frame) => total + rangeCount(frame), rangeCount(frame)) > MAX_RANGES) {
             this.end();
         }
@@ -317,6 +355,7 @@ export class SnippetFeature {
         this.closeChoices();
         this.generation++;
         this.frames = [];
+        this.placed = [];
     }
 
     private closeChoices(): void {
@@ -350,6 +389,7 @@ export class SnippetFeature {
         frame.exits.set(stop, (frame.exits.get(stop) ?? 0) + 1);
         this.fieldTransforms.prune();
         const selections = selectedOf(frame);
+        this.placed = selections;
         if (selections.length === 0) {
             this.end();
             return;
@@ -430,9 +470,12 @@ export class SnippetFeature {
             if (popups !== undefined && [popups.completion, popups.signature, popups.hover, popups.pick, popups.peek].some((popup) => popup !== null)) {
                 return false;
             }
+            const active = this.isActive;
             const caret = this.language.editor.getCaret();
             this.end();
-            this.language.editor.setCaret(caret);
+            if (active) {
+                this.language.editor.setCaret(caret);
+            }
             return true;
         }
         return false;
@@ -456,7 +499,10 @@ export class SnippetFeature {
                     value: this.language.editor.textInRange(range),
                     transform: range.transform,
                     parents: range.parents,
-                    owner: instance
+                    owner: instance,
+                    frame,
+                    order: range.order,
+                    ancestors: range.ancestors
                 });
             }
         }
@@ -486,10 +532,13 @@ export class SnippetFeature {
 
     private applyFieldTransforms(targets: readonly FieldTransformTarget[], values: readonly string[]): void {
         const { editor } = this.language;
-        const active = this.frames.at(-1)?.instances.flatMap((instance) => instance.selected) ?? [];
+        const activeFrame = this.frames.at(-1);
+        const active = activeFrame?.instances.flatMap((instance) => instance.selected) ?? [];
         if (
-            targets.some((target) =>
-                active.some((range) => comparePositions(range.start, target.range.end) < 0 && comparePositions(target.range.start, range.end) < 0)
+            targets.some(
+                (target) =>
+                    target.frame === activeFrame &&
+                    active.some((range) => comparePositions(range.start, target.range.end) < 0 && comparePositions(target.range.start, range.end) < 0)
             )
         ) {
             return;
@@ -509,6 +558,9 @@ export class SnippetFeature {
                 return;
             }
             const text = value.replace(/\n/g, '\n' + prefix);
+            if (text === editor.textInRange(target.range)) {
+                continue;
+            }
             const empty = comparePositions(target.range.start, target.range.end) === 0;
             const group = empty
                 ? groups.find(
@@ -524,8 +576,17 @@ export class SnippetFeature {
                 group.targets.push({ target, text });
             }
         }
+        if (groups.length === 0) {
+            return;
+        }
+        for (const group of groups) {
+            group.targets.sort((left, right) => compareSnippetOrder(left.target.order, right.target.order));
+            group.change = { range: group.change.range, text: group.targets.map(({ text }) => text).join('') };
+        }
         const changes = groups.map((group) => group.change).sort((left, right) => comparePositions(right.range.start, left.range.start));
+        const peersOf = new Map(groups.map((group) => [group.change, group.targets.map(({ target }) => target)]));
         const ranges = new Map<symbol, EditorRange>();
+        const steps = new Map<symbol, EditorRange>();
         for (const group of groups) {
             let start = group.change.range.start;
             for (const edit of changes) {
@@ -533,7 +594,11 @@ export class SnippetFeature {
                     start = shiftPosition(start, edit);
                 }
             }
+            let local = group.change.range.start;
             for (const { target, text } of group.targets) {
+                const localEnd = positionInInsertion(local, text, text.length);
+                steps.set(target.id, { start: local, end: localEnd });
+                local = localEnd;
                 const end = positionInInsertion(start, text, text.length);
                 ranges.set(target.id, { start, end });
                 start = end;
@@ -543,10 +608,80 @@ export class SnippetFeature {
         const pick = this.language.popups?.getState().pick;
         const activeChoice =
             this.choicePrefix !== null && pick?.active.startsWith(this.choicePrefix) ? Number(pick.active.slice(this.choicePrefix.length)) : undefined;
-        this.detached = { targets, ranges };
+        const trackedFrames = [...new Set([...this.frames, ...targets.map((target) => target.frame as Frame)])];
+        const transformIds = new Set(targets.map((target) => target.id));
+        const captured = [
+            ...this.placed,
+            ...active,
+            ...trackedFrames.flatMap((frame) =>
+                frame.instances.flatMap((instance) =>
+                    instance.fields.flatMap((field) =>
+                        field.ranges.filter((range) => !transformIds.has(range.id) || comparePositions(range.start, range.end) < 0)
+                    )
+                )
+            )
+        ];
+        const ancestorsOf = new Map(
+            targets.map((target) => [
+                target,
+                new Set([
+                    ...(target.ancestors ?? []),
+                    ...(target.frame as Frame).instances.flatMap((instance) =>
+                        instance.fields.flatMap((field) =>
+                            target.owner === instance && target.parents?.includes(field.index) === true
+                                ? field.ranges
+                                      .filter((range) => rangeHolds(range, target.range.start) && rangeHolds(range, target.range.end))
+                                      .map((range) => range.id)
+                                : []
+                        )
+                    )
+                ])
+            ])
+        );
+        const map = <Range extends EditorRange>(range: Range, parent?: (target: FieldTransformTarget) => boolean): Range => {
+            const tracked =
+                'order' in range
+                    ? (range as Range & SessionRange)
+                    : captured.find((candidate) => comparePositions(candidate.start, range.start) === 0 && comparePositions(candidate.end, range.end) === 0);
+            let { start, end } = range;
+            for (const change of changes) {
+                const peers = peersOf.get(change)!;
+                const descendants = peers.filter((peer) => parent?.(peer) ?? (tracked !== undefined && ancestorsOf.get(peer)!.has(tracked.id)));
+                const grows = descendants.length > 0;
+                const empty = comparePositions(start, end) === 0;
+                const boundary = (position: EditorPosition): EditorPosition => {
+                    if (comparePositions(position, change.range.start) !== 0 || peers.length === 0) {
+                        return shiftPosition(position, change);
+                    }
+                    let low = 0,
+                        high = peers.length;
+                    while (low < high) {
+                        const middle = (low + high) >>> 1;
+                        if (compareSnippetOrder(peers[middle]!.order, tracked?.order ?? [Infinity]) < 0) {
+                            low = middle + 1;
+                        } else {
+                            high = middle;
+                        }
+                    }
+                    return low === 0 ? steps.get(peers[0]!.id)!.start : steps.get(peers[low - 1]!.id)!.end;
+                };
+                // A grown range takes in only its own descendants' output; a sibling's output at the same point stays outside.
+                const atChange = (position: EditorPosition): boolean => comparePositions(position, change.range.start) === 0;
+                start = grows && atChange(start) ? steps.get(descendants[0]!.id)!.start : grows ? shiftPosition(start, change) : boundary(start);
+                end = grows
+                    ? atChange(end)
+                        ? steps.get(descendants.at(-1)!.id)!.end
+                        : shiftPosition(end, change)
+                    : !empty && atChange(end)
+                      ? end
+                      : boundary(end);
+            }
+            return { ...range, start, end };
+        };
+        this.detached = { targets, ranges, map };
         this.applying = true;
         try {
-            editor.applyEdits(changes);
+            editor.applyEdits(changes, { mapSelections: (range) => map(range) });
         } finally {
             this.applying = false;
             this.detached = null;
@@ -563,7 +698,9 @@ export class SnippetFeature {
         for (const instance of frame.instances) {
             const active = instance.fields.find((field) => field.index === index)?.ranges ?? [];
             const owners = activeOwners(active, owned);
-            instance.selected = instance.selected.map((range) => mapRange(range, changes, (edit) => this.detached === null && !extras.has(edit)));
+            instance.selected = instance.selected.map((range) =>
+                this.detached === null ? mapRange(range, changes, (edit) => !extras.has(edit)) : this.detached.map(range)
+            );
             const values = instance.selected.map((range) => this.language.editor.textInRange(range));
             const field = instance.fields.find((field) => field.index === index);
             if (values.some((value) => value !== values[0])) {
@@ -575,10 +712,15 @@ export class SnippetFeature {
             } else if (field !== undefined) {
                 field.divergent = false;
             }
+            const rangeIds = new Set(instance.fields.flatMap((field) => field.ranges.map((range) => range.id)));
             instance.hull = mapRange(instance.hull, changes, (edit) =>
                 this.detached === null
                     ? !extras.has(edit)
-                    : this.detached.targets.some((target) => target.owner === instance && comparePositions(target.range.start, edit.range.start) === 0)
+                    : this.detached.targets.some(
+                          (target) =>
+                              (target.owner === instance || target.ancestors?.some((id) => rangeIds.has(id))) &&
+                              comparePositions(target.range.start, edit.range.start) === 0
+                      )
             );
             for (const field of instance.fields) {
                 const primary = field.ranges[field.primary];
@@ -603,16 +745,19 @@ export class SnippetFeature {
                         field.divergent = true;
                         return { ...range, ...replacement };
                     }
-                    return mapRange(range, changes, (edit) => {
-                        if (this.detached !== null) {
-                            return this.detached.targets.some(
-                                (target) =>
+                    if (this.detached !== null) {
+                        return this.detached.map(
+                            range,
+                            (target) =>
+                                target.ancestors?.includes(range.id) === true ||
+                                (target.frame === frame &&
+                                    target.owner === instance &&
                                     target.parents?.includes(field.index) === true &&
                                     rangeHolds(range, target.range.start) &&
-                                    rangeHolds(range, target.range.end) &&
-                                    comparePositions(target.range.start, edit.range.start) === 0
-                            );
-                        }
+                                    rangeHolds(range, target.range.end))
+                        );
+                    }
+                    return mapRange(range, changes, (edit) => {
                         const owner = owners.get(edit);
                         return (
                             owner !== undefined &&
@@ -625,7 +770,11 @@ export class SnippetFeature {
             }
             instance.fields = instance.fields.filter((field) => field.ranges.length > 0);
             if (!instance.fields.some((field) => field.index === 0)) {
-                instance.fields.push({ index: 0, primary: 0, ranges: [{ id: Symbol('snippet-final'), start: instance.hull.end, end: instance.hull.end }] });
+                instance.fields.push({
+                    index: 0,
+                    primary: 0,
+                    ranges: [{ id: Symbol('snippet-final'), order: [Infinity], start: instance.hull.end, end: instance.hull.end }]
+                });
             }
         }
         frame.order = frame.order.filter((index) => frame.instances.at(-1)?.fields.some((field) => field.index === index));
@@ -638,7 +787,8 @@ export class SnippetFeature {
             this.end();
             return;
         }
-        this.fieldTransforms.edited(change.changes);
+        this.fieldTransforms.edited(change.changes, this.detached?.map);
+        this.placed = this.placed.map((range) => (this.detached === null ? mapRange(range, change.changes, true) : this.detached.map(range)));
         if (!this.isActive) {
             return;
         }

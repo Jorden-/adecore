@@ -321,14 +321,31 @@ class SmartEditor implements Editor {
         this.controller.setSelectionRanges(provider);
     }
 
-    applyEdits(edits: readonly EditorContentChange[]): boolean {
+    applyEdits(edits: readonly EditorContentChange[], options: { readonly mapSelections?: (range: EditorRange) => EditorRange } = {}): boolean {
         if (this.settings.readOnly || edits.length === 0) {
             return false;
         }
         try {
+            const { mapSelections } = options;
             return this.model.applyEdits(
                 edits.map((edit) => ({ from: this.offsetAt(edit.range.start), to: this.offsetAt(edit.range.end), text: edit.text })),
-                { source: 'command' }
+                {
+                    source: 'command',
+                    selectionPositions:
+                        mapSelections &&
+                        this.model.getSelections().map((selection) => {
+                            const { start, end } = mapSelections(this.rangeOf(selection));
+                            const from = { line: start.line, column: start.character };
+                            const to = { line: end.line, column: end.character };
+                            if (selection.head < selection.anchor) {
+                                return { anchor: to, head: from };
+                            }
+                            return {
+                                anchor: from,
+                                head: selection.head === selection.anchor && start.line === end.line && start.character === end.character ? from : to
+                            };
+                        })
+                }
             );
         } catch {
             return false;

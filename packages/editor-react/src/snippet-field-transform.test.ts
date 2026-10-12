@@ -321,3 +321,407 @@ test('a detached field transform keeps the next fields visible choice picker ope
     expect(language.popups.getState().pick?.active).toBe(activeChoice);
     expect(language.popups.getState().pick?.groups[0]?.rows).toHaveLength(3);
 });
+
+test('an adjacent primary field does not grow into its transformed mirror', async () => {
+    const host = mount('${1:foo}${1/(.*)/-$1/} ${2:z}$0');
+    host.press('Tab');
+    await settle();
+    host.workers[0]!.answer(['-foo']);
+    await settle();
+    host.press('Tab', { shiftKey: true });
+    expect(host.editor.textInRange(host.editor.getSelection())).toBe('foo');
+    host.type('x');
+    expect(host.editor.getText()).toBe('x-foo z');
+});
+
+test('a detached replacement beside the active field preserves the editor selection', async () => {
+    const host = mount('${2:bar}${1/(.*)/-$1/}${1:foo}$0');
+    host.press('Tab');
+    await settle();
+    host.workers[0]!.answer(['-foo']);
+    await settle();
+    expect(host.editor.textInRange(host.editor.getSelection())).toBe('bar');
+    host.editor.runCommand('undo');
+    host.editor.runCommand('redo');
+    expect(host.editor.textInRange(host.editor.getSelection())).toBe('bar');
+    host.type('new');
+    expect(host.editor.getText()).toBe('new-foofoo');
+});
+
+test('an empty transform beside a nonempty active field does not invalidate a waiting accept', async () => {
+    const host = mount('${2:bar}${1/^$/A/}$0');
+    host.press('Tab');
+    await settle();
+    const waiting = host.feature.settleTransforms(() => true);
+    host.workers[0]!.answer(['A']);
+    expect(await waiting).toBe(true);
+    expect(host.editor.textInRange(host.editor.getSelection())).toBe('bar');
+    host.type('x');
+    expect(host.editor.getText()).toBe('xA');
+});
+
+for (const before of [true, false]) {
+    test(`an independent empty stop ${before ? 'before' : 'after'} a transformed range follows render order`, async () => {
+        const host = mount(before ? '${1:foo}$3${1/(.*)/-$1/} ${2:z}$0' : '${1:foo}${1/(.*)/-$1/}$3 ${2:z}$0');
+        host.press('Tab');
+        await settle();
+        host.workers[0]!.answer(['-foo']);
+        await settle();
+        host.press('Tab');
+        expect(host.editor.getCaret().character).toBe(before ? 3 : 7);
+    });
+}
+
+test('two different exits at one empty point both apply in source order', async () => {
+    const host = mount('${1/^$/A/}${2/^$/B/} ${3:z}$0');
+    host.press('Tab');
+    await settle();
+    host.press('Tab');
+    host.workers[0]!.answer(['A']);
+    await settle();
+    expect(host.workers[0]!.requests).toHaveLength(2);
+    host.workers[0]!.answer(['B']);
+    await settle();
+    expect(host.editor.getText()).toBe('AB z');
+});
+
+test('an empty independent stop between same-point targets stays between their outputs', async () => {
+    const host = mount('${1/^$/A/}$3${1/^$/B/} ${2:z}$0');
+    host.press('Tab');
+    await settle();
+    host.workers[0]!.answer(['A', 'B']);
+    await settle();
+    host.press('Tab');
+    expect(host.editor.getCaret().character).toBe(1);
+});
+
+test('the last nested field exit still applies after returning to its parent', async () => {
+    const host = mount('${1:foo} ${2:tail}$0');
+    const parsed = parseSnippet('${1:bar} ${1/(.*)/$1/}$0');
+    host.feature.applyEdits([{ range: host.editor.getSelection(), text: parsed.text }], host.feature.token);
+    host.feature.beginInstances([{ start: { line: 0, character: 0 }, text: parsed.text, stops: tabOrder(parsed), fields: parsed.fields }], { nested: true });
+    host.press('Tab');
+    await settle();
+    host.workers[0]!.answer(['LONG']);
+    await settle();
+    expect(host.editor.getText()).toBe('bar LONG tail');
+    expect(host.editor.getCaret().character).toBe(8);
+    host.press('Tab');
+    expect(host.editor.textInRange(host.editor.getSelection())).toBe('tail');
+});
+
+test('Escape after a final multi-caret pop cancels the exit without collapsing the carets', async () => {
+    const host = mount('${1:foo} ${1/(.*)/$1/}$0');
+    const parsed = parseSnippet('${1:foo} ${1/(.*)/$1/}$0');
+    host.editor.setText(parsed.text + '\n' + parsed.text);
+    host.feature.beginInstances([0, 1].map((line) => ({ start: { line, character: 0 }, text: parsed.text, stops: tabOrder(parsed), fields: parsed.fields })));
+    host.press('Tab');
+    await settle();
+    const selections = host.editor.getSelections();
+    host.press('Escape');
+    expect(host.editor.getSelections()).toEqual(selections);
+    host.workers[0]!.answer(['late']);
+    await settle();
+    expect(host.editor.getText()).toBe('foo foo\nfoo foo');
+});
+
+test('an empty nested exit grows its parent but keeps the child final caret after the output', async () => {
+    const host = mount('${1:foo} ${2:tail}$0');
+    const parsed = parseSnippet('${1/^$/A/}$0');
+    host.feature.applyEdits([{ range: host.editor.getSelection(), text: parsed.text }], host.feature.token);
+    host.feature.beginInstances([{ start: { line: 0, character: 0 }, text: parsed.text, stops: tabOrder(parsed), fields: parsed.fields }], { nested: true });
+    host.press('Tab');
+    await settle();
+    host.workers[0]!.answer(['A']);
+    await settle();
+    expect(host.editor.getText()).toBe('A tail');
+    expect(host.editor.getCaret()).toEqual({ line: 0, character: 1 });
+    host.press('Tab');
+    host.press('Tab', { shiftKey: true });
+    expect(host.editor.textInRange(host.editor.getSelection())).toBe('A');
+    host.editor.setCaret({ line: 0, character: 0 });
+    await settle();
+    expect(host.feature.isActive).toBe(true);
+});
+
+test('a failed parent exit keeps raw text and leaves its child projections unlinked', async () => {
+    const host = mount('${1:${2:b}} ${1/(.*)/$1/} ${3:z}$0');
+    host.press('Tab');
+    await settle();
+    host.workers[0]!.events.dispatchEvent(
+        Object.assign(new Event('message'), { data: { type: 'error', id: host.workers[0]!.requests[0]!.id, kind: 'range', message: 'limit' } })
+    );
+    await settle();
+    expect(host.editor.getText()).toBe('b b z');
+    host.type('x');
+    expect(host.editor.getText()).toBe('x b z');
+});
+
+test('a waiting explicit completion excludes output inserted at the end of its active range', async () => {
+    const mounted = mountEditor({ text: '', language: 'typescript' });
+    const port = new Port(),
+        timers = new ManualTimers(),
+        service = new FakeLanguageService();
+    service.respond('textDocument/completion', () => [
+        {
+            label: 'bar',
+            textEdit: { range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } }, newText: '${TM_FILENAME/(.*)/$1/}${1:x}$0' },
+            insertTextFormat: 2
+        },
+        { label: 'bark' }
+    ]);
+    const project = new ProjectLanguage(service, { snippetTransformWorker: () => port });
+    const language = new EditorLanguage(project, mounted.editor, 'file:///file.ts', 'typescript', timers);
+    cleanup.push(() => {
+        language.dispose();
+        project.dispose();
+        mounted.editor.dispose();
+    });
+    await language.document.ready;
+    const parsed = parseSnippet('${2:bar}${1/^$/A/}$0');
+    mounted.editor.setText(parsed.text);
+    language.snippets.begin({ line: 0, character: 0 }, parsed.text, tabOrder(parsed), parsed.fields);
+    mounted.press('Tab');
+    await settle();
+    language.completion.invoke();
+    timers.advance(1);
+    await settle();
+    const accept = language.completion.accept(false);
+    await settle();
+    port.answer(['A']);
+    await settle();
+    port.answer(['file']);
+    await accept;
+    expect(mounted.editor.getText()).toBe('filexA');
+});
+
+type Host = ReturnType<typeof mount>;
+const snapshot = (host: Host) => ({ text: host.editor.getText(), selections: host.editor.getSelections() });
+
+function mountInstances(source: string, count: number): Host {
+    const host = mount(source);
+    const parsed = parseSnippet(source);
+    host.editor.setText(Array.from({ length: count }, () => parsed.text).join('\n'));
+    host.feature.beginInstances(
+        Array.from({ length: count }, (_, line) => ({ start: { line, character: 0 }, text: parsed.text, stops: tabOrder(parsed), fields: parsed.fields }))
+    );
+    return host;
+}
+
+test('undo and redo of a multi-caret transform restore the exact selections', async () => {
+    const host = mountInstances('${1:a} ${1/(.*)/$1/} ${2:z}$0', 2);
+    host.press('Tab');
+    await settle();
+    const before = snapshot(host);
+    host.workers[0]!.answer(['A']);
+    await settle();
+    const after = snapshot(host);
+    expect(after.text).toBe('a A z\na A z');
+    expect(after.selections.map((range) => host.editor.textInRange(range))).toEqual(['z', 'z']);
+    host.editor.runCommand('undo');
+    expect(host.feature.isActive).toBe(false);
+    expect(snapshot(host)).toEqual(before);
+    host.editor.runCommand('redo');
+    expect(snapshot(host)).toEqual(after);
+    host.type('k');
+    expect(host.editor.getText()).toBe('a A k\na A k');
+});
+
+test('redo of a transform landing on a selection boundary keeps the selections off the output', async () => {
+    const host = mountInstances('${2:bar}${1/(.*)/-$1/}${1:foo}$0', 2);
+    host.press('Tab');
+    await settle();
+    const before = snapshot(host);
+    host.workers[0]!.answer(['-foo']);
+    await settle();
+    const after = snapshot(host);
+    expect(after.text).toBe('bar-foofoo\nbar-foofoo');
+    expect(after.selections.map((range) => host.editor.textInRange(range))).toEqual(['bar', 'bar']);
+    host.editor.runCommand('undo');
+    expect(host.feature.isActive).toBe(false);
+    expect(snapshot(host)).toEqual(before);
+    host.editor.runCommand('redo');
+    expect(snapshot(host)).toEqual(after);
+    host.type('new');
+    expect(host.editor.getText()).toBe('new-foofoo\nnew-foofoo');
+});
+
+test('redo of an empty transform beside a nonempty active field keeps that field selected', async () => {
+    const host = mount('${2:bar}${1/^$/A/}$0');
+    host.press('Tab');
+    await settle();
+    const before = snapshot(host);
+    host.workers[0]!.answer(['A']);
+    await settle();
+    const after = snapshot(host);
+    expect(after.text).toBe('barA');
+    expect(after.selections.map((range) => host.editor.textInRange(range))).toEqual(['bar']);
+    host.editor.runCommand('undo');
+    expect(host.feature.isActive).toBe(false);
+    expect(snapshot(host)).toEqual(before);
+    host.editor.runCommand('redo');
+    expect(snapshot(host)).toEqual(after);
+    host.type('x');
+    expect(host.editor.getText()).toBe('xA');
+});
+
+test('redo of the last nested field exit restores the caret after the output', async () => {
+    const host = mount('${1:foo} ${2:tail}$0');
+    const parsed = parseSnippet('${1:bar} ${1/(.*)/$1/}$0');
+    host.feature.applyEdits([{ range: host.editor.getSelection(), text: parsed.text }], host.feature.token);
+    host.feature.beginInstances([{ start: { line: 0, character: 0 }, text: parsed.text, stops: tabOrder(parsed), fields: parsed.fields }], { nested: true });
+    host.press('Tab');
+    await settle();
+    const before = snapshot(host);
+    host.workers[0]!.answer(['LONG']);
+    await settle();
+    const after = snapshot(host);
+    expect(after.text).toBe('bar LONG tail');
+    expect(after.selections).toEqual([{ start: { line: 0, character: 8 }, end: { line: 0, character: 8 } }]);
+    host.editor.runCommand('undo');
+    expect(host.feature.isActive).toBe(false);
+    expect(snapshot(host)).toEqual(before);
+    host.editor.runCommand('redo');
+    expect(snapshot(host)).toEqual(after);
+    host.type('x');
+    expect(host.editor.getText()).toBe('bar LONGx tail');
+});
+
+test('a backward selection keeps its direction when a pending transform lands, through undo and redo', async () => {
+    const host = mount('${1:a} ${1/(.*)/$1/} ${2:xyz}$0');
+    host.press('Tab');
+    await settle();
+    host.press('ArrowRight');
+    host.press('ArrowLeft', { shiftKey: true });
+    host.press('ArrowLeft', { shiftKey: true });
+    expect(host.editor.textInRange(host.editor.getSelection())).toBe('yz');
+    host.workers[0]!.answer(['AAA']);
+    await settle();
+    expect(host.editor.getText()).toBe('a AAA xyz');
+    const shrinks = (): string => {
+        host.press('ArrowRight', { shiftKey: true });
+        return host.editor.textInRange(host.editor.getSelection());
+    };
+    expect(host.editor.textInRange(host.editor.getSelection())).toBe('yz');
+    expect(shrinks()).toBe('z');
+    host.editor.runCommand('undo');
+    host.editor.runCommand('undo');
+    host.editor.runCommand('redo');
+    host.editor.runCommand('redo');
+    expect(host.editor.getText()).toBe('a AAA xyz');
+    expect(host.editor.textInRange(host.editor.getSelection())).toBe('yz');
+    expect(shrinks()).toBe('z');
+});
+
+test('a growing parent does not swallow a sibling output that lands at the same point', async () => {
+    const host = mount('${1} ${2:x${1/(.*)/[$1]/}}${1/(.*)/<$1>/}');
+    host.press('Tab');
+    await settle();
+    host.workers[0]!.answer(['[]', '<>']);
+    await settle();
+    expect(host.editor.getText()).toBe(' x[]<>');
+    expect(host.editor.textInRange(host.editor.getSelection())).toBe('x[]');
+    host.type('Z');
+    expect(host.editor.getText()).toBe(' Z<>');
+});
+
+test('an empty sibling target at the start of a parent is not swallowed through its start', async () => {
+    const host = mount('${1}${1/(.*)/<$1>/}${2:${1/(.*)/[$1]/}x}');
+    host.press('Tab');
+    await settle();
+    host.workers[0]!.answer(['<>', '[]']);
+    await settle();
+    expect(host.editor.getText()).toBe('<>[]x');
+    expect(host.editor.textInRange(host.editor.getSelection())).toBe('[]x');
+});
+
+test('the automatic final stop lands after a same-point transform output', async () => {
+    const host = mount('${1} ${1/^$/none/}');
+    host.press('Tab');
+    await settle();
+    host.workers[0]!.answer(['none']);
+    await settle();
+    expect(host.editor.getText()).toBe(' none');
+    expect(host.editor.getSelection().start).toEqual({ line: 0, character: 5 });
+});
+
+test('same-point outputs follow source order when mirrors inside a mirrored body come last in the targets', async () => {
+    const host = mount('${1}${1:${2/a/X/}}${2/b/Y/}${2}');
+    host.press('Tab');
+    host.press('Tab');
+    await settle();
+    host.workers[0]!.answer(['X', 'Y']);
+    await settle();
+    expect(host.editor.getText()).toBe('XXY');
+    expect(host.editor.getSelection().start).toEqual({ line: 0, character: 3 });
+});
+
+test('an unchanged transform output leaves an untracked caret where it was', async () => {
+    const host = mount('${1:a} ${1/(.*)/$1/}$0');
+    host.press('Tab');
+    await settle();
+    host.editor.setCaret({ line: 0, character: 2 });
+    host.workers[0]!.answer(['a']);
+    await settle();
+    expect(host.editor.getText()).toBe('a a');
+    expect(host.editor.getCaret()).toEqual({ line: 0, character: 2 });
+});
+
+test('a caret collapsed beside an empty target lands after that targets own output', async () => {
+    const host = mount('${1/^$/A/}${2:bar}$0');
+    host.press('Tab');
+    await settle();
+    host.press('ArrowLeft');
+    expect(host.editor.getCaret()).toEqual({ line: 0, character: 0 });
+    host.workers[0]!.answer(['A']);
+    await settle();
+    expect(host.editor.getText()).toBe('Abar');
+    expect(host.editor.getCaret()).toEqual({ line: 0, character: 1 });
+});
+
+test('a caret on an empty selected parent selects the parent once its output grows it', async () => {
+    const host = mount('${1:foo} ${2:tail}$0');
+    const parsed = parseSnippet('${1/^$/A/}$0');
+    host.feature.applyEdits([{ range: host.editor.getSelection(), text: parsed.text }], host.feature.token);
+    host.feature.beginInstances([{ start: { line: 0, character: 0 }, text: parsed.text, stops: tabOrder(parsed), fields: parsed.fields }], { nested: true });
+    host.press('Tab');
+    await settle();
+    host.press('Tab');
+    host.press('Tab', { shiftKey: true });
+    host.workers[0]!.answer(['A']);
+    await settle();
+    expect(host.editor.getText()).toBe('A tail');
+    expect(host.editor.textInRange(host.editor.getSelection())).toBe('A');
+    host.type('x');
+    expect(host.editor.getText()).toBe('x tail');
+});
+
+test('a selection exactly on a non-empty target covers that targets output', async () => {
+    const host = mount('${1:foo} ${1/(.*)/$1/}${2:end}$0');
+    host.press('Tab');
+    await settle();
+    host.editor.setSelection({ start: { line: 0, character: 4 }, end: { line: 0, character: 7 } });
+    host.workers[0]!.answer(['FOOD']);
+    await settle();
+    expect(host.editor.getText()).toBe('foo FOODend');
+    expect(host.editor.textInRange(host.editor.getSelection())).toBe('FOOD');
+});
+
+test.each([
+    ['after', '${1:ab}${2:cd}$0', 'Acd', 'cd'],
+    ['before', '${2:cd}${1:ab}$0', 'cdA', 'cd']
+])('an empty nested output does not grow a sibling field touching it (%s)', async (_name, outer, text, sibling) => {
+    const host = mount(outer);
+    const parsed = parseSnippet('${1/^$/A/}$0');
+    host.feature.applyEdits([{ range: host.editor.getSelection(), text: parsed.text }], host.feature.token);
+    host.feature.beginInstances([{ start: host.editor.getSelection().start, text: parsed.text, stops: tabOrder(parsed), fields: parsed.fields }], {
+        nested: true
+    });
+    host.press('Tab');
+    await settle();
+    host.workers[0]!.answer(['A']);
+    await settle();
+    expect(host.editor.getText()).toBe(text);
+    host.press('Tab');
+    expect(host.editor.textInRange(host.editor.getSelection())).toBe(sibling);
+});

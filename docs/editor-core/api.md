@@ -69,3 +69,5 @@ scanBrackets('call(items[0]').pairs; // Map { 10 => 12, 12 => 10 }
 Large dense edit batches rebuild the rope in one pass and emit one `contentEdits` stretch covering the changed region. Small or sparse batches retain separate content edits and share unchanged rope branches. In both cases the snapshot keeps the individual offset changes for annotations, maps selections with their existing affinity, and records one undo step.
 
 `replacementText` accepts an optional sixth `maxCharacters` argument, after `preserveCase`. It throws `RangeError` before concatenating expanded output above that limit. Without the argument its existing expansion behavior remains unchanged.
+
+`DocumentEditOptions.selectionPositions` supplies anchor/head positions in the resulting text. They are resolved against the new rope and recorded in the same undo state. Columns are clamped to their line, and a line outside the resulting text throws (the editor engine reports that as `false`). They are ignored when the edits leave the text unchanged. Explicit offset `selections` take precedence when both are supplied. Without either, selections keep their usual mapping.

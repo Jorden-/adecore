@@ -71,6 +71,13 @@ export class SnippetTransforms {
         if (copied.length === 0) {
             return Promise.resolve([]);
         }
+        this.pending = this.pending.filter((job) => {
+            if (job.current()) {
+                return true;
+            }
+            job.reject(new SnippetTransformError('superseded', 'The queued snippet changed.'));
+            return false;
+        });
         const kind = options.kind ?? 'accept';
         if (kind === 'accept') {
             this.pending = this.pending.filter((job) => {
