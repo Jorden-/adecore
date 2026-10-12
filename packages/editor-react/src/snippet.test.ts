@@ -181,3 +181,9 @@ for (const transform of ['${1/(.*)/${1:/upcase}/}', '${1/[}]/x/}', '${1/[{]/x/}'
         expect(parsed.fields?.find((field) => field.index === 1)?.ranges).toHaveLength(2);
     });
 }
+
+for (const broken of ['${1/abc} tail', '${1/abc/xyz tail', '${1/a/${1:/upcase} tail']) {
+    test(`malformed transforms preserve the remaining literal text: ${broken}`, () => {
+        expect(parseSnippet(broken).text).toBe(broken);
+    });
+}

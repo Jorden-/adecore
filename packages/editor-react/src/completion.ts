@@ -120,6 +120,7 @@ export class CompletionFeature {
         const { editor, project, uri, snippets } = this.language;
         const snippetToken = snippets.token;
         const inSnippet = snippets.isActive;
+        const acceptedSelections = editor.getSelections();
         recentChoicesOf(this.language.languageId).record(entry.item);
         let item = this.resolved.get(entry.item) ?? entry.item;
         const needsResolve = !this.resolved.has(entry.item) && project.service.providerOptions('completionItem/resolve', uri) !== undefined;
@@ -127,6 +128,19 @@ export class CompletionFeature {
         if (needsResolve) {
             // Resolving can add the import an item needs; an item that cannot be resolved is still inserted as it is.
             item = await this.resolveNow(entry.item);
+        }
+        const selections = editor.getSelections();
+        if (
+            needsResolve &&
+            ((inSnippet && snippets.token !== snippetToken) ||
+                selections.length !== acceptedSelections.length ||
+                selections.some(
+                    (range, index) =>
+                        comparePositions(range.start, acceptedSelections[index]!.start) !== 0 ||
+                        comparePositions(range.end, acceptedSelections[index]!.end) !== 0
+                ))
+        ) {
+            return;
         }
         const caret = editor.getCaret();
         const lineBefore = textBeforeOf(editor, caret);
@@ -170,7 +184,7 @@ export class CompletionFeature {
                     : { ...item, textEdit: undefined, insertText: item.textEdit?.newText ?? item.insertText };
             const editStart = editRangeOf(atItem, replace)?.start;
             // A commit character follows the name, so accepting must not also add a call.
-            const rendered = insertionOf(
+            const insertion = insertionOf(
                 atItem,
                 position,
                 line.slice(0, position.character),
@@ -183,6 +197,7 @@ export class CompletionFeature {
                         editStart === undefined ? undefined : editor.textInRange({ start: { line: editStart.line, character: 0 }, end: editStart })
                 }
             );
+            const rendered = commit === undefined ? insertion : { ...insertion, text: insertion.text + commit };
             characters += rendered.text.length;
             ranges += rendered.fields?.reduce((count, field) => count + field.ranges.length + (field.linked?.length ?? 0), 1) ?? rendered.stops.length;
             if (rendered.limited || characters > MAX_COMPLETION_CHARACTERS || ranges > MAX_COMPLETION_RANGES) {
@@ -248,8 +263,6 @@ export class CompletionFeature {
                     editor.setCaret({ line: end.line, character: end.character + plan.shift });
                 }
             } else {
-                const end = editor.getCaret();
-                editor.applyEdits([{ range: { start: end, end }, text: commit }]);
                 if (this.triggerCharacters().includes(commit)) {
                     this.beginRequest({ triggerKind: 2, triggerCharacter: commit }, 0);
                 }
@@ -323,7 +336,7 @@ export class CompletionFeature {
     private async resolveNow(item: CompletionItem): Promise<CompletionItem> {
         const { editor, project, uri } = this.language;
         try {
-            return await project.service.resolveCompletion(uri, item);
+            return { ...item, ...(await project.service.resolveCompletion(uri, item)) };
         } catch (error) {
             if (!(error instanceof StaleResultError)) {
                 return item;
@@ -333,7 +346,7 @@ export class CompletionFeature {
             const fresh = itemsOf(await project.service.completion(uri, editor.getCaret(), { triggerKind: 1 })).items.find(
                 (candidate) => candidate.label === item.label && candidate.kind === item.kind
             );
-            return fresh === undefined ? item : await project.service.resolveCompletion(uri, fresh).catch(() => fresh);
+            return fresh === undefined ? item : { ...fresh, ...(await project.service.resolveCompletion(uri, fresh).catch(() => fresh)) };
         } catch {
             return item;
         }
@@ -574,7 +587,7 @@ export class CompletionFeature {
             void project.service
                 .resolveCompletion(uri, entry.item)
                 .then((item) => {
-                    this.resolved.set(entry.item, item);
+                    this.resolved.set(entry.item, { ...entry.item, ...item });
                     if (this.ranked[this.active]?.item === entry.item) {
                         this.publish();
                     }

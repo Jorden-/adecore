@@ -49,6 +49,7 @@ const MAX_SNIPPET_RANGES = 1_000;
 const MAX_SNIPPET_DEPTH = 64;
 
 class SnippetLimitError extends Error {}
+class MalformedSnippetError extends Error {}
 
 class SnippetParser {
     private at = 0;
@@ -184,6 +185,9 @@ class SnippetParser {
                 break;
             }
         }
+        if (this.source[this.at - 1] !== '/') {
+            throw new MalformedSnippetError();
+        }
         let nested = 0;
         while (this.at < this.source.length) {
             const character = this.source[this.at++]!;
@@ -194,15 +198,19 @@ class SnippetParser {
                 this.at++;
             } else if (character === '}') {
                 if (nested === 0) {
-                    return;
+                    throw new MalformedSnippetError();
                 }
                 nested--;
             } else if (character === '/' && nested === 0) {
                 const end = this.source.indexOf('}', this.at);
-                this.at = end < 0 ? this.source.length : end + 1;
+                if (end < 0) {
+                    throw new MalformedSnippetError();
+                }
+                this.at = end + 1;
                 return;
             }
         }
+        throw new MalformedSnippetError();
     }
 }
 
@@ -408,6 +416,9 @@ export function compileSnippet(source: string): SnippetTemplate {
             nodes = new SnippetParser(source).parse();
             indices = variableIndices(nodes);
         } catch (error) {
+            if (error instanceof MalformedSnippetError) {
+                return { source, render: () => ({ text: source, stops: [] }) };
+            }
             if (!(error instanceof SnippetLimitError)) {
                 throw error;
             }

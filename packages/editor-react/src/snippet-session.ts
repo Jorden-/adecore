@@ -19,6 +19,7 @@ interface Field {
     ranges: SessionRange[];
     primary: number;
     choices?: readonly string[];
+    divergent?: boolean;
 }
 interface Instance {
     fields: Field[];
@@ -377,8 +378,15 @@ export class SnippetFeature {
             const owners = activeOwners(active, owned);
             instance.selected = instance.selected.map((range) => mapRange(range, changes, (edit) => !extras.has(edit)));
             const values = instance.selected.map((range) => this.language.editor.textInRange(range));
+            const field = instance.fields.find((field) => field.index === index);
             if (values.some((value) => value !== values[0])) {
-                return false;
+                if (field === undefined || (!this.applying && !field.divergent)) {
+                    return false;
+                }
+                // Per-caret completion variables intentionally give parent mirrors different values.
+                field.divergent = true;
+            } else if (field !== undefined) {
+                field.divergent = false;
             }
             instance.hull = mapRange(instance.hull, changes, (edit) => !extras.has(edit));
             for (const field of instance.fields) {

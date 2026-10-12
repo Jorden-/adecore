@@ -518,24 +518,32 @@ test('an edit crossing the active field ends the old session', async () => {
     expect(language.snippets.isActive).toBe(false);
 });
 
-test('an accept resolving after Tab does not push a child onto the new field', async () => {
+test('an accept resolving after Tab does not insert into the new field', async () => {
     const mounted = await languageSnippet('${1:fo} ${2:fo}$0');
     let resolve = (_item: unknown): void => undefined;
+    let resolves = 0;
     mounted.service.respond(
         'completionItem/resolve',
         () =>
             new Promise((done) => {
+                resolves++;
                 resolve = done;
             })
     );
-    mounted.service.respond('textDocument/completion', () => [{ label: 'foo', insertText: '${1:a}.${2:b}', insertTextFormat: 2 }]);
+    mounted.service.respond('textDocument/completion', () => [{ label: 'foo', insertText: '${1:a}.${2:b}', insertTextFormat: 2 }, { label: 'food' }]);
     mounted.language.completion.invoke();
     mounted.timers.advance(1);
     await new Promise<void>((done) => setImmediate(done));
+    expect(mounted.language.completion.isOpen).toBe(true);
+    const pending = mounted.language.completion.accept(false);
+    expect(resolves).toBe(1);
     mounted.press('Tab');
+    expect(mounted.editor.getSelection().start.character).toBe(3);
     resolve({ label: 'foo', insertText: '${1:a}.${2:b}', insertTextFormat: 2 });
-    await new Promise<void>((done) => setImmediate(done));
-    mounted.press('Tab');
+    await pending;
+    expect(mounted.editor.getText()).toBe('fo fo');
+    expect(mounted.editor.getSelection().start.character).toBe(3);
+    expect(mounted.language.snippets.isActive).toBe(true);
     mounted.press('Tab');
     expect(mounted.language.snippets.isActive).toBe(false);
 });
@@ -586,4 +594,58 @@ test('a group exceeding the render budget leaves every caret unchanged and repor
     expect(editor.getText()).toBe('fo\nfo');
     expect(notices).toEqual(['Completion is too large to insert']);
     expect(language.snippets.isActive).toBe(false);
+});
+
+test('commit characters retain outer stops and land at every mirrored completion', async () => {
+    const mounted = await languageSnippet('${1:fo} $1 ${2:tail}$0', 2);
+    mounted.service.respond('textDocument/completion', () => [
+        { label: 'foo', commitCharacters: [';'] },
+        { label: 'food', commitCharacters: [';'] }
+    ]);
+    mounted.language.completion.invoke();
+    mounted.timers.advance(1);
+    await new Promise<void>((done) => setImmediate(done));
+    expect(mounted.language.completion.isOpen).toBe(true);
+    mounted.press(';');
+    await new Promise<void>((done) => setImmediate(done));
+    expect(mounted.editor.getText()).toBe('foo; foo; tail\nfoo; foo; tail');
+    expect(mounted.language.snippets.isActive).toBe(true);
+    mounted.press('Tab');
+    expect(mounted.editor.getSelections().map((range) => mounted.editor.textInRange(range))).toEqual(['tail', 'tail']);
+});
+
+test('caret-specific nested completion retains a mirrored parent and its remaining stops', async () => {
+    const mounted = await languageSnippet('${1:fo} $1 ${2:tail}$0');
+    await completeWithin(mounted, '${1:$CURSOR_NUMBER}.${2:b}', false, true);
+    expect(mounted.editor.getText()).toBe('2.b 1.b tail');
+    expect(mounted.language.snippets.isActive).toBe(true);
+    mounted.press('Tab');
+    mounted.type('end');
+    expect(mounted.editor.getText()).toBe('2.end 1.end tail');
+    expect(mounted.language.snippets.isActive).toBe(true);
+    mounted.press('Tab');
+    mounted.press('Tab');
+    expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('tail');
+    mounted.press('Tab', { shiftKey: true });
+    expect(mounted.editor.getSelections().map((range) => mounted.editor.textInRange(range))).toEqual(['1.end', '2.end']);
+    mounted.type('same');
+    expect(mounted.editor.getText()).toBe('same same tail');
+    expect(mounted.language.snippets.isActive).toBe(true);
+});
+
+test('a resolved item retains inherited snippet fields when the server omits them', async () => {
+    const mounted = await completion('fo', 'unused');
+    mounted.editor.setCaret({ line: 0, character: 2 });
+    mounted.service.respond('textDocument/completion', () => ({
+        isIncomplete: false,
+        itemDefaults: { insertTextFormat: 2, insertTextMode: 2, editRange: { start: { line: 0, character: 0 }, end: { line: 0, character: 2 } } },
+        items: [{ label: 'foo', textEditText: 'foo(${1:x})$0' }]
+    }));
+    mounted.service.respond('completionItem/resolve', () => ({ label: 'foo', detail: 'resolved' }));
+    mounted.language.completion.invoke();
+    mounted.timers.advance(1);
+    await new Promise<void>((done) => setImmediate(done));
+    expect(mounted.editor.getText()).toBe('foo(x)');
+    expect(mounted.editor.textInRange(mounted.editor.getSelection())).toBe('x');
+    expect(mounted.language.snippets.isActive).toBe(true);
 });
