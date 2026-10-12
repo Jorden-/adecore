@@ -437,7 +437,7 @@ export function paintGutter(container: HTMLElement, layout: EditorLayout, rows: 
             item.style.setProperty('--se-line', `${layout.metrics.lineHeight}px`);
             item.style.setProperty('--se-mark', colorValue(highlight.color));
             if (fill === undefined) {
-                item.style.background = tintValue(highlight.color);
+                item.style.setProperty('--se-tint', tintValue(highlight.color));
             }
         }
         const number = document.createElement('span');

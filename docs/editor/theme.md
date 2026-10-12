@@ -6,18 +6,18 @@ The page's theme colors the editor's chrome; the syntax theme colors the code. T
 
 `editor.css` defines its tokens on `:root` and `[data-theme]`, on top of the tokens of the [`@adecore/ui` theme](/ui/guide/theme). Override any of them after the import.
 
-| Token                                          | What it colors or sizes                                                 |
-| ---------------------------------------------- | ----------------------------------------------------------------------- |
-| `--code-font-size`, `--code-line-height`       | The code; `--text-code` and its line height by default                  |
-| `--font-mono`                                  | The code face                                                           |
-| `--editor-selection`, `--editor-occurrence`    | The selection and the marks of the other uses of the selected text      |
-| `--editor-guide`, `--editor-guide-active`      | Indent guides, and the guide of the block around the caret              |
-| `--editor-margin`, `--editor-whitespace`       | The right margin and the dots and arrows of whitespace                  |
-| `--editor-added`, `--editor-modified`, `--editor-deleted` | Change marks                                                 |
-| `--editor-mark-number-mix`, `--editor-mark-bar-width`     | Line number shade and bar width of a highlight with a `bar`  |
-| `--find-match`, `--find-current`, `--find-current-text` | Find matches                                                   |
-| `--agent-1` to `--agent-6`, `--agent-ink`      | [Agent](/editor/agents) colors and the text on them                     |
-| `--term-fg`                                    | The code's text color when set; `--text` otherwise                     |
+| Token                                                                      | What it colors or sizes                                                                                           |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `--code-font-size`, `--code-line-height`                                   | The code; `--text-code` and its line height by default                                                            |
+| `--font-mono`                                                              | The code face                                                                                                     |
+| `--editor-selection`, `--editor-occurrence`                                | The selection and the marks of the other uses of the selected text                                                |
+| `--editor-guide`, `--editor-guide-active`                                  | Indent guides, and the guide of the block around the caret                                                        |
+| `--editor-margin`, `--editor-whitespace`                                   | The right margin and the dots and arrows of whitespace                                                            |
+| `--editor-added`, `--editor-modified`, `--editor-deleted`                  | Change marks                                                                                                      |
+| `--editor-mark-number-mix`, `--editor-mark-bar-width`, `--editor-mark-gap` | Line number shade, bar width and the gap between the tinted number cell and the code, of a highlight with a `bar` |
+| `--find-match`, `--find-current`, `--find-current-text`                    | Find matches                                                                                                      |
+| `--agent-1` to `--agent-6`, `--agent-ink`                                  | [Agent](/editor/agents) colors and the text on them                                                               |
+| `--term-fg`                                                                | The code's text color when set; `--text` otherwise                                                                |
 
 Call `refreshFont()` after the font tokens change.
 
@@ -84,12 +84,12 @@ serveDiffSyntax(self);
 
 A `DiffSyntaxWorkerEndpoint` supplies message listeners and `postMessage(message, { transfer })`. `DiffSyntaxInput` messages are:
 
-| Type | Payload | Behavior |
-| --- | --- | --- |
-| `start` | `themes`, `maxLines` | Load missing JSON custom themes before requests, retain already loaded theme objects, clear earlier documents, and set a positive line-count cache budget. |
-| `request` | `generation`, `index`, optional `document` | Return tokens for a block. Send the document on its first request and after a cache miss. |
-| `cancel` | `generation` | Drop queued requests and suppress late responses, retaining computed tokens. |
-| `dispose` | `generation` | Cancel requests and remove that document from the cache. |
+| Type      | Payload                                    | Behavior                                                                                                                                                   |
+| --------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `start`   | `themes`, `maxLines`                       | Load missing JSON custom themes before requests, retain already loaded theme objects, clear earlier documents, and set a positive line-count cache budget. |
+| `request` | `generation`, `index`, optional `document` | Return tokens for a block. Send the document on its first request and after a cache miss.                                                                  |
+| `cancel`  | `generation`                               | Drop queued requests and suppress late responses, retaining computed tokens.                                                                               |
+| `dispose` | `generation`                               | Cancel requests and remove that document from the cache.                                                                                                   |
 
 A `DiffSyntaxDocument` contains `language`, `theme`, `blocks` and `resets`. Generations are positive integers allocated by the host; assign a new one whenever the text, language, theme or block layout changes. `resets` identifies blocks that start independent hunks. A zero-line side has no blocks and needs no request. An actual blank source line is a valid empty-string block.
 

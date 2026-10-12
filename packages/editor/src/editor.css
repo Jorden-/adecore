@@ -19,6 +19,7 @@
     --editor-deleted: var(--status-error);
     --editor-mark-number-mix: 72%;
     --editor-mark-bar-width: 3px;
+    --editor-mark-gap: 4px;
     --editor-sticky-shadow: color-mix(in srgb, black 12%, transparent);
     --agent-1: #c4602f;
     --agent-2: #7c4dd8;
@@ -235,8 +236,10 @@
     color: var(--text-muted);
 }
 /* A line a host marked with a bar: the number in a shade of the mark that reads on the tint, and a bar along the edge. */
+/* The tint stops short of the code, so the cell and the line read as two surfaces. */
 .se-line-marked {
     align-items: flex-start;
+    background: linear-gradient(to right, var(--se-tint, transparent) calc(100% - var(--editor-mark-gap)), transparent 0);
 }
 .se-line-marked > span:first-child {
     display: flex;

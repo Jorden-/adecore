@@ -491,7 +491,7 @@ test('unified review draws a tinted cell with a solid or hatched bar and no sign
         expect(page.host.querySelectorAll('.se-line-sign').length).toBe(0);
         expect(page.host.querySelectorAll('.se-change').length).toBe(0);
         const marked = page.host.querySelector('.se-line-marked') as HTMLElement;
-        expect(marked.style.background).toContain('color-mix');
+        expect(marked.style.getPropertyValue('--se-tint')).toContain('color-mix');
     });
 });
 
