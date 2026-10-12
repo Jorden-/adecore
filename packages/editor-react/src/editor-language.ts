@@ -98,7 +98,7 @@ export class EditorLanguage {
         this.rename = new RenameFeature(this);
         this.navigation = new NavigationFeature(this);
         this.peek = new PeekFeature(this);
-        this.callHierarchy = new CallHierarchyFeature(this);
+        this.callHierarchy = new CallHierarchyFeature(this, timers);
         this.symbolPicker = new SymbolPickerFeature(this);
         this.contextMenu = new ContextMenuFeature(this);
         this.history = new HistoryFeature(this);

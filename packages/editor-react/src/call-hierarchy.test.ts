@@ -27,6 +27,7 @@ async function settle(): Promise<void> {
 }
 
 interface Setup {
+    timers: ManualTimers;
     service: FakeLanguageService;
     editor: FakeEditor;
     language: EditorLanguage;
@@ -57,9 +58,10 @@ async function setup(
     const visits: Place[] = [];
     const project = new ProjectLanguage(service, { notify: (notice) => notices.push(notice), openPlace: (place) => visits.push(place) });
     const editor = new FakeEditorEngine().mount({} as HTMLElement, { text: TEXT, theme: 'light' });
-    const language = new EditorLanguage(project, editor, uri, 'typescript', new ManualTimers());
+    const timers = new ManualTimers();
+    const language = new EditorLanguage(project, editor, uri, 'typescript', timers);
     await language.document.ready;
-    const result = { service, editor, language, notices, visits };
+    const result = { timers, service, editor, language, notices, visits };
     open.push(result);
     return result;
 }
@@ -102,6 +104,17 @@ describe('call hierarchy', () => {
         await language.callHierarchy.open();
         expect(language.popups.getState().callHierarchy).toBeNull();
         expect(notices).toHaveLength(1);
+    });
+
+    test('scrolls its row into view once the editor draws it, since the caret line may be at the bottom', async () => {
+        const { language, editor, timers } = await setup({ incoming: (parent) => callers[parent.name] ?? [] });
+        editor.setCaret({ line: 0, character: 10 });
+        await language.callHierarchy.open();
+        const scrolled: unknown[] = [];
+        editor.widgetsByOwner.get('call-hierarchy')![0]!.render({ scrollIntoView: (options: unknown) => scrolled.push(options) } as unknown as HTMLElement);
+        expect(scrolled).toEqual([]);
+        timers.advance(0);
+        expect(scrolled).toEqual([{ block: 'nearest' }]);
     });
 
     test('opens on the callers of the symbol at the caret, listed by name', async () => {
