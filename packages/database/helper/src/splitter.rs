@@ -171,6 +171,91 @@ pub fn first_keyword(sql: &str) -> String {
     sql[i..end].to_uppercase()
 }
 
+/// The variables that hold the access mode of a MySQL transaction; `tx_read_only` is the name MariaDB and MySQL 5 use.
+const ACCESS_MODE_VARIABLES: [&str; 2] = ["TRANSACTION_READ_ONLY", "TX_READ_ONLY"];
+
+/// Whether a MySQL statement could take a read only session out of read only: it makes a transaction read write, or it
+/// runs text that only the server gets to see (`PREPARE`, `EXECUTE`).
+pub fn escapes_read_only(statement: &str) -> bool {
+    let tokens = mysql_tokens(statement);
+    let assigns = tokens.iter().any(|token| token == "SET" || token == "SET_VAR");
+
+    matches!(tokens.first().map(String::as_str), Some("PREPARE" | "EXECUTE"))
+        || tokens.windows(2).any(|pair| pair[0] == "READ" && pair[1] == "WRITE")
+        || (assigns && tokens.iter().any(|token| ACCESS_MODE_VARIABLES.contains(&token.as_str())))
+}
+
+/// The words, quoted names and punctuation of a MySQL statement in upper case, without its strings and comments.
+///
+/// The server runs the inside of `/*! */`, `/*M! */` and `/*+ */`, so those words count. A name may be quoted with double
+/// quotes under `ANSI_QUOTES`, so a double-quoted string counts as a name too.
+fn mysql_tokens(sql: &str) -> Vec<String> {
+    let bytes = sql.as_bytes();
+    let mut tokens = Vec::new();
+    let mut i = 0;
+
+    while i < bytes.len() {
+        let byte = bytes[i];
+
+        match byte {
+            b' ' | b'\t' | b'\r' | b'\n' | 0x0b | 0x0c => {
+                i += 1;
+            }
+            b'\'' => {
+                // A string is no word, but it still keeps the words on either side of it apart.
+                tokens.push("'".to_string());
+                i = skip_quoted(bytes, i, Dialect::Mysql);
+            }
+            b'`' | b'"' => {
+                let end = skip_quoted(bytes, i, Dialect::Mysql);
+                let inner_end = if end > i + 1 && bytes[end - 1] == byte { end - 1 } else { end };
+                tokens.push(sql[i + 1..inner_end].to_uppercase());
+                i = end;
+            }
+            b'-' if bytes.get(i + 1) == Some(&b'-') && is_line_comment_start(bytes, i, Dialect::Mysql) => {
+                i = skip_line(bytes, i);
+            }
+            b'#' => {
+                i = skip_line(bytes, i);
+            }
+            b'/' if bytes.get(i + 1) == Some(&b'*') => {
+                let marker = match (bytes.get(i + 2), bytes.get(i + 3)) {
+                    (Some(b'!' | b'+'), _) => Some(3),
+                    (Some(b'M'), Some(b'!')) => Some(4),
+                    _ => None,
+                };
+
+                match marker {
+                    Some(length) => {
+                        i += length;
+                        while bytes.get(i).is_some_and(u8::is_ascii_digit) {
+                            i += 1;
+                        }
+                    }
+                    None => i = find(bytes, i + 2, b"*/").map_or(bytes.len(), |end| end + 2),
+                }
+            }
+            b'*' if bytes.get(i + 1) == Some(&b'/') => {
+                i += 2;
+            }
+            _ if is_word_byte(byte) => {
+                let end = bytes[i..]
+                    .iter()
+                    .position(|&candidate| !is_word_byte(candidate))
+                    .map_or(bytes.len(), |offset| i + offset);
+                tokens.push(sql[i..end].to_uppercase());
+                i = end;
+            }
+            _ => {
+                tokens.push((byte as char).to_string());
+                i += 1;
+            }
+        }
+    }
+
+    tokens
+}
+
 fn is_word_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'$' || byte >= 0x80
 }
@@ -363,6 +448,51 @@ mod tests {
             vec!["SELECT", "1", "LIMIT", "1"]
         );
         assert_eq!(top_level_words("SELECT [limit] FROM a", Dialect::Sqlite), vec!["SELECT", "FROM", "A"]);
+    }
+
+    #[test]
+    fn finds_what_takes_a_session_out_of_read_only() {
+        for statement in [
+            "SET SESSION TRANSACTION READ WRITE",
+            "set transaction read write",
+            "SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ WRITE",
+            "START TRANSACTION READ WRITE",
+            "START TRANSACTION WITH CONSISTENT SNAPSHOT, READ WRITE",
+            "SET TRANSACTION READ/* a */WRITE",
+            "SET TRANSACTION READ -- a\nWRITE",
+            "SET @@session.tx_read_only = 0",
+            "SET SESSION transaction_read_only = OFF",
+            "SET autocommit = 1, @@transaction_read_only = 0",
+            "SET @@session.`tx_read_only` = 0",
+            "SET @@session.\"tx_read_only\" = 0",
+            "/*!40101 SET SESSION TRANSACTION READ WRITE */",
+            "/*M!100000 SET tx_read_only = 0 */",
+            "SET STATEMENT tx_read_only = 0 FOR DELETE FROM t",
+            "INSERT /*+ SET_VAR(transaction_read_only = 0) */ INTO t VALUES (1)",
+            "PREPARE s FROM @sql",
+            "EXECUTE s",
+            "EXECUTE IMMEDIATE 'DELETE FROM t'",
+        ] {
+            assert!(escapes_read_only(statement), "{statement}");
+        }
+
+        for statement in [
+            "SELECT 1",
+            "SET SESSION TRANSACTION READ ONLY",
+            "SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED",
+            "START TRANSACTION",
+            "SELECT @@transaction_read_only, @@tx_read_only",
+            "SELECT 'READ WRITE', 'SET tx_read_only = 0'",
+            "SELECT 1 -- READ WRITE",
+            "SELECT 1 /* SET TRANSACTION READ WRITE */",
+            "SELECT `read`, `write` FROM t",
+            "SELECT read, write FROM t",
+            "LOCK TABLES t READ",
+            "DEALLOCATE PREPARE s",
+            "SELECT 'it''s', \"unterminated",
+        ] {
+            assert!(!escapes_read_only(statement), "{statement}");
+        }
     }
 
     #[test]

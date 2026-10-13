@@ -104,11 +104,11 @@ The helper enforces `readOnly: true`, not the views:
 - MySQL and MariaDB start the session with `SET SESSION TRANSACTION READ ONLY`.
 - `apply` and `import` fail with `read-only`, and so does a statement the server refuses on a read only session.
 
-The views disable their edit actions and say why. On MySQL the setting is a session variable, so SQL typed in a [`QueryConsole`](/database/views/query-console) can switch it back. For a guarantee, connect with an account that may only `SELECT`.
+The views disable their edit actions and say why. On MySQL the setting is a session variable, so SQL typed in a [`QueryConsole`](/database/views/query-console) could switch it back. On a read only session the helper refuses, with `read-only`, a statement that makes a transaction writable (`SET TRANSACTION READ WRITE`, `START TRANSACTION READ WRITE`, or setting `transaction_read_only` or `tx_read_only`), and every `PREPARE` and `EXECUTE`, whose text it cannot read. A stored procedure that switches the setting itself is out of its sight, so for a guarantee, connect with an account that may only `SELECT`.
 
 ## `where` and `orderBy` are SQL
 
-`rows`, `count` and a table `export` take `where` and `orderBy` as SQL, the way a person types them after those keywords in a table view. The helper puts `where` in parentheses and `orderBy` after it, in one `SELECT`, and sends that as written. It is the filter field of a database tool, and a person who can type a filter can already run any query in the console.
+`rows`, `count` and a table `export` take `where` and `orderBy` as SQL, the way a person types them after those keywords in a table view. The helper puts `where` in parentheses and `orderBy` after it, in one `SELECT`, and sends that as written. On MySQL it sends that `SELECT` as a prepared statement, so a `;` in `where` cannot end it and start another. It is the filter field of a database tool, and a person who can type a filter can already run any query in the console.
 
 - Never build a `where` from input of a third party. There is no parameter binding for it.
 - Neither gets around a read only connection.

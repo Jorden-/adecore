@@ -690,11 +690,61 @@ async fn read_only_sessions_cannot_write() {
     assert_eq!(executed["results"].as_array().unwrap().len(), 1);
     assert_eq!(executed["results"][0]["error"]["code"], "query-failed");
 
+    for escape in [
+        "SET SESSION TRANSACTION READ WRITE; DELETE FROM users",
+        "SET TRANSACTION READ WRITE; DELETE FROM users",
+        "START TRANSACTION READ WRITE; DELETE FROM users; COMMIT",
+        "SET @@session.tx_read_only = 0; DELETE FROM users",
+        "SET /*!40101 SESSION TRANSACTION READ WRITE */; DELETE FROM users",
+        "PREPARE writable FROM 'SET SESSION TRANSACTION READ WRITE'; EXECUTE writable; DELETE FROM users",
+    ] {
+        let escaped = sandbox.client.ok("execute", json!({ "session": session, "sql": escape })).await;
+        assert_eq!(escaped["results"].as_array().unwrap().len(), 1, "{escape}: {escaped}");
+        assert_eq!(escaped["results"][0]["error"]["code"], "read-only", "{escape}: {escaped}");
+    }
+
+    let injected = sandbox
+        .client
+        .error(
+            "count",
+            json!({ "session": session, "schema": sandbox.schema, "table": "users", "where": "1)\n; SET SESSION TRANSACTION READ WRITE; DELETE FROM users; SELECT (1" }),
+        )
+        .await;
+    assert_eq!(injected["code"], "query-failed", "{injected}");
+
     let readable = sandbox
         .client
         .ok("execute", json!({ "session": session, "sql": "SELECT COUNT(*) FROM users" }))
         .await;
     assert_eq!(readable["results"][0]["rows"], json!([[3]]));
+
+    sandbox.finish().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn keeps_a_where_inside_one_statement() {
+    let Some(mut sandbox) = Sandbox::new("where").await else {
+        return;
+    };
+    sandbox.script(SCHEMA_SQL).await;
+    let injected = "1)\n; DELETE FROM users; SELECT (1";
+
+    let counted = sandbox.error("count", json!({ "table": "users", "where": injected })).await;
+    assert_eq!(counted["code"], "query-failed", "{counted}");
+
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("users.csv");
+    let exported = sandbox
+        .client
+        .error(
+            "export",
+            json!({ "session": sandbox.session, "source": { "kind": "table", "schema": sandbox.schema, "table": "users", "where": injected }, "format": "csv", "path": path.to_str().unwrap() }),
+        )
+        .await;
+    assert_eq!(exported["code"], "query-failed", "{exported}");
+    assert!(!path.exists());
+
+    assert_eq!(sandbox.ok("count", json!({ "table": "users" })).await["count"], 3);
 
     sandbox.finish().await;
 }

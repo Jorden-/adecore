@@ -15,7 +15,7 @@ use crate::import::{ImportPlan, ImportReader, ImportRow, at_line, at_lines, inse
 use crate::kinds::mysql_kind;
 use crate::protocol::*;
 use crate::quoting::{Dialect, mysql_string_literal};
-use crate::splitter::split_statements;
+use crate::splitter::{escapes_read_only, split_statements};
 use crate::sql::{
     DEFAULT_EXECUTE_CELL_LIMIT, DEFAULT_EXECUTE_LIMIT, MAX_LIMIT, Param, bare_condition, cell_sql, conflict, count_sql, export_query, fragment, page_sql,
     paging, paging_with, pick_row_key, plan_apply, resolve_cell_limit, rows_sql, single_statement,
@@ -31,6 +31,14 @@ const QUERY_INTERRUPTED_STATE: &str = "70100";
 const APPLY_SAVEPOINT: &str = "adecore_apply";
 const IMPORT_SAVEPOINT: &str = "adecore_import";
 const SYSTEM_SCHEMAS: [&str; 4] = ["information_schema", "performance_schema", "mysql", "sys"];
+
+/// Read only is a session setting on MySQL, which a statement of the person could switch back.
+fn escape_refused() -> DatabaseError {
+    DatabaseError::new(
+        ErrorCode::ReadOnly,
+        "The connection is read only. It runs no statement that makes a transaction writable, and no prepared statement.",
+    )
+}
 
 pub struct MysqlEngine {
     connection: Conn,
@@ -421,6 +429,58 @@ async fn read_set<P: Protocol>(result: &mut QueryResult<'_, '_, P>, limit: usize
     }
 
     Ok((result_columns(&columns), rows, has_more))
+}
+
+/// Writes the rows of the first result set to the file, and what the format closes with.
+async fn write_export<P: Protocol>(
+    mut result: QueryResult<'_, '_, P>,
+    mut file: tokio::fs::File,
+    params: &ExportParams,
+    table_name: &str,
+    cancelled: &AtomicBool,
+) -> Result<Exporter> {
+    let columns: Vec<Column> = result.columns_ref().to_vec();
+
+    if columns.is_empty() {
+        result.drop_result().await?;
+
+        return Err(DatabaseError::unsupported("The statement returns no rows to export."));
+    }
+
+    let expected = result.columns();
+    let mut exporter = Exporter::new(params.format, DIALECT, result_columns(&columns), params.header.unwrap_or(true), table_name);
+
+    while let Some(row) = result.next().await? {
+        if expected.as_ref().is_some_and(|expected| !Arc::ptr_eq(expected, &row.columns())) {
+            break;
+        }
+
+        if cancelled.load(Ordering::SeqCst) {
+            // The server is told to stop, but the rest of the result is still in flight and would fail the next request.
+            let _ = tokio::time::timeout(CANCEL_DRAIN_TIMEOUT, result.drop_result()).await;
+
+            return Err(DatabaseError::cancelled());
+        }
+
+        let cells: Vec<Cell> = row
+            .unwrap()
+            .into_iter()
+            .enumerate()
+            .map(|(index, value)| cell_of(value, &columns[index], usize::MAX))
+            .collect();
+        exporter.push(&cells);
+
+        if exporter.is_full() {
+            file.write_all(&exporter.take()).await?;
+        }
+    }
+
+    result.drop_result().await?;
+    exporter.finish();
+    file.write_all(&exporter.take()).await?;
+    file.flush().await?;
+
+    Ok(exporter)
 }
 
 fn default_expression(flavor: Flavor, raw: Option<String>, extra: &str, data_type: &str) -> Option<String> {
@@ -927,7 +987,8 @@ impl MysqlEngine {
 
     pub async fn count(&mut self, params: CountParams) -> Result<CountResult> {
         let sql = count_sql(DIALECT, &params.schema, &params.table, fragment(&params.r#where));
-        let count: Option<i64> = self.connection.query_first(sql).await?;
+        // Prepared, so the `where` cannot end the statement and start another.
+        let count: Option<i64> = self.connection.exec_first(sql, ()).await?;
 
         Ok(CountResult {
             count: count.unwrap_or_default(),
@@ -1015,6 +1076,15 @@ impl MysqlEngine {
 
             let started = Instant::now();
 
+            if self.read_only && escapes_read_only(&statement) {
+                results.push(StatementResult::Error {
+                    sql: statement,
+                    error: escape_refused(),
+                    elapsed_ms: elapsed_ms(started.elapsed()),
+                });
+                break;
+            }
+
             match self.run_statement(&statement, limit, cell_limit, started).await {
                 Ok(result) => results.push(result),
                 Err(error) if error.sql_state.as_deref() == Some(QUERY_INTERRUPTED_STATE) || cancelled.load(Ordering::SeqCst) => {
@@ -1060,54 +1130,24 @@ impl MysqlEngine {
         let started = Instant::now();
         let (sql, table_name) = export_query(DIALECT, &params.source, params.table_name.as_deref())?;
 
-        if let ExportSource::Query { schema: Some(schema), .. } = &params.source {
-            self.connection.query_drop(format!("USE {}", DIALECT.quote_ident(schema))).await?;
+        if let ExportSource::Query { schema, .. } = &params.source {
+            if self.read_only && escapes_read_only(&sql) {
+                return Err(escape_refused());
+            }
+
+            if let Some(schema) = schema {
+                self.connection.query_drop(format!("USE {}", DIALECT.quote_ident(schema))).await?;
+            }
         }
 
         let (mut partial, file) = PartialFile::create(&params.path)?;
-        let mut file = tokio::fs::File::from_std(file);
-        let mut result = self.connection.query_iter(sql).await?;
-        let columns: Vec<Column> = result.columns_ref().to_vec();
-
-        if columns.is_empty() {
-            result.drop_result().await?;
-
-            return Err(DatabaseError::unsupported("The statement returns no rows to export."));
-        }
-
-        let expected = result.columns();
-        let mut exporter = Exporter::new(params.format, DIALECT, result_columns(&columns), params.header.unwrap_or(true), &table_name);
-
-        while let Some(row) = result.next().await? {
-            if expected.as_ref().is_some_and(|expected| !Arc::ptr_eq(expected, &row.columns())) {
-                break;
-            }
-
-            if cancelled.load(Ordering::SeqCst) {
-                // The server is told to stop, but the rest of the result is still in flight and would fail the next request.
-                let _ = tokio::time::timeout(CANCEL_DRAIN_TIMEOUT, result.drop_result()).await;
-
-                return Err(DatabaseError::cancelled());
-            }
-
-            let cells: Vec<Cell> = row
-                .unwrap()
-                .into_iter()
-                .enumerate()
-                .map(|(index, value)| cell_of(value, &columns[index], usize::MAX))
-                .collect();
-            exporter.push(&cells);
-
-            if exporter.is_full() {
-                file.write_all(&exporter.take()).await?;
-            }
-        }
-
-        result.drop_result().await?;
-        exporter.finish();
-        file.write_all(&exporter.take()).await?;
-        file.flush().await?;
-        drop(file);
+        let file = tokio::fs::File::from_std(file);
+        // A table is prepared, so its `where` and `orderBy` cannot end the statement and start another. A query is a statement
+        // the person typed, and the server prepares only some of the statements an export takes, such as not every SHOW.
+        let exporter = match &params.source {
+            ExportSource::Table { .. } => write_export(self.connection.exec_iter(sql, ()).await?, file, &params, &table_name, &cancelled).await?,
+            ExportSource::Query { .. } => write_export(self.connection.query_iter(sql).await?, file, &params, &table_name, &cancelled).await?,
+        };
         partial.commit()?;
 
         Ok(ExportResult {
