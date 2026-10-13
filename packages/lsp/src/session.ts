@@ -39,6 +39,8 @@ export interface LspSessionOptions {
     configuration?: Record<string, unknown>;
     clientInfo?: { name: string; version?: string };
     timeoutMs?: number;
+    /* How long the changes for a server with full sync gather before the whole text goes out; 200 by default. */
+    fullSyncDelayMs?: number;
     snippetSupport?: boolean;
     insertTextModes?: readonly (1 | 2)[];
     completionItemDefaults?: readonly string[];

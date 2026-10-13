@@ -4,7 +4,7 @@
 
 `session.openDocument(item)` sends `didOpen` and returns the `LspDocument` that owns the document's text and version from then on. `item` has a `uri`, a `languageId`, the `text` and an optional `version`, `1` by default. A URI can be open once per session; `session.getDocument(uri)` returns it. Wait for `document.ready` before you count on the server having it.
 
-`updateText(text)` sends the one range that differs from the text the document holds, and nothing when it is the same. `applyChanges(changes)` sends `didChange` entries in order, each in the text the entry before it left. Both raise the version by one. A server that negotiated full sync gets the whole new text instead of the ranges.
+`updateText(text)` sends the one range that differs from the text the document holds, and nothing when it is the same. `applyChanges(changes)` sends `didChange` entries in order, each in the text the entry before it left. Both raise the version by one. A server that negotiated full sync gets the whole new text instead of the ranges, once the changes pause for `fullSyncDelayMs` of the [session](/lsp/sessions), and at once before a request, `save()` or `close()`; the changes in between go out as one, under the newest version. The promise of a change resolves when its text has been sent.
 
 `save()` sends `didSave` when the server asked for it, with the text when it asked for that too. It writes no file: call it after the app saved. `close()` cancels what is pending, sends `didClose` and clears the document's diagnostics; calling it again does nothing.
 
@@ -58,6 +58,8 @@ applyContentChanges('red blue red', [minimalChange('red blue red', after)]) === 
 ```
 
 `applyTextEdits` rejects edits that overlap; several insertions at one position keep their order. `minimalChange(before, after)` is the one `ContentChange` between two texts, never splitting a surrogate pair or a `\r\n`. `offsetAt`, `positionAt` and `endPosition` convert between offsets and positions and throw on a position outside the text instead of clamping.
+
+A host that keeps its own copy of a document, to check the changes it passes on, can hold it in a `TextMirror` instead of a string. `new TextMirror(text)` keeps the text as its lines, so `applyChanges(changes)` costs the lines a change touches instead of the whole text, as `applyContentChanges` does; `text` joins the lines when it is read, and `lineCount` counts them. A change that does not fit throws, and leaves the text as it was, also after the entries before it in the same call. `LspDocument` holds its text this way.
 
 ## Workspace edits
 

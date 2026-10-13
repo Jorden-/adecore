@@ -1,4 +1,4 @@
-import { LspSession } from './session.ts';
+import { LspSession, type LspSessionOptions } from './session.ts';
 import type { LspTransport, RpcMessage, ServerCapabilities } from './protocol.ts';
 
 /* A transport that records what is sent and lets a test say what comes back, for tests that assert on the exact wire. */
@@ -73,10 +73,10 @@ export async function flush(): Promise<void> {
 
 export const origin = { line: 0, character: 0 };
 
-export async function sessionWith(capabilities: ServerCapabilities = {}) {
+export async function sessionWith(capabilities: ServerCapabilities = {}, options?: LspSessionOptions) {
     const transport = new ScriptedTransport();
     transport.autoInitialize = { textDocumentSync: 2, ...capabilities };
-    const session = new LspSession(transport);
+    const session = new LspSession(transport, options);
     await session.initialize();
     return { transport, session };
 }

@@ -1,6 +1,7 @@
 import { ErrorCodes, LspError, StaleResultError } from './connection.ts';
-import { applyContentChanges, minimalChange } from './edits.ts';
+import { minimalChange } from './edits.ts';
 import type { LspSession } from './session.ts';
+import { TextMirror } from './text-mirror.ts';
 import type {
     CallHierarchyIncomingCall,
     CallHierarchyItem,
@@ -36,6 +37,9 @@ import type {
     WorkspaceEdit
 } from './protocol.ts';
 
+/* The delay of the VS Code language client for servers with full sync. */
+const FULL_SYNC_DELAY_MS = 200;
+
 /*
  * One open text document in one session. It owns the version: every change raises it by one, and a
  * result that arrives for an older version is refused, so nothing computed for a text that is gone
@@ -47,9 +51,10 @@ export class LspDocument {
     readonly languageId: string;
     readonly ready: Promise<void>;
     private revision: number;
-    private content: string;
+    private readonly content: TextMirror;
     private closed = false;
     private synced: Promise<void>;
+    private sendFullText?: () => void;
     private closePromise?: Promise<void>;
     private readonly inFlight = new Set<AbortController>();
     private readonly latest = new Map<string, AbortController>();
@@ -61,7 +66,7 @@ export class LspDocument {
         this.session = session;
         this.uri = item.uri;
         this.languageId = item.languageId;
-        this.content = item.text;
+        this.content = new TextMirror(item.text);
         this.revision = item.version ?? 1;
         if (!Number.isSafeInteger(this.revision) || this.revision < 0) {
             throw new LspError('Invalid document version');
@@ -78,7 +83,7 @@ export class LspDocument {
     }
 
     get text(): string {
-        return this.content;
+        return this.content.text;
     }
 
     get isClosed(): boolean {
@@ -88,15 +93,17 @@ export class LspDocument {
     /* Sends the difference to the text as the one range that changed, or the whole text to a server that wants no ranges. */
     updateText(text: string): Promise<void> {
         this.assertOpen();
-        if (text === this.content) {
+        const current = this.content.text;
+        if (text === current) {
             return this.synced;
         }
-        return this.applyChanges([minimalChange(this.content, text)]);
+        return this.applyChanges([minimalChange(current, text)]);
     }
 
     /*
      * Applies `didChange` entries in order, which a server that negotiated incremental sync gets as
-     * they are. The version goes up by one even when the text ends up the same.
+     * they are. The version goes up by one even when the text ends up the same. A server with full
+     * sync gets the whole text once the changes pause, or before the next request, save or close.
      */
     applyChanges(changes: readonly ContentChange[]): Promise<void> {
         this.assertOpen();
@@ -104,16 +111,17 @@ export class LspDocument {
         if (!kind) {
             return Promise.reject(new LspError('Server did not negotiate document changes', ErrorCodes.MethodNotFound));
         }
-        let next: string;
         try {
-            next = applyContentChanges(this.content, changes);
+            this.content.applyChanges(changes);
         } catch (error) {
             return Promise.reject(error);
         }
-        this.content = next;
         const version = ++this.revision;
         this.cancelRequests();
-        const contentChanges = kind === 1 ? [{ text: next }] : changes.map((change) => ({ ...change }));
+        if (kind === 1) {
+            return this.queueFullText();
+        }
+        const contentChanges = changes.map((change) => ({ ...change }));
         this.synced = this.synced.then(() =>
             this.session.connection.notify('textDocument/didChange', { textDocument: { uri: this.uri, version }, contentChanges })
         );
@@ -126,6 +134,7 @@ export class LspDocument {
         this.assertOpen();
         const version = this.version;
         const text = this.text;
+        this.sendFullText?.();
         await this.synced;
         this.assertCurrent(version);
         const save = this.session.syncOptions.save;
@@ -278,6 +287,7 @@ export class LspDocument {
         }
         this.closed = true;
         this.cancelRequests();
+        this.sendFullText?.();
         this.closePromise = this.synced
             .then(async () => {
                 if (!this.session.connection.isClosed && this.session.syncOptions.openClose) {
@@ -292,6 +302,7 @@ export class LspDocument {
     disconnect(): void {
         this.closed = true;
         this.cancelRequests();
+        this.sendFullText?.();
         this.session.forgetDocument(this);
     }
 
@@ -325,6 +336,7 @@ export class LspDocument {
             abort();
         }
         try {
+            this.sendFullText?.();
             await this.synced;
             this.assertCurrent(version);
             const result = await this.session.request<T>(method, params, { signal: controller.signal, timeoutMs: options.timeoutMs });
@@ -368,6 +380,33 @@ export class LspDocument {
         if (this.closed || this.version !== version) {
             throw new StaleResultError(this.uri);
         }
+    }
+
+    /* Changes that arrive while the whole text waits go out with it, under the newest version. */
+    private queueFullText(): Promise<void> {
+        if (this.sendFullText) {
+            return this.synced;
+        }
+        const due = new Promise<void>((resolve) => {
+            const timer = setTimeout(resolve, this.session.options.fullSyncDelayMs ?? FULL_SYNC_DELAY_MS);
+            this.sendFullText = () => {
+                clearTimeout(timer);
+                resolve();
+            };
+        });
+        this.synced = this.synced
+            .then(() => due)
+            .then(async () => {
+                this.sendFullText = undefined;
+                if (!this.session.connection.isClosed) {
+                    await this.session.connection.notify('textDocument/didChange', {
+                        textDocument: { uri: this.uri, version: this.revision },
+                        contentChanges: [{ text: this.content.text }]
+                    });
+                }
+            });
+        void this.synced.catch((error) => this.session.connection.reportError(error));
+        return this.synced;
     }
 
     private cancelRequests(): void {

@@ -52,6 +52,7 @@ child.stderr.on('data', (chunk) => log(String(chunk)));
 | `initializationOptions`  |                    | What the server takes in its handshake                                     |
 | `configuration`          | `{}`               | Settings, sent after the handshake and answered to `workspace/configuration` |
 | `timeoutMs`              | 30 seconds         | The deadline of a request; `0` turns it off                                |
+| `fullSyncDelayMs`        | 200 ms             | How long the changes for a server with full sync gather before the whole text goes out |
 | `snippetSupport`         | `false`            | Whether completion items may be snippets                                   |
 | `insertTextModes`        | not advertised     | Supported completion insertion modes: `1` as-is, `2` adjusted indentation   |
 | `completionItemDefaults` | not advertised     | Completion-list default fields the consumer applies to each item           |

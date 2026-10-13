@@ -93,6 +93,64 @@ describe('versioned language documents', () => {
         await session.shutdown();
     });
 
+    it('gathers the keystrokes for a server with full sync into one whole text under the newest version', async () => {
+        const { session, transport } = await sessionWith({ textDocumentSync: { openClose: true, change: 1 } }, { fullSyncDelayMs: 20 });
+        const document = session.openDocument({ uri: 'file:///main.ts', languageId: 'typescript', text: '' });
+        const typed = 'const typed = 50;'.repeat(3).slice(0, 50);
+        const updates = [...typed].map((_, index) => document.updateText(typed.slice(0, index + 1)));
+        await Promise.all(updates);
+        const changes = () => transport.sent.filter((message) => 'method' in message && message.method === 'textDocument/didChange');
+        expect(changes()).toEqual([
+            {
+                jsonrpc: '2.0',
+                method: 'textDocument/didChange',
+                params: { textDocument: { uri: document.uri, version: 51 }, contentChanges: [{ text: typed }] }
+            }
+        ]);
+        await document.updateText('');
+        expect(changes()).toHaveLength(2);
+        expect(changes()[1]).toMatchObject({ params: { textDocument: { version: 52 }, contentChanges: [{ text: '' }] } });
+        await session.shutdown();
+    });
+
+    it('sends the waiting whole text before a request, a save and a close, without waiting out the delay', async () => {
+        const { session, transport } = await sessionWith(
+            { textDocumentSync: { openClose: true, change: 1, save: true }, hoverProvider: true },
+            { fullSyncDelayMs: 60_000 }
+        );
+        const document = session.openDocument({ uri: 'file:///main.ts', languageId: 'typescript', text: 'a' });
+        const typing = [document.updateText('ab'), document.updateText('abc')];
+        const hover = document.hover(origin);
+        await flush();
+        expect(transport.methods().slice(-2)).toEqual(['textDocument/didChange', 'textDocument/hover']);
+        expect(transport.sent.at(-2)).toMatchObject({ params: { textDocument: { version: 3 }, contentChanges: [{ text: 'abc' }] } });
+        transport.respond('textDocument/hover', null);
+        await Promise.all([...typing, hover]);
+        const saving = document.updateText('abcd');
+        await document.save();
+        await saving;
+        expect(transport.methods().slice(-2)).toEqual(['textDocument/didChange', 'textDocument/didSave']);
+        const closing = document.updateText('abcde');
+        await document.close();
+        await closing;
+        expect(transport.methods().slice(-2)).toEqual(['textDocument/didChange', 'textDocument/didClose']);
+        expect(transport.sent.at(-2)).toMatchObject({ params: { textDocument: { version: 5 }, contentChanges: [{ text: 'abcde' }] } });
+        await session.shutdown();
+    });
+
+    it('drops the waiting whole text without an error when the connection goes', async () => {
+        const { session, transport } = await sessionWith({ textDocumentSync: { openClose: true, change: 1 } }, { fullSyncDelayMs: 60_000 });
+        const errors: Error[] = [];
+        session.connection.onError((error) => errors.push(error));
+        const document = session.openDocument({ uri: 'file:///main.ts', languageId: 'typescript', text: 'a' });
+        await document.ready;
+        const typing = document.updateText('ab');
+        transport.close();
+        await typing;
+        expect(transport.methods()).not.toContain('textDocument/didChange');
+        expect(errors).toEqual([]);
+    });
+
     it('refuses changes when the server negotiated none', async () => {
         const { session } = await sessionWith({ textDocumentSync: { openClose: true, change: 0 } });
         const document = session.openDocument({ uri: 'file:///main.ts', languageId: 'typescript', text: 'old' });
