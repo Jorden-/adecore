@@ -13,6 +13,7 @@ export interface DesignOptions {
     buttonFile?: string;
     namespace?: string;
     namespaceExempt?: readonly string[];
+    colorExempt?: readonly string[];
     theme?: string;
 }
 
@@ -353,11 +354,13 @@ export function designProblemsIn(files: readonly DesignSource[], options: Design
         [
             'a color is a token of the theme, never a raw value in a component',
             () => {
-                const raw = pageSources().flatMap(({ path, text }) =>
-                    stringsOf(path, text)
-                        .filter(({ classes }) => /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab)\(/.test(classes))
-                        .map(({ start }) => `${path}:${lineOf(text, start)}`)
-                );
+                const raw = pageSources()
+                    .filter(({ path }) => !options.colorExempt?.includes(path))
+                    .flatMap(({ path, text }) =>
+                        stringsOf(path, text)
+                            .filter(({ classes }) => /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab)\(/.test(classes))
+                            .map(({ start }) => `${path}:${lineOf(text, start)}`)
+                    );
                 return raw;
             }
         ],

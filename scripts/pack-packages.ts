@@ -1,7 +1,32 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { cpSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { packedEntrypoints } from './packed-artifacts.ts';
-import { dependencyOrder, discoverPackages, type WorkspacePackage } from './workspaces.ts';
+import { dependencyOrder, discoverPackages, versionManifest, type WorkspacePackage } from './workspaces.ts';
+
+/* Files npm packs whether `files` lists them or not. */
+const ALWAYS_PACKED = /^(?:readme|license|licence|notice|changelog)\b/i;
+
+/*
+ * npm packs the manifest it finds on disk, so each package is packed from a copy whose manifest is the one
+ * `release:version` writes: a checkout at 0.0.0 still keeps its `workspace:` ranges.
+ */
+export function stagePackage(pkg: WorkspacePackage, directory: string): string {
+    const files = pkg.manifest.files;
+    if (!Array.isArray(files)) {
+        throw new Error(`${pkg.manifest.name} needs a files whitelist to be packed.`);
+    }
+    const included = new Set(files.filter((entry: string) => !entry.startsWith('!')).map((entry: string) => entry.split('/')[0]));
+    const target = join(directory, 'stage', pkg.manifest.name);
+    rmSync(target, { recursive: true, force: true });
+    mkdirSync(target, { recursive: true });
+    for (const entry of readdirSync(pkg.directory)) {
+        if (included.has(entry) || ALWAYS_PACKED.test(entry)) {
+            cpSync(join(pkg.directory, entry), join(target, entry), { recursive: true });
+        }
+    }
+    writeFileSync(join(target, 'package.json'), `${JSON.stringify(versionManifest(pkg.manifest, pkg.manifest.version ?? '0.0.0'), null, 2)}\n`);
+    return target;
+}
 
 export async function packPackages(packages: WorkspacePackage[], directory: string): Promise<Record<string, string>> {
     mkdirSync(directory, { recursive: true });
@@ -11,7 +36,7 @@ export async function packPackages(packages: WorkspacePackage[], directory: stri
         let pkg: WorkspacePackage | undefined;
         while ((pkg = queue.shift())) {
             const child = Bun.spawn(['npm', 'pack', '--ignore-scripts', '--json', '--pack-destination', directory], {
-                cwd: pkg.directory,
+                cwd: stagePackage(pkg, directory),
                 stdin: 'ignore',
                 stdout: 'pipe',
                 stderr: 'pipe',

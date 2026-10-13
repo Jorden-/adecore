@@ -44,6 +44,14 @@ test('keeps formatter and provider exemptions specific to their package and file
     expect(designProblemsIn(sources, { namespace: 'database' }).map((problem) => problem.rule)).toHaveLength(3);
 });
 
+test('exempts from the color rule only the files named for it', () => {
+    const sources = [
+        { path: 'logic/ansi.ts', text: "const color = 'rgb(255 0 0)';" },
+        { path: 'Component.tsx', text: '<div className="text-[#ffffff]" />' }
+    ];
+    expect(designProblemsIn(sources, { colorExempt: ['logic/ansi.ts'] }).map((problem) => problem.location)).toEqual(['Component.tsx:1']);
+});
+
 test('reports invalid theme type, colors and lengths while permitting alpha masks', () => {
     const scale = '--text-xs: 12px; --text-sm: 14px; --text-md: 16px; --text-lg: 20px; --text-xl: round(2rem, 1px);';
     const theme = `${scale}\n/* Who floats over whom. */\n.mask { mask-image: linear-gradient(#000, #000); }`;

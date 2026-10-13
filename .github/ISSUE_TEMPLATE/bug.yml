@@ -1,5 +1,5 @@
 name: Bug
-description: A component or a part of the shell that does not do what its docs or its types say.
+description: A part of a package that does not do what its docs or its types say.
 labels: ["Bug"]
 body:
   - type: dropdown
@@ -18,9 +18,27 @@ body:
     attributes:
       label: Which package?
       options:
-        - ui
-        - terminal
+        - agent-contracts
+        - agents
+        - agents-react
+        - database
+        - database-darwin-arm64
+        - database-linux-arm64
+        - database-linux-x64
+        - database-win32-x64
+        - diagram
+        - drawing
+        - editor
+        - editor-core
+        - editor-react
+        - intelligent-ui
+        - lsp
+        - merge
+        - plan
+        - service
         - shell
+        - terminal
+        - ui
     validations:
       required: true
   - type: textarea

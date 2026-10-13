@@ -50,3 +50,14 @@ export function packedEntrypoints(manifest: PackageManifest, files: string[]): s
         });
     });
 }
+
+/* A `workspace:` range means nothing outside this repository, so no packed manifest may keep one, not even among its devDependencies. */
+export function assertPublishableManifest(manifest: PackageManifest): void {
+    for (const group of ['dependencies', 'optionalDependencies', 'peerDependencies', 'devDependencies'] as const) {
+        for (const [name, range] of Object.entries(manifest[group] ?? {})) {
+            if (range.startsWith('workspace:')) {
+                throw new Error(`${manifest.name} packs ${group} ${name}@${range}.`);
+            }
+        }
+    }
+}

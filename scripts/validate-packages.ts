@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpath
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { packPackages } from './pack-packages.ts';
-import { packedEntrypoints } from './packed-artifacts.ts';
+import { assertPublishableManifest, packedEntrypoints } from './packed-artifacts.ts';
 import { dependencyOrder, discoverPackages, repositoryRoot, type PackageManifest } from './workspaces.ts';
 
 /* What a consumer runs against each packed package that is selected, in this order. */
@@ -95,6 +95,7 @@ try {
         if (manifest.name !== pkg.manifest.name) {
             throw new Error(`Expected ${pkg.manifest.name}, received packed ${manifest.name}.`);
         }
+        assertPublishableManifest(manifest);
         const files = readdirSync(target, { recursive: true, withFileTypes: true })
             .filter((entry) => entry.isFile())
             .map((entry) => relative(target, join(entry.parentPath, entry.name)).replaceAll('\\', '/'));

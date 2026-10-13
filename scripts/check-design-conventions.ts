@@ -23,7 +23,23 @@ const packages: { directory: string; options: DesignOptions }[] = [
             // The provider installs the namespace without reading any labels from it.
             namespaceExempt: ['DatabaseProvider.tsx']
         }
-    }
+    },
+    {
+        directory: 'packages/agents-react/src',
+        options: {
+            // An escape sequence carries a color of its own, and a framed page receives the theme's tokens
+            // as the colors the engine computed for them; neither can name a token.
+            colorExempt: ['chat/logic/ansi.ts', 'chat/ui/visual-theme.ts']
+        }
+    },
+    {
+        directory: 'packages/editor-react/src',
+        options: {
+            // These follow a held Mod key to draw a link under the pointer, without binding a shortcut.
+            keyListeners: ['definition-link.ts', 'inlay-hints.ts']
+        }
+    },
+    { directory: 'packages/terminal/src', options: {} }
 ];
 
 let failures = 0;

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { packedEntrypoints } from './packed-artifacts.ts';
+import { assertPublishableManifest, packedEntrypoints } from './packed-artifacts.ts';
 import type { PackageManifest } from './workspaces.ts';
 
 const manifest: PackageManifest = {
@@ -43,4 +43,13 @@ test('rejects accidentally published tests, lost licenses and source-only export
         )
     ).toThrow('LICENSE');
     expect(() => packedEntrypoints({ name: '@adecore/example', exports: { '.': './src/index.ts' } }, files)).toThrow('source and default');
+});
+
+test('rejects a workspace range in every dependency group of a packed manifest', () => {
+    expect(() =>
+        assertPublishableManifest({ ...manifest, dependencies: { '@adecore/ui': '0.16.0' }, devDependencies: { typescript: '^7.0.2' } })
+    ).not.toThrow();
+    for (const group of ['dependencies', 'optionalDependencies', 'peerDependencies', 'devDependencies']) {
+        expect(() => assertPublishableManifest({ ...manifest, [group]: { '@adecore/ui': 'workspace:*' } })).toThrow(`${group} @adecore/ui@workspace:*`);
+    }
 });

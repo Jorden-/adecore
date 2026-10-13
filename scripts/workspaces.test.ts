@@ -58,7 +58,7 @@ describe('workspace dependency order', () => {
 });
 
 describe('release version normalization', () => {
-    test('normalizes regular and optional dependencies exactly and peers as a compatible range', () => {
+    test('normalizes regular, optional and development dependencies exactly and peers as a compatible range', () => {
         const manifest: PackageManifest = {
             name: '@adecore/agents',
             version: '0.0.0',
@@ -67,7 +67,7 @@ describe('release version normalization', () => {
             dependencies: { '@adecore/agent-contracts': 'workspace:*', zod: '^4.6.5' },
             optionalDependencies: { '@adecore/database-linux-x64': '0.0.0' },
             peerDependencies: { '@adecore/ui': '^0.15.0', react: '^19.3.0' },
-            devDependencies: { '@adecore/ui': 'workspace:*' }
+            devDependencies: { '@adecore/ui': 'workspace:*', typescript: '^7.0.2' }
         };
         const updated = versionManifest(manifest, 'v0.16.0-beta.1');
         expect(updated).toEqual({
@@ -75,8 +75,10 @@ describe('release version normalization', () => {
             version: '0.16.0-beta.1',
             dependencies: { '@adecore/agent-contracts': '0.16.0-beta.1', zod: '^4.6.5' },
             optionalDependencies: { '@adecore/database-linux-x64': '0.16.0-beta.1' },
-            peerDependencies: { '@adecore/ui': '^0.16.0-beta.1', react: '^19.3.0' }
+            peerDependencies: { '@adecore/ui': '^0.16.0-beta.1', react: '^19.3.0' },
+            devDependencies: { '@adecore/ui': '0.16.0-beta.1', typescript: '^7.0.2' }
         });
+        expect(JSON.stringify(updated)).not.toContain('workspace:');
         expect(manifest.version).toBe('0.0.0');
         expect(manifest.dependencies?.['@adecore/agent-contracts']).toBe('workspace:*');
     });

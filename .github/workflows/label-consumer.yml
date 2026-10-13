@@ -29,7 +29,9 @@ jobs:
               *) echo "No consumer label for '$consumer'." ;;
           esac
           package=$(printf '%s\n' "$BODY" | awk '/^### Which package\?/ { found = 1; next } found && NF { print; exit }')
-          case "$package" in
-              ui|terminal|shell) gh issue edit "$NUMBER" --add-label "$package" ;;
-              *) echo "No package label for '$package'." ;;
-          esac
+          # The form lists every package; only those with a label of their own get one.
+          if [[ "$package" =~ ^[a-z0-9-]+$ ]] && gh label list --limit 500 --json name --jq '.[].name' | grep -qxF -- "$package"; then
+              gh issue edit "$NUMBER" --add-label "$package"
+          else
+              echo "No package label for '$package'."
+          fi

@@ -124,7 +124,8 @@ export function assertPrereleaseFlag(value: string, flagged: boolean): void {
 export function versionManifest(manifest: PackageManifest, value: string): PackageManifest {
     const version = releaseVersion(value);
     const updated = { ...manifest, version };
-    for (const group of runtimeGroups) {
+    // A published manifest keeps its devDependencies, and `workspace:` means nothing outside this repository.
+    for (const group of [...runtimeGroups, 'devDependencies' as const]) {
         const dependencies = manifest[group];
         if (dependencies) {
             updated[group] = Object.fromEntries(
