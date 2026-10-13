@@ -1,8 +1,5 @@
 import type { AgentKind, UsageProvider } from '@adecore/agent-contracts';
-import { AccountDot } from '@adecore/agents-react/agents/AccountDot';
-import { AgentIcon } from '@adecore/agents-react/agents/AgentIcon';
-import { ProviderLogo } from '@adecore/agents-react/agents/ProviderLogo';
-import { CliMark, CliTile } from '@adecore/agents-react/providers/parts';
+import { AccountDot, AgentIcon, ProviderLogo, CliMark, CliTile } from '@adecore/agents-react/providers';
 import { DemoChatHost } from '../shared/agents.tsx';
 
 const KINDS: AgentKind[] = ['claude', 'codex', 'gemini', 'copilot', 'apple'];

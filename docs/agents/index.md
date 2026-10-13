@@ -3,7 +3,7 @@
 A host for agent chats, for Node, Bun or an Electron utility process. It runs Claude Code and Codex as chat backends, keeps every thread on disk, streams it to the clients that read it, and manages the CLIs' accounts and what they cost. It answers the requests of [`@adecore/agent-contracts`](/agent-contracts/), so [`@adecore/agents-react`](/agents-react/) can draw it in a window.
 
 ```ts
-import { AgentHost } from '@adecore/agents/host/agent-host';
+import { AgentHost } from '@adecore/agents/host';
 ```
 
 ## Install
@@ -34,7 +34,18 @@ It registers no IPC channel and opens no server: it serves a `FramePort` your ap
 
 ## Entry points
 
-There is no root import. Every module has its own subpath, `@adecore/agents/<path>` without an extension, and the model catalogs are JSON: `@adecore/agents/providers/claude-models.json`. The [module reference](/agents/reference) lists every one. Keep them out of a page: the page imports the contracts and the views, never this package.
+| Entry | What it holds |
+| --- | --- |
+| `@adecore/agents` | Files, processes, watching, serialization and errors, shared by the other entries |
+| `@adecore/agents/host` | `AgentHost`, `wireAgents`, the request handlers, the CLI environment and an in-memory port |
+| `@adecore/agents/chat` | `ChatCore`, sessions, stores, the backends of the CLIs and the thread |
+| `@adecore/agents/providers` | The provider registry, model catalogs, runtime modes, CLI detection and accounts |
+| `@adecore/agents/usage` | Usage from transcripts, prices and plan limits |
+| `@adecore/agents/coordination` | The outbox, tasks between chats, lineage and messages |
+| `@adecore/agents/context` | Context commands: verbs, arguments, help and refusals |
+| `@adecore/agents/testing` | Fake CLIs, a manual clock, a fake watcher and test accounts |
+
+The model catalogs are JSON: `@adecore/agents/providers/claude-models.json` and `@adecore/agents/providers/codex-models.json`. The [export reference](/agents/reference) lists every name. A module that no entry exports is internal. Keep the package out of a page: the page imports the contracts and the views, never this package.
 
 ## Where to go next
 

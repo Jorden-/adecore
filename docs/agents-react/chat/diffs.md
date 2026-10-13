@@ -3,12 +3,8 @@
 The file changes a chat reports, highlighted with Shiki. A host can opt in to its editor for bounded edit and patch reviews, including split with wrapping. Legacy hosts use `@pierre/diffs`. The thread draws them under a tool call, in the changed files of a turn and in an approval; they are exported for a review pane of your own. They draw what the host reported and write nothing.
 
 ```tsx
-import UnifiedDiff from '@adecore/agents-react/chat/ui/UnifiedDiff';
-import EditDiff from '@adecore/agents-react/chat/ui/EditDiff';
-import DiffPool from '@adecore/agents-react/chat/ui/DiffPool';
+import { UnifiedDiff, EditDiff, DiffPool } from '@adecore/agents-react/chat/ui';
 ```
-
-All three are default exports.
 
 <Demo src="agents/diffs" />
 
@@ -50,14 +46,14 @@ The demo above runs under such a pool. Without one the diffs highlight on the pa
 
 ## Changes of a turn
 
-`ChatActions.turnDiff(chatId, turnId)` reads what the working tree holds against the checkpoint a turn started from, or `null` without one. The helpers in `chat/logic/tools` read changes out of tool calls: `fileChanges(name, input)` for an edit's before and after, `unifiedChanges(tool)` for a patch, `approvalChanges(input)` for the copy an approval carries, and `hasFileChanges(tool)`.
+`ChatActions.turnDiff(chatId, turnId)` reads what the working tree holds against the checkpoint a turn started from, or `null` without one. The helpers in `@adecore/agents-react/chat` read changes out of tool calls: `fileChanges(name, input)` for an edit's before and after, `unifiedChanges(tool)` for a patch, `approvalChanges(input)` for the copy an approval carries, and `hasFileChanges(tool)`.
 
 ## Editor source tokens
 
-The additive `@adecore/agents-react/chat/ui/diff-syntax` entrypoint connects a [`DiffView`](/editor-react/change-review#diffview) to the shared Shiki runtime. Existing patch and split components keep their APIs; hosts without the optional editor keep their rendering. The optional editor path adds `@adecore/editor-react` and its LSP dependency to the installation even for hosts that do not opt in; the renderer remains in a lazy chunk.
+The diff syntax helpers of `@adecore/agents-react/chat/ui` connect a [`DiffView`](/editor-react/change-review#diffview) to the shared Shiki runtime. Existing patch and split components keep their APIs; hosts without the optional editor keep their rendering. The optional editor path adds `@adecore/editor-react` and its LSP dependency to the installation even for hosts that do not opt in; the renderer remains in a lazy chunk.
 
 ```ts
-import { diffSourceTokens, diffSyntaxRuntime } from '@adecore/agents-react/chat/ui/diff-syntax';
+import { diffSourceTokens, diffSyntaxRuntime } from '@adecore/agents-react/chat/ui';
 import { diffSyntaxDocument } from '@adecore/editor-react';
 
 const mapping = diffSyntaxDocument(document, language, theme);
@@ -68,11 +64,11 @@ const tokens = diffSourceTokens(document, mapping, diffSyntaxRuntime(code));
 
 `diffSourceTokens(document, mapping, runtime)` returns a `DiffSourceTokenSession`, structurally compatible with the view's `DiffSourceTokens`. Its `get(side, index)` requests the source block on demand, returning undefined while pending, an immutable `LineToken` array when ready, or null after a failure or outside the source. It caches each decoded block and keeps array identity for unchanged source lines. `subscribe(listener)` reports completed blocks and returns an unsubscribe function. `dispose()` cancels both side sessions, frees their arrays and ignores late replies. Create a new source when the text, language, theme or mapping changes.
 
-`DiffSyntaxMapping` supplies the separate old and new `DiffSyntaxDocument` definitions and a `locate(side, index)` callback; `diffSyntaxDocument` builds that mapping. The syntax entrypoint imports no React renderer.
+`DiffSyntaxMapping` supplies the separate old and new `DiffSyntaxDocument` definitions and a `locate(side, index)` callback; `diffSyntaxDocument` builds that mapping. The syntax helpers import no React renderer.
 
 `diffSyntaxRuntime(code)` returns the runtime of a host's `code`, made on its first use and shared by every diff under that host. `createDiffSyntaxRuntime(options)` creates an independent `DiffSyntaxRuntime`; `DiffSyntaxRuntimeOptions` takes custom `themes`, an optional `workerFactory` and an optional borrowed `highlighter`. A runtime opens a `DiffSyntaxSession` per document, with `request(block)`, `cancel()` and `dispose()`. Dispose an independent runtime when its owner ends; a shared runtime belongs to its `code`. The service sends custom themes once and falls back from a failed worker to main-thread Shiki with yields between blocks.
 
-`useDiffSourceTokens(document, language, theme, runtime?)` from `@adecore/agents-react/chat/ui/use-diff-source-tokens` creates the mapping and token provider together in one memo. Pass its result directly to `DiffView`. It opens sessions on the first committed read, releases both sides on unmount or a definition change, and reopens after StrictMode effect replay. No runtime resource starts during an abandoned render. Without a runtime it uses the shared one of the host's `code`; pass one for an independently owned service or tests.
+`useDiffSourceTokens(document, language, theme, runtime?)` creates the mapping and token provider together in one memo. Pass its result directly to `DiffView`. It opens sessions on the first committed read, releases both sides on unmount or a definition change, and reopens after StrictMode effect replay. No runtime resource starts during an abandoned render. Without a runtime it uses the shared one of the host's `code`; pass one for an independently owned service or tests.
 
 
 `EditDiff` and `UnifiedDiff` accept optional `maxHeight` in pixels. The editor defaults to 480 pixels; `fill` ignores this limit. With an explicit cap, the legacy fallback scrolls within the same height. A single-change approval removes its intermediate scroll container so only the review viewport and the surrounding prompt card scroll.

@@ -5,7 +5,7 @@
 import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { runOverStdio, type FakeCli, type FakeIo, type FakeProgram } from './fake-cli.ts';
+import type { FakeCli, FakeIo, FakeProgram } from './fake-cli.ts';
 
 export function fakeClaude(io: FakeIo): FakeProgram {
     const args = io.argv;
@@ -1073,8 +1073,4 @@ export function claudeStoppingOnResume(sessionIds: ReadonlySet<string>, how: 'mi
         io.exit(1);
         return { onLine: () => undefined };
     };
-}
-
-if (import.meta.main) {
-    await runOverStdio(fakeClaude);
 }

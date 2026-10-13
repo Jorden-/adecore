@@ -1,7 +1,5 @@
 import { useNow } from '@adecore/ui';
-import { AccountLimitsList, LimitsList, WindowBar } from '@adecore/agents-react/usage/LimitsList';
-import { useLimitGroups } from '@adecore/agents-react/usage/limits';
-import { UsageLimits } from '@adecore/agents-react/usage/UsageLimits';
+import { AccountLimitsList, LimitsList, WindowBar, useLimitGroups, UsageLimits } from '@adecore/agents-react/usage';
 import { usageLimits } from '../shared/agents-data.ts';
 import { AgentDemo } from '../shared/agents.tsx';
 

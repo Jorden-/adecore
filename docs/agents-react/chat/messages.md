@@ -3,7 +3,7 @@
 The renderers the thread draws text with, for a message, a note or a block of output outside it.
 
 ```tsx
-import { Markdown, MessageMarkdown, ReplyMarkdown } from '@adecore/agents-react/chat/ui/Markdown';
+import { Markdown, MessageMarkdown, ReplyMarkdown } from '@adecore/agents-react/chat/ui';
 ```
 
 <Demo src="agents/markdown" />
@@ -42,7 +42,7 @@ The diagram stands in the frame of a code block and scrolls sideways when it is 
 
 Mermaid draws with its strict security level and without HTML labels, so a label is text, a click directive does nothing and a link cannot run script; a directive inside the diagram cannot change those settings or the theme. The drawing is shown as an image (a `data:` URL of the SVG), which never runs script and loads nothing. A page with a Content Security Policy needs `data:` in `img-src` and `'unsafe-inline'` in `style-src` (Mermaid measures labels with a style element of its own while it draws), and no `'unsafe-eval'`.
 
-`mermaidConfig`, `sizedSvg` and `svgDataUrl` in `chat/ui/mermaid` are the configuration and the steps from Mermaid's SVG to the image.
+The configuration and the steps from Mermaid's SVG to the image are internal to the package.
 
 ## AnsiOutput and FadingWords
 

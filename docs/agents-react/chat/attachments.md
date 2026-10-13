@@ -5,7 +5,7 @@ The composer reads files, checks them against the limits and turns `@` picks and
 ## Reading files
 
 ```ts
-import { checkAttachmentLimits, readAttachments, uploadBytes } from '@adecore/agents-react/chat/attachments';
+import { checkAttachmentLimits, readAttachments, uploadBytes } from '@adecore/agents-react/chat';
 
 const { accepted, rejected } = checkAttachmentLimits(
     held.length,
@@ -48,7 +48,7 @@ A path picked with `@` sits in the text and in `mentions`; a skill picked with `
 A file list can hand paths to the composer by drag. The payload is the paths joined by spaces under `MENTION_DRAG_TYPE` (`application/x-adecore-mention`):
 
 ```ts
-import { carriesMentions, droppedMentions, writeMentionDrag } from '@adecore/agents-react/chat/mentions';
+import { carriesMentions, droppedMentions, writeMentionDrag } from '@adecore/agents-react/chat';
 
 row.addEventListener('dragstart', (event) => writeMentionDrag(event.dataTransfer!, [path]));
 

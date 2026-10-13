@@ -30,10 +30,8 @@ Import the theme after the one of `@adecore/ui`, let Tailwind scan the package, 
 Add the words of `AGENTS_LOCALES` to your i18next, and render the views in a `ChatHostProvider` and a `ChatScopeContext`:
 
 ```tsx
-import { Composer } from '@adecore/agents-react/chat/ui/Composer';
-import { Timeline } from '@adecore/agents-react/chat/ui/Timeline';
-import { ChatHostProvider } from '@adecore/agents-react/host';
-import { ChatScopeContext } from '@adecore/agents-react/scope';
+import { ChatHostProvider, ChatScopeContext } from '@adecore/agents-react';
+import { Composer, Timeline } from '@adecore/agents-react/chat/ui';
 
 <ChatHostProvider host={CHAT_HOST}>
     <ChatScopeContext.Provider value={scope}>
@@ -44,7 +42,7 @@ import { ChatScopeContext } from '@adecore/agents-react/scope';
 
 [Getting started](https://adecore.dev/agents-react/guide/getting-started) covers the words, the host, the scope and its transport.
 
-Every module has its own subpath, `@adecore/agents-react/<path>`; there is no root import.
+The root holds the host, the scope and the transport; `/chat`, `/chat/ui`, `/prompts`, `/providers`, `/state`, `/usage`, `/locales` and `/testing` hold the rest. A module that no entry exports is internal.
 
 ## Documentation
 
@@ -57,7 +55,7 @@ Every module has its own subpath, `@adecore/agents-react/<path>`; there is no ro
 | [Chat](https://adecore.dev/agents-react/chat/timeline) | The timeline, the composer, prompts and their parts, each with a live demo |
 | [Providers](https://adecore.dev/agents-react/providers/providers-pane) | The settings of the CLIs and their accounts |
 | [Usage](https://adecore.dev/agents-react/usage/usage-page) | Cost, charts and plan limits |
-| [Modules](https://adecore.dev/agents-react/reference) | Every subpath and its exports |
+| [Exports](https://adecore.dev/agents-react/reference) | Every entry point and its exports |
 
 ## License
 

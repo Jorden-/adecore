@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ProviderAccountsService } from '../providers/accounts/service.ts';
-import { testAccounts } from '../providers/accounts/test-accounts.ts';
+import { testAccounts } from '../testing/accounts.ts';
 import { chatSessionAccounts, limitAccountsOf, usageAccountsOf, usageRootsOf } from './accounts.ts';
 
 let root: string;

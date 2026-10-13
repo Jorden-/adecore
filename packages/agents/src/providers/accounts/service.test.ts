@@ -7,7 +7,7 @@ import type { AgentEvent } from '../../events.ts';
 import { providerFor } from '../registry.ts';
 import { ProviderAccountsService } from './service.ts';
 import type { ShadowHomeReport } from './shadow-home.ts';
-import { memorySecrets } from './test-accounts.ts';
+import { memorySecrets } from '../../testing/accounts.ts';
 import type { AccountReading } from './status.ts';
 
 const env = { HOME: '/home/bas', ANTHROPIC_API_KEY: 'sk-ant' };

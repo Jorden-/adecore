@@ -5,7 +5,7 @@ Four records outlive a reload: the drafts of every chat, the chat preferences (t
 ## Configure first
 
 ```ts
-import { configureChatStorage } from '@adecore/agents-react/storage';
+import { configureChatStorage } from '@adecore/agents-react';
 
 configureChatStorage({ namespace: 'my-app' });
 ```
@@ -62,8 +62,8 @@ For each record the current key wins when it holds anything, even something that
 A `storage` event from another window of the same origin is how a change arrives there. Reload the preferences when their key changes:
 
 ```ts
-import { chatPreferencesKey, reloadChatPreferences } from '@adecore/agents-react/chat/preferences';
-import { reloadUsagePreferences, usagePreferencesKey } from '@adecore/agents-react/state/usage';
+import { chatPreferencesKey, reloadChatPreferences } from '@adecore/agents-react/chat';
+import { reloadUsagePreferences, usagePreferencesKey } from '@adecore/agents-react/state';
 
 window.addEventListener('storage', (event) => {
     if (event.key === chatPreferencesKey()) {

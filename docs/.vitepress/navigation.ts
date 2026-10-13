@@ -195,7 +195,7 @@ export const sidebar: DefaultTheme.SidebarMulti = {
             ['Storage', '/agents/storage'],
             ['Testing', '/agents/testing']
         ]),
-        group('Reference', [['Modules', '/agents/reference']])
+        group('Reference', [['Exports', '/agents/reference']])
     ],
     '/intelligent-ui/': [
         group('Intelligent UI', [
@@ -258,7 +258,7 @@ export const sidebar: DefaultTheme.SidebarMulti = {
             ['Charts and tiles', '/agents-react/usage/charts'],
             ['Plan limits', '/agents-react/usage/limits']
         ]),
-        group('Reference', [['Modules', '/agents-react/reference']])
+        group('Reference', [['Exports', '/agents-react/reference']])
     ],
     '/merge/': [
         group('Merge', [

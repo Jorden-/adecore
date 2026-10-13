@@ -8,10 +8,9 @@ A transport is four members. One that refuses everything is enough to check that
 
 ```tsx
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ChatClient } from '@adecore/agents-react/chat/chat-client';
-import { ChatScopeContext, type ChatScope } from '@adecore/agents-react/scope';
-import { chatSink } from '@adecore/agents-react/state/chats';
-import { ChatTransportError, type ChatTransport } from '@adecore/agents-react/transport';
+import { ChatClient } from '@adecore/agents-react/chat';
+import { ChatScopeContext, type ChatScope, ChatTransportError, type ChatTransport } from '@adecore/agents-react';
+import { chatSink } from '@adecore/agents-react/state';
 
 const transport: ChatTransport = {
     status: 'closed',

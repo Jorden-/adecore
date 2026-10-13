@@ -4,23 +4,27 @@ A host runs without a CLI, a login or a network when its parts are swapped for f
 
 ## Fakes
 
-| Module                  | Export                          |                                                                                      |
-| ----------------------- | ------------------------------- | ------------------------------------------------------------------------------------ |
-| `chat/fake-cli`         | `inProcess(cli)`                | A `spawn` that runs a fake CLI in the process. `started` lists every run.            |
-| `chat/fake-claude`      | `fakeClaude`                    | Claude Code's stream-json protocol.                                                  |
-| `chat/fake-codex`       | `fakeCodex`, `fakeCodexWith`    | Codex's app-server protocol, the second with options.                                |
-| `host/memory-port`      | `memoryPortPair()`              | Two ends of a `FramePort` in one process; a frame arrives as a copy, a moment later. |
-| `outbox/manual-clock`   | `ManualClock`                   | Time for the outbox that moves when you say.                                         |
-| `watch-test-helpers`    | `FakeWatch`, `EventLog`         | File changes you raise yourself, and a log of events to wait on.                     |
-| `providers/accounts/test-accounts` | `testAccounts`, `memorySecrets` | An account service with fake checks and secrets in a `Map`.                 |
+Every fake comes from `@adecore/agents/testing`, except `memoryPortPair()`, which a real host can use as well and which comes from `@adecore/agents/host`. No module outside that entry imports them, so a host that never imports it never ships them.
 
-`fakeClaude` answers a message with `echo:` and its text. A message `slow` keeps the turn running, so a test can stop it, and `crash` or `crash loudly` end the process the way a crash does. [`fake-claude`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/fake-claude.ts) and [`fake-codex`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/fake-codex.ts) have the rest, for approvals, questions and background work; a few of those write files or start a process, so read them before you use them.
+| Export                          |                                                                                      |
+| ------------------------------- | ------------------------------------------------------------------------------------ |
+| `inProcess(cli)`                | A `spawn` that runs a fake CLI in the process. `started` lists every run.            |
+| `fakeClaude`                    | Claude Code's stream-json protocol.                                                  |
+| `fakeCodex`, `fakeCodexWith`    | Codex's app-server protocol, the second with options.                                |
+| `memoryPortPair()`              | Two ends of a `FramePort` in one process; a frame arrives as a copy, a moment later. |
+| `ManualClock`                   | Time for the outbox that moves when you say.                                         |
+| `FakeWatch`, `EventLog`         | File changes you raise yourself, and a log of events to wait on.                     |
+| `testAccounts`, `memorySecrets` | An account service with fake checks and secrets in a `Map`.                          |
+
+A test that needs real pipes and a real exit code runs a fake as a process: resolve `@adecore/agents/testing/bin/fake-claude` or `@adecore/agents/testing/bin/fake-codex` and start it with `bun` where the CLI's command would go. `runOverStdio(cli)` does the same for a fake of your own. The captures the fakes follow are JSON under `@adecore/agents/testing/fixtures/`.
+
+`fakeClaude` answers a message with `echo:` and its text. A message `slow` keeps the turn running, so a test can stop it, and `crash` or `crash loudly` end the process the way a crash does. [`fake-claude`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/testing/fake-claude.ts) and [`fake-codex`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/testing/fake-codex.ts) have the rest, for approvals, questions and background work; a few of those write files or start a process, so read them before you use them.
 
 A run of `inProcess` has `runLater()` for what the fake put off, `crash(code)`, and `exited`. Wait on events rather than on time, and put a limit on every wait, so a test that goes wrong fails rather than hangs:
 
 ```ts
-import { FakeWatch } from '@adecore/agents/watch-test-helpers';
-import { settled } from '@adecore/agents/watch-seam';
+import { FakeWatch } from '@adecore/agents/testing';
+import { settled } from '@adecore/agents';
 
 const seams = new FakeWatch();
 let scans = 0;

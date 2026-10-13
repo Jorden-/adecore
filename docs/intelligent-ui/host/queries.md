@@ -33,7 +33,7 @@ The compiler needs each source's argument schema: `UiCompileOptions.querySchemas
 
 ```ts
 import { z } from 'zod';
-import type { ChatUiHost } from '@adecore/agents/chat/ui-queries';
+import type { ChatUiHost } from '@adecore/agents/chat';
 
 const intelligentUi: ChatUiHost = {
     // Called once per reply that may read a source or name a link; the result stays on the backend.
@@ -51,7 +51,7 @@ const intelligentUi: ChatUiHost = {
 
 `capture`, `authorize` and `read` are yours; `projectsOf`, `assertCanRead` and `fetchRuns` stand for your own code. `capture` records what the writing chat may read, once per reply. `authorize` throws to refuse, and runs before every read with that captured access and the chat's current info. `read` returns the result, which must pass `result`.
 
-To say why with a code a client can word itself, throw a `ChatUiRefusal(code, reason)` from `@adecore/agents/chat/ui-queries`, as in `throw new ChatUiRefusal('project-closed', 'The project is closed.')`. The code lands in the reading's `code` and the sentence in its `reason`: from `authorize` the reading is `refused`, from `read` it is `failed`, and from `ChatUiHost.link` the link stays plain. Keep a code the same across versions. Pick one of the host codes below when it fits, and otherwise one that is in neither table.
+To say why with a code a client can word itself, throw a `ChatUiRefusal(code, reason)` from `@adecore/agents/chat`, as in `throw new ChatUiRefusal('project-closed', 'The project is closed.')`. The code lands in the reading's `code` and the sentence in its `reason`: from `authorize` the reading is `refused`, from `read` it is `failed`, and from `ChatUiHost.link` the link stays plain. Keep a code the same across versions. Pick one of the host codes below when it fits, and otherwise one that is in neither table.
 
 ## Reading
 

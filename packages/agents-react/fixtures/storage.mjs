@@ -8,10 +8,9 @@ Object.defineProperty(globalThis, 'localStorage', {
         throw new Error('Storage has not been configured');
     }
 });
-const drafts = await import('@adecore/agents-react/chat/drafts');
-const preferences = await import('@adecore/agents-react/chat/preferences');
-const usage = await import('@adecore/agents-react/state/usage');
-const storage = await import('@adecore/agents-react/storage');
+const chat = await import('@adecore/agents-react/chat');
+const state = await import('@adecore/agents-react/state');
+const storage = await import('@adecore/agents-react');
 assert.equal(reads, 0);
 
 const records = new Map([
@@ -36,16 +35,16 @@ storage.configureChatStorage({
     }
 });
 assert.equal(reads, 0);
-assert.equal(preferences.CHAT_PREFERENCES_KEY, 'custom.preferences');
-assert.equal(usage.USAGE_PREFERENCES_KEY, 'example.usage');
-assert.deepEqual(drafts.useDrafts.getState().ids, ['chat']);
-assert.equal(drafts.readDraft('chat').text, 'unsent');
-assert.equal(drafts.readDraft('chat').quote, 'remember');
-assert.equal(preferences.readChatPreferences().lastProvider, 'codex');
-assert.equal(preferences.readChatPreferences().changedAt, 42);
-assert.equal(usage.useUsageStore.getState().currency, 'EUR');
-// A store imported after hydration still loads on its first use.
-const stash = await import('@adecore/agents-react/chat/stash');
+assert.equal(chat.CHAT_PREFERENCES_KEY, 'custom.preferences');
+assert.equal(state.USAGE_PREFERENCES_KEY, 'example.usage');
+assert.deepEqual(chat.useDrafts.getState().ids, ['chat']);
+assert.equal(chat.readDraft('chat').text, 'unsent');
+assert.equal(chat.readDraft('chat').quote, 'remember');
+assert.equal(chat.readChatPreferences().lastProvider, 'codex');
+assert.equal(chat.readChatPreferences().changedAt, 42);
+assert.equal(state.useUsageStore.getState().currency, 'EUR');
+// A store imported after hydration still loads on its first use; the stash is internal, so it is read from its source.
+const stash = await import('../src/chat/stash.ts');
 assert.equal(stash.useStash.getState().prompts[0].text, 'for later');
 for (const [oldKey, newKey] of [
     ['ruimte.chat.drafts', 'example.chat.drafts'],
@@ -57,16 +56,16 @@ for (const [oldKey, newKey] of [
 }
 assert.throws(() => storage.configureChatStorage({ namespace: 'too-late' }), /before using/);
 records.set('example.usage', JSON.stringify({ period: 'today', currency: 'USD' }));
-usage.reloadUsagePreferences();
-assert.equal(usage.useUsageStore.getState().period, 'today');
+state.reloadUsagePreferences();
+assert.equal(state.useUsageStore.getState().period, 'today');
 refuseWrites = true;
-drafts.writeDraft('new', { ...drafts.EMPTY_DRAFT, text: 'kept in memory' });
-assert.equal(drafts.readDraft('new').text, 'kept in memory');
-preferences.rememberChatPreferences({ runtimeMode: 'auto' });
-preferences.reloadChatPreferences();
-assert.equal(preferences.readChatPreferences().runtimeMode, 'auto');
-usage.useUsageStore.getState().setCurrency('EUR');
-usage.reloadUsagePreferences();
-assert.equal(usage.useUsageStore.getState().currency, 'EUR');
+chat.writeDraft('new', { ...chat.EMPTY_DRAFT, text: 'kept in memory' });
+assert.equal(chat.readDraft('new').text, 'kept in memory');
+chat.rememberChatPreferences({ runtimeMode: 'auto' });
+chat.reloadChatPreferences();
+assert.equal(chat.readChatPreferences().runtimeMode, 'auto');
+state.useUsageStore.getState().setCurrency('EUR');
+state.reloadUsagePreferences();
+assert.equal(state.useUsageStore.getState().currency, 'EUR');
 assert.equal(reads, 0);
 console.log('Storage compatibility fixture passed');

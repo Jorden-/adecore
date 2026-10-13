@@ -3,8 +3,7 @@
 React views for agent chats: the thread, the composer, approvals and questions, the agent CLIs and their accounts, and what they cost. It runs in the page and talks to a host of chats, such as [`@adecore/agents`](/agents/), over the requests and events of [`@adecore/agent-contracts`](/agent-contracts/). It starts no process and registers no channel.
 
 ```tsx
-import { Timeline } from '@adecore/agents-react/chat/ui/Timeline';
-import { Composer } from '@adecore/agents-react/chat/ui/Composer';
+import { Timeline, Composer } from '@adecore/agents-react/chat/ui';
 ```
 
 <Demo src="agents/chat" />
@@ -33,7 +32,19 @@ The views read a chat from a store, never from the wire. A `ChatClient` fills th
 
 ## Entry points
 
-There is no root import. Every module has its own subpath, `@adecore/agents-react/<path>`, without an extension; the [module reference](/agents-react/reference) lists all of them. `DiffPool`, `EditDiff` and `UnifiedDiff` are default exports, everything else is named. Two entries are assets: `@adecore/agents-react/theme.css` and the words under `@adecore/agents-react/locales/<language>/<namespace>.json`.
+| Entry | What it holds |
+| --- | --- |
+| `@adecore/agents-react` | `ChatHostProvider`, the scope, the transport, storage, lazy loading and the settings sections |
+| `@adecore/agents-react/chat` | `ChatClient`, chat actions, drafts, preferences, mentions, forks, timeline rows and subagent navigation |
+| `@adecore/agents-react/chat/ui` | `Timeline`, `Composer`, messages, diffs, subagents, limits, rows and smaller parts |
+| `@adecore/agents-react/prompts` | `PromptView` and the parts and logic of approvals and questions |
+| `@adecore/agents-react/providers` | `ProvidersPane`, its parts, the marks of the CLIs and model names |
+| `@adecore/agents-react/state` | The stores of chats, providers, accounts and usage |
+| `@adecore/agents-react/usage` | `UsagePage`, `UsageDialog`, `UsagePane` and their charts and limits |
+| `@adecore/agents-react/locales` | The words of the views, by namespace |
+| `@adecore/agents-react/testing` | Prompts in every state, for tests and demos |
+
+The [export reference](/agents-react/reference) lists every name; a module that no entry exports is internal. `DiffPool`, `EditDiff` and `UnifiedDiff` are named exports of `@adecore/agents-react/chat/ui`. Two entries are assets: `@adecore/agents-react/theme.css` and the words under `@adecore/agents-react/locales/<language>/<namespace>.json`.
 
 ## Where to go next
 

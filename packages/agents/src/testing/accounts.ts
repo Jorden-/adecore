@@ -1,8 +1,8 @@
 import type { AgentKind, ProviderAccountMap, ProviderInfo } from '@adecore/agent-contracts';
-import { providerFor } from '../registry.ts';
-import { ProviderAccountsService } from './service.ts';
-import { accountsPath, writeAccounts } from './store.ts';
-import type { SecretStore } from './variables.ts';
+import { providerFor } from '../providers/registry.ts';
+import { ProviderAccountsService } from '../providers/accounts/service.ts';
+import { accountsPath, writeAccounts } from '../providers/accounts/store.ts';
+import type { SecretStore } from '../providers/accounts/variables.ts';
 
 /* A keychain in memory; `values` is what it holds, by key. */
 export function memorySecrets(values = new Map<string, string>()): SecretStore & { values: Map<string, string> } {

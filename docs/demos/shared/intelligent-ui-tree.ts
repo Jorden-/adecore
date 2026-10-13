@@ -1,4 +1,4 @@
-import type { UiBlockFrameProps } from '@adecore/agents-react/chat/ui/intelligent-ui/UiBlockFrame';
+import type { UiBlockFrameProps } from '@adecore/agents-react/chat/ui';
 
 export type DemoNode = UiBlockFrameProps['nodes'][number];
 

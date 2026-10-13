@@ -1,4 +1,4 @@
-import { Markdown, MessageMarkdown, ReplyMarkdown } from '@adecore/agents-react/chat/ui/Markdown';
+import { Markdown, MessageMarkdown, ReplyMarkdown } from '@adecore/agents-react/chat/ui';
 
 const REPLY = `The retry lives in \`fetchJson\`:
 

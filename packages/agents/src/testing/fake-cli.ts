@@ -1,4 +1,4 @@
-import type { ChatProcess, ChatSpawnOptions, SpawnChatProcess } from './chat-process.ts';
+import type { ChatProcess, ChatSpawnOptions, SpawnChatProcess } from '../chat/chat-process.ts';
 
 /* What a fake CLI has instead of `process`, so the same fake runs in a test and as a child process. */
 export interface FakeIo {

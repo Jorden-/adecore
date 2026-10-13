@@ -19,14 +19,9 @@ test('real Markdown links, timeline menus and shell slots retain their source co
             import { createRoot } from ${resolve('react-dom/client')};
             import i18next from ${resolve('i18next')};
             import { UIProvider, ContextMenu } from ${resolve('@adecore/ui')};
-            import { ChatHostProvider } from ${resolve('@adecore/agents-react/host')};
-            import { ChatScopeContext } from ${resolve('@adecore/agents-react/scope')};
-            import { Markdown, MessageMarkdown } from ${resolve('@adecore/agents-react/chat/ui/Markdown')};
-            import { FileLinkContext } from ${resolve('@adecore/agents-react/chat/ui/file-links')};
-            import { TimelineMenuPopup } from ${resolve('@adecore/agents-react/chat/ui/TimelineMenu')};
-            import { readTimelineTarget, EMPTY_TARGET } from ${resolve('@adecore/agents-react/chat/logic/timeline-target')};
-            import { AssistantRow } from ${resolve('@adecore/agents-react/chat/ui/rows/MessageRows')};
-            import { ReplyContext } from ${resolve('@adecore/agents-react/chat/ui/reply-context')};
+            import { ChatHostProvider, ChatScopeContext } from ${resolve('@adecore/agents-react')};
+            import { Markdown, MessageMarkdown, FileLinkContext, TimelineMenuPopup, AssistantRow, ReplyContext } from ${resolve('@adecore/agents-react/chat/ui')};
+            import { readTimelineTarget, EMPTY_TARGET } from ${resolve('@adecore/agents-react/chat')};
             await i18next.init({lng:'en',resources:{en:{'agent-chat':{timeline:{menu:{openInPreview:'Open in preview'}},common:{action:{copy:'Copy',selectAll:'Select all'}}}}}});
             window.opens=[]; window.targets=[]; window.shell=[]; window.clicks=[];
             const code='  printf "héllo"  ';

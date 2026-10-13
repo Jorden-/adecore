@@ -5,7 +5,7 @@ import { parseHTML } from 'linkedom';
 import type { ChatApprovalItem } from '@adecore/agent-contracts';
 import { ApprovalActions } from '../ui/PromptActions';
 import { focusPromptHeading, focusPromptStart } from './focus';
-import { PROMPT_SAMPLES } from './prompts.fixtures';
+import { PROMPT_SAMPLES } from '../../testing/prompts';
 import { approvalButtons } from './subjects';
 
 const command = PROMPT_SAMPLES.find((sample) => sample.label === 'Permission · Command')!.items[0] as ChatApprovalItem;

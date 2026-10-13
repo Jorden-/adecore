@@ -27,7 +27,7 @@ Zod is its only dependency. The package has no React and no DOM, so the backend 
 An agent writes blocks only when it knows the language. `uiSessionNote()` returns a short note for the start of every session: the tag syntax, the rules for state, actions and expressions, the compact catalog and one example. It stays under 2,400 characters.
 
 ```ts
-import { ChatCore } from '@adecore/agents/chat/chat-core';
+import { ChatCore } from '@adecore/agents/chat';
 import { uiSessionNote } from '@adecore/intelligent-ui/text';
 
 const fenceLanguage = 'ui';
@@ -97,7 +97,7 @@ A client applies a preview only while the item's text is `textLength` long, so a
 The `Timeline` of `@adecore/agents-react` draws an assistant item with `ui` through [`UiReply`](/agents-react/chat/intelligent-ui), between the reply's own Markdown. What a block may do outside itself comes from `ChatHost.intelligentUi`:
 
 ```ts
-import type { ChatHost } from '@adecore/agents-react/host';
+import type { ChatHost } from '@adecore/agents-react';
 
 // Handed to the `ChatHostProvider` around the views.
 const CHAT_HOST: Partial<ChatHost> = {

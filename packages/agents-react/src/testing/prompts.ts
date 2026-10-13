@@ -1,5 +1,5 @@
 import type { ChatQuestion, ChatQuestionItem, ChatApprovalItem } from '@adecore/agent-contracts';
-import type { PendingPrompt } from './prompts';
+import type { PendingPrompt } from '../prompts/logic/prompts';
 
 const endpoints: ChatQuestion = {
     id: 'endpoints',

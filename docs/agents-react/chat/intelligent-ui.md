@@ -9,7 +9,7 @@ An agent can answer with a block of components: a summary, a table, a checklist,
 The assistant row draws a reply with UI blocks through `UiReply`. It splits the text into prose and blocks with `uiReplyParts`, so prose stays Markdown and each block becomes a card.
 
 ```tsx
-import { UiReply } from '@adecore/agents-react/chat/ui/intelligent-ui/UiReply';
+import { UiReply } from '@adecore/agents-react/chat/ui';
 
 <UiReply
     text={item.text}
@@ -42,7 +42,7 @@ A visible block reads its live data at most once every ten seconds, and once mor
 `UI_RENDERERS` maps every catalog component to a renderer. It is typed as `UiRenderers`, so a component added to the catalog fails the typecheck until it has an entry. `Show`, `Each`, `Column` and `Option` map to `null`: the evaluation resolves the first two, and a table and a segmented control read the last two from their own node.
 
 ```tsx
-import { UI_RENDERERS } from '@adecore/agents-react/chat/ui/intelligent-ui/registry';
+import { UI_RENDERERS } from '@adecore/agents-react/chat/ui';
 
 const renderer = UI_RENDERERS[node.type];
 const element = renderer === null ? null : createElement(renderer, { node, context }, children);

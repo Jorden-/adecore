@@ -16,7 +16,7 @@ import type {
     UsageSummaryResult,
     UsageTotals
 } from '@adecore/agent-contracts';
-import type { SubagentTask } from '@adecore/agents-react/host';
+import type { SubagentTask } from '@adecore/agents-react';
 
 /* The moment the demos were loaded; every time in the fixtures counts back from it. */
 export const NOW = Date.now();

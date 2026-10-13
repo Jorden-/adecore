@@ -16,7 +16,7 @@ The package brings no CLI: install Claude Code or Codex and sign in with it.
 ## Use
 
 ```ts
-import { AgentHost } from '@adecore/agents/host/agent-host';
+import { AgentHost } from '@adecore/agents/host';
 
 const host = await AgentHost.open({ dataDir });
 const disconnect = host.connect(port);
@@ -26,7 +26,7 @@ disconnect();
 await host.close();
 ```
 
-Every module has its own subpath, `@adecore/agents/<path>`; there is no root import. A new chat runs in `full-access` unless it names a runtime mode, so name one.
+The root holds the file, process and error helpers; `/host`, `/chat`, `/providers`, `/usage`, `/coordination`, `/context` and `/testing` hold the rest. A module that no entry exports is internal. A new chat runs in `full-access` unless it names a runtime mode, so name one.
 
 ## Documentation
 
@@ -41,7 +41,7 @@ Every module has its own subpath, `@adecore/agents/<path>`; there is no root imp
 | [Context commands](https://adecore.dev/agents/context-commands) | A command line your agents call back into |
 | [Storage](https://adecore.dev/agents/storage) | What is written where, and the file helpers |
 | [Testing](https://adecore.dev/agents/testing) | The fakes and the error codes |
-| [Modules](https://adecore.dev/agents/reference) | Every subpath of the package |
+| [Exports](https://adecore.dev/agents/reference) | Every entry point and its exports |
 
 ## License
 

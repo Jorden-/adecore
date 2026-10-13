@@ -15,7 +15,7 @@ When a CLI starts under an account that is not the default, the host takes the v
 A variable marked `sensitive` is kept in the macOS login keychain, through the `security` command, and never in `providers.json`. On another platform a sensitive variable is refused with `secrets-unavailable`. A client gets a sensitive value as `''` with `valueRedacted: true`; saving that back keeps the stored value. A sensitive value holds printable ASCII only.
 
 ```ts
-import type { AccountsHost } from '@adecore/agents/providers/accounts/variables';
+import type { AccountsHost } from '@adecore/agents/providers';
 
 const accountsHost: AccountsHost = { name: 'My app', variablePrefixes: ['MYAPP_'], keychainPrefix: 'my-app' };
 ```
@@ -27,7 +27,7 @@ Pass it as the host's `accountsHost`. `name` is what a refusal calls the host, n
 Without an `env` the host gives its CLIs its own environment, filtered by `cliEnvironment`. Filter more with `environmentPolicy`:
 
 ```ts
-import { cliEnvironment } from '@adecore/agents/host/environment';
+import { cliEnvironment } from '@adecore/agents/host';
 
 const env = cliEnvironment(process.env, {
     sessionPrefixes: ['MYAPP'],
@@ -36,7 +36,7 @@ const env = cliEnvironment(process.env, {
 });
 ```
 
-`variables` removes names, `prefixes` removes names that start with one, and `sessionPrefixes` removes `<prefix>_HOOK_*`, `<prefix>_CONTEXT_*` and `<prefix>_SESSION_ID` while keeping the rest, such as `MYAPP_HOME`. Filtering never changes its input. A host that was itself started from inside an agent session would otherwise hand that session's callbacks to its own agents. One set of hook, context and session variables of an older host is always removed, whatever the policy; the names are in [`host/environment`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/host/environment.ts).
+`variables` removes names, `prefixes` removes names that start with one, and `sessionPrefixes` removes `<prefix>_HOOK_*`, `<prefix>_CONTEXT_*` and `<prefix>_SESSION_ID` while keeping the rest, such as `MYAPP_HOME`. Filtering never changes its input. A host that was itself started from inside an agent session would otherwise hand that session's callbacks to its own agents. One set of hook, context and session variables of an older host is always removed, whatever the policy; the names are in [`host/environment`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/host/environment.ts), behind `@adecore/agents/host`.
 
 An `env` you pass is taken as it is, unless you also pass `environmentPolicy`. Add a chat's own credentials afterwards, in `envFor` on the core.
 

@@ -9,7 +9,7 @@ Nothing is drawn until the host sets [`visuals`](/agents-react/guide/host#visual
 The chat client keeps a chat's visuals in its `ChatState` (`visuals`), from the attach and from every `chat.visuals` event. A visual has no item in the thread, so the timeline places it by its `at`, the way it places an app's thread cards: right before the first row that began after it. In a settled turn it lands under the fold, above the answer that closed the turn; in a running turn it stands between the calls around it, and always above the working row. Among a visual and a card of the same moment, the visual comes first. While the thread holds only its newest page, a visual from before that page waits until the page comes in.
 
 ```ts
-import { timedRowsOf, withTimedRows } from '@adecore/agents-react/chat/logic/thread-cards';
+import { timedRowsOf, withTimedRows } from '@adecore/agents-react/chat';
 
 const rows = withTimedRows(threadRows, timedRowsOf(cards, visuals, heldFrom));
 ```

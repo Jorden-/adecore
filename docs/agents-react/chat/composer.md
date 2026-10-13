@@ -3,7 +3,7 @@
 The box a person writes a message in, with everything that goes with it: `@` for files and other chats, `$` for skills, `/` for commands, attachments, the model and permission settings, messages queued behind a running turn, and the approvals and questions the chat waits on.
 
 ```tsx
-import { Composer } from '@adecore/agents-react/chat/ui/Composer';
+import { Composer } from '@adecore/agents-react/chat/ui';
 ```
 
 <Demo src="agents/composer" />
@@ -28,7 +28,7 @@ import { Composer } from '@adecore/agents-react/chat/ui/Composer';
 
 `onSend` may return nothing, and the composer clears its draft at once, without waiting for the host. If a send can fail in your app, keep the text and files until `send` resolves, so a person can try again. Return a promise of whether the host took the message, and a send that also opens a new chat waits for it: Mod+Alt+Enter sends, and once the promise resolves `true` (or once `onSend` returned nothing) calls the host's `openNewChat(scopeId, chatId)`. Without `openNewChat`, Mod+Alt+Enter sends the other way, like Alt+Enter.
 
-A command of your own, such as a menu row, sends what a composer on screen holds the way its keys do: `sendFromComposer(key, how)` from `chat/composer-send`, with the scope's `keyOf(chatId)` and a `ComposerSend` (`default`, `alternate` or `and-new`). It answers `false` when that chat has no composer on screen; each composer registers itself with `registerComposerSender`. `SEND_AND_NEW_SHORTCUT` in `chat/send-key` is Mod+Alt+Enter, for a menu or a list of keys to print.
+A command of your own, such as a menu row, sends what a composer on screen holds the way its keys do: `sendFromComposer(key, how)` from `@adecore/agents-react/chat`, with the scope's `keyOf(chatId)` and a `ComposerSend` (`default`, `alternate` or `and-new`). It answers `false` when that chat has no composer on screen; each composer registers itself. `SEND_AND_NEW_SHORTCUT` is Mod+Alt+Enter, for a menu or a list of keys to print.
 
 Before the first message, picking another CLI's model calls `onRetarget(provider, selection)`, which moves the empty chat. After it, or with `providerFixed`, the picker offers only the chat's own CLI.
 
@@ -36,7 +36,7 @@ Before the first message, picking another CLI's model calls `onRetarget(provider
 
 `Mod` is Command on macOS and Control elsewhere. A key inside an IME composition belongs to the composition, and a key the host's `isAppShortcut` claims passes through.
 
-Which key sends is the person's `sendKey` in the [chat preferences](/agents-react/guide/persistence): `enter` (the default) sends on Enter, `mod-enter-multiline` sends a message of one line on Enter and one of more lines on Mod+Enter only, and `mod-enter` sends on Mod+Enter only. Where Enter does not send, it adds a line. The send button's tooltip shows the key that sends what is in the box. A settings page of your own can offer the three with `CHAT_SEND_KEYS`, `sendKeyLabel` and `sendKeyHint` from `chat/send-key` and `rememberSendKey` from `chat/preferences`.
+Which key sends is the person's `sendKey` in the [chat preferences](/agents-react/guide/persistence): `enter` (the default) sends on Enter, `mod-enter-multiline` sends a message of one line on Enter and one of more lines on Mod+Enter only, and `mod-enter` sends on Mod+Enter only. Where Enter does not send, it adds a line. The send button's tooltip shows the key that sends what is in the box. A settings page of your own can offer the three with `CHAT_SEND_KEYS`, `sendKeyLabel` and `sendKeyHint` and `rememberSendKey` from `@adecore/agents-react/chat`.
 
 | Key                         |                                                                              |
 | --------------------------- | ---------------------------------------------------------------------------- |
@@ -61,7 +61,7 @@ Which key sends is the person's `sendKey` in the [chat preferences](/agents-reac
 While the chat has a goal, `GoalDock({ chatId, info, goals })` stands at the top of the composer, which draws it itself: where the goal stands, the objective, how far it got in what the CLI counts, and the actions the CLI takes. The whole objective and what the last check said are in its tooltip. `goalView(info, goals, canAct)` answers which actions those are: pause, resume and clear on a CLI with `goals: 'native'`, clear between turns on one with `goals: 'command'`, and none where the host's actions have no `goal`. `GoalPill({ chatId })` says a goal works in a header that shows the chat without its thread, from the status every client gets.
 
 ```tsx
-import { GoalDock, GoalPill } from '@adecore/agents-react/chat/ui/GoalDock';
+import { GoalDock, GoalPill } from '@adecore/agents-react/chat/ui';
 ```
 
 ## Pickers and pasting
@@ -118,4 +118,4 @@ const input = useRef<ComposerInputHandle>(null);
 
 The handle has `focus()`, `setCaret(pos)` and `insert(text)`. `onKeyDown(event, view)` and `onPaste(event, view)` run before the editor's own and return `true` for a key or paste they handled. `onChange` and `onSelectionChange` get the text, the selection as `InputSelection` and the editor state. Keep `extensions` and an element `placeholder` the same object between renders, since a new one reconfigures the editor. A `value` from outside moves the caret to the end and stays out of the undo history.
 
-The editor parts are exported for an input of your own: `composerEditorExtensions`, `markdownLanguage`, `chipDecorations`, `insertAtSelection`, and the key decisions in `chat/ui/composer/keys` (`enterAction`, `listItemAt`, `inOpenFence`, `recallDirection`, ...). `PlainTextarea` is the textarea a written answer uses unless the host's `dictation` hands another.
+The editor parts are exported for an input of your own: `composerEditorExtensions`, `markdownLanguage`, `chipDecorations`, `insertAtSelection`, and the key decisions `enterAction`, `listItemAt`, `inOpenFence` and `recallDirection`, all from `@adecore/agents-react/chat/ui`. `PlainTextarea` is the textarea a written answer uses unless the host's `dictation` hands another.

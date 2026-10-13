@@ -3,7 +3,7 @@
 A `ChatHostProvider` hands the views under it what only the app around them can decide. Render one around everything that draws a chat, and keep the object you hand it in a constant: the provider reads it once, as it mounts. One host may serve several scopes, so a function that is about one host of chats gets its `scopeId`.
 
 ```tsx
-import { ChatHostProvider, type ChatHost } from '@adecore/agents-react/host';
+import { ChatHostProvider, type ChatHost } from '@adecore/agents-react';
 
 const CHAT_HOST: Partial<ChatHost> = {
     notify: (toast) => showToast(toast),
@@ -50,7 +50,7 @@ export function Workspace() {
 | `attachments`                      | No previews; reading rejects                       | `useUrl` for a URL to an attached file's bytes, `read` for the bytes as a `Blob`.                      |
 | `ReadImage`                        | Nothing under a tool that read an image            | A component that draws the image at `path`.                                                            |
 | `intelligentUi`                    | Choices stay closed, live values and links stay as first read | `sendChoice`, `query`, `link`, `openLink`, `openUrl` and `subscribe` for [Intelligent UI](/intelligent-ui/guide/getting-started#draw-the-blocks) blocks. |
-| `fileLinks`                        | Paths in a reply stay text                         | `target(text, cwd, scopeId)` finds a `FileRef`; `open(cwd, ref, scopeId)` opens it on its rendering scope. `useOpenFileLink()` from `chat/ui/file-links` follows one the same way from a view of your own. |
+| `fileLinks`                        | Paths in a reply stay text                         | `target(text, cwd, scopeId)` finds a `FileRef`; `open(cwd, ref, scopeId)` opens it on its rendering scope. `useOpenFileLink()` from `@adecore/agents-react/chat/ui` follows one the same way from a view of your own. |
 | `code`                             | Light, `github-light` and `github-dark`            | `useMode()` follows the app's light or dark, `useThemes()` names the Shiki themes, `custom` registers your own, `syntaxWorker?()` supplies the shared diff syntax runtime, `highlighter?()` lends the page highlighter to code blocks and the diff fallback, `editor?()` opts in to bounded editor edit reviews. |
 | `useStreaming()`                   | `words`                                            | How a reply appears while it streams: `words`, `blocks` or `whole`.                                    |
 | `useSendDelivery()` | `queue` | What Send does while a turn runs: `queue` waits for the turn to end, `steer` hands the message to the running turn as soon as the backend takes input. Option or Alt picks the other one. |
@@ -90,8 +90,8 @@ The views run every action on a chat through a `ChatActions`: clear, stop, unque
 A set of your own serves every scope under its provider and gets only chat ids, so it has to know which host each chat is on. Wrap the requests rather than replace them, and keep the `code` of a refusal:
 
 ```ts
-import { transportActions } from '@adecore/agents-react/chat/actions';
-import type { ChatActions, ChatHost } from '@adecore/agents-react/host';
+import { transportActions } from '@adecore/agents-react/chat';
+import type { ChatActions, ChatHost } from '@adecore/agents-react';
 
 const base = transportActions(transport);
 const actions: ChatActions = {
@@ -123,7 +123,7 @@ const CHAT_HOST: Partial<ChatHost> = {
 
 ```tsx
 import { Button } from '@adecore/ui';
-import type { ChatHost, ComposerSlotProps } from '@adecore/agents-react/host';
+import type { ChatHost, ComposerSlotProps } from '@adecore/agents-react';
 
 function InsertSelection({ disabled, insert }: ComposerSlotProps) {
     return (
@@ -144,7 +144,7 @@ A thread draws the visuals of its chat, pages an agent published, only when `vis
 - `openLink(url)` opens an http or https link a person followed in a visual, outside the app, such as in their browser.
 
 ```ts
-import type { ChatHost } from '@adecore/agents-react/host';
+import type { ChatHost } from '@adecore/agents-react';
 
 const CHAT_HOST: Partial<ChatHost> = {
     visuals: {

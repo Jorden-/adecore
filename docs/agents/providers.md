@@ -21,7 +21,7 @@ Each provider has a `ModelCatalog`, shipped as `providers/claude-models.json` an
 
 ```ts
 import { ModelCatalogDataSchema } from '@adecore/agent-contracts/model';
-import { ModelCatalog } from '@adecore/agents/providers/catalog';
+import { ModelCatalog } from '@adecore/agents/providers';
 
 const catalog = new ModelCatalog(
     ModelCatalogDataSchema.parse({
@@ -60,8 +60,8 @@ Codex has no policy that matches every mode of Claude Code exactly; this is the 
 
 ## A provider of your own
 
-A `ChatProvider` is data plus a backend: its `kind`, `name`, `catalog`, `capabilities`, `command`, `resumeCommand`, `home` for accounts, `detect`, the arguments for a first prompt and for a one-shot prompt, and `createBackend(launch, host)`. The `ChatBackend` owns the process, speaks the CLI's protocol, and reports what happens as `BackendEvent`s through `host.onEvent`; the session turns those into thread items. See [`chat/backend`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/backend.ts) for the whole interface, and the built-ins for two that work.
+A `ChatProvider` is data plus a backend: its `kind`, `name`, `catalog`, `capabilities`, `command`, `resumeCommand`, `home` for accounts, `detect`, the arguments for a first prompt and for a one-shot prompt, and `createBackend(launch, host)`. The `ChatBackend` owns the process, speaks the CLI's protocol, and reports what happens as `BackendEvent`s through `host.onEvent`; the session turns those into thread items. See [`chat/backend`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/backend.ts) for the whole interface, exported from `@adecore/agents/chat`, and the built-ins for two that work.
 
 An optional `ChatBackend.steerTurn(input)` appends user input to native work without interrupting it. Resolve `true` only after native acceptance, `false` only for a known refusal because there is no active turn, and reject for uncertain transport failures. Codex uses `turn/steer` with `expectedTurnId`; Claude writes stream-json input and waits for its replayed user UUID. The CLI may replay it only once a slow tool returns, so Claude waits through the whole turn and rejects only when the UUID is still missing 30 seconds after the turn ended. Codex rejects every request the app-server leaves unanswered for 60 seconds; when that happens during the handshake, the start fails and the app-server is ended.
 
-Both built-in backends cut stdout into frames with `LineSplitter` from `chat/chat-process`, which a backend of your own can use as well. A line longer than `MAX_LINE_LENGTH`, 64 million UTF-16 units, is dropped and reported as `failed`, and the frames after it read as usual. Once a stdin write or the pipe itself failed, the backend writes nothing more to it.
+Both built-in backends cut stdout into frames with `LineSplitter` from `@adecore/agents/chat`, which a backend of your own can use as well. A line longer than `MAX_LINE_LENGTH`, 64 million UTF-16 units, is dropped and reported as `failed`, and the frames after it read as usual. Once a stdin write or the pipe itself failed, the backend writes nothing more to it.

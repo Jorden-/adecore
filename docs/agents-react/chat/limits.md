@@ -3,8 +3,7 @@
 When a turn stops on the plan's usage limit or on an overloaded model, the chat says so until the next turn. The composer draws `LimitDock` itself; `LimitPill` is for a header that shows the chat without its thread.
 
 ```tsx
-import { LimitDock, LimitPill } from '@adecore/agents-react/chat/ui/LimitState';
-import { ResumeCompactionDock } from '@adecore/agents-react/chat/ui/ResumeCompactionDock';
+import { LimitDock, LimitPill, ResumeCompactionDock } from '@adecore/agents-react/chat/ui';
 ```
 
 <Demo src="agents/limits" />

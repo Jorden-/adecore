@@ -3,7 +3,7 @@
 The thread of one chat, with the composer docked under it. It reads the chat from the store of the scope it is rendered in, so it needs a [`ChatScopeContext`](/agents-react/guide/getting-started#a-scope) and a chat that was opened there.
 
 ```tsx
-import { Timeline } from '@adecore/agents-react/chat/ui/Timeline';
+import { Timeline } from '@adecore/agents-react/chat/ui';
 ```
 
 <Demo src="agents/chat" />
@@ -28,7 +28,7 @@ The path of a file a call reads or writes, in its line and in the line of an app
 
 ## Reading width
 
-In a parent with the class `chat-column`, a chat that is a view of its own, the rows and the composer stand in a centered column. Its width is the person's reading width in the [chat preferences](/agents-react/guide/persistence): `narrow` (640 pixels), `comfortable` (768 pixels, the default) or `full`, the whole width of the view. The thread's right click menu offers the three in such a view, and a settings page of your own can offer them with `CHAT_READING_WIDTHS`, `readingWidthLabel` and `readingWidthHint` from `chat/reading-width` and `rememberReadingWidth` from `chat/preferences`. A node on a canvas, without `chat-column`, always runs the width it has. `SubagentTimeline` follows the same width.
+In a parent with the class `chat-column`, a chat that is a view of its own, the rows and the composer stand in a centered column. Its width is the person's reading width in the [chat preferences](/agents-react/guide/persistence): `narrow` (640 pixels), `comfortable` (768 pixels, the default) or `full`, the whole width of the view. The thread's right click menu offers the three in such a view, and a settings page of your own can offer them with `CHAT_READING_WIDTHS`, `readingWidthLabel` and `readingWidthHint` and `rememberReadingWidth` from `@adecore/agents-react/chat`. A node on a canvas, without `chat-column`, always runs the width it has. `SubagentTimeline` follows the same width.
 
 ## Props
 
@@ -63,7 +63,7 @@ The thread has no find of its own. The host's `useTimelineFind(options)` gets th
 
 ## Rows
 
-`Row` draws one `TimelineRow`, and the components it picks from are exported for a thread of your own: `UserRow`, `AssistantRow`, `ThinkingRow`, `LiveThoughtRow`, `ReportRow`, `ReplyHeader`, `NoteRow`, `AgentTurnRow`, `CompactionRow`, `ApprovalHistoryRow` and `QuestionHistoryRow` in `chat/ui/rows/MessageRows`; `WorkRow`, `WorkLiveRow`, `WorkGroupRow`, `WorkingRow`, `RunningFor`, `TurnFoldRow`, `ChangedFilesRow` and `ToggleLine` in `chat/ui/rows/WorkRows` (a `ToggleLine` without `onToggle` is a line with nothing to open); `SubagentRow`, `SubagentBranchRow`, `TaskRow`, `WorkflowRow`, `ForksRow` and `VisualRow` in files of their own. `deriveTimelineRows(items, options)` turns items into rows the way the timeline does.
+`Row` draws one `TimelineRow`, and the components it picks from are exported for a thread of your own: `UserRow`, `AssistantRow`, `ThinkingRow`, `LiveThoughtRow`, `ReportRow`, `ReplyHeader`, `NoteRow`, `AgentTurnRow`, `CompactionRow`, `ApprovalHistoryRow` and `QuestionHistoryRow`; `WorkRow`, `WorkLiveRow`, `WorkGroupRow`, `WorkingRow`, `RunningFor`, `TurnFoldRow`, `ChangedFilesRow` and `ToggleLine` (a `ToggleLine` without `onToggle` is a line with nothing to open); `SubagentRow`, `SubagentBranchRow`, `TaskRow`, `WorkflowRow`, `ForksRow` and `VisualRow`, all from `@adecore/agents-react/chat/ui`. `deriveTimelineRows(items, options)` turns items into rows the way the timeline does.
 
 <Demo src="agents/rows" />
 
@@ -71,7 +71,7 @@ The thread has no find of its own. The host's `useTimelineFind(options)` gets th
 
 ### Generated images
 
-A tool call named `ImageGeneration` (`IMAGE_GENERATION_TOOL`) is drawn by `GeneratedImageRow({ chatId, tool })` in `chat/ui/rows/GeneratedImageRow`, in the thread and in a sub-agent's work alike. It stays out of tool groups and out of the fold of a finished turn, also when no text follows it or the image comes after the closing answer. An opened turn keeps its calls in order around the image. The row shows a line with the size and the dimensions of the image, and the thumbnail at most 360 pixels wide at the ratio the attachment names, on the left edge of the thread's text. The thumbnail opens large in the lightbox, and its menu copies the revised prompt. Open and Save to project sit under it, come from the host's [`attachments`](/agents-react/chat/attachments#stored-files) and are left out, with their line, when the host has none. A transparent image stands on a checkerboard. Bytes the host no longer has leave a quiet square with the reason on a tooltip, and disable Open and Save.
+A tool call named `ImageGeneration` (`IMAGE_GENERATION_TOOL`) is drawn by `GeneratedImageRow({ chatId, tool })`, in the thread and in a sub-agent's work alike. It stays out of tool groups and out of the fold of a finished turn, also when no text follows it or the image comes after the closing answer. An opened turn keeps its calls in order around the image. The row shows a line with the size and the dimensions of the image, and the thumbnail at most 360 pixels wide at the ratio the attachment names, on the left edge of the thread's text. The thumbnail opens large in the lightbox, and its menu copies the revised prompt. Open and Save to project sit under it, come from the host's [`attachments`](/agents-react/chat/attachments#stored-files) and are left out, with their line, when the host has none. A transparent image stands on a checkerboard. Bytes the host no longer has leave a quiet square with the reason on a tooltip, and disable Open and Save.
 
 A failure is a failed tool line with the reason as its detail: the provider's words, or a check of what came back (empty, not an image, larger than the attachment limit). `generatedImageView(tool)` answers which of `generating`, `failed` and `ready` a call is in, and `attachmentAspect(attachment)` its width over height.
 

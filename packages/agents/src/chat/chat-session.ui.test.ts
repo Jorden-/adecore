@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { ChatEvent, ChatItem } from '@adecore/agent-contracts';
-import { ManualClock } from '../outbox/manual-clock.ts';
+import { ManualClock } from '../testing/manual-clock.ts';
 import { compileUiBlock, evaluateUiBlock } from '@adecore/intelligent-ui';
 import { flush, rig } from './chat-session.fixture.test.ts';
 

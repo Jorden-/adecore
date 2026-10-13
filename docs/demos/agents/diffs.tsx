@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { Segmented } from '@adecore/ui';
 import type { ChatFileChange } from '@adecore/agent-contracts';
-import DiffPool from '@adecore/agents-react/chat/ui/DiffPool';
-import EditDiff from '@adecore/agents-react/chat/ui/EditDiff';
-import UnifiedDiff from '@adecore/agents-react/chat/ui/UnifiedDiff';
+import { DiffPool, EditDiff, UnifiedDiff } from '@adecore/agents-react/chat/ui';
 import DiffWorker from '@pierre/diffs/worker/worker.js?worker';
 
 const PATCH: ChatFileChange = {

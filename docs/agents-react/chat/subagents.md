@@ -3,8 +3,7 @@
 An agent a chat delegated to has a row in the thread with its task, its state and the report it ended with. Its own conversation lives in the CLI's transcript, and the views read it from there on request.
 
 ```tsx
-import { SubagentTimeline } from '@adecore/agents-react/chat/ui/SubagentTimeline';
-import { SubagentBreadcrumb, SubagentTitleCrumb } from '@adecore/agents-react/chat/ui/SubagentControls';
+import { SubagentTimeline, SubagentBreadcrumb, SubagentTitleCrumb } from '@adecore/agents-react/chat/ui';
 ```
 
 <Demo src="agents/subagents" />
@@ -33,4 +32,4 @@ Which conversation a chat shows is its trail: the steps down from the main agent
 
 A host without `chat.subagent` refuses it with `unknown-request`. The first refusal hides the open button on that host's rows that carry no pointer of their own (`useSubagentSupport`); the rows themselves still draw. `history-expired` reads the newest page again.
 
-`SubagentConversation` is the reader behind `SubagentTimeline`, for a view of your own: construct it with the transport, chat id, call id and a state setter, `start()` it once and `dispose()` it on unmount, which stops the watch and leaves the subagent running. The helpers in `chat/subagent-list` and `chat/subagent-view` name, order and count subagents the way the flyout and the crumbs do.
+`SubagentConversation` is the reader behind `SubagentTimeline`, for a view of your own: construct it with the transport, chat id, call id and a state setter, `start()` it once and `dispose()` it on unmount, which stops the watch and leaves the subagent running. The helpers in `@adecore/agents-react/chat` (`subagentTitle`, `summaryWordOf`, `stopOf`, `useSubagentView`, `useSubagentTrail`, `crumbOf`, ...) name, order and count subagents the way the flyout and the crumbs do.

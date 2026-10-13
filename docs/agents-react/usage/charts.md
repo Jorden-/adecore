@@ -3,7 +3,7 @@
 The parts of the [usage page](/agents-react/usage/usage-page), each drawn from a summary the app already has. Fold a summary first with `deriveUsage(summary, metric)`.
 
 ```tsx
-import { deriveUsage, labelEveryFor } from '@adecore/agents-react/usage/summary';
+import { deriveUsage, labelEveryFor } from '@adecore/agents-react/usage';
 ```
 
 <Demo src="agents/usage-parts" />

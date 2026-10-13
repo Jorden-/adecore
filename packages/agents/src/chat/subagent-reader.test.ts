@@ -3,7 +3,7 @@ import { appendFile, cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { workflowAgentRef, type ChatInfo, type ChatItem, type ChatSubagentChangedEvent, type ChatSubagentItem } from '@adecore/agent-contracts';
-import { FakeWatch } from '../watch-test-helpers.ts';
+import { FakeWatch } from '../testing/watch.ts';
 import { claudeProjectSlug } from './claude-transcript.ts';
 import type { ThreadItemsParams } from './codex-thread.ts';
 import { SubagentReader, type SubagentChat } from './subagent-reader.ts';

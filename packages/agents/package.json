@@ -4,14 +4,75 @@
     "description": "Node-compatible agent chat hosts, providers, accounts, usage and durable task coordination.",
     "type": "module",
     "exports": {
-        "./*.json": {
-            "source": "./src/*.json",
-            "default": "./dist/*.json"
+        ".": {
+            "source": "./src/index.ts",
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
         },
-        "./*": {
-            "source": "./src/*.ts",
-            "types": "./dist/*.d.ts",
-            "default": "./dist/*.js"
+        "./chat": {
+            "source": "./src/chat/index.ts",
+            "types": "./dist/chat/index.d.ts",
+            "default": "./dist/chat/index.js"
+        },
+        "./context": {
+            "source": "./src/context/index.ts",
+            "types": "./dist/context/index.d.ts",
+            "default": "./dist/context/index.js"
+        },
+        "./coordination": {
+            "source": "./src/coordination/index.ts",
+            "types": "./dist/coordination/index.d.ts",
+            "default": "./dist/coordination/index.js"
+        },
+        "./host": {
+            "source": "./src/host/index.ts",
+            "types": "./dist/host/index.d.ts",
+            "default": "./dist/host/index.js"
+        },
+        "./providers": {
+            "source": "./src/providers/index.ts",
+            "types": "./dist/providers/index.d.ts",
+            "default": "./dist/providers/index.js"
+        },
+        "./usage": {
+            "source": "./src/usage/index.ts",
+            "types": "./dist/usage/index.d.ts",
+            "default": "./dist/usage/index.js"
+        },
+        "./testing": {
+            "source": "./src/testing/index.ts",
+            "types": "./dist/testing/index.d.ts",
+            "default": "./dist/testing/index.js"
+        },
+        "./testing/bin/fake-claude": {
+            "source": "./src/testing/bin/fake-claude.ts",
+            "types": "./dist/testing/bin/fake-claude.d.ts",
+            "default": "./dist/testing/bin/fake-claude.js"
+        },
+        "./testing/bin/fake-codex": {
+            "source": "./src/testing/bin/fake-codex.ts",
+            "types": "./dist/testing/bin/fake-codex.d.ts",
+            "default": "./dist/testing/bin/fake-codex.js"
+        },
+        "./providers/claude-models.json": {
+            "source": "./src/providers/claude-models.json",
+            "default": "./dist/providers/claude-models.json"
+        },
+        "./providers/codex-models.json": {
+            "source": "./src/providers/codex-models.json",
+            "default": "./dist/providers/codex-models.json"
+        },
+        "./usage/prices-snapshot.json": {
+            "source": "./src/usage/prices-snapshot.json",
+            "default": "./dist/usage/prices-snapshot.json"
+        },
+        "./testing/fixtures/*": {
+            "source": "./src/chat/fixtures/*",
+            "default": "./dist/chat/fixtures/*"
+        },
+        "./package.json": {
+            "source": "./package.json",
+            "default": "./package.json"
         }
     },
     "scripts": {

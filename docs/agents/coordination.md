@@ -8,9 +8,8 @@ Modules for agents that hand each other work: an outbox that keeps a promise acr
 
 ```ts
 import { z } from 'zod';
-import { OutboxStore } from '@adecore/agents/outbox/outbox';
-import { OutboxWorker } from '@adecore/agents/outbox/outbox-worker';
-import { ManualClock } from '@adecore/agents/outbox/manual-clock';
+import { OutboxStore, OutboxWorker } from '@adecore/agents/coordination';
+import { ManualClock } from '@adecore/agents/testing';
 
 export async function runOutboxExample(dataDir: string): Promise<string[]> {
     const WorkSchema = z.object({ kind: z.literal('record-result'), payload: z.object({ text: z.string() }) });
@@ -48,13 +47,8 @@ A task is what a chat asked of a chat it opened. `TaskStore` keeps them under `t
 
 ```ts
 import { z } from 'zod';
-import type { ChatCore } from '@adecore/agents/chat/chat-core';
-import { OutboxStore } from '@adecore/agents/outbox/outbox';
-import { OutboxWorker } from '@adecore/agents/outbox/outbox-worker';
-import { TaskStore } from '@adecore/agents/tasks/task-store';
-import { restartBackgroundLimits } from '@adecore/agents/tasks/background-limit';
-import { BackgroundLimitWorkSchema, DeliverWaitingWorkSchema, GiveTaskWorkSchema, WakeParentWorkSchema } from '@adecore/agents/tasks/task-work';
-import { wireTasks } from '@adecore/agents/tasks/wiring';
+import type { ChatCore } from '@adecore/agents/chat';
+import { OutboxStore, OutboxWorker, TaskStore, restartBackgroundLimits, BackgroundLimitWorkSchema, DeliverWaitingWorkSchema, GiveTaskWorkSchema, WakeParentWorkSchema, wireTasks } from '@adecore/agents/coordination';
 
 export async function openTaskServices(dataDir: string, chats: ChatCore, placedIds: ReadonlySet<string>) {
     const WorkSchema = z.discriminatedUnion('kind', [BackgroundLimitWorkSchema, DeliverWaitingWorkSchema, GiveTaskWorkSchema, WakeParentWorkSchema]);

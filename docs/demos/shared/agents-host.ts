@@ -1,9 +1,15 @@
 import globalI18next from 'i18next';
 import { useSyncExternalStore } from 'react';
 import type { AgentEventType, AgentRequestType, ChatBookmark, ChatEvent, ChatInfo, ChatItem, ProviderAccounts } from '@adecore/agent-contracts';
-import type { ChatHost, FileRef } from '@adecore/agents-react/host';
-import { configureChatStorage } from '@adecore/agents-react/storage';
-import { ChatTransportError, type ChatEventMap, type ChatRequestMap, type ChatTransport } from '@adecore/agents-react/transport';
+import {
+    type ChatHost,
+    type FileRef,
+    configureChatStorage,
+    ChatTransportError,
+    type ChatEventMap,
+    type ChatRequestMap,
+    type ChatTransport
+} from '@adecore/agents-react';
 import chatEn from '@adecore/agents-react/locales/en/agent-chat.json';
 import promptsEn from '@adecore/agents-react/locales/en/agent-prompts.json';
 import providersEn from '@adecore/agents-react/locales/en/agent-providers.json';

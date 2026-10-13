@@ -3,8 +3,7 @@
 What the agent CLIs of a host cost over a period, read from their transcripts by the host: a total, a chart per day or hour, tiles for the kinds of tokens, a breakdown by model, folder and day, and what is left of each plan. The page asks the host; it scans nothing itself.
 
 ```tsx
-import { UsageDialog } from '@adecore/agents-react/usage/UsageDialog';
-import { UsagePage } from '@adecore/agents-react/usage/UsagePage';
+import { UsageDialog, UsagePage } from '@adecore/agents-react/usage';
 ```
 
 <Demo src="agents/usage-page" />

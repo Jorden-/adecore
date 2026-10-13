@@ -3,8 +3,7 @@
 The cards a person answers a chat's approvals and questions in. The [composer](/agents-react/chat/composer) draws them itself, in its own place, for every request the chat waits on (`PromptComposer`). The parts are exported for a stack of cards somewhere else, such as over a canvas of chats.
 
 ```tsx
-import { PromptView } from '@adecore/agents-react/prompts/ui/PromptView';
-import { usePromptSession } from '@adecore/agents-react/prompts/logic/usePromptSession';
+import { PromptView, usePromptSession } from '@adecore/agents-react/prompts';
 ```
 
 <Demo src="agents/prompts" />
@@ -22,10 +21,9 @@ Requests that hold the agent up come first, oldest first, then optional question
 `usePromptSession` keeps the state of a stack: which subject is in front, a draft per request, sending and the last error. `PromptView` draws one subject. `answerPrompt(subject, action, actions, host)` sends a card's action as the request it is answered with, or to the host's `prompts.answer` for a prompt of your app.
 
 ```tsx
-import { useChatActions } from '@adecore/agents-react/chat/actions';
-import { useChatHost } from '@adecore/agents-react/host';
-import { orderPrompts } from '@adecore/agents-react/prompts/logic/prompts';
-import { answerPrompt, isBlockingSubject, promptCreatedAt, promptIdOf, type PromptSubject } from '@adecore/agents-react/prompts/logic/subjects';
+import { useChatActions } from '@adecore/agents-react/chat';
+import { useChatHost } from '@adecore/agents-react';
+import { orderPrompts, answerPrompt, isBlockingSubject, promptCreatedAt, promptIdOf, type PromptSubject } from '@adecore/agents-react/prompts';
 
 const pick = (waiting: readonly PromptSubject[], id: string | null): PromptSubject | null =>
     waiting.find((subject) => promptIdOf(subject) === id) ?? orderPrompts(waiting, isBlockingSubject, promptCreatedAt)[0] ?? null;
@@ -82,4 +80,4 @@ A `HostPrompt` is `{ id, createdAt, blocking, asks, data }`: a stable id, whethe
 
 ## Parts
 
-`PromptView` is made of `PromptCard` (the frame, with heading, meta, notice and error), `ApprovalBody` with `CommandBox` for a command, `QuestionBody`, and the action rows. `PROMPT_SURFACE` is the surface class of the card for a frame that matches it. The logic in `prompts/logic/prompts` is pure: `emptyPromptDraft`, `questionAnswer`, `answerValue`, `pickPromptChoice`, `promptAnswers`, `isBlockingPrompt`, `orderPrompts` and `nextPrompt`.
+`PromptView` is made of `PromptCard` (the frame, with heading, meta, notice and error), `ApprovalBody` with `CommandBox` for a command, `QuestionBody`, and the action rows. `PROMPT_SURFACE` is the surface class of the card for a frame that matches it. The logic in `@adecore/agents-react/prompts` is pure: `emptyPromptDraft`, `questionAnswer`, `answerValue`, `pickPromptChoice`, `promptAnswers`, `isBlockingPrompt`, `orderPrompts` and `nextPrompt`.

@@ -15,9 +15,9 @@ import {
 } from '@adecore/agent-contracts';
 import { ChatCore } from '../chat/chat-core.ts';
 import { ChatStore } from '../chat/chat-store.ts';
-import { fakeClaude } from '../chat/fake-claude.ts';
+import { fakeClaude } from '../testing/fake-claude.ts';
 import type { SpawnChatProcess } from '../chat/chat-process.ts';
-import { inProcess, type InProcessCli } from '../chat/fake-cli.ts';
+import { inProcess, type InProcessCli } from '../testing/fake-cli.ts';
 import { AgentHost } from './agent-host.ts';
 import { memoryPortPair } from './memory-port.ts';
 

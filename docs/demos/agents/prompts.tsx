@@ -1,9 +1,15 @@
 import { useState } from 'react';
 import type { ChatApprovalItem, ChatQuestionItem } from '@adecore/agent-contracts';
-import { orderPrompts, type PendingPrompt } from '@adecore/agents-react/prompts/logic/prompts';
-import { isBlockingSubject, promptCreatedAt, promptIdOf, type PromptSubject } from '@adecore/agents-react/prompts/logic/subjects';
-import { usePromptSession } from '@adecore/agents-react/prompts/logic/usePromptSession';
-import { PromptView } from '@adecore/agents-react/prompts/ui/PromptView';
+import {
+    orderPrompts,
+    type PendingPrompt,
+    isBlockingSubject,
+    promptCreatedAt,
+    promptIdOf,
+    type PromptSubject,
+    usePromptSession,
+    PromptView
+} from '@adecore/agents-react/prompts';
 import { Button } from '@adecore/ui';
 
 const approval: ChatApprovalItem = {

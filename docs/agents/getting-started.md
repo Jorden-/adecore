@@ -7,11 +7,9 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatEventEnvelope, ServerFrame } from '@adecore/agent-contracts';
-import { ChatCore } from '@adecore/agents/chat/chat-core';
-import { fakeClaude } from '@adecore/agents/chat/fake-claude';
-import { inProcess } from '@adecore/agents/chat/fake-cli';
-import { AgentHost } from '@adecore/agents/host/agent-host';
-import { memoryPortPair } from '@adecore/agents/host/memory-port';
+import { ChatCore } from '@adecore/agents/chat';
+import { fakeClaude, inProcess } from '@adecore/agents/testing';
+import { AgentHost, memoryPortPair } from '@adecore/agents/host';
 
 const dataDir = await mkdtemp(join(tmpdir(), 'agents-example-'));
 const fake = inProcess(fakeClaude);

@@ -1,11 +1,15 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ChatClient } from '@adecore/agents-react/chat/chat-client';
-import { ChatHostProvider } from '@adecore/agents-react/host';
-import { ChatScopeContext, type ChatScope } from '@adecore/agents-react/scope';
-import { chatSink, useChats } from '@adecore/agents-react/state/chats';
-import { useProviderAccountsStore, watchProviderAccounts } from '@adecore/agents-react/state/provider-accounts';
-import { providerSinkFor, useProvidersStore } from '@adecore/agents-react/state/providers';
-import { useUsageStore } from '@adecore/agents-react/state/usage';
+import { ChatClient } from '@adecore/agents-react/chat';
+import { ChatHostProvider, ChatScopeContext, type ChatScope } from '@adecore/agents-react';
+import {
+    chatSink,
+    useChats,
+    useProviderAccountsStore,
+    watchProviderAccounts,
+    providerSinkFor,
+    useProvidersStore,
+    useUsageStore
+} from '@adecore/agents-react/state';
 import { initialAccounts, PROVIDERS } from './agents-data.ts';
 import { DEMO_CHAT_HOST, demoChats, FakeAgentHost, type DemoChats } from './agents-host.ts';
 

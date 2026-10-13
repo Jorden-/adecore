@@ -2,7 +2,7 @@
  * Network-free `codex app-server` fake. Prompt commands exercise approvals, edits, questions,
  * interrupts, failures, names, subagents, pagination, forks and goals through the real JSON-RPC shapes.
  */
-import { runOverStdio, type FakeCli } from './fake-cli.ts';
+import type { FakeCli } from './fake-cli.ts';
 
 type Frame = Record<string, unknown>;
 
@@ -635,7 +635,3 @@ export function fakeCodexWith(options: FakeCodexOptions): FakeCli {
 }
 
 export const fakeCodex: FakeCli = fakeCodexWith({});
-
-if (import.meta.main) {
-    await runOverStdio(fakeCodex);
-}

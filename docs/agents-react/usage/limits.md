@@ -3,8 +3,7 @@
 What is left of each plan: the session and weekly windows of every CLI and account, as the host last read them.
 
 ```tsx
-import { UsageLimits } from '@adecore/agents-react/usage/UsageLimits';
-import { UsageLimitsCard } from '@adecore/agents-react/usage/UsageLimitsCard';
+import { UsageLimits, UsageLimitsCard } from '@adecore/agents-react/usage';
 ```
 
 <Demo src="agents/usage-limits" />
@@ -29,4 +28,4 @@ import { UsageLimitsCard } from '@adecore/agents-react/usage/UsageLimitsCard';
 
 `LimitsList({ limits, now, compact? })` lists every CLI with its windows; `compact` is for a list inside a hover card. `AccountLimitsList({ groups, now })` does the same per account, once a CLI has several. `WindowBar({ window, now, compact })` is one bar with how much is used and when it resets.
 
-`limitsOfAccount`, `sessionWindow`, `continueTarget` and `hasUnreadAccount` in `agents/account-limits`, and `nextReset`, `explain` and `accountNote` in `usage/limit-groups`, are the logic behind them.
+The logic behind them, which windows an account shows and which reset comes next, is internal to the package.

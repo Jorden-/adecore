@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { ChatInfo } from '@adecore/agent-contracts';
-import { ManualClock } from '../outbox/manual-clock.ts';
+import { ManualClock } from '../testing/manual-clock.ts';
 import type { TurnInput } from './backend.ts';
 import { type ChatSessionOptions } from './chat-session.ts';
 import { ClaudeProtocol } from './claude-protocol.ts';

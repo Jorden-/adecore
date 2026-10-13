@@ -2,13 +2,8 @@ import type { ReactNode } from 'react';
 import { NOW, PICTURE, chatInfo, chatItems } from '../shared/agents-data.ts';
 import { AgentDemo } from '../shared/agents.tsx';
 import { DEMO_CHAT } from '../shared/agents-host.ts';
-import { ChatActivity, StatusIcon } from '@adecore/agents-react/chat/ui/ChatActivity';
-import { AccountPill } from '@adecore/agents-react/chat/ui/AccountPill';
-import { ChatReferenceChip } from '@adecore/agents-react/chat/ui/ChatReferenceChip';
-import { ImageThumb } from '@adecore/agents-react/chat/ui/ImageView';
-import { UploadThumb } from '@adecore/agents-react/chat/ui/UploadThumb';
-import { WelcomeGreeting } from '@adecore/agents-react/chat/ui/Welcome';
-import type { StatusWord } from '@adecore/agents-react/agents/status-look';
+import { ChatActivity, StatusIcon, AccountPill, ChatReferenceChip, ImageThumb, UploadThumb, WelcomeGreeting } from '@adecore/agents-react/chat/ui';
+import type { StatusWord } from '@adecore/agents-react/chat';
 
 const WORDS: StatusWord[] = ['running', 'paused', 'done', 'failed', 'cancelled'];
 

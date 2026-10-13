@@ -12,10 +12,11 @@ const SMOKE_CHECKS: Record<string, string> = {
 const spec = { label: 'com.example.worker', description: 'Example worker', program: process.execPath, args: [], environment: {}, workingDirectory: process.cwd(), logFile: '/tmp/example.log' };
 assert.match(service.systemdUnit(spec), /Description=Example worker/);
 assert.equal(service.definitionRunsProgram(service.launchAgentPlist(spec), spec.program), true);`,
-    '@adecore/agents': `const { runProcess } = await import('@adecore/agents/run-process');
+    '@adecore/agents': `const { runProcess, Serializer } = await import('@adecore/agents');
 const child = await runProcess([process.execPath, '-e', 'process.stdout.write("packed backend")']);
 assert.equal(child.exitCode, 0); assert.equal(child.stdout, 'packed backend');
-const { Serializer } = await import('@adecore/agents/serializer'); assert.equal(typeof Serializer, 'function');`,
+assert.equal(typeof Serializer, 'function');
+const { AgentHost } = await import('@adecore/agents/host'); assert.equal(typeof AgentHost.open, 'function');`,
     '@adecore/agent-contracts': "await import('@adecore/agent-contracts');",
     '@adecore/merge': `const packedMerge = await import('@adecore/merge');
 const changes = packedMerge.diffLines(['before'], ['after']);

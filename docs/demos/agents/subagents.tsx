@@ -1,8 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { crumbOf, openFromMain, useSubagentItem, useSubagentTrail } from '@adecore/agents-react/chat/subagent-view';
-import { SubagentTitleCrumb } from '@adecore/agents-react/chat/ui/SubagentControls';
-import { SubagentInfo } from '@adecore/agents-react/chat/ui/SubagentInfo';
-import { SubagentTimeline } from '@adecore/agents-react/chat/ui/SubagentTimeline';
+import { crumbOf, openFromMain, useSubagentItem, useSubagentTrail } from '@adecore/agents-react/chat';
+import { SubagentTitleCrumb, SubagentInfo, SubagentTimeline } from '@adecore/agents-react/chat/ui';
 import { AgentDemo } from '../shared/agents.tsx';
 import { DEMO_CHAT } from '../shared/agents-host.ts';
 

@@ -1,4 +1,4 @@
-import { ProvidersPane } from '@adecore/agents-react/providers/ProvidersPane';
+import { ProvidersPane } from '@adecore/agents-react/providers';
 import { AgentDemo } from '../shared/agents.tsx';
 
 export default function ProvidersPaneDemo() {

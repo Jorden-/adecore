@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import type { ChatSendExtras } from '@adecore/agents-react/chat/chat-client';
-import { Composer } from '@adecore/agents-react/chat/ui/Composer';
-import { useChatScope } from '@adecore/agents-react/scope';
-import { useChatRow } from '@adecore/agents-react/state/chats';
+import type { ChatSendExtras } from '@adecore/agents-react/chat';
+import { Composer } from '@adecore/agents-react/chat/ui';
+import { useChatScope } from '@adecore/agents-react';
+import { useChatRow } from '@adecore/agents-react/state';
 import { chatInfo } from '../shared/agents-data.ts';
 import { AgentDemo } from '../shared/agents.tsx';
 

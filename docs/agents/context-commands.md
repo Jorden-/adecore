@@ -3,7 +3,7 @@
 A host can give its agents a command line to call back into it: to open another chat, hand over a task, read a document. The package has the parsing, the help and the refusals of such a command; it has no executable, server, socket or hook of its own. Your app decides how a call reaches it, checks who is calling, and hands each verb what it may touch.
 
 ```ts
-import { createVerbRegistry, requiredField, VerbRefusal } from '@adecore/agents/context/verb';
+import { createVerbRegistry, requiredField, VerbRefusal } from '@adecore/agents/context';
 ```
 
 ## A verb
@@ -12,8 +12,7 @@ A note verb over a write function of your app's own, with a dry run that checks 
 
 ```ts
 import { z } from 'zod';
-import { createVerbRegistry, requiredField, VerbRefusal, type VerbCallBase } from '@adecore/agents/context/verb';
-import { refusalBody } from '@adecore/agents/context/refusal';
+import { createVerbRegistry, requiredField, VerbRefusal, type VerbCallBase, refusalBody } from '@adecore/agents/context';
 
 interface Call extends VerbCallBase {
     authorized: boolean;

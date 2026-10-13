@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { LimitDock, LimitPill } from '@adecore/agents-react/chat/ui/LimitState';
-import { ResumeCompactionDock } from '@adecore/agents-react/chat/ui/ResumeCompactionDock';
-import { useChatRow } from '@adecore/agents-react/state/chats';
+import { LimitDock, LimitPill, ResumeCompactionDock } from '@adecore/agents-react/chat/ui';
+import { useChatRow } from '@adecore/agents-react/state';
 import { NOW, chatInfo, chatItems } from '../shared/agents-data.ts';
 import { AgentDemo } from '../shared/agents.tsx';
 import { DEMO_CHAT } from '../shared/agents-host.ts';

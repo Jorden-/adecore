@@ -1,4 +1,4 @@
-import type { DirectoryWatcher, WatchDirectory, WatchSeams } from './watch-seam.ts';
+import type { DirectoryWatcher, WatchDirectory, WatchSeams } from '../watch-seam.ts';
 
 export class FakeDirectoryWatcher implements DirectoryWatcher {
     readonly path: string;

@@ -1,7 +1,5 @@
 import { Fragment, useState, type ComponentType, type ReactNode } from 'react';
-import { UI_RENDERERS } from '@adecore/agents-react/chat/ui/intelligent-ui/registry';
-import type { UiRenderContext, UiRendererProps } from '@adecore/agents-react/chat/ui/intelligent-ui/render-context';
-import { UiBlockFrame } from '@adecore/agents-react/chat/ui/intelligent-ui/UiBlockFrame';
+import { UI_RENDERERS, type UiRenderContext, type UiRendererProps, UiBlockFrame } from '@adecore/agents-react/chat/ui';
 import type { DemoNode } from './intelligent-ui-tree.ts';
 
 function withIds(nodes: readonly DemoNode[], prefix: string): DemoNode[] {

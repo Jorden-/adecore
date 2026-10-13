@@ -3,7 +3,7 @@
 `AgentHost` is the chats of one data folder, with the CLIs, accounts and usage around them, served over ports. `wireAgents` is the same without the ports, for an app that answers requests on a wire of its own.
 
 ```ts
-import { AgentHost } from '@adecore/agents/host/agent-host';
+import { AgentHost } from '@adecore/agents/host';
 
 const host = await AgentHost.open({ dataDir });
 const disconnect = host.connect(port);
@@ -42,7 +42,7 @@ A fork lands somewhere in the app, and continuing a chat under another account m
 ## wireAgents
 
 ```ts
-import { wireAgents } from '@adecore/agents/host/wiring';
+import { wireAgents } from '@adecore/agents/host';
 
 const wiring = wireAgents({ dataDir });
 await wiring.accounts.load();
@@ -61,9 +61,8 @@ The chats themselves are a `ChatCore`. A host adds what it knows by overriding i
 ```ts
 import { resolve } from 'node:path';
 import type { RuntimeMode } from '@adecore/agent-contracts';
-import { ChatCore, type ChatCoreOptions } from '@adecore/agents/chat/chat-core';
-import { ChatError } from '@adecore/agents/chat/errors';
-import { narrowerMode } from '@adecore/agents/modes';
+import { ChatCore, type ChatCoreOptions, ChatError } from '@adecore/agents/chat';
+import { narrowerMode } from '@adecore/agents/providers';
 
 class ProjectChats extends ChatCore {
     private readonly folders: ReadonlySet<string>;

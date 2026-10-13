@@ -1,4 +1,4 @@
-import { CodeBlock } from '@adecore/agents-react/chat/ui/CodeBlock';
+import { CodeBlock } from '@adecore/agents-react/chat/ui';
 
 const CODE = `export async function fetchJson<T>(url: string, attempts = 3): Promise<T> {
     for (let attempt = 1; ; attempt++) {

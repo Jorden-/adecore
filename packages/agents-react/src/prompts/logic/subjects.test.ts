@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { ChatApprovalItem, ChatQuestionItem } from '@adecore/agent-contracts';
 import type { ChatHost } from '../../host';
-import { PROMPT_SAMPLES } from './prompts.fixtures';
+import { PROMPT_SAMPLES } from '../../testing/prompts';
 import {
     answerPrompt,
     approvalButtons,

@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { Button, ErrorBoundary } from '@adecore/ui';
-import { UsageDialog } from '@adecore/agents-react/usage/UsageDialog';
-import { UsageLimitsCard } from '@adecore/agents-react/usage/UsageLimitsCard';
-import { UsagePage } from '@adecore/agents-react/usage/UsagePage';
+import { UsageDialog, UsageLimitsCard, UsagePage } from '@adecore/agents-react/usage';
 import { AgentDemo } from '../shared/agents.tsx';
 
 export default function UsagePageDemo() {

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AnsiOutput } from '@adecore/agents-react/chat/ui/AnsiOutput';
-import { FadingWords } from '@adecore/agents-react/chat/ui/FadingWords';
+import { AnsiOutput, FadingWords } from '@adecore/agents-react/chat/ui';
 
 const OUTPUT =
     '\u001b[1mbun test\u001b[0m v1.2.0\n\u001b[32m✓\u001b[0m returns the parsed body\n\u001b[32m✓\u001b[0m retries a 503 twice\n\u001b[31m✗\u001b[0m throws on a 404 at once\n\n \u001b[32m2 pass\u001b[0m\n \u001b[31m1 fail\u001b[0m';

@@ -49,6 +49,21 @@ describe('the boundary of @adecore/agents', () => {
         expect(bunned).toEqual([]);
     });
 
+    // The fakes run a whole CLI in memory; a host that reached them would ship them.
+    test('nothing outside a test imports from testing', () => {
+        const reaching = sources()
+            .filter(
+                ({ path, text }) =>
+                    !isTest(path) &&
+                    !path.startsWith('testing/') &&
+                    modulesOf(text).some(
+                        (specifier) => specifier.startsWith('.') && resolve(dirname(join(HERE, path)), specifier).startsWith(join(HERE, 'testing'))
+                    )
+            )
+            .map(({ path }) => path);
+        expect(reaching).toEqual([]);
+    });
+
     test('the checks see every way a file names a module', () => {
         expect(modulesOf(`import type { A } from "@ruimte/contracts";\nimport './side-effect.ts';\nexport { B } from '../../apps/x';`)).toEqual([
             '@ruimte/contracts',

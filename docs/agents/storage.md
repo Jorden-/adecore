@@ -31,8 +31,7 @@ A record starts with its `info`. `ChatStore.settled` reads only that and the las
 ```ts
 import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { writeAtomic } from '@adecore/agents/fs';
-import { Serializer } from '@adecore/agents/serializer';
+import { writeAtomic, Serializer } from '@adecore/agents';
 
 export async function writeCounter(dataDir: string): Promise<number> {
     await mkdir(dataDir, { recursive: true });
@@ -66,7 +65,7 @@ The count ends at 2. `Serializer.run` runs work one at a time, even after one fa
 
 ## Generated image attachments
 
-The Codex adapter reads the bytes of an image through `generatedImage(data, prompt)` (`@adecore/agents/chat/generated-image`). It refuses a result that is empty, malformed, not an image or too large, tells PNG, JPEG, GIF and WebP apart by their bytes, and reads the size in pixels. It never reads the path where the provider saved the image. An `imageView` item records its path as tool input and does not read it either.
+The Codex adapter reads the bytes of an image through `generatedImage(data, prompt)`, which is internal to the package. It refuses a result that is empty, malformed, not an image or too large, tells PNG, JPEG, GIF and WebP apart by their bytes, and reads the size in pixels. It never reads the path where the provider saved the image. An `imageView` item records its path as tool input and does not read it either.
 
 `AttachmentStore.saveGenerated(chatId, ref, upload)` takes the attachment id from the provider's item id and writes the bytes whole, never over an image already there. A completion that comes again reuses the file, and a replay with other bytes under the same id fails. The backend waits for the write before it passes on the events after it, the end of the turn included. `ChatCore.attachment` finds generated images in the chat's tool items as well as files in user messages and the queue.
 

@@ -1,11 +1,18 @@
 import { useState } from 'react';
 import type { ChatToolItem } from '@adecore/agent-contracts';
-import { summarizeGroup } from '@adecore/agents-react/chat/logic/timeline';
-import { AgentTurnRow, CompactionRow, NoteRow, ReportRow } from '@adecore/agents-react/chat/ui/rows/MessageRows';
-import { WorkGroupRow, WorkingRow, WorkRow } from '@adecore/agents-react/chat/ui/rows/WorkRows';
-import { ForksRow } from '@adecore/agents-react/chat/ui/rows/ForksRow';
-import { TaskRow } from '@adecore/agents-react/chat/ui/rows/TaskRow';
-import { WorkflowRow } from '@adecore/agents-react/chat/ui/rows/WorkflowRow';
+import { summarizeGroup } from '@adecore/agents-react/chat';
+import {
+    AgentTurnRow,
+    CompactionRow,
+    NoteRow,
+    ReportRow,
+    WorkGroupRow,
+    WorkingRow,
+    WorkRow,
+    ForksRow,
+    TaskRow,
+    WorkflowRow
+} from '@adecore/agents-react/chat/ui';
 import { NOW, chatItems, taskRows, workflowTool } from '../shared/agents-data.ts';
 import { AgentDemo } from '../shared/agents.tsx';
 import { DEMO_CHAT, demoChats, forkChats } from '../shared/agents-host.ts';

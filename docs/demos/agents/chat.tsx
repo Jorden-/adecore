@@ -1,14 +1,9 @@
 import { useEffect } from 'react';
-import { AgentIcon } from '@adecore/agents-react/agents/AgentIcon';
-import { useSubagentTrail } from '@adecore/agents-react/chat/subagent-view';
-import { AccountPill } from '@adecore/agents-react/chat/ui/AccountPill';
-import { Composer } from '@adecore/agents-react/chat/ui/Composer';
-import { LimitPill } from '@adecore/agents-react/chat/ui/LimitState';
-import { SubagentBreadcrumb, SubagentTitleCrumb } from '@adecore/agents-react/chat/ui/SubagentControls';
-import { SubagentTimeline } from '@adecore/agents-react/chat/ui/SubagentTimeline';
-import { Timeline } from '@adecore/agents-react/chat/ui/Timeline';
-import { useChatScope } from '@adecore/agents-react/scope';
-import { useChatRow } from '@adecore/agents-react/state/chats';
+import { AgentIcon } from '@adecore/agents-react/providers';
+import { useSubagentTrail } from '@adecore/agents-react/chat';
+import { AccountPill, Composer, LimitPill, SubagentBreadcrumb, SubagentTitleCrumb, SubagentTimeline, Timeline } from '@adecore/agents-react/chat/ui';
+import { useChatScope } from '@adecore/agents-react';
+import { useChatRow } from '@adecore/agents-react/state';
 import { AgentDemo } from '../shared/agents.tsx';
 import { DEMO_CHAT } from '../shared/agents-host.ts';
 

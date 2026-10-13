@@ -64,7 +64,7 @@ for (const [namespace, words] of Object.entries(await AGENTS_LOCALES.en!())) {
 Configure where drafts and preferences are kept before anything reads a store: once one was read, it is fixed. See [Persistence](/agents-react/guide/persistence).
 
 ```ts
-import { configureChatStorage } from '@adecore/agents-react/storage';
+import { configureChatStorage } from '@adecore/agents-react';
 
 configureChatStorage({ namespace: 'my-app' });
 ```
@@ -72,7 +72,7 @@ configureChatStorage({ namespace: 'my-app' });
 A `ChatHostProvider` hands the views what only your app can decide. Keep the object in a constant, since the provider reads it once. Everything you leave out keeps a default that leaves that part out. See [Host adapters](/agents-react/guide/host).
 
 ```tsx
-import { ChatHostProvider, type ChatHost } from '@adecore/agents-react/host';
+import { ChatHostProvider, type ChatHost } from '@adecore/agents-react';
 
 const CHAT_HOST: Partial<ChatHost> = {
     notify: (toast) => showToast(toast),
@@ -92,12 +92,9 @@ A scope is one host of chats: an id, a transport to reach it, and a `ChatClient`
 
 ```ts
 import type { FramePort } from '@adecore/agent-contracts/port';
-import { ChatClient } from '@adecore/agents-react/chat/chat-client';
-import { portTransport } from '@adecore/agents-react/port-transport';
-import type { ChatScope } from '@adecore/agents-react/scope';
-import { chatSink } from '@adecore/agents-react/state/chats';
-import { watchProviderAccounts } from '@adecore/agents-react/state/provider-accounts';
-import { providerSinkFor } from '@adecore/agents-react/state/providers';
+import { ChatClient } from '@adecore/agents-react/chat';
+import { portTransport, type ChatScope } from '@adecore/agents-react';
+import { chatSink, watchProviderAccounts, providerSinkFor } from '@adecore/agents-react/state';
 
 export function openScope(id: string, port: MessagePort): ChatScope {
     const frames: FramePort = {
@@ -125,10 +122,9 @@ Render the scope in `ChatScopeContext`, inside `UIProvider`, and a thread with i
 
 ```tsx
 import { useEffect } from 'react';
-import { Composer } from '@adecore/agents-react/chat/ui/Composer';
-import { Timeline } from '@adecore/agents-react/chat/ui/Timeline';
-import { ChatScopeContext, useChatScope, type ChatScope } from '@adecore/agents-react/scope';
-import { useChatRow } from '@adecore/agents-react/state/chats';
+import { Composer, Timeline } from '@adecore/agents-react/chat/ui';
+import { ChatScopeContext, useChatScope, type ChatScope } from '@adecore/agents-react';
+import { useChatRow } from '@adecore/agents-react/state';
 
 function Chat({ chatId, cwd }: { chatId: string; cwd: string }) {
     const scope = useChatScope();
