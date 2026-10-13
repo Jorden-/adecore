@@ -275,7 +275,7 @@ pub async fn exports_every_format(db: &mut Db<'_>, directory: &Path) {
     assert_eq!(csv["rows"], 3);
     assert_eq!(csv["bytes"], text.len());
     assert!(csv["elapsedMs"].is_number());
-    assert!(!directory.join("exp.csv.partial").exists());
+    assert!(!has_partial(directory, "exp.csv"));
 
     let mut headerless = export_params(
         &csv_path,
@@ -368,7 +368,7 @@ pub async fn export_failures_leave_nothing_behind(db: &mut Db<'_>, directory: &P
     let failing = export_params(&target, "csv", json!({ "kind": "query", "sql": "SELECT nope FROM exp" }));
     assert_eq!(db.error("export", failing).await["code"], "query-failed");
     assert_eq!(std::fs::read_to_string(&target).unwrap(), "old");
-    assert!(!directory.join("kept.csv.partial").exists());
+    assert!(!has_partial(directory, "kept.csv"));
 
     let missing = directory.join("no-such-folder").join("out.csv");
     let error = db
@@ -402,7 +402,7 @@ pub async fn export_failures_leave_nothing_behind(db: &mut Db<'_>, directory: &P
         )
         .await;
     assert_eq!(unknown_table["code"], "query-failed");
-    assert!(!directory.join("kept.csv.partial").exists());
+    assert!(!has_partial(directory, "kept.csv"));
     assert_eq!(std::fs::read_to_string(&target).unwrap(), "old");
 }
 
@@ -419,12 +419,12 @@ pub async fn cancels_an_export(db: &mut Db<'_>, directory: &Path, endless: &str)
     let running = tokio::spawn(db.client.dispatcher.submit(&line));
 
     tokio::time::sleep(Duration::from_millis(700)).await;
-    assert!(directory.join("endless.csv.partial").exists(), "rows are being written");
+    assert!(has_partial(directory, "endless.csv"), "rows are being written");
     assert_eq!(db.client.ok("cancel", json!({ "request": id })).await, json!({ "cancelled": true }));
 
     let answer: Value = serde_json::from_str(&tokio::time::timeout(Duration::from_secs(15), running).await.expect("the export stops").unwrap()).unwrap();
     assert_eq!(answer["error"]["code"], "cancelled", "{answer}");
-    assert!(!directory.join("endless.csv.partial").exists());
+    assert!(!has_partial(directory, "endless.csv"));
     assert!(!target.exists());
 
     assert_eq!(
@@ -432,6 +432,15 @@ pub async fn cancels_an_export(db: &mut Db<'_>, directory: &Path, endless: &str)
         json!([[1]]),
         "the session keeps working"
     );
+}
+
+/// Whether an export to `name` left a partial file of its own, which is named `<name>.<pid>-<n>.partial`.
+fn has_partial(directory: &Path, name: &str) -> bool {
+    std::fs::read_dir(directory).unwrap().any(|entry| {
+        let file = entry.unwrap().file_name().to_string_lossy().into_owned();
+
+        file.starts_with(&format!("{name}.")) && file.ends_with(".partial")
+    })
 }
 
 async fn seed_people(db: &mut Db<'_>) {

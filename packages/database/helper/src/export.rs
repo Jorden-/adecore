@@ -1,7 +1,9 @@
 //! Writes the rows of a query to a file in one of the export formats.
 
-use std::fs::File;
+use std::fs::{File, OpenOptions};
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::error::{DatabaseError, Result};
 use crate::protocol::{Cell, CellObject, FileFormat, ResultColumn, ValueKind};
@@ -9,7 +11,11 @@ use crate::quoting::Dialect;
 
 const FLUSH_AT: usize = 64 * 1024;
 
-/// A file written under the name `<path>.partial` and renamed once complete. Dropping it before that removes the partial file.
+/// Tells apart the partial files of the exports of this helper, so two exports to one path never share one.
+static NEXT_PARTIAL: AtomicU64 = AtomicU64::new(0);
+const PARTIAL_ATTEMPTS: u32 = 64;
+
+/// A file written under a name of its own, `<path>.<pid>-<n>.partial`, and renamed once complete. Dropping it before that removes the partial file.
 pub struct PartialFile {
     destination: PathBuf,
     partial: PathBuf,
@@ -24,19 +30,29 @@ impl PartialFile {
             return Err(DatabaseError::invalid_request("The path of an export must be absolute."));
         }
 
-        let mut partial = destination.clone().into_os_string();
-        partial.push(".partial");
-        let partial = PathBuf::from(partial);
-        let file = File::create(&partial)?;
+        let mut attempts = 0;
 
-        Ok((
-            PartialFile {
-                destination,
-                partial,
-                committed: false,
-            },
-            file,
-        ))
+        loop {
+            let mut partial = destination.clone().into_os_string();
+            partial.push(format!(".{}-{}.partial", std::process::id(), NEXT_PARTIAL.fetch_add(1, Ordering::Relaxed)));
+            let partial = PathBuf::from(partial);
+
+            // `create_new` refuses a name that is there, a link included, so nothing else is written through it.
+            match OpenOptions::new().write(true).create_new(true).open(&partial) {
+                Ok(file) => {
+                    return Ok((
+                        PartialFile {
+                            destination,
+                            partial,
+                            committed: false,
+                        },
+                        file,
+                    ));
+                }
+                Err(error) if error.kind() == ErrorKind::AlreadyExists && attempts < PARTIAL_ATTEMPTS => attempts += 1,
+                Err(error) => return Err(error.into()),
+            }
+        }
     }
 
     pub fn partial_path(&self) -> &Path {
@@ -264,6 +280,8 @@ fn is_plain_number(text: &str) -> bool {
 
 fn string_literal(dialect: Dialect, text: &str) -> String {
     match dialect {
+        // A SQLite string literal ends at a NUL, so such text goes in as the bytes it is made of.
+        Dialect::Sqlite if text.contains('\0') => format!("CAST(X'{}' AS TEXT)", text.bytes().map(|byte| format!("{byte:02x}")).collect::<String>()),
         Dialect::Sqlite => format!("'{}'", text.replace('\'', "''")),
         Dialect::Mysql => format!("'{}'", text.replace('\\', "\\\\").replace('\'', "''").replace('\0', "\\0")),
     }
@@ -277,7 +295,8 @@ pub fn sql_literal(dialect: Dialect, kind: ValueKind, cell: &Cell) -> String {
         Cell::Text(text) if matches!(kind, ValueKind::Integer | ValueKind::Decimal | ValueKind::Float) && is_plain_number(text) => text.clone(),
         Cell::Text(text) => string_literal(dialect, text),
         Cell::Object(CellObject::LongText { preview, .. }) => string_literal(dialect, preview),
-        Cell::Object(CellObject::Binary { hex, .. }) if hex.is_empty() => "''".to_string(),
+        // MySQL has no empty `0x` literal; its column keeps the type. SQLite has no column type to keep, so an empty string would read back as text.
+        Cell::Object(CellObject::Binary { hex, .. }) if hex.is_empty() && dialect == Dialect::Mysql => "''".to_string(),
         Cell::Object(CellObject::Binary { hex, .. }) => match dialect {
             Dialect::Sqlite => format!("X'{hex}'"),
             Dialect::Mysql => format!("0x{hex}"),
@@ -414,6 +433,8 @@ mod tests {
         assert_eq!(sql_literal(Dialect::Sqlite, ValueKind::Binary, &binary("89504e")), "X'89504e'");
         assert_eq!(sql_literal(Dialect::Mysql, ValueKind::Binary, &binary("89504e")), "0x89504e");
         assert_eq!(sql_literal(Dialect::Mysql, ValueKind::Binary, &binary("")), "''");
+        assert_eq!(sql_literal(Dialect::Sqlite, ValueKind::Binary, &binary("")), "X''");
+        assert_eq!(sql_literal(Dialect::Sqlite, ValueKind::Text, &text("ab\0cd")), "CAST(X'6162006364' AS TEXT)");
         assert_eq!(sql_literal(Dialect::Mysql, ValueKind::Text, &text("nul\0")), "'nul\\0'");
     }
 
@@ -469,7 +490,78 @@ mod tests {
         drop(partial);
 
         assert!(target.exists());
-        assert!(!directory.path().join("out.csv.partial").exists());
+        assert!(partial_files(&directory).is_empty());
+    }
+
+    fn partial_files(directory: &tempfile::TempDir) -> Vec<std::path::PathBuf> {
+        std::fs::read_dir(directory.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| path.to_string_lossy().ends_with(".partial"))
+            .collect()
+    }
+
+    #[test]
+    fn two_exports_to_one_file_write_partial_files_of_their_own() {
+        let directory = tempfile::tempdir().unwrap();
+        let target = directory.path().join("out.csv");
+        let (mut first, mut first_file) = PartialFile::create(target.to_str().unwrap()).unwrap();
+        let (mut second, mut second_file) = PartialFile::create(target.to_str().unwrap()).unwrap();
+
+        assert_ne!(first.partial_path(), second.partial_path());
+        std::io::Write::write_all(&mut second_file, b"second").unwrap();
+        second.commit().unwrap();
+        std::io::Write::write_all(&mut first_file, b"first").unwrap();
+        first.commit().unwrap();
+
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "first");
+        assert!(partial_files(&directory).is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_link_in_the_way_of_a_partial_file_is_left_alone() {
+        let directory = tempfile::tempdir().unwrap();
+        let marker = directory.path().join("unrelated.txt");
+        let target = directory.path().join("linked.csv");
+        std::fs::write(&marker, "must survive").unwrap();
+        std::os::unix::fs::symlink(&marker, directory.path().join("linked.csv.partial")).unwrap();
+
+        let (mut partial, mut file) = PartialFile::create(target.to_str().unwrap()).unwrap();
+        std::io::Write::write_all(&mut file, b"exported").unwrap();
+        partial.commit().unwrap();
+
+        assert_eq!(std::fs::read_to_string(&marker).unwrap(), "must survive");
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "exported");
+    }
+
+    #[test]
+    fn sqlite_literals_read_back_as_the_value_they_wrote() {
+        let connection = rusqlite::Connection::open_in_memory().unwrap();
+        connection.execute_batch("CREATE TABLE data(value)").unwrap();
+
+        for cell in [binary(""), binary("00ff"), text("ab\0cd"), text("it's")] {
+            let literal = sql_literal(Dialect::Sqlite, ValueKind::Text, &cell);
+            connection.execute_batch(&format!("INSERT INTO data VALUES ({literal})")).unwrap();
+        }
+
+        let rows: Vec<(String, Vec<u8>)> = connection
+            .prepare("SELECT typeof(value), CAST(value AS BLOB) FROM data ORDER BY rowid")
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .unwrap()
+            .map(|row| row.unwrap())
+            .collect();
+
+        assert_eq!(
+            rows,
+            vec![
+                ("blob".to_string(), vec![]),
+                ("blob".to_string(), vec![0, 255]),
+                ("text".to_string(), b"ab\0cd".to_vec()),
+                ("text".to_string(), b"it's".to_vec()),
+            ]
+        );
     }
 
     #[test]

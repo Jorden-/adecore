@@ -88,7 +88,7 @@ await session.export({
 
 `source` is a table (`{ kind: 'table', schema, table, where?, orderBy? }`) or one statement that reads (`{ kind: 'query', sql, schema? }`), starting with `SELECT`, `WITH`, `SHOW`, `PRAGMA`, `EXPLAIN`, `DESCRIBE`, `DESC`, `VALUES` or `TABLE`. The call resolves with `{ rows, bytes, elapsedMs }`.
 
-The helper streams the rows, so a table larger than memory still exports, and writes every value whole. It writes to `<path>.partial` and renames that at the end, so a failure or a cancel leaves an existing file at `path` alone. To cancel, abort the `signal` in the options; the table view has a Cancel button for that.
+The helper streams the rows, so a table larger than memory still exports, and writes every value whole. It writes to a partial file of its own beside `path` and renames that at the end, so a failure or a cancel leaves an existing file at `path` alone, and two exports to one `path` never write into each other: the one that finishes last is the file. To cancel, abort the `signal` in the options; the table view has a Cancel button for that.
 
 | Format | What it writes                                                                                                                                                                    |
 | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
