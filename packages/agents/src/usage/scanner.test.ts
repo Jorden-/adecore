@@ -81,7 +81,7 @@ describe('the usage scanner', () => {
         expect(warm.records()).toHaveLength(3);
     });
 
-    test('reads only what a file added and counts a Codex turn once', async () => {
+    test('parses added usage after verifying the committed bytes and counts a Codex turn once', async () => {
         const { home, codex, roots } = await workspace();
         const path = join(codex, 'grow.jsonl');
         const lines = [
@@ -156,6 +156,19 @@ describe('the usage scanner', () => {
         const report = await scanner.scan();
         expect(report.roots).toEqual([{ provider: 'claude', path: join(home, 'nowhere'), status: 'missing', message: null }]);
         expect(scanner.records()).toHaveLength(0);
+    });
+
+    test('detects a larger rewrite after an unchanged transcript header', async () => {
+        const { home, claude, roots } = await workspace();
+        const path = join(claude, 'a.jsonl');
+        const header = `${JSON.stringify({ type: 'session_meta', padding: 'x'.repeat(8192) })}\n`;
+        await writeFile(path, header + assistant('msg_1', 0, 40));
+        await new UsageScanner(home, roots).scan();
+
+        await writeFile(path, header + assistant('msg_2', 5, 60) + assistant('msg_3', 10, 15));
+        const reloaded = new UsageScanner(home, roots);
+        await reloaded.scan();
+        expect(reloaded.records().map((record) => record.dedupeKey)).toEqual(['msg_2', 'msg_3']);
     });
 
     test('a line still being written is counted once, not twice', async () => {

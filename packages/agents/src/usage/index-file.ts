@@ -19,7 +19,7 @@ export interface IndexedFile {
     tail: UsageRecord[];
     /* What the reader has to remember to carry on halfway through a Codex file. */
     codex: CodexParserState | null;
-    /* A hash of the first bytes up to the offset, which tells a file that grew from one rewritten larger; null in an older index. */
+    /* A versioned hash of all bytes before the offset; absent in indexes that cannot verify an append. */
     head: string | null;
 }
 

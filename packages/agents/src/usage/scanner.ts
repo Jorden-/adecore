@@ -30,16 +30,25 @@ async function readFrom(path: string, from: number): Promise<string> {
     }
 }
 
-// How much of the start of a file tells an append from a rewrite; a transcript's first line names its session.
-const HEAD_BYTES = 4096;
+const HASH_CHUNK_BYTES = 65536;
 
-/* A hash of the first bytes of a file, up to `length` and no more than `HEAD_BYTES`. */
+/* Verifies every committed byte: a transcript can be rewritten after an unchanged session header. */
 async function headOf(path: string, length: number): Promise<string> {
     const handle = await open(path, 'r');
     try {
-        const buffer = Buffer.alloc(Math.min(length, HEAD_BYTES));
-        const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
-        return createHash('sha256').update(buffer.subarray(0, bytesRead)).digest('base64');
+        const buffer = Buffer.alloc(Math.min(length, HASH_CHUNK_BYTES));
+        const hash = createHash('sha256');
+        let offset = 0;
+        while (offset < length) {
+            const { bytesRead } = await handle.read(buffer, 0, Math.min(buffer.length, length - offset), offset);
+            if (bytesRead === 0) {
+                break;
+            }
+            hash.update(buffer.subarray(0, bytesRead));
+            offset += bytesRead;
+        }
+        // Older indexes hashed only the first 4 KB; they cannot establish that the rest stayed unchanged.
+        return `sha256:${hash.digest('base64')}`;
     } finally {
         await handle.close();
     }
@@ -153,7 +162,7 @@ function withAccount(records: UsageRecord[], accountOf: AccountOf): UsageRecord[
 }
 
 /*
- * Reads only what a transcript appended since the last scan, and starts a file over once it was
+ * Parses only what a transcript appended since the last scan, and starts a file over once it was
  * rewritten or cut. A deleted transcript keeps its totals, since its usage still happened.
  */
 export class UsageScanner {
@@ -262,7 +271,7 @@ export class UsageScanner {
             known !== undefined &&
             known.provider === provider &&
             info.size > known.size &&
-            known.head !== null &&
+            known.head?.startsWith('sha256:') === true &&
             (await headOf(path, known.offset)) === known.head;
         const from = grown ? known.offset : 0;
         const text = await readFrom(path, from);
