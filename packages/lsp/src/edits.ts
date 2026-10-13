@@ -18,11 +18,15 @@ export interface PlannedDocumentEdit {
 const CR = 13;
 const LF = 10;
 
-/* A line ends at `\n`, `\r\n` or a lone `\r`, which is how the protocol counts lines. */
-export function offsetAt(text: string, position: Position): number {
+function checkPosition(position: Position): void {
     if (!Number.isInteger(position.line) || !Number.isInteger(position.character) || position.line < 0 || position.character < 0) {
         throw new LspError('Invalid edit position');
     }
+}
+
+/* A line ends at `\n`, `\r\n` or a lone `\r`, which is how the protocol counts lines. */
+export function offsetAt(text: string, position: Position): number {
+    checkPosition(position);
     let line = 0;
     let offset = 0;
     while (line < position.line && offset < text.length) {
@@ -81,12 +85,40 @@ export function endPosition(text: string): Position {
     return positionAt(text, text.length);
 }
 
+/* `offsetAt` for many positions in one text: the starts of its lines are found once instead of on every call. */
+function offsetsIn(text: string): (position: Position) => number {
+    const starts = [0];
+    for (let i = 0; i < text.length; i++) {
+        const code = text.charCodeAt(i);
+        if (code === CR && text.charCodeAt(i + 1) === LF) {
+            i++;
+            starts.push(i + 1);
+        } else if (code === CR || code === LF) {
+            starts.push(i + 1);
+        }
+    }
+    return (position) => {
+        checkPosition(position);
+        const start = starts[position.line];
+        if (start === undefined) {
+            throw new LspError('Edit line is outside the document');
+        }
+        const next = starts[position.line + 1];
+        const end = next === undefined ? text.length : next - (text.charCodeAt(next - 1) === LF && text.charCodeAt(next - 2) === CR ? 2 : 1);
+        if (start + position.character > end) {
+            throw new LspError('Edit character is outside the line');
+        }
+        return start + position.character;
+    };
+}
+
 /* Edits are simultaneous and in the coordinates of `text`; two inserts at one place keep their order. */
 export function applyTextEdits(text: string, edits: readonly TextEdit[]): string {
+    const offsetOf = offsetsIn(text);
     const spans = edits
         .map((edit, index) => ({
-            start: offsetAt(text, edit.range.start),
-            end: offsetAt(text, edit.range.end),
+            start: offsetOf(edit.range.start),
+            end: offsetOf(edit.range.end),
             text: edit.newText,
             index
         }))

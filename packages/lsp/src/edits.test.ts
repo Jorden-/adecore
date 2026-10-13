@@ -77,6 +77,36 @@ describe('workspace edit planning', () => {
         ).toBe('abx');
     });
 
+    it('finds every position the way offsetAt does, line endings and the end of the text included', () => {
+        const text = 'ab\r\n\rc\n\n🙂d\r';
+        for (let line = 0; line <= 6; line++) {
+            for (let character = 0; character <= 3; character++) {
+                const position = { line, character };
+                let expected: string;
+                try {
+                    const offset = offsetAt(text, position);
+                    expected = `${text.slice(0, offset)}|${text.slice(offset)}`;
+                } catch (e) {
+                    expected = String(e);
+                }
+                let received: string;
+                try {
+                    received = applyTextEdits(text, [{ range: { start: position, end: position }, newText: '|' }]);
+                } catch (e) {
+                    received = String(e);
+                }
+                expect(received).toBe(expected);
+            }
+        }
+    });
+
+    it('applies an edit on every line of a long file in about linear time', () => {
+        const count = 50_000;
+        const text = 'abcdefghij\n'.repeat(count);
+        const edits = Array.from({ length: count }, (_, line) => ({ range: { start: { line, character: 0 }, end: { line, character: 1 } }, newText: 'z' }));
+        expect(applyTextEdits(text, edits)).toBe('zbcdefghij\n'.repeat(count));
+    });
+
     it('rejects overlap, invalid ranges, version mismatches and unhandled file operations', () => {
         const edit = { range: { start: origin, end: { line: 0, character: 2 } }, newText: 'new' };
         expect(() => applyTextEdits('old', [edit, edit])).toThrow('overlap');
