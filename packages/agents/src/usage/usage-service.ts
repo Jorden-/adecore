@@ -135,14 +135,19 @@ export class UsageService {
     }
 
     private async runScan(): Promise<void> {
-        // The table and the rate are fetched beside the walk, so a slow answer never holds up the scan.
+        // A fetch never holds up the scan or the answer waiting on it; a table or rate it brings in is announced on its own.
+        void Promise.all([this.prices.ensure(), this.rates.ensure()]).then((fetched) => {
+            if (fetched.includes(true)) {
+                this.sinks.emit({ event: 'usage.changed', payload: { scannedAt: this.report.at } });
+            }
+        });
         const [report] = await Promise.all([
             this.scanner.scan().catch((e: unknown) => {
                 console.error('The usage scan failed:', errorText(e));
                 return null;
             }),
-            this.prices.ensure(),
-            this.rates.ensure()
+            this.prices.load(),
+            this.rates.load()
         ]);
         this.failed = report === null;
         if (report === null) {

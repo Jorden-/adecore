@@ -132,6 +132,24 @@ describe('the usage scanner', () => {
         expect(scanner.records()).toHaveLength(1);
     });
 
+    test('reads a file rewritten to a larger one from the start instead of as an append', async () => {
+        const { home, claude, roots } = await workspace();
+        const path = join(claude, 'a.jsonl');
+        await writeFile(path, assistant('msg_1', 0, 40));
+        const scanner = new UsageScanner(home, roots);
+        await scanner.scan();
+
+        await writeFile(path, assistant('msg_2', 5, 60) + assistant('msg_3', 10, 15));
+        await scanner.scan();
+        expect(scanner.records().map((record) => record.dedupeKey)).toEqual(['msg_2', 'msg_3']);
+
+        // An index read back from disk knows the start of the file just as well.
+        await writeFile(path, assistant('msg_4', 15, 25) + assistant('msg_5', 20, 35) + assistant('msg_6', 25, 45));
+        const reloaded = new UsageScanner(home, roots);
+        await reloaded.scan();
+        expect(reloaded.records().map((record) => record.dedupeKey)).toEqual(['msg_4', 'msg_5', 'msg_6']);
+    });
+
     test('says which root is not there instead of failing the pass', async () => {
         const { home } = await workspace();
         const scanner = new UsageScanner(home, [{ provider: 'claude', path: join(home, 'nowhere') }]);

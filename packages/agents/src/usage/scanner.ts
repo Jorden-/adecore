@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdir, open, readFile, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { UsageRoot } from '@adecore/agent-contracts';
@@ -24,6 +25,21 @@ async function readFrom(path: string, from: number): Promise<string> {
             filled += bytesRead;
         }
         return buffer.subarray(0, filled).toString('utf8');
+    } finally {
+        await handle.close();
+    }
+}
+
+// How much of the start of a file tells an append from a rewrite; a transcript's first line names its session.
+const HEAD_BYTES = 4096;
+
+/* A hash of the first bytes of a file, up to `length` and no more than `HEAD_BYTES`. */
+async function headOf(path: string, length: number): Promise<string> {
+    const handle = await open(path, 'r');
+    try {
+        const buffer = Buffer.alloc(Math.min(length, HEAD_BYTES));
+        const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+        return createHash('sha256').update(buffer.subarray(0, bytesRead)).digest('base64');
     } finally {
         await handle.close();
     }
@@ -241,7 +257,13 @@ export class UsageScanner {
         if (known !== undefined && known.provider === provider && known.size === info.size && known.mtimeMs === info.mtimeMs) {
             return false;
         }
-        const grown = known !== undefined && known.provider === provider && info.size > known.size;
+        // A file only counts as grown while it starts the way it did; one rewritten larger is read again from the start.
+        const grown =
+            known !== undefined &&
+            known.provider === provider &&
+            info.size > known.size &&
+            known.head !== null &&
+            (await headOf(path, known.offset)) === known.head;
         const from = grown ? known.offset : 0;
         const text = await readFrom(path, from);
         const parsed = parseChunk(text, provider, from, grown ? known.codex : null);
@@ -254,7 +276,8 @@ export class UsageScanner {
             // Folding here keeps the streaming copies of one message out of the index entirely.
             records: foldByKey([...before, ...withAccount(parsed.records, accountOf)]),
             tail: withAccount(parsed.tail, accountOf),
-            codex: parsed.codex
+            codex: parsed.codex,
+            head: await headOf(path, parsed.offset)
         };
         this.index.set(path, entry);
         this.dirty = true;

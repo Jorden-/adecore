@@ -19,6 +19,8 @@ export interface IndexedFile {
     tail: UsageRecord[];
     /* What the reader has to remember to carry on halfway through a Codex file. */
     codex: CodexParserState | null;
+    /* A hash of the first bytes up to the offset, which tells a file that grew from one rewritten larger; null in an older index. */
+    head: string | null;
 }
 
 export type UsageIndex = Map<string, IndexedFile>;
@@ -39,6 +41,7 @@ interface FileRow {
     r: RecordRow[];
     t: RecordRow[];
     c: CodexParserState | null;
+    h?: string;
 }
 
 interface IndexFile {
@@ -88,7 +91,16 @@ export function encodeIndex(index: UsageIndex): string {
         record.account === undefined ? 0 : accounts.index(record.account) + 1
     ];
     for (const [path, file] of index) {
-        files[path] = { p: file.provider, s: file.size, m: file.mtimeMs, o: file.offset, c: file.codex, r: file.records.map(row), t: file.tail.map(row) };
+        files[path] = {
+            p: file.provider,
+            s: file.size,
+            m: file.mtimeMs,
+            o: file.offset,
+            c: file.codex,
+            r: file.records.map(row),
+            t: file.tail.map(row),
+            ...(file.head === null ? {} : { h: file.head })
+        };
     }
     const document: IndexFile = {
         version: INDEX_VERSION,
@@ -171,7 +183,16 @@ export function decodeIndex(text: string): UsageIndex {
         const records = decode(file.r);
         const tail = decode(Array.isArray(file.t) ? file.t : []);
         if (!broken) {
-            index.set(path, { provider: file.p, size: file.s, mtimeMs: file.m, offset: file.o, records, tail, codex: file.c ?? null });
+            index.set(path, {
+                provider: file.p,
+                size: file.s,
+                mtimeMs: file.m,
+                offset: file.o,
+                records,
+                tail,
+                codex: file.c ?? null,
+                head: typeof file.h === 'string' ? file.h : null
+            });
         }
     }
     return index;

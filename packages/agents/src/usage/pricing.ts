@@ -164,8 +164,8 @@ export class PriceBook {
     private table: PriceTable;
     private source: UsagePricing['source'] = 'snapshot';
     private fetchedAt: number | null = null;
-    private loadedFromDisk = false;
-    private inFlight: Promise<void> | null = null;
+    private stored: Promise<void> | null = null;
+    private inFlight: Promise<boolean> | null = null;
 
     constructor(home: string, allowFetch = true) {
         this.home = home;
@@ -181,11 +181,19 @@ export class PriceBook {
         return lookupPrice(this.table, model);
     }
 
-    /* Refreshes at most one table at a time; a second caller waits for the first one's answer. */
-    ensure(): Promise<void> {
-        this.inFlight ??= this.refresh().finally(() => {
-            this.inFlight = null;
-        });
+    /* Reads the table an earlier run stored, once; asking LiteLLM is left to `ensure`. */
+    load(): Promise<void> {
+        this.stored ??= this.readStored();
+        return this.stored;
+    }
+
+    /* Refreshes at most one table at a time, a second caller waiting for the first one's answer; true when a newer table came in. */
+    ensure(): Promise<boolean> {
+        this.inFlight ??= this.load()
+            .then(() => this.fetchFresh())
+            .finally(() => {
+                this.inFlight = null;
+            });
         return this.inFlight;
     }
 
@@ -193,26 +201,27 @@ export class PriceBook {
         return join(this.home, 'usage', 'prices.json');
     }
 
-    private async refresh(): Promise<void> {
-        if (!this.loadedFromDisk) {
-            this.loadedFromDisk = true;
-            try {
-                const snapshot = JSON.parse(await readFile(this.file, 'utf8')) as Snapshot;
-                const table = parsePriceTable(snapshot?.document);
-                if (table.size > 0 && typeof snapshot.fetchedAt === 'number') {
-                    this.table = table;
-                    this.source = 'litellm';
-                    this.fetchedAt = snapshot.fetchedAt;
-                }
-            } catch (e) {
-                if (!isNotFound(e)) {
-                    console.warn('The stored price table would not read; using the bundled one:', errorText(e));
-                }
+    private async readStored(): Promise<void> {
+        try {
+            const snapshot = JSON.parse(await readFile(this.file, 'utf8')) as Snapshot;
+            const table = parsePriceTable(snapshot?.document);
+            if (table.size > 0 && typeof snapshot.fetchedAt === 'number') {
+                this.table = table;
+                this.source = 'litellm';
+                this.fetchedAt = snapshot.fetchedAt;
+            }
+        } catch (e) {
+            if (!isNotFound(e)) {
+                console.warn('The stored price table would not read; using the bundled one:', errorText(e));
             }
         }
+    }
+
+    private async fetchFresh(): Promise<boolean> {
         if (!this.allowFetch || (this.fetchedAt !== null && Date.now() - this.fetchedAt < TTL_MS)) {
-            return;
+            return false;
         }
+        let changed = false;
         try {
             const response = await fetch(LITELLM_URL, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
             if (!response.ok) {
@@ -226,11 +235,13 @@ export class PriceBook {
             this.table = table;
             this.source = 'litellm';
             this.fetchedAt = Date.now();
+            changed = true;
             await mkdir(join(this.home, 'usage'), { recursive: true, mode: 0o700 });
             await writeAtomic(this.file, JSON.stringify({ fetchedAt: this.fetchedAt, document } satisfies Snapshot));
         } catch (e) {
             // Whatever is loaded keeps pricing; a table that could not be refreshed is not a failure.
             console.warn('Could not refresh the price table:', errorText(e));
         }
+        return changed;
     }
 }

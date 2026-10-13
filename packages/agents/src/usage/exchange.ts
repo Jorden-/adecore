@@ -32,8 +32,8 @@ export class ExchangeRates {
     private readonly home: string;
     private readonly allowFetch: boolean;
     private rate: UsageRate | null = null;
-    private loadedFromDisk = false;
-    private inFlight: Promise<void> | null = null;
+    private stored: Promise<void> | null = null;
+    private inFlight: Promise<boolean> | null = null;
 
     constructor(home: string, allowFetch = true) {
         this.home = home;
@@ -44,11 +44,19 @@ export class ExchangeRates {
         return this.rate;
     }
 
-    /* Refreshes at most one rate at a time; a second caller waits for the first one's answer. */
-    ensure(): Promise<void> {
-        this.inFlight ??= this.refresh().finally(() => {
-            this.inFlight = null;
-        });
+    /* Reads the rate an earlier run stored, once; asking for a new one is left to `ensure`. */
+    load(): Promise<void> {
+        this.stored ??= this.readStored();
+        return this.stored;
+    }
+
+    /* Refreshes at most one rate at a time, a second caller waiting for the first one's answer; true when a newer rate came in. */
+    ensure(): Promise<boolean> {
+        this.inFlight ??= this.load()
+            .then(() => this.fetchFresh())
+            .finally(() => {
+                this.inFlight = null;
+            });
         return this.inFlight;
     }
 
@@ -56,23 +64,24 @@ export class ExchangeRates {
         return join(this.home, 'usage', 'exchange-rate.json');
     }
 
-    private async refresh(): Promise<void> {
-        if (!this.loadedFromDisk) {
-            this.loadedFromDisk = true;
-            try {
-                const stored = JSON.parse(await readFile(this.file, 'utf8')) as UsageRate;
-                if (stored?.currency === TARGET_CURRENCY && typeof stored.rate === 'number' && stored.rate > 0) {
-                    this.rate = stored;
-                }
-            } catch (e) {
-                if (!isNotFound(e)) {
-                    console.warn('The stored exchange rate would not read; asking for a new one:', errorText(e));
-                }
+    private async readStored(): Promise<void> {
+        try {
+            const stored = JSON.parse(await readFile(this.file, 'utf8')) as UsageRate;
+            if (stored?.currency === TARGET_CURRENCY && typeof stored.rate === 'number' && stored.rate > 0) {
+                this.rate = stored;
+            }
+        } catch (e) {
+            if (!isNotFound(e)) {
+                console.warn('The stored exchange rate would not read; asking for a new one:', errorText(e));
             }
         }
+    }
+
+    private async fetchFresh(): Promise<boolean> {
         if (!this.allowFetch || (this.rate !== null && Date.now() - this.rate.fetchedAt < TTL_MS)) {
-            return;
+            return false;
         }
+        let changed = false;
         try {
             const response = await fetch(`${FRANKFURTER_URL}?from=USD&to=${TARGET_CURRENCY}`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
             if (!response.ok) {
@@ -83,11 +92,13 @@ export class ExchangeRates {
                 throw new Error(`The answer carried no ${TARGET_CURRENCY} rate`);
             }
             this.rate = { ...parsed, fetchedAt: Date.now() };
+            changed = true;
             await mkdir(join(this.home, 'usage'), { recursive: true, mode: 0o700 });
             await writeAtomic(this.file, JSON.stringify(this.rate));
         } catch (e) {
             // Yesterday's rate still converts; a rate that could not be refreshed is not a failure.
             console.warn('Could not refresh the exchange rate:', errorText(e));
         }
+        return changed;
     }
 }
