@@ -75,7 +75,7 @@ Without `exists`, what `read` has no text for is of unknown existence. A move or
 
 ## Problems
 
-`project.problems` is a `ProjectProblems` store of every file's problems, for a problems panel. `subscribe` and `getSnapshot` fit `useSyncExternalStore`. A `ProblemFile` has a `path` and its `rows`; a `ProblemRow` has the `diagnostic` and the `server` that reported it. Rows go worst first, then in file order, and files by path. Hints stay in the editor and are left out.
+`project.problems` is a `ProjectProblems` store of every file's problems, for a problems panel. `subscribe` and `getSnapshot` fit `useSyncExternalStore`. A `ProblemFile` has a `path` and its `rows`; a `ProblemRow` has the `diagnostic` and the `server` that reported it. Rows go worst first, then in file order, and files by path. Hints stay in the editor and are left out. A report sorts only the rows of its own file, the snapshot is made when it is first read, and a clean file reported clean again tells nobody.
 
 ```tsx
 const files = useSyncExternalStore(project.problems.subscribe, project.problems.getSnapshot);

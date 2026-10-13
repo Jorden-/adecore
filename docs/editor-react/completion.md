@@ -6,7 +6,7 @@
 
 Typing an identifier character, or a trigger character the service lists in the `triggerCharacters` of its completion options, asks for suggestions after a pause of 80 milliseconds. Each later character filters the list that is there, unless the service marked it incomplete; then the list is asked again. `completion.invoke()` asks at once, as Ctrl+Space does.
 
-`CompletionPopup` draws the list: the matched letters, a letter and color per kind, and the documentation of the active row beside it, resolved through `completionItem/resolve` when the service supports it. The keys while it is open:
+`CompletionPopup` draws the list: the matched letters, a letter and color per kind, and the documentation of the active row beside it, resolved through `completionItem/resolve` when the service supports it. A complete list is never asked for again while it is open; only when the service turns down a resolve because the text moved on is the list asked for at the new text, and an accept does the same. A failed accept is told through the host's `notify`, so `accept()` never rejects. The keys while it is open:
 
 | Key                | What it does                                                                                        |
 | ------------------ | --------------------------------------------------------------------------------------------------- |

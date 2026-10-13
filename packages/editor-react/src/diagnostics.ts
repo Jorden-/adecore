@@ -1,6 +1,7 @@
 import type { Diagnostic } from '@adecore/lsp';
 import type { EditorContentChange, EditorPosition, EditorReveal } from '@adecore/editor';
 import type { EditorLanguage } from './editor-language.ts';
+import { sameRange } from './hover-content.ts';
 import { isShortcut } from './shortcut-keys.ts';
 import { comparePositions, markerOf, neighborProblem, problemCountsOf, problemsAt, severityOf, shiftRange, type Problem } from './diagnostics-model.ts';
 
@@ -27,7 +28,7 @@ export class DiagnosticsFeature {
         const reports = project.service.onDiagnostics((report) => {
             if (report.uri === uri) {
                 this.reports.set(report.source, report.diagnostics);
-                this.rebuild(true);
+                this.rebuild();
             }
         });
         const edits = editor.onTextChange((change) => this.shift(change.changes));
@@ -99,23 +100,37 @@ export class DiagnosticsFeature {
         editor.announce(project.i18n.t('editor:language.announce.problem', { severity, message: problem.diagnostic.message }));
     }
 
+    /* The problems follow the edit as the markers do. Their number does not change, so nobody is told. */
     private shift(changes: readonly EditorContentChange[]): void {
+        let moved = false;
         for (const [server, diagnostics] of this.reports) {
-            this.reports.set(
-                server,
-                diagnostics.map((diagnostic) => ({ ...diagnostic, range: shiftRange(diagnostic.range, changes) }))
-            );
+            let shifted: Diagnostic[] | null = null;
+            for (const [index, diagnostic] of diagnostics.entries()) {
+                const range = shiftRange(diagnostic.range, changes);
+                if (!sameRange(range, diagnostic.range)) {
+                    shifted ??= [...diagnostics];
+                    shifted[index] = { ...diagnostic, range };
+                }
+            }
+            if (shifted !== null) {
+                this.reports.set(server, shifted);
+                moved = true;
+            }
         }
-        this.rebuild(false);
+        if (moved) {
+            this.collect();
+        }
     }
 
-    private rebuild(draw: boolean): void {
-        this.list = [...this.reports].flatMap(([server, diagnostics]) => diagnostics.map((diagnostic): Problem => ({ diagnostic, server })));
-        if (draw) {
-            this.language.editor.setMarkers(this.list.map((problem) => markerOf(problem.diagnostic)));
-        }
+    private rebuild(): void {
+        this.collect();
+        this.language.editor.setMarkers(this.list.map((problem) => markerOf(problem.diagnostic)));
         for (const listener of [...this.listeners]) {
             listener();
         }
+    }
+
+    private collect(): void {
+        this.list = [...this.reports].flatMap(([server, diagnostics]) => diagnostics.map((diagnostic): Problem => ({ diagnostic, server })));
     }
 }

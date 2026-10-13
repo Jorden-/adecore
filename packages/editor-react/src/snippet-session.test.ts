@@ -689,15 +689,14 @@ test('an aborted incomplete refresh cannot close its newer refresh', async () =>
     mounted.timers.advance(151);
     mounted.type('r');
     mounted.timers.advance(151);
-    expect(replies).toHaveLength(4);
-    replies[2]!();
-    await new Promise<void>((done) => setImmediate(done));
-    expect(mounted.language.completion.isOpen).toBe(true);
-    replies[3]!();
+    // One request per keystroke for an incomplete list; the one for `r` aborted the one for `o`.
+    expect(replies).toHaveLength(2);
+    replies[1]!();
     await new Promise<void>((done) => setImmediate(done));
     expect(mounted.language.completion.isOpen).toBe(true);
     replies[0]!();
-    replies[1]!();
+    await new Promise<void>((done) => setImmediate(done));
+    expect(mounted.language.completion.isOpen).toBe(true);
 });
 
 test('replacing an indented parent removes its trailing empty child', async () => {

@@ -1,13 +1,13 @@
 import { createPortal } from 'react-dom';
-import { useSyncExternalStore, type MouseEvent } from 'react';
+import { memo, useSyncExternalStore, type MouseEvent } from 'react';
+import type { DocComment } from '@adecore/editor';
 import { useTranslation } from 'react-i18next';
 import type { EditorLanguage } from './editor-language.ts';
-import { DOC_LINK_PREFIX, sectionsOf, type DocTagEntry } from './doc-comment-model.ts';
+import { DOC_LINK_PREFIX, sectionsOf, type DocTagEntry, type ParsedDocComment } from './doc-comment-model.ts';
 import { markdownParts } from './hover-content.ts';
 import { Signature } from './HoverSections.tsx';
 import { shikiLanguageOf } from './language-ids.ts';
 import { Markdown } from './Markdown.tsx';
-import type { RenderedDocEntry } from './rendered-docs.ts';
 
 const LINK = /\[([^\]]*)\]\(#doc-link:[^)]*\)/g;
 const KNOWN = new Set([
@@ -83,12 +83,18 @@ function TagRow({ tag, language, linkable, spaced }: { tag: DocTagEntry; languag
     );
 }
 
-export function RenderedDocBlock({ language, entry }: { language: EditorLanguage; entry: RenderedDocEntry }) {
+interface DocBlockProps {
+    language: EditorLanguage;
+    comment: DocComment;
+    parsed: ParsedDocComment;
+    linkable: boolean;
+}
+
+function DocBlock({ language, comment, parsed, linkable }: DocBlockProps) {
     const { t } = useTranslation('editor');
     const feature = language.renderedDocs;
-    const { description, tags } = entry.parsed;
+    const { description, tags } = parsed;
     const highlighter = shikiLanguageOf(language.languageId);
-    const linkable = feature.canFollow;
     const sections = sectionsOf(tags);
     const deprecated = sections.find((section) => section.name === 'deprecated');
     const shown = sections.filter((section) => section.name !== 'deprecated');
@@ -106,7 +112,7 @@ export function RenderedDocBlock({ language, entry }: { language: EditorLanguage
             return;
         }
         if (href.startsWith(DOC_LINK_PREFIX)) {
-            feature.follow(decodeURIComponent(href.slice(DOC_LINK_PREFIX.length)), entry.comment);
+            feature.follow(decodeURIComponent(href.slice(DOC_LINK_PREFIX.length)), comment);
         } else if (/^(https?:|mailto:)/i.test(href)) {
             window.open(href, '_blank', 'noopener,noreferrer');
         }
@@ -143,6 +149,9 @@ export function RenderedDocBlock({ language, entry }: { language: EditorLanguage
     );
 }
 
+/* Drawn again only when its comment or its links change, since every scroll of the editor draws the popups again. */
+export const RenderedDocBlock = memo(DocBlock);
+
 /*
  * The documentation comments the editor drew as rows, filled with their formatted text. It portals into
  * the element the editor made for each row, so the editor decides what is in view; a comment is parsed
@@ -151,5 +160,18 @@ export function RenderedDocBlock({ language, entry }: { language: EditorLanguage
 export function RenderedDocs({ language }: { language: EditorLanguage }) {
     const feature = language.renderedDocs;
     useSyncExternalStore(feature.subscribe, feature.getVersion, feature.getVersion);
-    return <>{feature.entries().map((entry) => createPortal(<RenderedDocBlock language={language} entry={entry} />, entry.container, entry.id))}</>;
+    const linkable = feature.canFollow;
+    return (
+        <>
+            {feature
+                .entries()
+                .map((entry) =>
+                    createPortal(
+                        <RenderedDocBlock language={language} comment={entry.comment} parsed={entry.parsed} linkable={linkable} />,
+                        entry.container,
+                        entry.id
+                    )
+                )}
+        </>
+    );
 }

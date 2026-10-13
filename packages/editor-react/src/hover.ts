@@ -14,6 +14,11 @@ const HIDE_DELAY_MS = 250;
 const COUNT_DELAY_MS = 500;
 const TOAST_ID = 'language-hover';
 
+export interface HoverSettings {
+    /* Counts the references of the symbol on a card that stays up, which can be a search over the whole project; on unless false. */
+    readonly referenceCount?: boolean;
+}
+
 /*
  * The card under a character the pointer rests on: the problems there, and what the language servers
  * say about the symbol. It opens after the pointer has stayed a moment, stays while the pointer is on
@@ -28,6 +33,7 @@ export class HoverFeature {
     private hideTimer: unknown;
     private countTimer: unknown;
     private inCard = false;
+    private referenceCount = true;
     /* Counts every request, so an answer that arrives after the pointer moved on is dropped. */
     private request = 0;
     private lookup: AbortController | null = null;
@@ -80,6 +86,13 @@ export class HoverFeature {
             }
             this.hide();
         });
+    }
+
+    configure(settings: HoverSettings): void {
+        this.referenceCount = settings.referenceCount !== false;
+        if (!this.referenceCount) {
+            this.timers.clear(this.countTimer);
+        }
     }
 
     /* The pointer entered or left the card, which is where a link in it is clicked. */
@@ -236,7 +249,7 @@ export class HoverFeature {
         }
         this.pinned = pinned;
         this.present(position, problems, info, problems[0]?.diagnostic.range ?? range);
-        if (info !== null) {
+        if (info !== null && this.referenceCount) {
             this.scheduleCount(position, request, controller.signal);
         }
     }
@@ -270,7 +283,7 @@ export class HoverFeature {
     /* How many places use the symbol, which can take a while in a large project and so arrives after the card does. */
     private async count(position: EditorPosition, key: string, request: number, signal: AbortSignal): Promise<void> {
         const { service } = this.language.project;
-        if (request !== this.request || !service.supports('textDocument/references', this.language.uri)) {
+        if (request !== this.request || !this.referenceCount || !service.supports('textDocument/references', this.language.uri)) {
             return;
         }
         const found = await service.references(this.language.uri, position, false, { signal }).catch(() => null);

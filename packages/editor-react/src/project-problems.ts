@@ -30,9 +30,13 @@ export function compareRows(left: ProblemRow, right: ProblemRow): number {
  */
 export class ProjectProblems {
     private readonly reports = new Map<string, Map<string, readonly Diagnostic[]>>();
+    private readonly files = new Map<string, ProblemFile>();
     private readonly listeners = new Set<() => void>();
     private readonly stop: () => void;
-    private snapshot: readonly ProblemFile[] = [];
+    /* The paths of `files` in order; null once a file came or went. */
+    private order: string[] | null = [];
+    /* Made on first read after a report, so a project nobody lists does no sorting. */
+    private snapshot: readonly ProblemFile[] | null = [];
 
     constructor(service: LanguageService, pathOf: (uri: string) => string = (uri) => uri) {
         const subscription = service.onDiagnostics((report) => this.report(pathOf(report.uri), report.source, report.diagnostics));
@@ -42,6 +46,10 @@ export class ProjectProblems {
     report(path: string, server: string, diagnostics: readonly Diagnostic[]): void {
         const kept = diagnostics.filter((diagnostic) => severityOf(diagnostic) !== 'hint');
         const servers = this.reports.get(path) ?? new Map<string, readonly Diagnostic[]>();
+        if (kept.length === 0 && !servers.has(server)) {
+            // A clean file reported clean again, as servers do after every edit.
+            return;
+        }
         if (kept.length === 0) {
             servers.delete(server);
         } else {
@@ -49,22 +57,30 @@ export class ProjectProblems {
         }
         if (servers.size === 0) {
             this.reports.delete(path);
+            this.files.delete(path);
+            this.order = null;
         } else {
+            if (!this.files.has(path)) {
+                this.order = null;
+            }
             this.reports.set(path, servers);
+            const rows = [...servers].flatMap(([name, list]) => list.map((diagnostic): ProblemRow => ({ diagnostic, server: name }))).sort(compareRows);
+            this.files.set(path, { path, rows });
         }
-        this.snapshot = [...this.reports]
-            .map(([file, byServer]): ProblemFile => ({
-                path: file,
-                rows: [...byServer].flatMap(([name, list]) => list.map((diagnostic): ProblemRow => ({ diagnostic, server: name }))).sort(compareRows)
-            }))
-            .sort((left, right) => left.path.localeCompare(right.path));
+        this.snapshot = null;
         for (const listener of [...this.listeners]) {
             listener();
         }
     }
 
     /* The same array until the next report, which is what a store a component reads must hand out. */
-    getSnapshot = (): readonly ProblemFile[] => this.snapshot;
+    getSnapshot = (): readonly ProblemFile[] => {
+        if (this.snapshot === null) {
+            this.order ??= [...this.files.keys()].sort((left, right) => left.localeCompare(right));
+            this.snapshot = this.order.map((path) => this.files.get(path)!);
+        }
+        return this.snapshot;
+    };
 
     subscribe = (listener: () => void): (() => void) => {
         this.listeners.add(listener);

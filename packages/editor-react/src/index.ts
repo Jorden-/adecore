@@ -44,6 +44,7 @@ export type { ProjectFiles, StagedFile, WorkspaceEditHost } from './workspace-ed
 export { useProblemCounts } from './use-problem-counts.ts';
 export type { ProblemCounts } from './diagnostics.ts';
 export type { BlameSource, CodeVisionSettings } from './code-vision.ts';
+export type { HoverSettings } from './hover.ts';
 export type { Problem } from './diagnostics-model.ts';
 export type {
     PopupState,

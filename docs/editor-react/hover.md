@@ -6,7 +6,7 @@
 
 Resting the pointer on a name for 300 milliseconds asks the service for its hover; the card closes 250 milliseconds after the pointer leaves the name and the card. `hover.quickInfo()` opens the card for the caret, as Ctrl+J on a Mac and Ctrl+Q elsewhere do, and it stays until the caret moves. `hover.keep()` pins the open card, `hover.hide()` closes it, and `hover.showRange(range)` opens an empty card over a range for the app to fill.
 
-`HoverCard` splits the answer into its parts: the signature in code, the documentation as Markdown with its `@param` and other tags set apart, a browser-support baseline where the server gives one, and the problems at that place. A type name in the signature is a link to its definition, and the card counts the references of the name after half a second, where the service supports them. Markdown is GitHub-flavored without raw HTML. Code is colored through [`EditorRenderingProvider`](/editor-react/editor-view#editorrenderingprovider).
+`HoverCard` splits the answer into its parts: the signature in code, the documentation as Markdown with its `@param` and other tags set apart, a browser-support baseline where the server gives one, and the problems at that place. A type name in the signature is a link to its definition, and the card counts the references of the name after half a second, where the service supports them. That count can be a search over the whole project, so `hover.configure({ referenceCount: false })` (a `HoverSettings`) leaves it out; it is on unless `false`. Markdown is GitHub-flavored without raw HTML. Code is colored through [`EditorRenderingProvider`](/editor-react/editor-view#editorrenderingprovider).
 
 ## Problems
 
@@ -19,7 +19,7 @@ The `DiagnosticsFeature` (`language.diagnostics`) turns the service's diagnostic
 | `at(position)`       | The problems at a position                                                |
 | `step(direction)`    | Puts the caret on the next or previous problem, as F2 and Alt+Shift+F2 do |
 | `goToFirst()`        | Puts the caret on the first problem                                       |
-| `onChange(listener)` | Called when the problems change                                           |
+| `onChange(listener)` | Called when a report changes the problems; an edit only moves them        |
 
 `useProblemCounts(language)` reads `counts()` in a component and renders again when it changes; `null` gives zeros. For the problems of the whole project, see [`ProjectProblems`](/editor-react/project#problems).
 

@@ -12,10 +12,10 @@ function markup(source: string, options: { php?: boolean; follow?: boolean } = {
     const language = {
         apple: false,
         languageId: options.php === true ? 'php' : 'typescript',
-        renderedDocs: { canFollow: options.follow ?? true, follow: () => {} }
+        renderedDocs: { follow: () => {} }
     } as unknown as EditorLanguage;
-    const entry = { id: 'docs-0', comment: comment!, parsed: parseDocComment(comment!.body, { php: options.php }), container: null as unknown as HTMLElement };
-    return renderToStaticMarkup(createElement(RenderedDocBlock, { language, entry }));
+    const parsed = parseDocComment(comment!.body, { php: options.php });
+    return renderToStaticMarkup(createElement(RenderedDocBlock, { language, comment: comment!, parsed, linkable: options.follow ?? true }));
 }
 
 const SOURCE = [

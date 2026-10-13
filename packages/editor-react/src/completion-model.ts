@@ -1,3 +1,4 @@
+import { labelCollator } from '@adecore/ui/format';
 import type { SnippetTransformJob } from './snippet-transform-protocol.ts';
 import type { EditorContentChange, EditorPosition, EditorRange } from '@adecore/editor';
 import { applyCompletionDefaults, type CompletionItem, type CompletionResult, type MarkupContent } from '@adecore/lsp';
@@ -201,6 +202,7 @@ export function rankCompletions(
     recency: (item: CompletionItem) => number = () => 0,
     limit = 150
 ): Ranked[] {
+    const { compare } = labelCollator();
     return items
         .map((item, index) => {
             const prefix = prefixOf(item);
@@ -212,7 +214,7 @@ export function rankCompletions(
                 left.score - right.score ||
                 right.recent - left.recent ||
                 Number(right.item.preselect === true) - Number(left.item.preselect === true) ||
-                (left.item.sortText ?? left.item.label).localeCompare(right.item.sortText ?? right.item.label) ||
+                compare(left.item.sortText ?? left.item.label, right.item.sortText ?? right.item.label) ||
                 left.index - right.index
         )
         .slice(0, limit)

@@ -36,8 +36,6 @@ import { messageOf } from './error-message.ts';
 
 const METHOD = 'textDocument/completion';
 const START_DELAY_MS = 80;
-/* After typing stops, the list is asked for again at the new text: a server only resolves an item for the text it was made for. */
-const REFRESH_DELAY_MS = 150;
 const RESOLVE_DELAY_MS = 120;
 const PAGE = 8;
 const LINES_BACK = 60;
@@ -104,8 +102,11 @@ export class CompletionFeature {
     private server = '';
     private request = 0;
     private controller: AbortController | null = null;
+    private resolving: AbortController | null = null;
+    private accepting: AbortController | null = null;
+    /* What the list was ranked for last: the caret event and the text event of one keystroke both refilter, and only the first has to rank. */
+    private rankedFor: { readonly pool: readonly CompletionItem[]; readonly key: string } | null = null;
     private requestTimer: unknown;
-    private refreshTimer: unknown;
     private resolveTimer: unknown;
     private textRevision = 0;
     private acceptSequence = 0;
@@ -122,11 +123,13 @@ export class CompletionFeature {
             editor.onCaret((position) => this.caretMoved(position)),
             editor.onBlur(() => {
                 this.acceptSequence++;
+                this.accepting?.abort();
                 this.close();
             })
         ];
         language.onDispose(() => {
             this.disposed = true;
+            this.accepting?.abort();
             for (const off of offs) {
                 off();
             }
@@ -174,6 +177,9 @@ export class CompletionFeature {
         }
         const { editor, project, uri, snippets } = this.language;
         const acceptSequence = ++this.acceptSequence;
+        this.accepting?.abort();
+        const accepting = new AbortController();
+        this.accepting = accepting;
         const snippetToken = snippets.token;
         const inSnippet = snippets.isActive;
         const exitChanges: { changes: readonly EditorContentChange[]; map: (range: EditorRange) => EditorRange }[] = [];
@@ -210,7 +216,7 @@ export class CompletionFeature {
         this.close();
         if (needsResolve) {
             // Resolving can add the import an item needs; an item that cannot be resolved is still inserted as it is.
-            item = await this.resolveNow(entry.item);
+            item = await this.resolveNow(entry.item, accepting.signal);
         }
         if (!current()) {
             return;
@@ -474,20 +480,20 @@ export class CompletionFeature {
      * made for. When the person typed on since, the list is asked for again at the new text and the same
      * suggestion is resolved in that one; an item that cannot be resolved is still inserted as it is.
      */
-    private async resolveNow(item: CompletionItem): Promise<CompletionItem> {
+    private async resolveNow(item: CompletionItem, signal: AbortSignal): Promise<CompletionItem> {
         const { editor, project, uri } = this.language;
         try {
-            return { ...item, ...(await project.service.resolveCompletion(uri, item)) };
+            return { ...item, ...(await project.service.resolveCompletion(uri, item, { signal })) };
         } catch (error) {
             if (!(error instanceof StaleResultError)) {
                 return item;
             }
         }
         try {
-            const fresh = itemsOf(await project.service.completion(uri, editor.getCaret(), { triggerKind: 1 })).items.find(
+            const fresh = itemsOf(await project.service.completion(uri, editor.getCaret(), { triggerKind: 1 }, { signal })).items.find(
                 (candidate) => candidate.label === item.label && candidate.kind === item.kind
             );
-            return fresh === undefined ? item : { ...fresh, ...(await project.service.resolveCompletion(uri, fresh).catch(() => fresh)) };
+            return fresh === undefined ? item : { ...fresh, ...(await project.service.resolveCompletion(uri, fresh, { signal }).catch(() => fresh)) };
         } catch {
             return item;
         }
@@ -496,11 +502,12 @@ export class CompletionFeature {
     close(): void {
         this.request++;
         this.controller?.abort();
+        this.resolving?.abort();
         this.timers.clear(this.requestTimer);
-        this.timers.clear(this.refreshTimer);
         this.timers.clear(this.resolveTimer);
         this.pool = [];
         this.ranked = [];
+        this.rankedFor = null;
         this.touched = false;
         this.explicit = false;
         this.activeKey = null;
@@ -583,7 +590,6 @@ export class CompletionFeature {
         } else if (this.isOpen) {
             if (text === '' || typedIdentifier) {
                 this.refilter();
-                this.scheduleRefresh();
             } else {
                 this.close();
             }
@@ -606,20 +612,6 @@ export class CompletionFeature {
     private triggerCharacters(): readonly string[] {
         const { project, uri } = this.language;
         return project.service.providerOptions(METHOD, uri)?.triggerCharacters ?? [];
-    }
-
-    private scheduleRefresh(): void {
-        const { project, uri } = this.language;
-        this.timers.clear(this.refreshTimer);
-        if (this.start === null || !project.service.supports(METHOD, uri)) {
-            return;
-        }
-        const request = this.request;
-        this.refreshTimer = this.timers.set(() => {
-            if (request === this.request && this.start !== null) {
-                void this.ask({ triggerKind: 1 }, request, true);
-            }
-        }, REFRESH_DELAY_MS);
     }
 
     private beginRequest(context: CompletionContext, delay: number): void {
@@ -685,6 +677,11 @@ export class CompletionFeature {
             return;
         }
         const lineBefore = textBeforeOf(editor, caret);
+        const typedKey = `${caret.line}:${caret.character}:${lineBefore}`;
+        if (this.rankedFor?.pool === this.pool && this.rankedFor.key === typedKey) {
+            return;
+        }
+        this.rankedFor = { pool: this.pool, key: typedKey };
         // Most items of a list replace the same range, so the text under it is read once and not once per item.
         const typed = new Map<string, string>();
         const textBetween = (range: EditorRange): string => {
@@ -725,20 +722,29 @@ export class CompletionFeature {
     private scheduleResolve(): void {
         const { project, uri } = this.language;
         this.timers.clear(this.resolveTimer);
+        this.resolving?.abort();
         const entry = this.ranked[this.active];
         if (entry === undefined || this.resolved.has(entry.item) || project.service.providerOptions('completionItem/resolve', uri) === undefined) {
             return;
         }
+        const request = this.request;
         this.resolveTimer = this.timers.set(() => {
+            const controller = new AbortController();
+            this.resolving = controller;
             void project.service
-                .resolveCompletion(uri, entry.item)
+                .resolveCompletion(uri, entry.item, { signal: controller.signal })
                 .then((item) => {
                     this.resolved.set(entry.item, { ...entry.item, ...item });
                     if (this.ranked[this.active]?.item === entry.item) {
                         this.publish();
                     }
                 })
-                .catch(() => undefined);
+                .catch((error: unknown) => {
+                    // A server only resolves an item for the text it was made for, so only an item that is wanted and stale costs a new list.
+                    if (error instanceof StaleResultError && !controller.signal.aborted && request === this.request && this.start !== null) {
+                        void this.ask({ triggerKind: 1 }, request, true);
+                    }
+                });
         }, RESOLVE_DELAY_MS);
     }
 
