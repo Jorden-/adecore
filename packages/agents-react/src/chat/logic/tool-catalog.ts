@@ -15,6 +15,8 @@ export interface ToolEntry {
     changesFiles: boolean;
     /* Whether the call reads a path the thread may draw as an image. */
     readsImage: boolean;
+    /* Whether `command` in its input is a shell command, drawn as one. */
+    shell: boolean;
 }
 
 function entry(icon: LucideIcon, summary: readonly string[], rest: Partial<ToolEntry> = {}): ToolEntry {
@@ -24,6 +26,7 @@ function entry(icon: LucideIcon, summary: readonly string[], rest: Partial<ToolE
         grouped: true,
         changesFiles: false,
         readsImage: false,
+        shell: false,
         ...rest
     };
 }
@@ -44,7 +47,8 @@ export const TOOL_CATALOG: Record<string, ToolEntry> = {
     NotebookEdit: entry(SquarePen, ['file_path', 'notebook_path']),
     // Codex reports a patch as the paths it touches; its own input carries no path of its own.
     ApplyPatch: entry(SquarePen, ['summary'], { grouped: false, changesFiles: true }),
-    Bash: entry(Terminal, ['description', 'command']),
+    // Codex's command executions arrive under this name too.
+    Bash: entry(Terminal, ['description', 'command'], { shell: true }),
     Grep: entry(Search, ['pattern']),
     Glob: entry(FolderSearch, ['pattern']),
     WebFetch: entry(Globe, ['url', 'query']),

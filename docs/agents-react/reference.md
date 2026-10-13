@@ -61,6 +61,7 @@ Many props and options are not exported types. Derive them where you need one, a
 | [`chat/logic/answers`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/answers.ts) | `toggleChoice` |
 | [`chat/logic/bookmarks`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/bookmarks.ts) | `bookmarkLabel`, `bookmarksInThreadOrder`, `bookmarkRows` |
 | [`chat/logic/context-usage`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/context-usage.ts) | `CONTEXT_OPTION`, `ContextPart`, `CONTEXT_PARTS`, `ContextSegment`, `contextFraction`, `contextSegments`, `orderOptions` |
+| [`chat/logic/embedded-code`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/embedded-code.ts) | `EmbeddedCode`, `SHELL_LANGUAGE`, `EMBEDDED_CODE_LIMIT`, `embeddedCode` |
 | [`chat/logic/fork`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/fork.ts) | `FORKABLE_PROVIDERS`, `ForkPoint`, `forkRefusal`, `summaryRefusal`, `forkIdsAfter`, `forkedTurnIds`, `lastSettledTurn`, `forkPointOf`, `forkPointLabel`, `turnIdOfRow`, `ForkShape`, `forkShapes`, `ForkWorktreeChoice`, `ForkCliChoice`, `forkPayload`, `branchRefusal` |
 | [`chat/logic/handback`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/handback.ts) | `handbackReportOf` |
 | [`chat/logic/json`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/json.ts) | `isRecord` |
@@ -74,7 +75,7 @@ Many props and options are not exported types. Derive them where you need one, a
 | [`chat/logic/timeline`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/timeline.ts) | `SubagentBranch`, `BaseMoved`, `TimelineRow`, `isBlock`, `summarizeGroup`, `summarizeTurn`, `agentTurnLabel`, `turnLabel`, `findSubagentBranch`, `deriveTimelineRows` |
 | [`chat/logic/generated-image`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/generated-image.ts) | `IMAGE_GENERATION_TOOL`, `GeneratedImageFailure`, `GeneratedImageView`, `isImageGeneration`, `generatedImageView`, `attachmentAspect` |
 | [`chat/logic/tool-catalog`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/tool-catalog.ts) | `ToolEntry`, `TOOL_CATALOG`, `toolEntry` |
-| [`chat/logic/tools`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/tools.ts) | `FileChange`, `toolSummary`, `readImagePath`, `fileChanges`, `isFileChange`, `unifiedChanges`, `approvalChanges`, `hasFileChanges`, `toolStartedAt`, `liveOutput` |
+| [`chat/logic/tools`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/tools.ts) | `FileChange`, `toolSummary`, `shellCommand`, `ToolCallLines`, `toolCallLines`, `exitCodeOf`, `hasOutput`, `hasToolBody`, `readImagePath`, `fileChanges`, `isFileChange`, `unifiedChanges`, `approvalChanges`, `hasFileChanges`, `toolStartedAt`, `liveOutput` |
 | [`chat/logic/visual-height`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/visual-height.ts) | `clampVisualHeight`, `initialVisualHeight`, `rememberVisualHeight` |
 | [`chat/logic/welcome`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/welcome.ts) | `DayPart`, `dayPartOf` |
 | [`chat/logic/workflow`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/workflow.ts) | `WorkflowAgentState`, `WorkflowAgentView`, `WorkflowPhaseView`, `workflowAgentState`, `workflowPhases`, `workflowAgentTime` |
@@ -104,7 +105,9 @@ Many props and options are not exported types. Derive them where you need one, a
 | [`chat/ui/QuoteButton`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/QuoteButton.tsx) | `QuoteButton` |
 | [`chat/ui/ResumeCompactionDock`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/ResumeCompactionDock.tsx) | `ResumeCompactionDock` |
 | [`chat/ui/RunSettings`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/RunSettings.tsx) | `RunSettings` |
+| [`chat/ui/RowTime`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/RowTime.tsx) | `RowTime` |
 | [`chat/ui/Scrubber`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/Scrubber.tsx) | `CardChat`, `Scrubber` |
+| [`chat/ui/ShellCommand`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/ShellCommand.tsx) | `ShellCommand` |
 | [`chat/ui/SubagentControls`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/SubagentControls.tsx) | `SubagentTitleCrumb`, `SubagentBreadcrumb` |
 | [`chat/ui/SubagentInfo`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/SubagentInfo.tsx) | `SubagentInfo` |
 | [`chat/ui/SubagentStopButton`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/SubagentStopButton.tsx) | `SubagentStopButton` |
@@ -124,6 +127,7 @@ Many props and options are not exported types. Derive them where you need one, a
 | [`chat/ui/file-links`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/file-links.ts) | `FileLinkContext`, `useFileLinkCwd`, `useFileLinkTarget`, `openFileLink` |
 | [`chat/ui/find-reveal`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/find-reveal.ts) | `ChatFindField`, `FindReveal`, `FindRevealContext`, `useOpenForFind` |
 | [`chat/ui/full-diff`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/full-diff.ts) | `DiffContents`, `fullFileDiff` |
+| [`chat/ui/highlighter`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/highlighter.ts) | `Highlighter`, `GrammarState`, `loadLanguage`, `loadTheme`, `readyHighlighter`, `loadedLanguage`, `tokenizerFor`, `tokenStyle` |
 | [`chat/ui/icons`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/icons.tsx) | `DOCK_ICON_SIZE`, `ROW_GUTTER`, `toolIcon` |
 | [`chat/ui/markdown-blocks`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/markdown-blocks.ts) | `MarkdownBlock`, `splitMarkdownBlocks`, `settledBlocksText` |
 | [`chat/ui/quote-selection`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/quote-selection.ts) | `QuoteTaker`, `QuoteTakerContext`, `selectedAnswerQuote` |

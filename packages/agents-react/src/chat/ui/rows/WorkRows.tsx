@@ -1,11 +1,24 @@
-import { Suspense, useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { Fragment, Suspense, useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import clsx from 'clsx';
 import i18next from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, FileDiff, X } from 'lucide-react';
 import type { ChatCheckpointDiff, ChatCheckpointFile, ChatFileChange, ChatToolItem, ChatTurnItem } from '@adecore/agent-contracts';
 import type { BaseMoved } from '../../logic/timeline';
-import { fileChanges, liveOutput, readImagePath, toolStartedAt, toolSummary, unifiedChanges, type FileChange } from '../../logic/tools';
+import {
+    exitCodeOf,
+    fileChanges,
+    hasOutput,
+    hasToolBody,
+    liveOutput,
+    readImagePath,
+    shellCommand,
+    toolCallLines,
+    toolStartedAt,
+    toolSummary,
+    unifiedChanges,
+    type FileChange
+} from '../../logic/tools';
 import { useOpenForFind } from '../find-reveal';
 import { chatHost } from '../../../host';
 import { lazyNamed } from '../../../lazy';
@@ -17,6 +30,8 @@ import { formatClockDuration, formatElapsedShort } from '@adecore/ui/format';
 import { Icon, Spinner, useTickingText } from '@adecore/ui';
 import { ROW_GUTTER, toolIcon } from '../icons';
 import { AnsiOutput } from '../AnsiOutput';
+import { RowTime } from '../RowTime';
+import { ShellCommand } from '../ShellCommand';
 import { DiffStack, ReviewStackView } from '../diff/DiffStack';
 import { reviewEntries, type ReviewEntry } from '../diff/review-plan';
 import { useReviewStack } from '../diff/use-review-stack';
@@ -26,54 +41,76 @@ const UnifiedDiff = lazyNamed(() => import('../UnifiedDiff'), 'default');
 
 const OUTPUT_LIMIT = 4000;
 
-function clip(text: string): string {
-    return text.length > OUTPUT_LIMIT
-        ? `${text.slice(0, OUTPUT_LIMIT)}\n${i18next.t('agent-chat:work.moreCharacters', { count: text.length - OUTPUT_LIMIT })}`
-        : text;
+/* The line that says how much of a text past the limit is left out; empty for a text within it. */
+function clipNotice(text: string): string {
+    return text.length > OUTPUT_LIMIT ? `\n${i18next.t('agent-chat:work.moreCharacters', { count: text.length - OUTPUT_LIMIT })}` : '';
 }
 
+function clip(text: string): string {
+    return text.slice(0, OUTPUT_LIMIT) + clipNotice(text);
+}
+
+/*
+ * The line of a call, a subagent or a group. Without `onToggle` it has nothing to open: no chevron, and
+ * not a button. `time` shows at the right edge while the line is hovered or focused.
+ */
 export function ToggleLine({
     icon,
     label,
     detail,
-    open,
+    command,
+    open = false,
     onToggle,
     failed,
     live,
     trailing,
+    time,
     className
 }: {
     icon: ReactNode;
     label: string;
     detail?: string;
-    open: boolean;
-    onToggle(): void;
+    /* Draws `detail` as a shell command, in the colors of the code theme. */
+    command?: boolean;
+    open?: boolean;
+    onToggle?(): void;
     failed?: boolean;
     live?: boolean;
     trailing?: ReactNode;
+    time?: number;
     className?: string;
 }) {
-    return (
-        <button
-            className={clsx(
-                // Fix the width so long commands reach the truncation inside the negative margins.
-                '-mx-1 mb-0.5 flex h-7 w-[calc(100%+8px)] items-center gap-2 rounded-md px-1 text-left text-xs text-text-muted hover:bg-surface-hover',
-                failed && 'text-status-error',
-                className
-            )}
-            onClick={onToggle}
-        >
+    const classes = clsx(
+        // Fix the width so long commands reach the truncation inside the negative margins.
+        'group/line -mx-1 mb-0.5 flex h-7 w-[calc(100%+8px)] items-center gap-2 rounded-md px-1 text-left text-xs text-text-muted',
+        onToggle !== undefined && 'hover:bg-surface-hover',
+        failed && 'text-status-error',
+        className
+    );
+    const content = (
+        <>
             <span className={clsx(ROW_GUTTER, live && 'text-accent')}>{icon}</span>
             <span className={clsx('shrink-0', live && 'chat-live-text')}>{label}</span>
             {detail && (
                 <span data-find-field="summary" className="min-w-0 truncate font-mono text-text-faint">
-                    {detail}
+                    {command ? <ShellCommand command={detail} /> : detail}
                 </span>
             )}
             <span className="grow" />
             {trailing}
+            {time !== undefined && <RowTime at={time} />}
             {failed && <Icon icon={X} size={12} className="shrink-0" />}
-            <Icon icon={ChevronRight} size={12} className={clsx('shrink-0 text-text-faint transition-transform', open && 'rotate-90')} />
+            {onToggle !== undefined && (
+                <Icon icon={ChevronRight} size={12} className={clsx('shrink-0 text-text-faint transition-transform', open && 'rotate-90')} />
+            )}
+        </>
+    );
+    if (onToggle === undefined) {
+        return <div className={classes}>{content}</div>;
+    }
+    return (
+        <button className={classes} onClick={onToggle}>
+            {content}
         </button>
     );
 }
@@ -115,19 +152,12 @@ function ChangedFileLine({
     );
 }
 
-function ToolBody({ tool }: { tool: ChatToolItem }) {
-    const patches = unifiedChanges(tool);
-    const changes = patches.length > 0 ? [] : fileChanges(tool.name, tool.input);
+/* A diff keeps its card, with what the call answered under it. */
+function DiffBody({ tool, entries, patched }: { tool: ChatToolItem; entries: readonly ReviewEntry[]; patched: boolean }) {
     return (
         <div className="mt-1.5 mb-2 ml-6 overflow-hidden rounded-md border border-border bg-surface-raised">
-            {patches.length + changes.length > 0 ? (
-                <DiffStack entries={reviewEntries(patches, changes)} />
-            ) : (
-                <pre className="max-h-64 overflow-auto px-3 py-2 font-mono text-code text-text-muted select-text">
-                    {clip(JSON.stringify(tool.input, null, 2) ?? '')}
-                </pre>
-            )}
-            {tool.output !== null && tool.output !== '' && patches.length === 0 && (
+            <DiffStack entries={entries} />
+            {hasOutput(tool.output) && !patched && (
                 <pre
                     data-find-field="output"
                     className={clsx(
@@ -142,9 +172,64 @@ function ToolBody({ tool }: { tool: ChatToolItem }) {
     );
 }
 
+/* What a call answered, muted under the call; a failure in the error color, or its exit code when the tool names one. */
+function ToolOutput({ tool }: { tool: ChatToolItem }) {
+    const { t } = useTranslation('agent-chat');
+    if (!hasOutput(tool.output)) {
+        return null;
+    }
+    const failed = tool.state === 'error';
+    const { code, rest } = failed ? exitCodeOf(tool.output) : { code: null, rest: tool.output };
+    return (
+        <>
+            {hasOutput(rest) && (
+                <pre
+                    data-find-field="output"
+                    className={clsx('max-h-64 overflow-auto whitespace-pre-wrap', failed && code === null ? 'text-status-error' : 'text-text-muted')}
+                >
+                    <AnsiOutput text={rest} limit={OUTPUT_LIMIT} />
+                </pre>
+            )}
+            {code !== null && <div className="text-status-error">{t('work.exitCode', { code: String(code) })}</div>}
+        </>
+    );
+}
+
+/* An opened call without a card: what it was asked in the foreground, what it answered muted below. */
+function ToolBody({ tool }: { tool: ChatToolItem }) {
+    const patches = unifiedChanges(tool);
+    const changes = patches.length > 0 ? [] : fileChanges(tool.name, tool.input);
+    if (patches.length + changes.length > 0) {
+        return <DiffBody tool={tool} entries={reviewEntries(patches, changes)} patched={patches.length > 0} />;
+    }
+    const lines = toolCallLines(tool.name, tool.input);
+    return (
+        <div className="mt-0.5 mb-2 ml-6 flex flex-col gap-1.5 font-mono text-code select-text">
+            {lines.command !== null && (
+                <pre className="max-h-64 overflow-auto whitespace-pre-wrap wrap-anywhere text-text">
+                    <ShellCommand command={lines.command.slice(0, OUTPUT_LIMIT)} />
+                    {clipNotice(lines.command)}
+                </pre>
+            )}
+            {lines.args.length > 0 && (
+                <dl className="grid max-h-64 grid-cols-[auto_minmax(0,1fr)] gap-x-3 overflow-auto">
+                    {lines.args.map(([key, value]) => (
+                        <Fragment key={key}>
+                            <dt className="text-text-faint">{key}</dt>
+                            <dd className="whitespace-pre-wrap wrap-anywhere text-text">{clip(value)}</dd>
+                        </Fragment>
+                    ))}
+                </dl>
+            )}
+            {lines.text !== null && <pre className="max-h-64 overflow-auto whitespace-pre-wrap wrap-anywhere text-text">{clip(lines.text)}</pre>}
+            <ToolOutput tool={tool} />
+        </div>
+    );
+}
+
 /*
- * One settled tool call: a line, and its input and output behind it. An image the call looked at is
- * drawn under the line. `icon`, `label` and `failed` let a row that knows the call better name it.
+ * One settled tool call: a line, and what it was asked and answered behind it. An image the call
+ * looked at is drawn under the line. `icon`, `label` and `failed` let a row that knows the call better name it.
  */
 export function WorkRow({
     tool,
@@ -165,18 +250,22 @@ export function WorkRow({
     const image = tool.state === 'done' ? readImagePath(tool.name, tool.input) : null;
     const { ReadImage } = chatHost();
     useOpenForFind(tool.id, 'output', setOpen);
+    const summary = detail ?? toolSummary(tool.name, tool.input);
+    const opens = hasToolBody(tool);
     return (
         <div data-find-item={tool.id} className={nested ? 'ml-6' : undefined}>
             <ToggleLine
                 icon={icon ?? toolIcon(tool.name)}
                 label={label ?? tool.name}
-                detail={detail ?? toolSummary(tool.name, tool.input)}
-                open={open}
-                onToggle={() => setOpen((o) => !o)}
+                detail={summary}
+                command={detail === undefined && summary === shellCommand(tool.name, tool.input)}
+                open={open && opens}
+                onToggle={opens ? () => setOpen((o) => !o) : undefined}
                 failed={failed ?? tool.state === 'error'}
+                time={tool.createdAt}
             />
             {image !== null && ReadImage !== null && <ReadImage path={image} />}
-            {open && <ToolBody tool={tool} />}
+            {open && opens && <ToolBody tool={tool} />}
         </div>
     );
 }
@@ -193,18 +282,21 @@ export function WorkLiveRow({ chatId, tool: derived }: { chatId: string; tool: C
     const [open, setOpen] = useState(false);
     const tool = useCurrentItem(chatId, derived);
     const tail = liveOutput(tool);
+    const summary = toolSummary(tool.name, tool.input);
+    const opens = hasToolBody(tool);
     return (
         <div>
             <ToggleLine
                 icon={toolIcon(tool.name)}
                 label={tool.name}
-                detail={toolSummary(tool.name, tool.input) || tool.progress?.description || ''}
-                open={open}
-                onToggle={() => setOpen((o) => !o)}
+                detail={summary || tool.progress?.description || ''}
+                command={summary !== '' && summary === shellCommand(tool.name, tool.input)}
+                open={open && opens}
+                onToggle={opens ? () => setOpen((o) => !o) : undefined}
                 trailing={<RunningFor startedAt={toolStartedAt(tool)} />}
                 live
             />
-            {open && <ToolBody tool={tool} />}
+            {open && opens && <ToolBody tool={tool} />}
             {tail !== null && !open && (
                 <pre className="mt-1.5 mb-2 ml-6 max-h-48 overflow-auto rounded-md border border-border bg-surface-raised px-3 py-2 font-mono text-code whitespace-pre-wrap text-chat-output select-text">
                     <AnsiOutput text={tail} tailLines={12} />
@@ -219,7 +311,7 @@ export function WorkGroupRow({ tools, summary, expanded, onToggle }: { tools: Ch
     const failed = tools.some((tool) => tool.state === 'error');
     return (
         <div>
-            <ToggleLine icon={toolIcon(tools[0]!.name)} label={summary} open={expanded} onToggle={onToggle} failed={failed} />
+            <ToggleLine icon={toolIcon(tools[0]!.name)} label={summary} open={expanded} onToggle={onToggle} failed={failed} time={tools[0]!.createdAt} />
         </div>
     );
 }
@@ -244,7 +336,7 @@ export function TurnFoldRow({
     return (
         <button
             className={clsx(
-                'group -mx-1 mb-2 flex h-7 w-[calc(100%+8px)] min-w-0 items-center gap-2 rounded-md px-1 text-left text-xs text-text-muted hover:bg-surface-hover',
+                'group group/line -mx-1 mb-2 flex h-7 w-[calc(100%+8px)] min-w-0 items-center gap-2 rounded-md px-1 text-left text-xs text-text-muted hover:bg-surface-hover',
                 turn.state === 'error' && 'text-status-error'
             )}
             aria-expanded={expanded}
@@ -255,6 +347,8 @@ export function TurnFoldRow({
             </span>
             <span className="shrink-0 group-hover:text-text">{label}</span>
             {work.length > 0 && <span className="min-w-0 truncate text-text-faint">{work.map((part) => ` · ${part}`).join('')}</span>}
+            <span className="grow" />
+            <RowTime at={turn.createdAt} />
         </button>
     );
 }

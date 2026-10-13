@@ -134,6 +134,11 @@
             "types": "./dist/chat/logic/context-usage.d.ts",
             "default": "./dist/chat/logic/context-usage.js"
         },
+        "./chat/logic/embedded-code": {
+            "source": "./src/chat/logic/embedded-code.ts",
+            "types": "./dist/chat/logic/embedded-code.d.ts",
+            "default": "./dist/chat/logic/embedded-code.js"
+        },
         "./chat/logic/fork": {
             "source": "./src/chat/logic/fork.ts",
             "types": "./dist/chat/logic/fork.d.ts",
@@ -414,10 +419,20 @@
             "types": "./dist/chat/ui/RunSettings.d.ts",
             "default": "./dist/chat/ui/RunSettings.js"
         },
+        "./chat/ui/RowTime": {
+            "source": "./src/chat/ui/RowTime.tsx",
+            "types": "./dist/chat/ui/RowTime.d.ts",
+            "default": "./dist/chat/ui/RowTime.js"
+        },
         "./chat/ui/Scrubber": {
             "source": "./src/chat/ui/Scrubber.tsx",
             "types": "./dist/chat/ui/Scrubber.d.ts",
             "default": "./dist/chat/ui/Scrubber.js"
+        },
+        "./chat/ui/ShellCommand": {
+            "source": "./src/chat/ui/ShellCommand.tsx",
+            "types": "./dist/chat/ui/ShellCommand.d.ts",
+            "default": "./dist/chat/ui/ShellCommand.js"
         },
         "./chat/ui/SubagentControls": {
             "source": "./src/chat/ui/SubagentControls.tsx",
@@ -543,6 +558,11 @@
             "source": "./src/chat/ui/full-diff.ts",
             "types": "./dist/chat/ui/full-diff.d.ts",
             "default": "./dist/chat/ui/full-diff.js"
+        },
+        "./chat/ui/highlighter": {
+            "source": "./src/chat/ui/highlighter.ts",
+            "types": "./dist/chat/ui/highlighter.d.ts",
+            "default": "./dist/chat/ui/highlighter.js"
         },
         "./chat/ui/icons": {
             "source": "./src/chat/ui/icons.tsx",

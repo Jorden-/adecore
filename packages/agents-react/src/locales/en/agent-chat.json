@@ -177,7 +177,8 @@
     "andMore": "and more, truncated",
     "edits_one": "{{count}} edit",
     "edits_other": "{{count}} edits",
-    "workingFor": "Working for"
+    "workingFor": "Working for",
+    "exitCode": "Exit code {{code}}"
   },
   "timeline": {
     "welcome": {

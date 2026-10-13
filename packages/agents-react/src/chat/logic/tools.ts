@@ -32,6 +32,69 @@ export function toolSummary(name: string, input: unknown): string {
     return '';
 }
 
+/* The command of a shell call, as it was run; null for any other call or one without a command. */
+export function shellCommand(name: string, input: unknown): string | null {
+    if (toolEntry(name)?.shell !== true || !isRecord(input)) {
+        return null;
+    }
+    const command = str(input.command);
+    return command === null || command.trim() === '' ? null : command;
+}
+
+/* What a call was asked to do, as the lines its opened row shows. */
+export interface ToolCallLines {
+    /* The command of a shell call, whole. */
+    readonly command: string | null;
+    /* The rest of the input as key and value: a string as it is, anything else as compact JSON. */
+    readonly args: ReadonlyArray<readonly [key: string, value: string]>;
+    /* An input that is not an object, as text. */
+    readonly text: string | null;
+}
+
+// A shell call's description is already the detail of its row.
+const SHELL_SHOWN = new Set(['command', 'description']);
+
+function valueText(value: unknown): string {
+    // An empty string can be the point of a call (clearing a field), so it shows as one.
+    return typeof value === 'string' && value !== '' ? value : (JSON.stringify(value) ?? String(value));
+}
+
+/* The input of a call as lines: a shell command as itself, every other key as `key value`, null included. */
+export function toolCallLines(name: string, input: unknown): ToolCallLines {
+    if (!isRecord(input)) {
+        const text = input === null || input === undefined || input === '' ? null : valueText(input);
+        return { command: null, args: [], text };
+    }
+    const command = shellCommand(name, input);
+    const args = Object.entries(input)
+        .filter(([key, value]) => value !== undefined && !(command !== null && SHELL_SHOWN.has(key)))
+        .map(([key, value]) => [key, valueText(value)] as const);
+    return { command, args, text: null };
+}
+
+/* A failed call's output with the exit code its tool put on the first line ("Exit code 1"), as Claude Code's shell does. */
+export function exitCodeOf(output: string): { code: number | null; rest: string } {
+    const match = /^Exit code (-?\d+)[ \t]*(?:\r?\n|$)/.exec(output);
+    if (match === null || Number(match[1]) === 0) {
+        return { code: null, rest: output };
+    }
+    return { code: Number(match[1]), rest: output.slice(match[0].length) };
+}
+
+/* Whether an output says anything; whitespace alone does not. */
+export function hasOutput(output: string | null): output is string {
+    return output !== null && output.trim() !== '';
+}
+
+/* Whether opening a call shows anything: a diff, the input it was given or what it answered. */
+export function hasToolBody(tool: ChatToolItem): boolean {
+    if (hasFileChanges(tool) || hasOutput(tool.output)) {
+        return true;
+    }
+    const lines = toolCallLines(tool.name, tool.input);
+    return lines.command !== null || lines.args.length > 0 || lines.text !== null;
+}
+
 // What `GET /fs/file` will serve; a path with another suffix is not worth asking the host about.
 const IMAGE_SUFFIXES = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
 

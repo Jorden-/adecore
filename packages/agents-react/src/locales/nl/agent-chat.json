@@ -177,7 +177,8 @@
     "andMore": "en meer, afgekapt",
     "edits_one": "{{count}} bewerking",
     "edits_other": "{{count}} bewerkingen",
-    "workingFor": "Werkt al"
+    "workingFor": "Werkt al",
+    "exitCode": "Afsluitcode {{code}}"
   },
   "timeline": {
     "welcome": {
