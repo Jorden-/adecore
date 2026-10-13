@@ -25,16 +25,20 @@ export function MessageActions({ chatId, row }: { chatId: string; row: MessageRo
     const host = useChatHost();
     const { fork } = host;
     const turnId = row.item.turnId;
-    const bookmark = useChatRow(chatId, (chat) => chat?.bookmarks?.find((candidate) => candidate.itemId === row.id) ?? null);
-    const canFork = useChatRow(chatId, (chat) => turnId !== null && forkRefusal(chat?.info ?? null, chat?.structure[turnId]) === null);
+    // Every selector runs on every streamed word of the thread, so each only looks a field up; the work happens in render.
+    const bookmarks = useChatRow(chatId, (chat) => chat?.bookmarks);
+    const info = useChatRow(chatId, (chat) => chat?.info ?? null);
+    const turn = useChatRow(chatId, (chat) => (turnId === null ? undefined : chat?.structure[turnId]));
     const streaming = useChatRow(chatId, (chat) => {
         const item = chat?.items[row.id];
         return item?.kind === 'assistant' && item.streaming;
     });
     const hasText = useChatRow(chatId, (chat) => {
         const item = chat?.items[row.id];
-        return (item?.kind === 'user' || item?.kind === 'assistant') && item.text.trim() !== '';
+        return (item?.kind === 'user' || item?.kind === 'assistant') && /\S/.test(item.text);
     });
+    const bookmarked = bookmarks?.some((candidate) => candidate.itemId === row.id) === true;
+    const canFork = turnId !== null && forkRefusal(info, turn) === null;
     const [copied, setCopied] = useState(false);
 
     useEffect(() => {
@@ -67,7 +71,7 @@ export function MessageActions({ chatId, row }: { chatId: string; row: MessageRo
         >
             {!streaming && (
                 <ButtonGroup render={<span />}>
-                    {bookmark === null && (
+                    {!bookmarked && (
                         <IconButton icon={Bookmark} size="sm" label={t('bookmarks.add')} onClick={() => void placeBookmark(scope, host, chatId, row.id)} />
                     )}
                     {canFork && turnId !== null && fork !== null && (

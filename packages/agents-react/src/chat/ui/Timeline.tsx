@@ -1,4 +1,16 @@
-import { type CSSProperties, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+    type CSSProperties,
+    memo,
+    type RefObject,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useReducer,
+    useRef,
+    useState,
+    type ReactNode
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer, type Virtualizer } from '@tanstack/react-virtual';
 import clsx from 'clsx';
@@ -57,11 +69,11 @@ import { QuoteButton } from './QuoteButton';
 import { QuoteTakerContext, type QuoteTaker } from './quote-selection';
 import { useToggleSet } from './useToggleSet';
 import { WelcomeGreeting } from './Welcome';
-import { Row } from './rows/Rows';
+import { Row, type RowProps } from './rows/Rows';
 import { RowContainer } from './rows/RowContainer';
 import { ReplyHeader } from './rows/MessageRows';
 import { useChatRow, useChats } from '../../state/chats';
-import { useChatHost } from '../../host';
+import { useChatHost, type TimelineFindOptions } from '../../host';
 import { useChatScope } from '../../scope';
 import { FileLinkContext } from './file-links';
 import { AgentIcon } from '../../agents/AgentIcon';
@@ -135,6 +147,35 @@ function MarkableRow({ row, chatId, bookmark, children }: { row: TimelineRow; ch
         </>
     );
 }
+
+interface ThreadRowProps extends Omit<RowProps, 'openConversation'> {
+    previous: TimelineRow | null;
+    index: number;
+    top: number;
+    measure: (element: HTMLDivElement | null) => void;
+    /* The nonce of the flash on this row, or null when it has none. */
+    flashNonce: number | null;
+    bookmark: ChatBookmark | null;
+    openConversation(step: SubagentStep): void;
+}
+
+/* Memoized with stable props, so a streamed word or a scroll draws only the rows it changed. */
+const ThreadRow = memo(function ThreadRow({ row, previous, index, top, measure, chatId, flashNonce, bookmark, ...actions }: ThreadRowProps) {
+    const header = replyHeader(row, previous);
+    return (
+        <RowContainer row={row} previous={previous} index={index} top={top} ref={measure}>
+            {flashNonce !== null && <span key={flashNonce} className="chat-flash pointer-events-none absolute inset-0 rounded-lg" aria-hidden />}
+            {header !== null && (
+                <div className="chat-column-content w-full">
+                    <ReplyHeader chatId={chatId} at={header.at} />
+                </div>
+            )}
+            <MarkableRow row={row} chatId={chatId} bookmark={bookmark}>
+                <Row row={row} chatId={chatId} {...actions} />
+            </MarkableRow>
+        </RowContainer>
+    );
+});
 
 /*
  * `overlay` stands in the thread's place and ends where the composer starts, so the thread keeps
@@ -313,17 +354,11 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
         scrollPaddingEnd: coveredHeight
     });
 
-    // A change in what the last row says (a streaming delta) must also pull the view down.
-    const lastRow = rows[rows.length - 1];
-    const lastReplyLength = useChatRow(chatId, (row) => {
-        const item = lastRow?.kind === 'assistant' ? row?.items[lastRow.id] : undefined;
-        return item?.kind === 'assistant' ? item.text.length : null;
-    });
-    const tail = lastReplyLength ?? rows.length;
     /*
-     * Rows are measured as they render, so the end moves while it is drawn (a diff that highlights, an
-     * image that loads). `scrollToIndex` aims at where a row was when asked and fell short; the
-     * scroller's own bottom is a fact, and a new total size says a row was measured again.
+     * Rows are measured as they render, so the end moves while it is drawn (a streamed line, a diff that
+     * highlights, an image that loads). `scrollToIndex` aims at where a row was when asked and fell
+     * short; the scroller's own bottom is a fact, and a new total size says a row was measured again.
+     * A word that does not add a line moves nothing, so the thread does not listen to the words.
      */
     const totalSize = virtualizer.getTotalSize();
     useLayoutEffect(() => {
@@ -334,7 +369,7 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
         // The composer is in the scroll flow, so its measured height is part of this end position.
         element.scrollTop = element.scrollHeight;
         scrollGeometry.current = { top: element.scrollTop, height: element.scrollHeight, viewport: element.clientHeight };
-    }, [rows.length, tail, totalSize, composerHeight, frame.height]);
+    }, [rows.length, totalSize, composerHeight, frame.height]);
 
     // A page that went in above moves every row down by what it measures; the reader stays on the row they were on.
     useLayoutEffect(() => {
@@ -381,35 +416,59 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
     const scrollTop = virtualizer.scrollOffset ?? 0;
     const viewport = virtualizer.scrollRect?.height ?? 0;
     const visibleHeight = Math.max(0, viewport - coveredHeight);
+    const visibleHeightRef = useRef(visibleHeight);
+    visibleHeightRef.current = visibleHeight;
     const inView = showsScrubber ? messagesInView({ starts, scrollTop, visibleHeight }) : null;
+    /*
+     * The virtualizer draws again only when its range of rows changes, which a scroll inside one long
+     * row never does; the scroll itself redraws the strip once the messages in view are others.
+     */
+    const [, redrawStrip] = useReducer((count: number) => count + 1, 0);
+    const stripRef = useRef({ starts, inView });
+    stripRef.current = { starts, inView };
+    const followStrip = (element: HTMLElement): void => {
+        const { starts: current, inView: shown } = stripRef.current;
+        if (shown === null) {
+            return;
+        }
+        const next = messagesInView({ starts: current, scrollTop: element.scrollTop, visibleHeight: visibleHeightRef.current });
+        if (next?.first !== shown.first || next?.last !== shown.last) {
+            redrawStrip();
+        }
+    };
 
-    const chatFind = host.useTimelineFind({
-        chatId,
-        frame: frameRef,
-        thread: threadRef,
-        scroller: scrollRef,
-        enabled: onMainAgent,
-        rows,
-        structure: items,
-        order,
-        firstRowInView: () => {
-            const top = scrollRef.current?.scrollTop ?? 0;
-            return virtualizer.getVirtualItems().find((virtualRow) => virtualRow.end > top)?.index ?? 0;
-        },
-        openTurn: turns.add,
-        openGroup: groups.add,
-        openSubagent: subagents.add,
-        // A row already on screen stays put; the find scrolls to the match itself once it is drawn.
-        scrollToRow: (index) => {
-            const top = scrollRef.current?.scrollTop ?? 0;
-            const bottom = top + visibleHeight;
-            if (!virtualizer.getVirtualItems().some((virtualRow) => virtualRow.index === index && virtualRow.end > top && virtualRow.start < bottom)) {
-                virtualizer.scrollToIndex(index, { align: 'center' });
-            }
-        },
-        coveredHeight: () => coveredHeightRef.current,
-        stopFollowing
-    });
+    // One object while what it holds stays, so a find that keys an effect on it does not run it for every scroll.
+    const findOptions = useMemo<TimelineFindOptions>(
+        () => ({
+            chatId,
+            frame: frameRef,
+            thread: threadRef,
+            scroller: scrollRef,
+            enabled: onMainAgent,
+            rows,
+            structure: items,
+            order,
+            firstRowInView: () => {
+                const top = scrollRef.current?.scrollTop ?? 0;
+                return virtualizer.getVirtualItems().find((virtualRow) => virtualRow.end > top)?.index ?? 0;
+            },
+            openTurn: turns.add,
+            openGroup: groups.add,
+            openSubagent: subagents.add,
+            // A row already on screen stays put; the find scrolls to the match itself once it is drawn.
+            scrollToRow: (index) => {
+                const top = scrollRef.current?.scrollTop ?? 0;
+                const bottom = top + visibleHeightRef.current;
+                if (!virtualizer.getVirtualItems().some((virtualRow) => virtualRow.index === index && virtualRow.end > top && virtualRow.start < bottom)) {
+                    virtualizer.scrollToIndex(index, { align: 'center' });
+                }
+            },
+            coveredHeight: () => coveredHeightRef.current,
+            stopFollowing
+        }),
+        [chatId, onMainAgent, rows, items, order, virtualizer, turns.add, groups.add, subagents.add, stopFollowing]
+    );
+    const chatFind = host.useTimelineFind(findOptions);
     const searching = chatFind.open;
     // A find covers the whole thread, so every page before this one comes in while it is open.
     useEffect(() => {
@@ -579,20 +638,28 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
     };
     useEffect(() => registerMessageStepper(keyOf(chatId), (direction) => stepRef.current(direction)), [keyOf, chatId]);
 
+    // Read through a ref, so the rows keep one callback for their life and their memo holds.
+    const opensRef = useRef({ rows, show });
+    opensRef.current = { rows, show };
     /* The whole of what a sub-agent did, in the thread's place. Its row only keeps the beginning. */
-    const openConversation = (step: SubagentStep): void => {
-        show(openFromMain(step));
-    };
+    const openConversation = useCallback((step: SubagentStep): void => {
+        opensRef.current.show(openFromMain(step));
+    }, []);
 
+    const addSubagent = subagents.add;
     /* The header of a turn a sub-agent woke. It points at the row that agent worked in, or the one it hangs under. */
-    const openSubagent = (toolUseId: string): void => {
-        const found = findSubagentBranch(rows, toolUseId);
-        if (!found) {
-            return;
-        }
-        subagents.add(found.branch.id);
-        showRowAtTop(virtualizer, followRef, found.index);
-    };
+    const openSubagent = useCallback(
+        (toolUseId: string): void => {
+            const found = findSubagentBranch(opensRef.current.rows, toolUseId);
+            if (!found) {
+                return;
+            }
+            addSubagent(found.branch.id);
+            showRowAtTop(virtualizer, followRef, found.index);
+        },
+        [addSubagent, virtualizer]
+    );
+    const flashedRow = flash !== null && flash.key === keyOf(chatId) && !flash.block ? flash.rowId : null;
 
     return (
         // A file an answer names is relative to the folder this chat runs in, which is a worktree as
@@ -630,6 +697,7 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
                             if (wantsEarlier(el)) {
                                 loadEarlier();
                             }
+                            followStrip(el);
                         }}
                     >
                         {/* A welcome centers the greeting and the composer as one group. The composer keeps its
@@ -655,49 +723,31 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
                                     <EmptyThread chatId={chatId} />
                                 ) : (
                                     <div className="relative w-full shrink-0" style={{ height: virtualizer.getTotalSize() }}>
-                                        {virtualizer.getVirtualItems().map((virtualRow) => {
-                                            const row = rows[virtualRow.index]!;
-                                            const previous = virtualRow.index > 0 ? rows[virtualRow.index - 1]! : null;
-                                            const header = replyHeader(row, previous);
-                                            return (
-                                                <RowContainer
-                                                    key={row.id}
-                                                    row={row}
-                                                    previous={previous}
-                                                    index={virtualRow.index}
-                                                    top={virtualRow.start}
-                                                    ref={virtualizer.measureElement}
-                                                >
-                                                    {flash !== null && flash.key === keyOf(chatId) && flash.rowId === row.id && !flash.block && (
-                                                        <span
-                                                            key={flash.nonce}
-                                                            className="chat-flash pointer-events-none absolute inset-0 rounded-lg"
-                                                            aria-hidden
+                                        <UiReplyNavigationContext.Provider value={uiNavigation}>
+                                            <FindRevealContext.Provider value={chatFind.reveal}>
+                                                {virtualizer.getVirtualItems().map((virtualRow) => {
+                                                    const row = rows[virtualRow.index]!;
+                                                    return (
+                                                        <ThreadRow
+                                                            key={row.id}
+                                                            row={row}
+                                                            previous={virtualRow.index > 0 ? rows[virtualRow.index - 1]! : null}
+                                                            index={virtualRow.index}
+                                                            top={virtualRow.start}
+                                                            measure={virtualizer.measureElement}
+                                                            chatId={chatId}
+                                                            flashNonce={flash !== null && flashedRow === row.id ? flash.nonce : null}
+                                                            bookmark={marks.get(row.id) ?? null}
+                                                            toggleGroup={groups.toggle}
+                                                            toggleTurn={turns.toggle}
+                                                            toggleSubagent={subagents.toggle}
+                                                            openSubagent={openSubagent}
+                                                            openConversation={openConversation}
                                                         />
-                                                    )}
-                                                    {header !== null && (
-                                                        <div className="chat-column-content w-full">
-                                                            <ReplyHeader chatId={chatId} at={header.at} />
-                                                        </div>
-                                                    )}
-                                                    <UiReplyNavigationContext.Provider value={uiNavigation}>
-                                                        <FindRevealContext.Provider value={chatFind.reveal}>
-                                                            <MarkableRow row={row} chatId={chatId} bookmark={marks.get(row.id) ?? null}>
-                                                                <Row
-                                                                    row={row}
-                                                                    chatId={chatId}
-                                                                    toggleGroup={groups.toggle}
-                                                                    toggleTurn={turns.toggle}
-                                                                    toggleSubagent={subagents.toggle}
-                                                                    openSubagent={openSubagent}
-                                                                    openConversation={openConversation}
-                                                                />
-                                                            </MarkableRow>
-                                                        </FindRevealContext.Provider>
-                                                    </UiReplyNavigationContext.Provider>
-                                                </RowContainer>
-                                            );
-                                        })}
+                                                    );
+                                                })}
+                                            </FindRevealContext.Provider>
+                                        </UiReplyNavigationContext.Provider>
                                     </div>
                                 )}
                             </ContextMenu.Trigger>
