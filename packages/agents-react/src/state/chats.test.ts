@@ -287,6 +287,19 @@ describe('a thread held from its newest page', () => {
         expect(waitingRequestsOf(state).map((item) => item.id)).toEqual(['q0']);
     });
 
+    test('a request answered while the page before was on its way stays answered', () => {
+        const answered = applyEvent(held(), { type: 'item', item: question('q0', 'answered'), historyIndex: 1 });
+        const page = { items: [user('u1', 'first'), question('q0', 'pending')], history: { start: 0, cursor: null } };
+        const state = prependPage(answered, 'g:2', page);
+        expect(state.order).toEqual(['u1', 'q0', 'u3', 'u4']);
+        expect(state.items.q0).toEqual(question('q0', 'answered'));
+        expect(waitingRequestsOf(state)).toEqual([]);
+
+        const partial = prependPage(answered, 'g:2', { ...page, history: { start: 1, cursor: 'g:1' } });
+        expect(partial.items.q0).toEqual(question('q0', 'answered'));
+        expect(waitingRequestsOf(partial)).toEqual([]);
+    });
+
     test('a page for a cursor the thread no longer has changes nothing', () => {
         const state = held();
         expect(prependPage(state, 'g:9', { items: [user('u1', 'first')], history: { start: 0, cursor: null } })).toBe(state);

@@ -123,7 +123,8 @@ export function prependPage(state: ChatState, cursor: string, page: ChatHistoryR
     const olderIds = new Set(older.map((item) => item.id));
     const items = { ...state.items };
     for (const item of older) {
-        items[item.id] = item;
+        // A request from before the page that this client already holds came in live, which is never older than the page.
+        items[item.id] = state.items[item.id] ?? item;
     }
     const order = [...olderIds, ...state.order];
     if (page.history.cursor === null) {
