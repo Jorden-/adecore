@@ -1,7 +1,6 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type {
     ChatAttachment,
-    ChatAssistantItem,
     ChatCheckpointDiff,
     ChatEvent,
     ChatGoalAction,
@@ -20,10 +19,8 @@ import type {
     ModelSelection,
     RuntimeMode
 } from '@adecore/agent-contracts';
-import { GeneratedImageInputSchema, HOST_TASK_ORIGIN, notResumedNote } from '@adecore/agent-contracts';
-import { resolveUiChoice, UI_FENCE_LANGUAGE, UiFailure, uiHasFence, uiMayReferenceHost } from '@adecore/intelligent-ui';
-import type { UiCompileOptions } from '@adecore/intelligent-ui/compiler';
-import { UiStream, type UiStreamPreview } from '@adecore/intelligent-ui/stream';
+import { HOST_TASK_ORIGIN, notResumedNote } from '@adecore/agent-contracts';
+import { resolveUiChoice, UI_FENCE_LANGUAGE, UiFailure } from '@adecore/intelligent-ui';
 import type { ChatProvider } from '../providers/provider.ts';
 import type { LimitsUpdate } from '../usage/limits/normalize.ts';
 import type { BackendEvent, BackendLaunch, ChatBackend, TurnInput } from './backend.ts';
@@ -36,6 +33,7 @@ import { isMainAgentOutput, ThreadProjector } from './projector.ts';
 import { readableAssistantText } from './readable-text.ts';
 import type { SubagentSettlement } from './subagent-settlement.ts';
 import { ChatThread } from './thread.ts';
+import { UiReplies, type UiReplyHost } from './ui-replies.ts';
 import { errorText } from '../error-text.ts';
 import { systemClock, type OutboxClock } from '../outbox/outbox-worker.ts';
 
@@ -86,10 +84,7 @@ export interface ChatSessionOptions {
     checkpoints?: TurnCheckpoints;
     // The info string of the host's UI fences; `UI_FENCE_LANGUAGE` without one.
     uiFenceLanguage?: string;
-    ui?: {
-        schemas: UiCompileOptions['querySchemas'];
-        observe(item: ChatAssistantItem, final: boolean): void;
-    };
+    ui?: UiReplyHost;
     emit(event: ChatEvent): void;
     /* What a turn said about the plan it runs on. It belongs to the machine, so it leaves the chat. */
     onLimits?(update: LimitsUpdate): void;
@@ -119,8 +114,6 @@ export interface LimitResumeHooks {
 
 // Claude Code names a session about six seconds after its first prompt, and a first turn can run for minutes.
 const TITLE_RECHECK_MS = 10_000;
-// Longer than any fence line or the name of a tag a scan looks for, so a match never falls between two deltas.
-const UI_SCAN_OVERLAP = 64;
 
 export interface ChatSendExtras {
     uiChoice?: ChatUiChoiceOrigin;
@@ -208,40 +201,35 @@ export class ChatSession {
     private pendingPreambles: readonly string[];
     private submission: { turnId: string; input: TurnInput } | null = null;
     private readonly steering = new Set<string>();
-    private readonly uiStreams = new Map<string, UiStream>();
-    private readonly uiCompiled = new Map<string, UiStreamPreview>();
     private readonly capturedUiAccess: Map<string, unknown>;
-    // How much of a streaming reply's text the fence and host scans already covered, so a delta scans only its tail.
-    private readonly uiScanned = new Map<string, number>();
-    private readonly uiReferencing = new Set<string>();
-    private readonly uiAttachments = new Map<string | null, string | undefined>();
-    private readonly uiFenceLanguage: string;
+    private readonly uiReplies: UiReplies;
 
     constructor(options: ChatSessionOptions) {
         this.options = options;
-        this.uiFenceLanguage = options.uiFenceLanguage ?? UI_FENCE_LANGUAGE;
         this.pendingPreambles = options.preambles ?? [];
         this.capturedUiAccess = new Map(Object.entries(options.uiAccess ?? {}));
         this.thread = new ChatThread(options.info, options.items);
         this.projector = new ThreadProjector(this.thread, { providerName: options.provider.name });
+        this.uiReplies = new UiReplies({
+            thread: this.thread,
+            fenceLanguage: options.uiFenceLanguage ?? UI_FENCE_LANGUAGE,
+            clock: options.clock ?? systemClock,
+            ...(options.ui ? { host: options.ui } : {}),
+            emit: (event) => options.emit(event),
+            repair: (note) => {
+                if (!this.pendingPreambles.includes(note)) {
+                    this.pendingPreambles = [...this.pendingPreambles, note];
+                }
+            }
+        });
     }
 
     get uiPreviews(): ChatEvent[] {
-        const events: ChatEvent[] = [];
-        for (const [itemId, preview] of this.uiCompiled) {
-            const item = this.thread.get(itemId);
-            if (item?.kind === 'assistant' && item.streaming && item.text.length === preview.textLength) {
-                events.push({ type: 'delta', itemId, text: '', ui: preview.blocks, textLength: preview.textLength });
-            }
-        }
-        return events;
+        return this.uiReplies.previews();
     }
 
     previewItems(items: ChatItem[]): ChatItem[] {
-        return items.map((item) => {
-            const preview = this.uiCompiled.get(item.id);
-            return item.kind === 'assistant' && preview?.textLength === item.text.length ? { ...item, ui: preview.blocks } : item;
-        });
+        return this.uiReplies.previewItems(items);
     }
 
     get id(): string {
@@ -1252,7 +1240,7 @@ export class ChatSession {
 
     /* Ends the process and stops listening to it, as the host goes down; the thread stays as it is. */
     freeze(): void {
-        this.clearUi();
+        this.uiReplies.clear();
         this.clearStartWarning();
         this.clearWorkflowWarnings();
         this.frozen = true;
@@ -1261,7 +1249,7 @@ export class ChatSession {
 
     /* Ends the CLI and everything it started; settles once it exited or was sent the SIGKILL. */
     dispose(): Promise<void> {
-        this.clearUi();
+        this.uiReplies.clear();
         this.clearStartWarning();
         this.clearWorkflowWarnings();
         if (this.titleTimer !== null) {
@@ -2131,129 +2119,9 @@ export class ChatSession {
 
     private emit(events: ChatEvent[]): void {
         const delegating = this.delegatingChange(events);
-        for (let event of delegating === null ? events : [...events, delegating]) {
-            if (event.type === 'reset') {
-                this.clearUi();
-            }
-            if (event.type === 'item' && event.item.kind === 'tool') {
-                this.uiAttachments.delete(event.item.turnId);
-            }
-            const item = event.type === 'item' ? event.item : event.type === 'delta' ? this.thread.get(event.itemId) : null;
-            if (item?.kind !== 'assistant' || item.parentToolUseId) {
-                this.options.emit(event);
-                continue;
-            }
-            const tail = this.unscannedUiText(item, event.type === 'item');
-            if (uiMayReferenceHost(tail)) {
-                this.uiReferencing.add(item.id);
-            }
-            let stream = this.uiStreams.get(item.id);
-            if (!stream && !uiHasFence(tail, this.uiFenceLanguage)) {
-                this.forgetUiScan(item);
-                this.options.emit(event);
-                continue;
-            }
-            if (!stream) {
-                stream = new UiStream({
-                    querySchemas: this.options.ui?.schemas,
-                    fenceLanguage: this.uiFenceLanguage,
-                    id: item.id,
-                    clock: this.options.clock ?? systemClock,
-                    emit: (preview) => {
-                        this.uiCompiled.set(item.id, preview);
-                        this.options.emit({ type: 'delta', itemId: item.id, text: '', ui: preview.blocks, textLength: preview.textLength });
-                    }
-                });
-                this.uiStreams.set(item.id, stream);
-            }
-            if (this.uiReferencing.has(item.id)) {
-                this.options.ui?.observe(item, false);
-            }
-            this.forgetUiScan(item);
-            const latestAttachment = this.latestUiAttachment(item.turnId);
-            if (event.type === 'item' && !item.streaming) {
-                const ui = stream
-                    .finish(item.text, latestAttachment)
-                    .map((block) => ({ ...block, revision: createHash('sha256').update(JSON.stringify(block)).digest('hex') }));
-                this.uiStreams.delete(item.id);
-                this.uiCompiled.delete(item.id);
-                const diagnostics = [...new Set(ui.flatMap((block) => block.diagnostics.map((diagnostic) => diagnostic.message)))].slice(0, 6);
-                if (diagnostics.length > 0) {
-                    const repair =
-                        `Your last ${this.uiFenceLanguage} block had these diagnostics: ${diagnostics.join(' ')} Use the catalog's supported props and components.`.slice(
-                            0,
-                            1200
-                        );
-                    if (!this.pendingPreambles.includes(repair)) {
-                        this.pendingPreambles = [...this.pendingPreambles, repair];
-                    }
-                }
-                const current = this.thread.get(item.id);
-                const completed = { ...item, ui, ...(current?.kind === 'assistant' && current.uiQueries ? { uiQueries: current.uiQueries } : {}) };
-                event = this.thread.upsert(completed);
-                this.options.emit(event);
-                this.options.ui?.observe(completed, true);
-            } else {
-                this.options.emit(event);
-                stream.update(item.text, latestAttachment);
-            }
+        for (const event of delegating === null ? events : [...events, delegating]) {
+            this.uiReplies.pass(event);
         }
-    }
-
-    /*
-     * The text a scan has not covered yet, from the start of the line the last scan ended in, since a fence
-     * is one line; a long line is cut short, behind a character no fence or tag can follow.
-     */
-    private unscannedUiText(item: ChatAssistantItem, whole: boolean): string {
-        const scanned = whole ? 0 : (this.uiScanned.get(item.id) ?? 0);
-        this.uiScanned.set(item.id, item.text.length);
-        if (scanned === 0 || scanned > item.text.length) {
-            return item.text;
-        }
-        const line = item.text.lastIndexOf('\n', scanned - 1) + 1;
-        const from = Math.max(line, scanned - UI_SCAN_OVERLAP);
-        return from === line ? item.text.slice(from) : `\0${item.text.slice(from)}`;
-    }
-
-    private forgetUiScan(item: ChatAssistantItem): void {
-        if (!item.streaming) {
-            this.uiScanned.delete(item.id);
-            this.uiReferencing.delete(item.id);
-        }
-    }
-
-    /* Looked up once per turn, and again only after one of its tool calls changed. */
-    private latestUiAttachment(turnId: string | null): string | undefined {
-        if (this.uiAttachments.has(turnId)) {
-            return this.uiAttachments.get(turnId);
-        }
-        const attachment = this.findUiAttachment(turnId);
-        this.uiAttachments.set(turnId, attachment);
-        return attachment;
-    }
-
-    private findUiAttachment(turnId: string | null): string | undefined {
-        for (const item of this.thread.list().toReversed()) {
-            if (item.kind !== 'tool' || item.turnId !== turnId || item.name !== 'ImageGeneration' || item.state !== 'done') {
-                continue;
-            }
-            const input = GeneratedImageInputSchema.safeParse(item.input);
-            if (input.success && input.data.attachment?.mime.startsWith('image/')) {
-                return input.data.attachment.id;
-            }
-        }
-        return undefined;
-    }
-
-    private clearUi(): void {
-        for (const stream of this.uiStreams.values()) {
-            stream.dispose();
-        }
-        this.uiStreams.clear();
-        this.uiCompiled.clear();
-        this.uiScanned.clear();
-        this.uiReferencing.clear();
-        this.uiAttachments.clear();
     }
 
     /* Said on the info as well as by the rows, since a client with the thread closed sees only the info. */
