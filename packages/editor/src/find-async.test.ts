@@ -1,4 +1,4 @@
-import { expect, test, spyOn } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { DocumentModel } from '@adecore/editor-core';
 import { FindController } from './find.ts';
 import { FindSearchQueue } from './find-search.ts';
@@ -513,4 +513,77 @@ test('switching to literal find releases a regex still running in the worker', a
     await flush();
     expect(host.find.state).toEqual({ count: 2, current: 0 });
     host.find.dispose();
+});
+
+describe('a step past the marks of a limited search', () => {
+    async function limited() {
+        const host = setup('word word word');
+        const seeks: { offset: number; result: ReturnType<typeof deferred<{ from: number; to: number } | null>> }[] = [];
+        host.client.next = (_snapshot, _query, offset) => {
+            const result = deferred<{ from: number; to: number } | null>();
+            seeks.push({ offset, result });
+            return result.promise;
+        };
+        host.find.set(query);
+        host.fire(0);
+        await flush();
+        host.reply([0, 4, 5, 9], true);
+        await flush();
+        host.find.step(1);
+        return { ...host, seeks };
+    }
+
+    test('asks the worker for the match after the last one and goes there', async () => {
+        const host = await limited();
+        expect(host.find.state).toEqual({ count: 2, current: 1, limited: true });
+        host.find.step(1);
+        await flush();
+        expect(host.seeks.map((seek) => seek.offset)).toEqual([9]);
+        expect(host.find.state.searching).toBe(true);
+        host.seeks[0]!.result.resolve({ from: 10, to: 14 });
+        await flush();
+        expect(host.find.state).toEqual({ count: 2, current: null, limited: true });
+        expect(host.find.currentMark).toMatchObject({ from: 10, to: 14 });
+        host.find.dispose();
+    });
+
+    test('takes a step asked for while it seeks once the seek lands', async () => {
+        const host = await limited();
+        host.find.step(1);
+        host.find.step(1);
+        await flush();
+        expect(host.seeks).toHaveLength(1);
+        // The seek wraps around to the first match, and the step waiting on it goes on to the second.
+        host.seeks[0]!.result.resolve({ from: 0, to: 4 });
+        await flush();
+        expect(host.find.state.current).toBe(1);
+        host.find.dispose();
+    });
+
+    test.each([
+        ['syntax', 'invalid'],
+        ['timeout', 'timeout'],
+        ['unavailable', 'unavailable'],
+        ['snapshot', 'error']
+    ] as const)('reports a %s failure of the worker as %s', async (kind, failed) => {
+        const host = await limited();
+        host.find.step(1);
+        await flush();
+        host.seeks[0]!.result.reject(new EditorSearchError(kind, kind));
+        await flush();
+        expect(host.find.state.failed).toBe(failed);
+        expect(host.find.state.searching).toBeUndefined();
+        host.find.dispose();
+    });
+
+    test('ignores the answer of a seek an edit made stale', async () => {
+        const host = await limited();
+        host.find.step(1);
+        await flush();
+        host.model.applyEdits([{ from: 0, to: 0, text: 'x' }]);
+        host.seeks[0]!.result.reject(new EditorSearchError('timeout', 'late'));
+        await flush();
+        expect(host.find.state.failed).toBeUndefined();
+        host.find.dispose();
+    });
 });

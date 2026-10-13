@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { mountEditor, pointer } from './testing.ts';
+import { mountEditor, pointer, release } from './testing.ts';
 
 describe('the focus', () => {
     test('leaving the editor is a blur, and moving inside it is not', () => {
@@ -16,6 +16,30 @@ describe('the focus', () => {
         focusOut(page.document.body);
         focusOut(null);
         expect(blurs).toBe(2);
+    });
+});
+
+describe('a double tap of the modifier', () => {
+    const tap = (mounted: ReturnType<typeof mountEditor>, timeStamp: number): void => {
+        mounted.press('Control', { ctrlKey: true, timeStamp } as never);
+        release(mounted.page.window, mounted.input, 'Control', { timeStamp: timeStamp + 40 } as never);
+    };
+
+    test('held the second time adds a caret below with the arrow', () => {
+        const mounted = mountEditor();
+        tap(mounted, 0);
+        mounted.press('Control', { ctrlKey: true, timeStamp: 100 } as never);
+        expect(mounted.press('ArrowDown', { ctrlKey: true, timeStamp: 150 } as never)).toBe(true);
+        expect(mounted.editor.getSelections()).toHaveLength(2);
+    });
+
+    test('starts over when the input loses the focus between the taps', () => {
+        const mounted = mountEditor();
+        tap(mounted, 0);
+        mounted.input.dispatchEvent(new mounted.page.window.Event('blur'));
+        mounted.press('Control', { ctrlKey: true, timeStamp: 100 } as never);
+        mounted.press('ArrowDown', { ctrlKey: true, timeStamp: 150 } as never);
+        expect(mounted.editor.getSelections()).toHaveLength(1);
     });
 });
 
