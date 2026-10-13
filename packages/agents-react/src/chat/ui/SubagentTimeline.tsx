@@ -17,6 +17,8 @@ import { FOLLOW_THRESHOLD_PX, rowRhythm } from './rows/row-rhythm';
 import { useToggleSet } from './useToggleSet';
 import { FileLinkContext } from './file-links';
 import { useChatRow } from '../../state/chats';
+import { useChatPreferences } from '../preferences';
+import { readingWidthStyle } from '../reading-width';
 import { useChatScope } from '../../scope';
 import { EmptyState, ContextMenu, Icon } from '@adecore/ui';
 
@@ -109,12 +111,14 @@ export function SubagentTimeline({ chatId, toolUseId }: { chatId: string; toolUs
         }
     }, [rows, state.status, loadEarlier]);
 
+    const readingWidth = useChatPreferences((preferences) => preferences.readingWidth);
+
     const openChild = (step: SubagentStep): void => {
         show(openBelow(trail, step));
     };
 
     return (
-        <div className="flex h-full min-h-0 flex-col">
+        <div className="flex h-full min-h-0 flex-col" style={readingWidthStyle(readingWidth)}>
             <SubagentInfo chatId={chatId} toolUseId={toolUseId} />
             {state.status === 'loading' && <div className="chat-column-content px-4 pt-4 text-xs text-text-faint">{t('subagents.loading')}</div>}
             {state.status === 'failed' && (

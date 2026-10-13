@@ -22,9 +22,13 @@ An opened tool call has no card: what it was asked stands under its line, a shel
 
 Only the rows on screen are drawn. The thread follows new text while it is scrolled to the end and stops once a person scrolls up or opens a fold. Near the top it loads the page before the oldest it holds and keeps the row being read in place. Once a thread has a few messages, a scrubber along its edge marks every message and bookmark.
 
-A message has its actions under it on hover: bookmark, fork (only with a host `fork`) and copy. A right click adds copying the message, its code or its Markdown, and selecting text in a reply offers to quote it into the composer. A bookmark marks its message with a line across the thread.
+A message has its actions under it on hover: bookmark, fork (only with a host `fork`) and copy. A right click adds copying the message, its code or its Markdown, and in a view of its own the reading width, and selecting text in a reply offers to quote it into the composer. A bookmark marks its message with a line across the thread.
 
 The path of a file a call reads or writes, in its line and in the line of an approval, and a file in the changed files card, is cut in the middle when it does not fit, so the folder it starts in and the name it ends with both stay in sight ([`MiddleTruncate`](/ui/display/middle-truncate)). The cut part is still in the line for a copy or a find, and a tooltip shows the whole path.
+
+## Reading width
+
+In a parent with the class `chat-column`, a chat that is a view of its own, the rows and the composer stand in a centered column. Its width is the person's reading width in the [chat preferences](/agents-react/guide/persistence): `narrow` (640 pixels), `comfortable` (768 pixels, the default) or `full`, the whole width of the view. The thread's right click menu offers the three in such a view, and a settings page of your own can offer them with `CHAT_READING_WIDTHS`, `readingWidthLabel` and `readingWidthHint` from `chat/reading-width` and `rememberReadingWidth` from `chat/preferences`. A node on a canvas, without `chat-column`, always runs the width it has. `SubagentTimeline` follows the same width.
 
 ## Props
 

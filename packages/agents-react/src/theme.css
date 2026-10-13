@@ -91,13 +91,14 @@
     /*
      * A chat that is a view of its own reads in a column. The scroller keeps the full width of the
      * main column, so its scrollbar sits at that column's right edge and nothing jumps when the
-     * thread grows past a screenful; only the rows and the composer inside it are centered.
+     * thread grows past a screenful; only the rows and the composer inside it are centered. The
+     * width is the person's reading width (`chat/reading-width.ts`).
      */
-    .chat-column .chat-column-content { margin-inline: auto; max-width: 768px; }
+    .chat-column .chat-column-content { margin-inline: auto; max-width: var(--chat-measure, 768px); }
     /* Wide pages clear the scrubber even when the reply column needs no extra padding. */
     .chat-wide-content { max-width: calc(100% - 2 * var(--chat-wide-inset, 0px)); }
     /* Wider by the input's inset (`.composer-input .cm-content` padding plus the card's border), so what is typed lines up with the thread. */
-    .chat-column .chat-composer-content { margin-inline: auto; max-width: calc(768px + 2 * 21px); }
+    .chat-column .chat-composer-content { margin-inline: auto; max-width: calc(var(--chat-measure, 768px) + 2 * 21px); }
 
     /* A diff inside a chat tool block; the library paints its own colors inside a shadow root and
        takes the face it draws them in through these variables. */

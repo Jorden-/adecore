@@ -1,6 +1,7 @@
 import { chatStorageKey, chatStorageLegacyKeys, createChatStore, onChatStorageConfiguration } from '../storage';
 import type { AgentKind, ChatPreferencesPayload, ModelSelection, ProviderInfo, ProviderAccounts, RuntimeMode } from '@adecore/agent-contracts';
 import { persistedJson } from './persisted-json';
+import { DEFAULT_READING_WIDTH, isChatReadingWidth, type ChatReadingWidth } from './reading-width';
 
 const storageKey = (): string => chatStorageKey('preferences');
 
@@ -14,6 +15,8 @@ export interface ChatPreferences {
     terminalRuntimeMode: RuntimeMode;
     /* Per machine, the account a new agent of each CLI starts under; an account id only means something on its own machine. */
     accountByMachine: Record<string, Partial<Record<AgentKind, string>>>;
+    /* How wide a chat of its own reads. It never reaches a machine. */
+    readingWidth: ChatReadingWidth;
     /* When a person last changed any of it; what settles whose pick a machine uses when several clients told it one. */
     changedAt: number;
 }
@@ -24,6 +27,7 @@ export const DEFAULT_CHAT_PREFERENCES: ChatPreferences = {
     runtimeMode: 'full-access',
     terminalRuntimeMode: 'full-access',
     accountByMachine: {},
+    readingWidth: DEFAULT_READING_WIDTH,
     changedAt: 0
 };
 
@@ -44,6 +48,7 @@ export function parseChatPreferences(raw: string | null): ChatPreferences {
             runtimeMode: stored.runtimeMode ?? DEFAULT_CHAT_PREFERENCES.runtimeMode,
             terminalRuntimeMode: stored.terminalRuntimeMode ?? DEFAULT_CHAT_PREFERENCES.terminalRuntimeMode,
             accountByMachine: { ...stored.accountByMachine },
+            readingWidth: isChatReadingWidth(stored.readingWidth) ? stored.readingWidth : DEFAULT_READING_WIDTH,
             changedAt: typeof stored.changedAt === 'number' ? stored.changedAt : 0
         };
     } catch {
@@ -142,15 +147,23 @@ export function reloadChatPreferences(): void {
     useChatPreferences.setState(storage.read(), true);
 }
 
+function store(preferences: ChatPreferences): void {
+    useChatPreferences.setState(preferences);
+    storage.write(preferences);
+}
+
 function write(preferences: ChatPreferences): void {
-    const next = { ...preferences, changedAt: Date.now() };
-    useChatPreferences.setState(next);
-    storage.write(next);
+    store({ ...preferences, changedAt: Date.now() });
 }
 
 /* The composer writes here on every change and the settings dialog too; both edit the same remembered default. */
 export function rememberChatPreferences(patch: Partial<ChatPreferences>): void {
     write({ ...useChatPreferences.getState(), ...patch });
+}
+
+/* The reading width leaves `changedAt` alone: it is no pick a machine weighs against another client's. */
+export function rememberReadingWidth(readingWidth: ChatReadingWidth): void {
+    store({ ...useChatPreferences.getState(), readingWidth });
 }
 
 export function rememberChatSelection(provider: AgentKind, selection: ModelSelection): void {

@@ -21,6 +21,8 @@ import {
     type TurnTarget
 } from '../timeline-scroll';
 import { useTimelineFlash } from '../timeline-flash';
+import { useChatPreferences } from '../preferences';
+import { readingMeasure, readingWidthStyle } from '../reading-width';
 import {
     SCRUBBER_MIN_TICKS,
     STRIP_INSET_PX,
@@ -364,7 +366,8 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
     const onMainAgent = trail.length === 0;
     // A node on a canvas has no strip. It is too narrow to give up a column of its width.
     const showsScrubber = frame.column && onMainAgent && ticks.length >= SCRUBBER_MIN_TICKS;
-    const paddingLeft = threadPaddingLeft(frame.width, showsScrubber);
+    const readingWidth = useChatPreferences((preferences) => preferences.readingWidth);
+    const paddingLeft = threadPaddingLeft(frame.width, showsScrubber, readingMeasure(readingWidth));
 
     /*
      * Where each message starts, from the virtualizer's measurements (an estimate for a row it never
@@ -592,7 +595,13 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
         // A file an answer names is relative to the folder this chat runs in, which is a worktree as
         // often as it is the project itself.
         <FileLinkContext.Provider value={info?.cwd ?? null}>
-            <div ref={frameRef} className="relative flex min-h-0 grow flex-col" data-file-cwd={info?.cwd ?? ''} data-file-scope-id={scope.id}>
+            <div
+                ref={frameRef}
+                className="relative flex min-h-0 grow flex-col"
+                style={readingWidthStyle(readingWidth)}
+                data-file-cwd={info?.cwd ?? ''}
+                data-file-scope-id={scope.id}
+            >
                 {searching && chatFind.bar}
                 <ContextMenu.Root>
                     <div
@@ -703,7 +712,7 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
                             </div>
                         </div>
                     </div>
-                    <TimelineMenuPopup target={target} thread={threadRef} chatId={onMainAgent ? chatId : null} />
+                    <TimelineMenuPopup target={target} thread={threadRef} chatId={onMainAgent ? chatId : null} column={frame.column} />
                 </ContextMenu.Root>
                 {drawsVisuals && <VisualDialogs chatId={chatId} />}
                 {loadingEarlier && !overlay && (

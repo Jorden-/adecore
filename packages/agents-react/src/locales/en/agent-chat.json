@@ -602,5 +602,20 @@
         "unreadable": "The source could not be read."
       }
     }
+  },
+  "readingWidth": {
+    "label": "Reading width",
+    "narrow": {
+      "label": "Narrow",
+      "hint": "A short line that is easy to follow."
+    },
+    "comfortable": {
+      "label": "Comfortable",
+      "hint": "A line of about 90 characters."
+    },
+    "full": {
+      "label": "Full",
+      "hint": "As wide as the view."
+    }
   }
 }

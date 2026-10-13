@@ -249,6 +249,11 @@
             "types": "./dist/chat/quote.d.ts",
             "default": "./dist/chat/quote.js"
         },
+        "./chat/reading-width": {
+            "source": "./src/chat/reading-width.ts",
+            "types": "./dist/chat/reading-width.d.ts",
+            "default": "./dist/chat/reading-width.js"
+        },
         "./chat/recent-messages": {
             "source": "./src/chat/recent-messages.ts",
             "types": "./dist/chat/recent-messages.d.ts",

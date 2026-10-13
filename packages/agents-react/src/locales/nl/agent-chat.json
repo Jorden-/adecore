@@ -602,5 +602,20 @@
         "unreadable": "De bron kon niet gelezen worden."
       }
     }
+  },
+  "readingWidth": {
+    "label": "Leesbreedte",
+    "narrow": {
+      "label": "Smal",
+      "hint": "Een korte regel die makkelijk te volgen is."
+    },
+    "comfortable": {
+      "label": "Comfortabel",
+      "hint": "Een regel van ongeveer 90 tekens."
+    },
+    "full": {
+      "label": "Volledig",
+      "hint": "Zo breed als de weergave."
+    }
   }
 }

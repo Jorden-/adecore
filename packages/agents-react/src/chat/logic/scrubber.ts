@@ -1,5 +1,6 @@
 import type { ChatBookmark } from '@adecore/agent-contracts';
 import type { TimelineRow } from './timeline';
+import { DEFAULT_READING_WIDTH, readingMeasure } from '../reading-width';
 
 /*
  * The strip at the left edge of a chat view with a tick per message a person sent, as numbers: which
@@ -30,8 +31,7 @@ export const TICK_HEIGHT_PX = 2;
 const PITCH_PX = 8;
 const MIN_PITCH_PX = 4;
 
-/* The thread's content column in a view of its own (`.chat-column-content`) and the scroller's padding around it (`px-4`). */
-const CONTENT_MAX_WIDTH_PX = 768;
+/* The scroller's padding around the thread's content column (`px-4`). */
 const THREAD_PADDING_PX = 16;
 export const STRIP_WIDTH_PX = 24;
 /* The strip's distance from the view's left edge, and the air it keeps between itself and the thread's text. */
@@ -273,13 +273,14 @@ export function stepMessage(starts: readonly number[], eligible: (index: number)
 /*
  * The left padding of the thread in a view that draws the strip at its left edge. A wide view keeps
  * the usual padding, since its centered column already clears the strip; a narrower one pads until
- * the column's text starts clear of it, so nothing is ever drawn under the strip.
+ * the column's text starts clear of it, so nothing is ever drawn under the strip. `measure` is the
+ * widest the content column runs (`readingMeasure`).
  */
-export function threadPaddingLeft(width: number, strip: boolean): number {
+export function threadPaddingLeft(width: number, strip: boolean, measure = readingMeasure(DEFAULT_READING_WIDTH)): number {
     if (!strip) {
         return THREAD_PADDING_PX;
     }
     // The column's margin is half of what the padding leaves, so the padding counts the clearance twice.
-    const padding = 2 * STRIP_CLEARANCE_PX + CONTENT_MAX_WIDTH_PX + THREAD_PADDING_PX - Math.floor(width);
+    const padding = 2 * STRIP_CLEARANCE_PX + measure + THREAD_PADDING_PX - Math.floor(width);
     return Math.min(STRIP_CLEARANCE_PX, Math.max(THREAD_PADDING_PX, padding));
 }

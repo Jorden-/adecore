@@ -78,9 +78,15 @@ describe('reading what is stored', () => {
             runtimeMode: 'auto',
             terminalRuntimeMode: 'supervised',
             accountByMachine: { local: { claude: 'claude_work' }, studio: { codex: 'codex_client' } },
+            readingWidth: 'narrow',
             changedAt: 42
         };
         expect(parseChatPreferences(JSON.stringify(stored))).toEqual(stored as ChatPreferences);
+    });
+
+    test('a reading width this build does not know is the default one', () => {
+        expect(parseChatPreferences(JSON.stringify({ readingWidth: 'wide' })).readingWidth).toBe('comfortable');
+        expect(parseChatPreferences(JSON.stringify({ readingWidth: 'full' })).readingWidth).toBe('full');
     });
 
     test('preferences written before the moment of a change was kept count as the oldest pick', () => {

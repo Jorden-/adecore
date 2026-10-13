@@ -308,4 +308,10 @@ describe('threadPaddingLeft', () => {
             expect(Number.isInteger(threadPaddingLeft(width, true))).toBe(true);
         }
     });
+    test('the column follows the reading width, and a full one always pads clear of the strip', () => {
+        expect(threadPaddingLeft(760, true, 640)).toBe(16);
+        expect(threadPaddingLeft(760, true)).toBe(40);
+        expect(threadPaddingLeft(2400, true, Number.POSITIVE_INFINITY)).toBe(40);
+        expect(threadPaddingLeft(2400, false, Number.POSITIVE_INFINITY)).toBe(16);
+    });
 });

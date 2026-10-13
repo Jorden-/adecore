@@ -1,7 +1,9 @@
 import type { RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BookmarkPlus, BookmarkX, Braces, Copy, Eye, FileText, GitFork, MessageSquare, Pencil, Scan } from 'lucide-react';
+import { BookmarkPlus, BookmarkX, Braces, Copy, Eye, FileText, GitFork, MessageSquare, MoveHorizontal, Pencil, Scan } from 'lucide-react';
 import { placeBookmark, removeBookmark, useBookmarkNaming } from '../bookmarks';
+import { rememberReadingWidth, useChatPreferences } from '../preferences';
+import { CHAT_READING_WIDTHS, readingWidthLabel, type ChatReadingWidth } from '../reading-width';
 import { forkRefusal, turnIdOfRow } from '../logic/fork';
 import { markdownOf, messageTextOf } from '../logic/timeline-copy';
 import type { TimelineTarget } from '../logic/timeline-target';
@@ -15,12 +17,15 @@ import { ContextMenu, copyText, DisabledReason, EDIT_SHORTCUTS, Icon, Kbd, selec
 export function TimelineMenuPopup({
     target,
     thread,
-    chatId = null
+    chatId = null,
+    column = false
 }: {
     target: TimelineTarget;
     thread: RefObject<HTMLDivElement | null>;
     /* The chat whose own thread this is; a thread in its place (a sub-agent's) has nothing to fork. */
     chatId?: string | null;
+    /* The thread is a view of its own (`.chat-column`), the one place its reading width shows. */
+    column?: boolean;
 }) {
     const { t } = useTranslation('agent-chat');
     const message = target.row === null ? null : messageTextOf(target.row);
@@ -79,6 +84,12 @@ export function TimelineMenuPopup({
                     </ContextMenu.Item>
                 </>
             )}
+            {column && (
+                <>
+                    <ContextMenu.Separator />
+                    <ReadingWidthSubmenu />
+                </>
+            )}
         </ContextMenu.Popup>
     );
 }
@@ -117,5 +128,27 @@ export function BookmarkMenuItems({ chatId, itemId, onName }: { chatId: string; 
                 <Icon icon={BookmarkX} size={14} /> {t('bookmarks.remove')}
             </ContextMenu.Item>
         </>
+    );
+}
+
+/* The person's reading width for every chat of its own on this client. */
+function ReadingWidthSubmenu() {
+    const { t } = useTranslation('agent-chat');
+    const readingWidth = useChatPreferences((preferences) => preferences.readingWidth);
+    return (
+        <ContextMenu.SubmenuRoot>
+            <ContextMenu.SubmenuTrigger>
+                <Icon icon={MoveHorizontal} size={14} /> {t('readingWidth.label')}
+            </ContextMenu.SubmenuTrigger>
+            <ContextMenu.Popup className="min-w-40">
+                <ContextMenu.RadioGroup value={readingWidth} onValueChange={(width: ChatReadingWidth) => rememberReadingWidth(width)}>
+                    {CHAT_READING_WIDTHS.map((width) => (
+                        <ContextMenu.RadioItem key={width} value={width}>
+                            {readingWidthLabel(width)}
+                        </ContextMenu.RadioItem>
+                    ))}
+                </ContextMenu.RadioGroup>
+            </ContextMenu.Popup>
+        </ContextMenu.SubmenuRoot>
     );
 }

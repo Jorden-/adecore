@@ -1,6 +1,6 @@
 # Persistence
 
-Four records outlive a reload: the drafts of every chat, the chat preferences (the model per CLI, the runtime mode, the account per host), the stash of prompts put aside, and the usage page's choices. Everything else, threads included, comes from the host again.
+Four records outlive a reload: the drafts of every chat, the chat preferences (the model per CLI, the runtime mode, the account per host, the reading width), the stash of prompts put aside, and the usage page's choices. Everything else, threads included, comes from the host again.
 
 ## Configure first
 
