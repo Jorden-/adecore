@@ -25,47 +25,6 @@ export function autoLines(block: MergeBlock): string[] | null {
     }
 }
 
-const QUOTES = new Set(['"', "'", '`']);
-
-/* A line with every run of whitespace outside a quoted string made one space; inside one, whitespace is the string's value. */
-function squashedLine(body: string): string {
-    let squashed = '';
-    let quote: string | null = null;
-    for (let index = 0; index < body.length; index += 1) {
-        const char = body[index]!;
-        if (quote !== null) {
-            squashed += char;
-            if (char === '\\' && index + 1 < body.length) {
-                index += 1;
-                squashed += body[index];
-            } else if (char === quote) {
-                quote = null;
-            }
-        } else if (/\s/.test(char)) {
-            if (!squashed.endsWith(' ')) {
-                squashed += ' ';
-            }
-        } else {
-            squashed += char;
-            if (QUOTES.has(char)) {
-                quote = char;
-            }
-        }
-    }
-    return squashed;
-}
-
-function squashed(lines: readonly string[]): string {
-    return lines
-        .map((line) => {
-            const body = line.trim();
-            // Indentation is meaning in Python, YAML or a Makefile, so only a blank line loses its own.
-            const indent = body === '' ? '' : line.slice(0, line.length - line.trimStart().length);
-            return `${indent}${squashedLine(body)}`;
-        })
-        .join('\n');
-}
-
 /* Where `inner` starts in `outer` as one run of lines, or -1. */
 function runIn(outer: readonly string[], inner: readonly string[]): number {
     for (let start = 0; start + inner.length <= outer.length; start += 1) {
@@ -91,16 +50,14 @@ function covers(base: readonly string[], outer: readonly string[], inner: readon
 
 /*
  * What the wand makes of a conflict, or null for one that needs a person after all. It closes only
- * sides that differ in whitespace inside or after a line, outside a quoted string, and a side that
- * already holds every line of the other without putting back what the other deleted. Anything else
- * is a choice it never guesses. A regular expression or a string that spans lines is not told
- * from code, so whitespace in one still counts as spacing.
+ * identical sides and a side that already holds every line of the other without putting back what
+ * the other deleted. Whitespace keeps its meaning because this function has no language context.
  */
 export function wandLines(block: MergeBlock): string[] | null {
     if (block.kind !== 'conflict') {
         return autoLines(block);
     }
-    if (squashed(block.ours) === squashed(block.theirs)) {
+    if (block.ours.length === block.theirs.length && block.ours.every((line, index) => line === block.theirs[index])) {
         return [...block.ours];
     }
     if (covers(block.base, block.ours, block.theirs)) {

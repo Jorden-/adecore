@@ -154,9 +154,20 @@ test('a draft of a block too long to spread into one call', () => {
 });
 
 describe('wandLines', () => {
-    test('sides that differ only in whitespace take ours', () => {
+    test('leaves whitespace in regexes, multiline strings and plain text for a person', () => {
+        const cases = [
+            { ours: ['const pattern = /a  b/;'], theirs: ['const pattern = /a b/;'] },
+            { ours: ['const text = `', 'a  b', '`;'], theirs: ['const text = `', 'a b', '`;'] },
+            { ours: ['paragraph  '], theirs: ['paragraph'] }
+        ];
+        for (const { ours, theirs } of cases) {
+            expect(wandLines({ kind: 'conflict', base: ['old'], ours, theirs })).toBeNull();
+        }
+    });
+
+    test('sides that differ only in whitespace need a choice without language context', () => {
         const blocks = splitBlocks(['a'], ['const x = 1;'], ['const  x   = 1;']);
-        expect(wandLines(blocks[0]!)).toEqual(['const x = 1;']);
+        expect(wandLines(blocks[0]!)).toBeNull();
     });
 
     test('the side that already holds the other wins', () => {
@@ -188,13 +199,13 @@ describe('wandLines', () => {
         { name: 'an addition on top of the same change still wins', base: ['old'], ours: ['new', 'more'], theirs: ['new'], wand: ['new', 'more'] },
         { name: 'indentation is not whitespace', base: ['    x = 1'], ours: ['    x = 2'], theirs: ['x = 2'], wand: null },
         { name: 'a tab is not four spaces', base: ['\tx = 1'], ours: ['\tx = 2'], theirs: ['    x = 2'], wand: null },
-        { name: 'whitespace inside and after a line still is', base: ['    x = 1'], ours: ['    x = 2;'], theirs: ['    x  =  2;  '], wand: ['    x = 2;'] },
-        { name: 'a blank line is blank however indented', base: ['x = 1'], ours: ['x = 2', ''], theirs: ['x = 2', '    '], wand: ['x = 2', ''] },
+        { name: 'whitespace inside and after a line needs a choice', base: ['    x = 1'], ours: ['    x = 2;'], theirs: ['    x  =  2;  '], wand: null },
+        { name: 'a blank line may belong to a multiline literal', base: ['x = 1'], ours: ['x = 2', ''], theirs: ['x = 2', '    '], wand: null },
         { name: 'whitespace inside a string is its value', base: ['s = "x";'], ours: ['const s = "a  b";'], theirs: ['const s = "a b";'], wand: null },
         { name: 'and so it is in single quotes and backticks', base: ['x'], ours: ["f('a b', `c  d`)"], theirs: ["f('a  b', `c d`)"], wand: null },
         { name: 'an escaped quote does not end the string', base: ['x'], ours: ['s = "a\\"  b"'], theirs: ['s = "a\\" b"'], wand: null },
-        { name: 'whitespace outside a string still is', base: ['x'], ours: ['s = "a  b";'], theirs: ['s  =   "a  b";  '], wand: ['s = "a  b";'] },
-        { name: 'and so it is between two strings', base: ['x'], ours: ['f("a  b", "c")'], theirs: ['f("a  b",   "c")'], wand: ['f("a  b", "c")'] }
+        { name: 'whitespace outside a string needs a choice', base: ['x'], ours: ['s = "a  b";'], theirs: ['s  =   "a  b";  '], wand: null },
+        { name: 'and so it does between two strings', base: ['x'], ours: ['f("a  b", "c")'], theirs: ['f("a  b",   "c")'], wand: null }
     ];
 
     for (const entry of cases) {

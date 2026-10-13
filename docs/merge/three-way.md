@@ -36,10 +36,10 @@ An answer is the lines a block becomes, kept in a `Map<number, readonly string[]
 
 The wand answers a conflict when:
 
-- The sides differ only in whitespace inside a line or at its end. Ours wins. Indentation still counts on a line with text, since it carries meaning in Python, YAML and Makefiles; a tab is not four spaces.
+- Both sides contain exactly the same lines. Ours wins.
 - One side holds the other's lines as one run, and what it adds puts back no base line the other side deleted. That side wins. An empty side is never held.
 
-It compares text and knows no language, so a difference in whitespace inside a string literal counts as none. Decide whether the app applies its answers directly or offers them for review.
+It compares text and knows no language, so whitespace differences need a choice. This includes indentation, string and regex contents, and trailing spaces that can carry meaning in Markdown. Earlier versions resolved some whitespace differences automatically; callers now get `null` for those conflicts and should offer their usual manual choice.
 
 ## Drafts
 
