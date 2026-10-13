@@ -27,7 +27,7 @@ export interface PlanApplyOptions {
     actor: PlanActor;
     /* ISO time written into `at`; injected so a test never reads the clock. */
     now: string;
-    /* Mints an id for an item that comes without one; retried until it is not taken. */
+    /* Mints an id for an item that comes without one; retried until it is not taken, and refused when it never is. */
     mintId?: () => string;
 }
 
@@ -41,10 +41,20 @@ export interface PlanApplied {
 }
 
 const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
+const ID_LENGTH = 6;
+/* 256 is no multiple of the alphabet, so a byte at or above this would favor its first characters. */
+const ID_BYTE_LIMIT = 256 - (256 % ID_ALPHABET.length);
 
 export function randomItemId(): string {
-    const bytes = crypto.getRandomValues(new Uint8Array(6));
-    return Array.from(bytes, (byte) => ID_ALPHABET[byte % ID_ALPHABET.length]).join('');
+    let id = '';
+    while (id.length < ID_LENGTH) {
+        for (const byte of crypto.getRandomValues(new Uint8Array(ID_LENGTH))) {
+            if (byte < ID_BYTE_LIMIT && id.length < ID_LENGTH) {
+                id += ID_ALPHABET[byte % ID_ALPHABET.length];
+            }
+        }
+    }
+    return id;
 }
 
 function issueMessage(error: z.ZodError): string {
@@ -56,9 +66,11 @@ function issueMessage(error: z.ZodError): string {
     return `${path ? `${path.replace(/^\./, '')}: ` : ''}${issue.message}`;
 }
 
+const MINT_ATTEMPTS = 1000;
+
 function idMinter(taken: Set<string>, mintId: () => string, minted: string[]) {
-    return (): string => {
-        for (let attempt = 0; attempt < 1000; attempt++) {
+    return (): string | PlanRefusal => {
+        for (let attempt = 0; attempt < MINT_ATTEMPTS; attempt++) {
             const id = mintId();
             if (!taken.has(id)) {
                 taken.add(id);
@@ -66,7 +78,7 @@ function idMinter(taken: Set<string>, mintId: () => string, minted: string[]) {
                 return id;
             }
         }
-        throw new Error('Could not mint a free plan item id');
+        return refuse('duplicate-id', `mintId gave no id the plan does not already have in ${MINT_ATTEMPTS} tries`);
     };
 }
 
@@ -176,7 +188,7 @@ function newItem(op: Extract<PlanOp, { op: 'add' }>, id: string): PlanItem {
     return { type: 'step', ...base, ...(op.checks ? { checks: op.checks } : {}) };
 }
 
-function applyOne(plan: Plan, op: PlanOp, options: PlanApplyOptions, mint: () => string, dropped: string[]): PlanRefusal | null {
+function applyOne(plan: Plan, op: PlanOp, options: PlanApplyOptions, mint: () => string | PlanRefusal, dropped: string[]): PlanRefusal | null {
     const verdict = canApply(op, options.actor, plan);
     if (!verdict.ok) {
         return verdict;
@@ -210,6 +222,9 @@ function applyOne(plan: Plan, op: PlanOp, options: PlanApplyOptions, mint: () =>
         }
         case 'add': {
             const id = op.id ?? mint();
+            if (typeof id !== 'string') {
+                return id;
+            }
             if (op.id !== undefined && locateItem(plan, op.id)) {
                 return refuse('duplicate-id', `The plan already has an item "${op.id}"`);
             }
@@ -411,6 +426,18 @@ export function createPlan(draft: PlanDraft, options: PlanCreateOptions): PlanAp
         }
     }
     const mint = idMinter(taken, options.mintId ?? randomItemId, minted);
+    // Minted up front so a refusal stops here; the tree below takes them in the same order, parents first.
+    const fresh: string[] = [];
+    for (const item of allDraftItems(source.items)) {
+        if (item.id === undefined) {
+            const id = mint();
+            if (typeof id !== 'string') {
+                return id;
+            }
+            fresh.push(id);
+        }
+    }
+    const nextId = (): string => fresh.shift()!;
     const described = <T extends { description?: string }>(value: T): T => {
         if (value.description === '') {
             delete value.description;
@@ -419,7 +446,7 @@ export function createPlan(draft: PlanDraft, options: PlanCreateOptions): PlanAp
     };
     const toStep = (step: PlanDraftStep): PlanStep => {
         const { steps, state, note, ...rest } = step;
-        const result: PlanStep = described({ ...rest, id: step.id ?? mint() });
+        const result: PlanStep = described({ ...rest, id: step.id ?? nextId() });
         if (steps && steps.length > 0) {
             result.steps = steps.map(toStep);
         }
@@ -431,10 +458,10 @@ export function createPlan(draft: PlanDraft, options: PlanCreateOptions): PlanAp
         }
         return result;
     };
-    const toText = (text: PlanDraftText): PlanText => described({ ...text, id: text.id ?? mint() });
+    const toText = (text: PlanDraftText): PlanText => described({ ...text, id: text.id ?? nextId() });
     const items = source.items.map((item): PlanItem => {
         if (item.type === 'section') {
-            return described({ ...item, id: item.id ?? mint(), items: item.items.map((child) => (child.type === 'text' ? toText(child) : toStep(child))) });
+            return described({ ...item, id: item.id ?? nextId(), items: item.items.map((child) => (child.type === 'text' ? toText(child) : toStep(child))) });
         }
         return item.type === 'text' ? toText(item) : toStep(item);
     });

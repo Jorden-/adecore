@@ -12,6 +12,7 @@ import {
     planProgress,
     planToMarkdown,
     progressText,
+    randomItemId,
     renderPlanText,
     stepState,
     validatePlan,
@@ -273,6 +274,38 @@ describe('deleting a plan', () => {
         ]);
         expect(codeOf(canDeletePlan(stamped, 'agent'))).toBe('set-by-person');
         expect(codeOf(canDeletePlan(planOf([step('a', { state: 'done', by: 'agent', at: NOW }), step('b', { checks: 'person' })]), 'agent'))).toBeUndefined();
+    });
+});
+
+describe('minting ids', () => {
+    test('a mintId that keeps giving a taken id is refused, not thrown', () => {
+        const plan = planOf([step('a')]);
+        const result = applyPlanOps(
+            plan,
+            [
+                { op: 'add', type: 'step', title: 'One' },
+                { op: 'add', type: 'step', title: 'Two' }
+            ],
+            { actor: 'agent', now: NOW, mintId: () => 'x' }
+        );
+        expect(codeOf(result)).toBe('duplicate-id');
+    });
+
+    test('a new plan whose mintId keeps giving a taken id is refused, not thrown', () => {
+        const draft: PlanDraft = {
+            meta: { title: 'Draft' },
+            items: [
+                { type: 'step', title: 'One' },
+                { type: 'step', title: 'Two' }
+            ]
+        };
+        expect(codeOf(createPlan(draft, { id: 'plan-1', now: NOW, mintId: () => 'x' }))).toBe('duplicate-id');
+    });
+
+    test('randomItemId makes six lowercase letters and digits', () => {
+        for (let i = 0; i < 200; i++) {
+            expect(randomItemId()).toMatch(/^[a-z0-9]{6}$/);
+        }
     });
 });
 

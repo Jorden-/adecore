@@ -117,7 +117,7 @@ const created = draft.ok ? createPlan(draft.draft, { id: 'release', now: new Dat
 
 `createPlan(draft, options)` takes a `PlanCreateOptions` and returns the new plan at `rev` 0 as `{ ok: true, plan, minted, dropped }`, or a refusal. It needs a title, from `options.meta` or the draft; `kind` defaults to `steps` and `checks` to `anyone`, and `options.meta` wins over the draft. A state in the draft is recorded as the agent's. A draft that gives a state to a step only a person checks is refused.
 
-Items without an id get one from `options.mintId`, or from `randomItemId`, which makes six random lowercase letters and digits with Web Crypto. The new ids are listed in `minted`. Pass `mintId` for predictable ids in tests.
+Items without an id get one from `options.mintId`, or from `randomItemId`, which makes six random lowercase letters and digits with Web Crypto. The new ids are listed in `minted`. Pass `mintId` for predictable ids in tests. An id that is already taken is minted again, and after 1000 taken ids in a row the call returns a `duplicate-id` refusal.
 
 ## Schemas
 
