@@ -761,6 +761,22 @@ export class ChatSession {
     }
 
     /*
+     * Marks the chat as waiting on a person for something the host asks beside the CLI, such as a
+     * card a verb holds its call for. The chat reads `needs-you` until every key is released.
+     */
+    holdForPerson(key: string): void {
+        if (this.thread.hold(key)) {
+            this.emit([this.thread.setStatus(this.thread.statusFor(this.thread.info.activeTurnId))]);
+        }
+    }
+
+    releaseHold(key: string): void {
+        if (this.thread.release(key) && this.thread.info.status === 'needs-you') {
+            this.emit([this.thread.setStatus(this.thread.statusFor(this.thread.info.activeTurnId))]);
+        }
+    }
+
+    /*
      * Starts the chat over: the CLI goes, and the next send starts one without a session to resume.
      * The thread resets at once; the returned promise lets the host wait for pending attachment
      * writes before removing their files. Writing the empty thread is the caller's.

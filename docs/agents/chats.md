@@ -20,6 +20,8 @@ A pending approval or question is an item with a `requestId`. `chat.approve` ans
 
 Stopping a turn settles the requests it left open, so no approval stays pending under a finished turn.
 
+Your app can ask a person something the CLI never asked, such as a card a context command waits on. `holdForPerson(chatId, key)` puts the chat at `needs-you` while its turn runs, so its status, notifications and anything else that follows the status treat it like a question; `releaseHold(chatId, key)` takes it back. A chat waits until the last key is released. The card itself, its answer and its timeout stay with your app.
+
 ## Subagents
 
 `chat.subagent` reads the conversation of an agent the chat delegated to, from the CLI's own transcript, a page at a time, and with `watch: true` sends `chat.subagentChanged` while it grows. `chat.stopSubagent` stops a subagent a task of your app opened; a Claude subagent that the running process announced is ended with `stop_task` while its parent and siblings go on. A process that did not start it refuses with `subagent-stale` while a turn runs, and with no turn running, like a subagent without a task id, the row is only marked stopped. `chat.stopTask` stops one background shell or monitor, on a CLI that can.

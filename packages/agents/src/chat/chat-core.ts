@@ -878,6 +878,17 @@ export class ChatCore {
         }
     }
 
+    /* Holds a chat at `needs-you` for what the host asks a person; false for a chat that is not here. */
+    holdForPerson(chatId: string, key: string): boolean {
+        const session = this.chats.get(chatId);
+        session?.holdForPerson(key);
+        return session !== undefined;
+    }
+
+    releaseHold(chatId: string, key: string): void {
+        this.chats.get(chatId)?.releaseHold(key);
+    }
+
     /* Removes a chat: its CLI, its record, its log, its attachments, its bookmarks and its visuals. */
     async kill(chatId: string): Promise<void> {
         await this.loaded(chatId);

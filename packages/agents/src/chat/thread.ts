@@ -13,6 +13,8 @@ export class ChatThread {
     private readonly order: string[] = [];
     private historyGeneration = randomUUID();
     private readonly indices = new Map<string, number>();
+    // What the host asks a person beside the CLI's own requests, such as a card a verb waits on.
+    private readonly holds = new Set<string>();
 
     constructor(info: ChatInfo, items: ChatItem[] = []) {
         this.info = info;
@@ -69,9 +71,25 @@ export class ChatThread {
         return null;
     }
 
+    /* While the host holds the chat for a person, a turn that runs reads as waiting on them. */
     patchInfo(patch: Partial<ChatInfo>): ChatEvent {
-        this.info = { ...this.info, ...patch };
+        const held = patch.status === 'running' && this.holds.size > 0 ? { ...patch, status: 'needs-you' as const } : patch;
+        this.info = { ...this.info, ...held };
         return { type: 'info', info: this.info };
+    }
+
+    /* False when the key held the chat already. */
+    hold(key: string): boolean {
+        if (this.holds.has(key)) {
+            return false;
+        }
+        this.holds.add(key);
+        return true;
+    }
+
+    /* False when the key did not hold the chat. */
+    release(key: string): boolean {
+        return this.holds.delete(key);
     }
 
     /* Empties the thread; the info carries on with the patch on top. */
@@ -118,7 +136,7 @@ export class ChatThread {
 
     /* A request can outlive the turn it came in, when work the CLI runs beside its turns asked it. */
     statusFor(activeTurnId: string | null): AgentStatus {
-        if (this.pending().length > 0) {
+        if (this.pending().length > 0 || this.holds.size > 0) {
             return 'needs-you';
         }
         return activeTurnId === null ? 'idle' : 'running';
