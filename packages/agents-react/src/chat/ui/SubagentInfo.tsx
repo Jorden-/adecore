@@ -25,7 +25,7 @@ export function SubagentInfo({ chatId, toolUseId }: { chatId: string; toolUseId:
     const word = item === null ? null : statusWordOf(item, task);
     const facts = item === null ? [] : subagentFacts(item, item.model === undefined ? null : modelName);
     return (
-        <section aria-label={t('subagents.info.label')} className="shrink-0 border-b border-border px-4 py-1.5">
+        <section aria-label={t('subagents.info.label')} className="shrink-0 border-b border-border py-1.5 pr-1.5 pl-4">
             <div className="flex min-w-0 items-center gap-2 text-xs text-text-faint">
                 <SubagentBreadcrumb chatId={chatId} className="max-w-1/3 shrink-0 font-medium" />
                 {item !== null && word !== null && (
