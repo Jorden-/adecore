@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use serde::Serialize;
 use serde_json::Value as Json;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{OwnedRwLockReadGuard, RwLock, mpsc, oneshot};
 
 use crate::engine::{self, Canceller, Engine};
 use crate::error::{DatabaseError, ErrorCode, Result};
@@ -32,12 +32,16 @@ fn to_json<T: Serialize>(value: T) -> Result<Json> {
 /// The id of the request a session is executing right now, if any.
 type Slot = Arc<Mutex<Option<String>>>;
 
+/// Held for reading while a MySQL kill is on its way, so the session starts nothing new that the kill could stop.
+type Gate = Arc<RwLock<()>>;
+
 struct RequestState {
     id: String,
     cancelled: Arc<AtomicBool>,
     /// Set under the lock of the slot, once the request will never run again.
     finished: AtomicBool,
     slot: Slot,
+    gate: Gate,
     canceller: Arc<Canceller>,
 }
 
@@ -52,6 +56,7 @@ struct SessionHandle {
     queue: mpsc::UnboundedSender<Command>,
     canceller: Arc<Canceller>,
     slot: Slot,
+    gate: Gate,
 }
 
 type Running = Arc<Mutex<HashMap<String, Arc<RequestState>>>>;
@@ -139,6 +144,7 @@ impl Dispatcher {
             cancelled: Arc::new(AtomicBool::new(false)),
             finished: AtomicBool::new(false),
             slot: handle.slot.clone(),
+            gate: handle.gate.clone(),
             canceller: handle.canceller.clone(),
         });
 
@@ -181,6 +187,7 @@ impl Dispatcher {
         let session = format!("s{}", self.counter.fetch_add(1, Ordering::SeqCst) + 1);
         let (queue, commands) = mpsc::unbounded_channel();
         let slot = Slot::default();
+        let gate = Gate::default();
 
         locked(&self.sessions).insert(
             session.clone(),
@@ -188,9 +195,10 @@ impl Dispatcher {
                 queue,
                 canceller: Arc::new(canceller),
                 slot: slot.clone(),
+                gate: gate.clone(),
             }),
         );
-        tokio::spawn(session_worker(engine, commands, self.running.clone(), slot));
+        tokio::spawn(session_worker(engine, commands, self.running.clone(), slot, gate));
 
         to_json(OpenResult { session, server })
     }
@@ -233,6 +241,7 @@ impl Dispatcher {
                 cancelled: Arc::new(AtomicBool::new(false)),
                 finished: AtomicBool::new(false),
                 slot: handle.slot.clone(),
+                gate: handle.gate.clone(),
                 canceller: handle.canceller.clone(),
             });
             let command = Command {
@@ -249,16 +258,23 @@ impl Dispatcher {
     }
 }
 
+/// A MySQL kill still to be sent, with the gate that keeps its session from starting the next request until it is.
+struct Kill {
+    killer: MysqlCanceller,
+    _gate: OwnedRwLockReadGuard<()>,
+}
+
 enum Reach {
     Finished,
     Queued,
-    Running(Option<MysqlCanceller>),
+    Running(Option<Kill>),
 }
 
 /// Marks the request cancelled and interrupts it only while it is the one its session is executing.
 ///
 /// Everything happens under the lock of the slot, so the request cannot end and the next one begin in between. A MySQL
-/// kill is sent after the lock is released; a request that ends in that gap can still make the server stop its successor.
+/// kill is sent after the lock is released, so it takes the session's gate first: a request that ends in that gap
+/// leaves its successor waiting until the kill is done, instead of letting the server stop the successor.
 fn reach(state: &RequestState) -> Reach {
     let slot = locked(&state.slot);
 
@@ -268,16 +284,20 @@ fn reach(state: &RequestState) -> Reach {
 
     state.cancelled.store(true, Ordering::SeqCst);
 
-    if slot.as_deref() == Some(state.id.as_str()) {
-        Reach::Running(state.canceller.trigger())
-    } else {
-        Reach::Queued
+    if slot.as_deref() != Some(state.id.as_str()) {
+        return Reach::Queued;
     }
+
+    // The worker holds the gate for writing only while its slot is empty, so it is free while this request is in the slot.
+    let killer = state.canceller.trigger();
+    let gate = state.gate.clone().try_read_owned();
+
+    Reach::Running(killer.zip(gate.ok()).map(|(killer, gate)| Kill { killer, _gate: gate }))
 }
 
-async fn kill(killer: Option<MysqlCanceller>) {
-    if let Some(killer) = killer
-        && let Err(error) = killer.cancel().await
+async fn kill(kill: Option<Kill>) {
+    if let Some(kill) = kill
+        && let Err(error) = kill.killer.cancel().await
     {
         eprintln!("adecore-database: could not cancel the query: {error}");
     }
@@ -341,8 +361,11 @@ where
     })
 }
 
-async fn session_worker(mut engine: Engine, mut commands: mpsc::UnboundedReceiver<Command>, running: Running, slot: Slot) {
+async fn session_worker(mut engine: Engine, mut commands: mpsc::UnboundedReceiver<Command>, running: Running, slot: Slot, gate: Gate) {
     while let Some(Command { id, state, call, reply }) = commands.recv().await {
+        // Waits out a kill still on its way to the request before, which would otherwise stop this one. The slot is empty
+        // until this request takes it, so no new kill can start in between.
+        drop(gate.write().await);
         // A cancel sets its flag under the same lock, so a request is either cancelled here or found in the slot.
         let cancelled_while_queued = {
             let mut current = locked(&slot);
@@ -432,5 +455,40 @@ async fn run_call(engine: &mut Engine, call: Call, cancelled: Arc<AtomicBool>) -
         Call::Open(_) | Call::Close(_) | Call::Test(_) | Call::Sample(_) | Call::Discover(_) | Call::Cancel(_) => {
             Err(DatabaseError::internal("A call without a session reached a session."))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn answer(dispatcher: &Arc<Dispatcher>, line: serde_json::Value) -> Json {
+        serde_json::from_str(&dispatcher.submit(&line.to_string()).await).unwrap()
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_session_starts_nothing_while_a_kill_is_on_its_way() {
+        let directory = tempfile::tempdir().unwrap();
+        let dispatcher = Arc::new(Dispatcher::new());
+        let path = directory.path().join("gate.sqlite");
+        let opened = answer(
+            &dispatcher,
+            serde_json::json!({ "id": "1", "method": "open", "params": { "connection": { "engine": "sqlite", "path": path.to_str().unwrap(), "create": true } } }),
+        )
+        .await;
+        let session = opened["result"]["session"].as_str().unwrap().to_string();
+        let gate = locked(&dispatcher.sessions)[&session].gate.clone();
+        let held = gate.clone().try_read_owned().unwrap();
+
+        let next = tokio::spawn(
+            dispatcher.submit(&serde_json::json!({ "id": "2", "method": "execute", "params": { "session": session, "sql": "SELECT 1" } }).to_string()),
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(!next.is_finished(), "the next request waits for the kill");
+
+        drop(held);
+        let line: Json = serde_json::from_str(&tokio::time::timeout(Duration::from_secs(5), next).await.unwrap().unwrap()).unwrap();
+        assert_eq!(line["result"]["results"][0]["rows"], serde_json::json!([[1]]));
+        assert!(gate.try_read_owned().is_ok(), "the gate is free again for the next kill");
     }
 }
