@@ -792,7 +792,12 @@ export class InputController {
     private pointerDown(event: PointerEvent): void {
         this.view.cancelScroll();
         const target = event.target as HTMLElement;
-        if (event.button !== 0 || target.closest('button, a, input, textarea, [contenteditable], .se-block, .se-gutter, .se-sticky')) {
+        // A press a part took already, such as a pinned header, which draws itself anew and so takes its target off the page before the press bubbles here.
+        if (
+            event.defaultPrevented ||
+            event.button !== 0 ||
+            target.closest('button, a, input, textarea, [contenteditable], .se-block, .se-gutter, .se-sticky')
+        ) {
             return;
         }
         // Cancels the compatibility mouse events, whose focus change would close the keyboard a tap opened; scrolling is not affected.

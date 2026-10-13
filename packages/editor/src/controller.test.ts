@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { mountEditor } from './testing.ts';
+import { mountEditor, pointer } from './testing.ts';
 
 describe('the focus', () => {
     test('leaving the editor is a blur, and moving inside it is not', () => {
@@ -16,5 +16,23 @@ describe('the focus', () => {
         focusOut(page.document.body);
         focusOut(null);
         expect(blurs).toBe(2);
+    });
+});
+
+describe('a pinned header', () => {
+    test('takes a press to its line and leaves the caret there, though it draws itself anew under the pointer', () => {
+        const body = Array.from({ length: 200 }, (_, line) => `        call${line}();`).join('\n');
+        const mounted = mountEditor({ text: `class A {\n    run() {\n${body}\n    }\n}` });
+        Object.defineProperties(mounted.viewport, { clientWidth: { value: 600 }, clientHeight: { value: 400 } });
+        mounted.editor.setBlocks([
+            { startLine: 1, endLine: 204, name: 'A' },
+            { startLine: 2, endLine: 203, name: 'run' }
+        ]);
+        mounted.editor.setScrollTop(20 * 100);
+        mounted.viewport.dispatchEvent(new mounted.page.window.Event('scroll'));
+        const header = [...mounted.page.host.querySelectorAll<HTMLElement>('.se-sticky-row')].find((row) => row.dataset.line === '1')!;
+        pointer(mounted.page.window, header, 'pointerdown', 10, 10);
+        expect(mounted.editor.getCaret()).toEqual({ line: 1, character: 4 });
+        expect(mounted.editor.getScrollTop()).toBe(0);
     });
 });
