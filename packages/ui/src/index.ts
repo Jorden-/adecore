@@ -49,6 +49,7 @@ export { Input, TextArea, type InputProps, type TextAreaProps } from './Input.ts
 export { Kbd, KeyCap, Keys, type KbdProps, type KeyCapProps, type KeysProps } from './Kbd.tsx';
 export { ListRow, type ListRowProps } from './ListRow.tsx';
 export { Meter, type MeterProps } from './Meter.tsx';
+export { MiddleTruncate, type MiddleTruncateProps } from './MiddleTruncate.tsx';
 export { PanelEmpty, type PanelEmptyProps } from './PanelEmpty.tsx';
 export { PanelHeader, type PanelHeaderProps } from './PanelHeader.tsx';
 export { Pill, type PillProps } from './Pill.tsx';

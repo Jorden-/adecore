@@ -896,3 +896,12 @@
     .ade-tab-insertion { position: absolute; top: 4px; bottom: 4px; width: 2px; pointer-events: none; background: var(--accent); }
     @media (prefers-reduced-motion: reduce) { .ade-split-preview path { transition: none; } }
 }
+
+@layer components {
+    /* `MiddleTruncate`. The text again, unseen and without height, so the element asks for the width of all of it while it draws a part. */
+    .middle-truncate { display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .middle-truncate::before { content: attr(data-text) / ""; display: block; height: 0; visibility: hidden; }
+    .middle-truncate-head::after { content: "\2026" / ""; }
+    /* The cut part stays in the text at no width, so a selection copies it and a find matches across the cut. */
+    .middle-truncate-middle { display: inline-block; width: 0; overflow: hidden; vertical-align: top; }
+}

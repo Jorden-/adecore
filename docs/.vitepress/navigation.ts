@@ -61,6 +61,7 @@ const desktopUi: DefaultTheme.SidebarItem[] = [
         ['Surface', '/ui/display/surface'],
         ['ListRow', '/ui/display/list-row'],
         ['KeyValueList', '/ui/display/key-value-list'],
+        ['MiddleTruncate', '/ui/display/middle-truncate'],
         ['PanelHeader', '/ui/display/panel-header'],
         ['Separator', '/ui/display/separator'],
         ['Skeleton', '/ui/display/skeleton'],
