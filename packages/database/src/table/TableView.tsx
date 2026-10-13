@@ -759,6 +759,7 @@ function TableBody({ connection, schema, table, toolbarStart, defaultWhere, defa
                                 onSelectedKeysChange={setSelected}
                                 onCommit={commit}
                                 loadValue={loadValue}
+                                onNotice={(notice) => (onNotice === undefined ? setFailure(notice.description ?? notice.title) : onNotice(notice))}
                                 sorts={sorts}
                                 onSortsChange={changeSorts}
                                 onFocusedCellChange={setFocus}

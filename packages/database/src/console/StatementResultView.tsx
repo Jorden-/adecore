@@ -3,6 +3,7 @@ import { ArrowUpRight, ChevronLeft, ChevronRight, CircleAlert, Download, PanelRi
 import { useTranslation } from 'react-i18next';
 import { Banner, ButtonGroup, ContextMenu, Icon, IconButton, Menu, Spinner } from '@adecore/ui';
 import { formatDecimal, formatNumber } from '@adecore/ui/format';
+import type { DatabaseNotice } from '../actions.ts';
 import { DataGrid } from '../grid/DataGrid.tsx';
 import { previewValueOf } from '../grid/focused-value.ts';
 import type { FocusedCell, GridMenuContext, GridRow } from '../grid/types.ts';
@@ -45,6 +46,8 @@ export interface StatementResultViewProps {
     keys?: ResultKeys | null;
     /* Offers Go to referenced row on a cell of a foreign key, as the table view does. */
     onFollowReference?(reference: Reference): void;
+    /* A copy from the grid that kept some values cut off. */
+    onNotice?(notice: DatabaseNotice): void;
 }
 
 /* One statement's outcome: a result set in a read-only grid, a count of affected rows, or the error the server gave. */
@@ -58,7 +61,8 @@ export function StatementResultView({
     valuePanelOpen = false,
     onValuePanelOpenChange,
     keys = null,
-    onFollowReference
+    onFollowReference,
+    onNotice
 }: StatementResultViewProps) {
     const { t } = useTranslation('database');
     const [focus, setFocus] = useState<FocusedCell | null>(null);
@@ -158,6 +162,7 @@ export function StatementResultView({
                     onFollow={follow}
                     canFollow={(cell) => referenceAt(cell) !== null}
                     menu={referenceMenu}
+                    onNotice={onNotice}
                 />
             </ValueDock>
             <footer className="flex h-10 shrink-0 items-center gap-4 border-t border-border px-3 text-xs text-text-muted">

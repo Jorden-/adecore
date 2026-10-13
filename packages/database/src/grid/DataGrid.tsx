@@ -15,6 +15,8 @@ import clsx from 'clsx';
 import { Ban, Copy, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ContextMenu, copyText, EDIT_SHORTCUTS, Icon, isApplePlatform, isModHeld, Kbd, useContentSize } from '@adecore/ui';
+import { formatNumber } from '@adecore/ui/format';
+import type { DatabaseNotice } from '../actions.ts';
 import type { EditValue, Value } from '../protocol/index.ts';
 import { assignRef } from '../assign-ref.ts';
 import type { SqlTarget } from '../sql.ts';
@@ -27,9 +29,9 @@ import type { EditMove } from './CellEditor.tsx';
 import { captureLayout, restoreLayout, sameLayout, type GridLayout } from './column-layout.ts';
 import { NO_COLUMN_SELECTION, selectColumn, shownSelection, type ColumnSelection } from './column-selection.ts';
 import { displayOrder, hideColumn, pinnedCount, showAllColumns, togglePin, type ColumnView } from './column-view.ts';
-import { COPY_FORMATS, formatCopy, type CopyFormat, type CopyInput } from './copy-formats.ts';
+import { COPY_FORMATS, formatCopy, type CopyFormat } from './copy-formats.ts';
 import { CopyAsMenu } from './CopyAsMenu.tsx';
-import { columnNotation, cellView, copyTextOf, isPreview, type CellView, type NumberNotation } from './display.ts';
+import { columnNotation, cellView, copyTextOf, isPreview, type CellView, type NumberNotation, type Shown } from './display.ts';
 import { draftOf, parseDraft } from './edit-value.ts';
 import { parseEnumType } from './enum-type.ts';
 import { GridHeaderCell, type HeaderActions } from './GridHeaderCell.tsx';
@@ -53,6 +55,7 @@ import { moveFocus, type CellPosition, type NavigationKey } from './navigation.t
 import { selectRow } from './row-selection.ts';
 import { sortOnly, sortStateOf, type GridSort } from './sort.ts';
 import type { ColumnRequest, FocusedCell, FocusRequest, GridColumn, GridMenuContext, GridRow } from './types.ts';
+import { loadWholeCells } from './whole-cells.ts';
 
 export interface DataGridProps {
     columns: readonly GridColumn[];
@@ -66,8 +69,10 @@ export interface DataGridProps {
     onSelectedKeysChange?(keys: ReadonlySet<string>): void;
     /* A cell was edited, or set to NULL or DEFAULT from its menu. */
     onCommit?(rowKey: string, column: number, value: EditValue): void;
-    /* The whole value of a cell that is only a preview, which editing needs. Resolves `undefined` when it cannot be had, which cancels the edit. */
+    /* The whole value of a cell that is only a preview, which editing and copying need. Resolves `undefined` when it cannot be had, which cancels the edit. */
     loadValue?(rowKey: string, column: number): Promise<Value | undefined>;
+    /* A copy that kept some values cut off, which the grid has no place of its own to say. */
+    onNotice?(notice: DatabaseNotice): void;
     /* The sorted columns by name, in order. Only shown unless `onSortsChange` is given, which is what makes the headers sort. */
     sorts?: readonly GridSort[];
     onSortsChange?(sorts: readonly GridSort[]): void;
@@ -150,6 +155,7 @@ export function DataGrid({
     onSelectedKeysChange,
     onCommit,
     loadValue,
+    onNotice,
     sorts,
     onSortsChange,
     onFocusedCellChange,
@@ -454,38 +460,55 @@ export function DataGrid({
         }
     };
 
-    /* The cells of the range or of the picked columns, as the columns and rows a copy writes. */
-    const blockOf = (): CopyInput | null => {
-        if (block === null) {
-            return null;
+    /* The cells from row `top` to `bottom` in the given columns, with the whole value of every preview `loadValue` can fetch. */
+    const wholeCellsOf = async (top: number, bottom: number, indexes: readonly number[]): Promise<readonly (readonly Shown[])[]> => {
+        const shown = rows.slice(top, bottom + 1);
+        const whole = await loadWholeCells(
+            shown.map((row) => indexes.map((index) => row.cells[index] ?? null)),
+            loadValue === undefined ? undefined : (row, column) => loadValue(shown[row]!.key, indexes[column]!)
+        );
+        if (whole.previews > 0) {
+            onNotice?.({
+                tone: 'error',
+                title: t('grid.copyPreviews.title', { count: whole.previews, formatted: formatNumber(whole.previews) }),
+                description: t(whole.tooLarge ? 'grid.copyPreviews.tooLarge' : 'grid.copyPreviews.unavailable')
+            });
         }
-        return {
-            columns: block.columns.map((index) => ({ name: columns[index]!.name, kind: columns[index]!.kind })),
-            rows: rows.slice(block.top, block.bottom + 1).map((row) => block.columns.map((index) => row.cells[index] ?? null)),
-            target: sqlTarget
-        };
+        return whole.rows;
     };
 
-    const copyAs = (format: CopyFormat): void => {
-        const block = blockOf();
-        if (block !== null) {
-            copyText(formatCopy(format, block));
+    const copyAs = async (format: CopyFormat): Promise<void> => {
+        if (block === null) {
+            return;
         }
+        const picked = block.columns;
+        const cells = await wholeCellsOf(block.top, block.bottom, picked);
+        await copyText(
+            formatCopy(format, {
+                columns: picked.map((index) => ({ name: columns[index]!.name, kind: columns[index]!.kind })),
+                rows: cells,
+                target: sqlTarget
+            })
+        );
+    };
+
+    const copyOne = async (row: number, column: number): Promise<void> => {
+        const [cells] = await wholeCellsOf(row, row, [column]);
+        await copyText(copyTextOf(cells?.[0] ?? null));
     };
 
     /* One cell copies as it reads; a block copies as TSV, which a spreadsheet pastes into cells. */
     const copyRange = (): void => {
         if (block !== null && block.top === block.bottom && block.columns.length === 1) {
-            copyText(copyTextOf(rows[block.top]?.cells[block.columns[0]!] ?? null));
+            void copyOne(block.top, block.columns[0]!);
         } else {
-            copyAs('tsv');
+            void copyAs('tsv');
         }
     };
 
     const copyCell = (): void => {
-        const row = menuTarget === null ? undefined : rows[menuTarget.row];
-        if (row !== undefined && menuTarget?.column != null) {
-            copyText(copyTextOf(row.cells[menuTarget.column] ?? null));
+        if (menuTarget !== null && menuTarget.column !== null && rows[menuTarget.row] !== undefined) {
+            void copyOne(menuTarget.row, menuTarget.column);
         }
     };
 
@@ -773,7 +796,7 @@ export function DataGrid({
                         <CopyAsMenu
                             disabled={block === null}
                             formats={sqlTarget === undefined ? COPY_FORMATS.filter((format) => format !== 'sql') : COPY_FORMATS}
-                            onCopy={copyAs}
+                            onCopy={(format) => void copyAs(format)}
                         />
                         {menuContext !== null && menuCell !== null && queryMenu !== undefined && (
                             <>

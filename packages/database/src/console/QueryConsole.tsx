@@ -513,6 +513,7 @@ export function QueryConsole({
                             valuePanelOpen={panelOpen}
                             onValuePanelOpenChange={setPanelOpen}
                             keys={keys}
+                            onNotice={notify}
                             onFollowReference={
                                 act === undefined || connection === undefined
                                     ? undefined

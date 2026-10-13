@@ -45,6 +45,8 @@ A click on a column header selects the column, and Shift or Cmd or Ctrl and clic
 
 Cmd or Ctrl and C copies the selection: one value, or a block as tab separated text. Copy as in a cell's menu writes the selection as TSV, CSV, JSON or SQL `INSERT` statements.
 
+A copy holds whole values. The view fetches each preview in the selection with `cell` first, up to 16 MiB of text in one copy. A value it cannot fetch, or a selection past that size, is copied as its preview, and a notice says so.
+
 A column header can be dragged wider, and a double click on its edge fits it to its content. Its menu hides the column, pins it to the left, copies its name and shows hidden columns again.
 
 ## Editing

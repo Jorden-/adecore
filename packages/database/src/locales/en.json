@@ -244,6 +244,12 @@
             "json": "JSON",
             "sql": "SQL INSERT statements"
         },
+        "copyPreviews": {
+            "title_one": "Copied a value cut off",
+            "title_other": "Copied {{formatted}} values cut off",
+            "unavailable": "Some values were copied cut off, since only their start was read and the whole values could not be loaded.",
+            "tooLarge": "Some values were copied cut off, since the whole values are too large to copy at once."
+        },
         "followReference": "Go to referenced row",
         "emptyValue": "(empty)"
     },

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import type { DatabaseNotice } from '../actions.ts';
+import type { Value } from '../protocol/index.ts';
 import type { Mounted } from '../testing/dom/harness.tsx';
-import { byText, clientOver, click, contextMenu, findAll, mount, perform } from '../testing/dom/harness.tsx';
+import { byText, clientOver, click, contextMenu, findAll, mount, perform, waitFor } from '../testing/dom/harness.tsx';
 import { fakeDatabaseTransport } from '../testing/index.ts';
 import { DataGrid } from './DataGrid.tsx';
 import type { GridColumn, GridRow } from './types.ts';
@@ -131,5 +133,86 @@ describe.skipIf(typeof document === 'undefined')('DataGrid with pinned columns',
         for (const cell of scrolling) {
             expect(cell.className).not.toContain('bg-clip-border');
         }
+    });
+});
+
+const LONG = 'x'.repeat(5000);
+
+describe.skipIf(typeof document === 'undefined')('DataGrid copying a preview', () => {
+    const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    let written: string[];
+    let mounted: Mounted | undefined;
+    let client: ReturnType<typeof clientOver>;
+
+    const mountWith = async (loadValue: ((rowKey: string, column: number) => Promise<Value | undefined>) | undefined, notices: DatabaseNotice[]) => {
+        mounted = await mount(
+            <DataGrid
+                label="Posts"
+                columns={columns}
+                rows={[{ key: 'row:0', number: 1, cells: [1, { kind: 'longText', preview: LONG.slice(0, 1024), length: LONG.length }] }]}
+                loadValue={loadValue}
+                onNotice={(notice) => notices.push(notice)}
+                sqlTarget={{ engine: 'sqlite', table: 'posts' }}
+            />,
+            { client }
+        );
+    };
+
+    const copyBodyAsSql = async (): Promise<void> => {
+        await contextMenu(findAll('[role=gridcell]')[1]!);
+        await click(byText('[role=menuitem]', 'Copy as'));
+        await click(await waitFor(() => byText('[role=menuitem]', 'SQL INSERT statements')));
+    };
+
+    beforeEach(() => {
+        written = [];
+        Object.defineProperty(navigator, 'clipboard', {
+            value: {
+                writeText: async (text: string) => {
+                    written.push(text);
+                }
+            },
+            configurable: true
+        });
+        client = clientOver(fakeDatabaseTransport({ databases: {} }));
+    });
+
+    afterEach(async () => {
+        await mounted?.unmount();
+        await client.dispose();
+        if (original) {
+            Object.defineProperty(navigator, 'clipboard', original);
+        } else {
+            Reflect.deleteProperty(navigator, 'clipboard');
+        }
+    });
+
+    test('copies the whole value it loads', async () => {
+        const notices: DatabaseNotice[] = [];
+        const asked: [string, number][] = [];
+        await mountWith(async (rowKey, column) => {
+            asked.push([rowKey, column]);
+            return LONG;
+        }, notices);
+        await copyBodyAsSql();
+
+        expect(await waitFor(() => written[0]!)).toBe(`INSERT INTO "posts" ("name") VALUES ('${LONG}');`);
+        expect(asked).toEqual([['row:0', 1]]);
+        expect(notices).toEqual([]);
+    });
+
+    test('copies the preview and says so when the whole value cannot be loaded', async () => {
+        const notices: DatabaseNotice[] = [];
+        await mountWith(undefined, notices);
+        await copyBodyAsSql();
+
+        expect(await waitFor(() => written[0]!)).toBe(`INSERT INTO "posts" ("name") VALUES ('${LONG.slice(0, 1024)}');`);
+        expect(notices).toEqual([
+            {
+                tone: 'error',
+                title: 'Copied a value cut off',
+                description: 'Some values were copied cut off, since only their start was read and the whole values could not be loaded.'
+            }
+        ]);
     });
 });

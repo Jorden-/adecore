@@ -244,6 +244,12 @@
             "json": "JSON",
             "sql": "SQL INSERT-statements"
         },
+        "copyPreviews": {
+            "title_one": "Een waarde is afgekapt gekopieerd",
+            "title_other": "{{formatted}} waarden zijn afgekapt gekopieerd",
+            "unavailable": "Sommige waarden zijn afgekapt gekopieerd, omdat alleen hun begin is gelezen en de hele waarden niet konden worden geladen.",
+            "tooLarge": "Sommige waarden zijn afgekapt gekopieerd, omdat de hele waarden te groot zijn om in één keer te kopiëren."
+        },
         "followReference": "Ga naar de verwezen rij",
         "emptyValue": "(leeg)"
     },
