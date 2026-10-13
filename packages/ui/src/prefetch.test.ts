@@ -116,7 +116,10 @@ describe('prefetching lazy modules', () => {
         const waiting: (() => void)[] = [];
         const log: string[] = [];
         let allowed = true;
-        const prefetcher = new Prefetcher((run) => waiting.push(run), () => allowed);
+        const prefetcher = new Prefetcher(
+            (run) => waiting.push(run),
+            () => allowed
+        );
         const workspace = loader('workspace', log);
         prefetcher.register(workspace);
         const done = prefetcher.prefetchEverything();

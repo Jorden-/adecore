@@ -27,9 +27,9 @@ const packages: { directory: string; options: DesignOptions }[] = [
     {
         directory: 'packages/agents-react/src',
         options: {
-            // An escape sequence carries a color of its own, and a framed page receives the theme's tokens
-            // as the colors the engine computed for them; neither can name a token.
-            colorExempt: ['chat/logic/ansi.ts', 'chat/ui/visual-theme.ts']
+            // An escape sequence carries a color of its own, and a framed page and mermaid receive the theme's
+            // tokens as the colors the engine computed for them; none of them can name a token.
+            colorExempt: ['chat/logic/ansi.ts', 'chat/ui/visual-theme.ts', 'chat/ui/MermaidBlock.tsx']
         }
     },
     {
