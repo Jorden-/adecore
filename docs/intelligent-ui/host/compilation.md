@@ -88,7 +88,7 @@ The agents host scans only the new tail of a streaming reply with both.
 | `stringLength`| 16,384  | One string or expression                   |
 | `milliseconds`| 30      | Time spent on one block                    |
 
-A host whose engine runs slower than the default assumes passes its own overrides, a `Partial<UiLimits>`, as the last argument of `new UiState`, `evaluateUiBlock`, `uiValidatedState`, `uiQueryArguments`, `uiLinkTargets` and `resolveUiChoice`. Every budget behind that call uses them; `UI_LIMITS` itself never changes.
+A host whose engine runs slower than the default assumes passes its own overrides, a `Partial<UiLimits>`, as the last argument of `new UiState`, `evaluateUiBlock`, `uiValidatedState`, `uiLinkTargets` and `resolveUiChoice`, and as the fourth of `uiQueryArguments`. Every budget behind that call uses them; `UI_LIMITS` itself never changes.
 
 `UI_REPLY_LIMITS` bounds a whole reply: 16 blocks, 262,144 UTF-16 units of UI source, 2,048 compiled nodes and 60 ms of compilation. A block that crosses the character, node or time limit becomes its text with one `budget_exceeded` diagnosis. Past 16 blocks the last block gets that diagnosis instead. Either way later fences stay text, and the compiler stops scanning there. A refusal is never cached, so removing an earlier block lets a later one compile again.
 

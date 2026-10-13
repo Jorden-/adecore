@@ -19,6 +19,21 @@ test('query arguments use only declared validated local inputs', () => {
     expect(() => uiQueryArguments(block, '$rows', { repo: '/outside' })).toThrow('bindings');
 });
 
+test('an input chosen from options a query read is checked against that reading', () => {
+    const block = compileUiBlock(
+        '$picked = "a"\n$rows = @Query("rows", {limit: 3, repo: "."})\n<Segmented value={$picked}><Each items={$rows} as="row"><Option value={row.id}>{row.name}</Option></Each></Segmented>',
+        { id: 'b', final: true, querySchemas: schemas }
+    );
+    expect(block.diagnostics).toEqual([]);
+    const rows = [
+        { id: 'a', name: 'A' },
+        { id: 'b', name: 'B' }
+    ];
+    expect(uiQueryArguments(block, '$rows', { $picked: 'b' }, {}, { $rows: rows })).toEqual({ limit: 3, repo: '.' });
+    expect(() => uiQueryArguments(block, '$rows', { $picked: 'c' }, {}, { $rows: rows })).toThrow('allowed values');
+    expect(() => uiQueryArguments(block, '$rows', { $picked: 'b' })).toThrow('allowed values');
+});
+
 test('a query cannot change its source or depend on another query result', () => {
     const block = compileUiBlock('$source = "rows"\n$a = @Query($source, {limit: 1, repo: "."})\n$b = @Query("rows", {limit: $a.count, repo: "."})', {
         id: 'b',

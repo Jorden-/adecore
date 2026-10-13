@@ -59,7 +59,7 @@ A client asks `ui.query` with the block's identity, the query name and its curre
 
 1. Finds the stored, completed block at that `revision`. A block that changed answers `block-stale`.
 2. Checks the query is declared there and its source registered.
-3. Validates the input values with `uiValidatedState` and evaluates the arguments with `uiQueryArguments(block, name, input)`, against the stored definition, never against the client's.
+3. Validates the input values with `uiValidatedState` and evaluates the arguments with `uiQueryArguments(block, name, input, limits?, queries?)`, against the stored definition, never against the client's. `queries` holds the newest fresh reading of each query of the block, so a value picked from options a query read passes; a choice passes the readings its `reads` name.
 4. Parses the arguments with the source's schema and authorizes them with the captured access.
 5. Answers from the cache if the same arguments were read in the last ten seconds, or reads.
 

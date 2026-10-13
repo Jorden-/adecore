@@ -40,16 +40,22 @@ export function uiValidatedState(
     return state;
 }
 
+/*
+ * `queries` are the readings the person saw, so an input chosen from options a query read is checked
+ * against them; without them such an input only passes as its default. The arguments themselves read
+ * only local state.
+ */
 export function uiQueryArguments(
     block: UiBlock,
     name: string,
     input: Readonly<Record<string, unknown>> = {},
-    limits: Partial<UiLimits> = {}
+    limits: Partial<UiLimits> = {},
+    queries: Readonly<Record<string, unknown>> = {}
 ): Record<string, UiValue> {
     if (!Object.hasOwn(block.queries, name)) {
         throw new UiFailure('invalid_query', 'This block does not declare that query.');
     }
-    const state = uiValidatedState(block, input, {}, limits);
+    const state = uiValidatedState(block, input, queries, limits);
     const query = block.queries[name];
     return query.expression
         ? (evaluateUiExpression(query.expression, state.scope(), new UiBudget(limits)) as Record<string, UiValue>)

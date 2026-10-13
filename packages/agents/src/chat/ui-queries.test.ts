@@ -272,3 +272,52 @@ test('a choice needs a fresh read of every query its block declares', async () =
     r.session.setUiAccess('reply', null);
     await expect(r.queries.choiceValues(r.session, { ...payload, reads: { $data: reading.readId! } })).rejects.toThrow('original access');
 });
+
+test('a choice from options a query read is refreshed and sent against the reading it came from', async () => {
+    const r = rig();
+    const source = {
+        args: z.object({}).strict(),
+        result: z.array(z.object({ id: z.string(), name: z.string() }).strict()),
+        authorize: async () => {},
+        read: async () => [
+            { id: 'a', name: 'A' },
+            { id: 'b', name: 'B' }
+        ]
+    };
+    const block = {
+        ...compileUiBlock(
+            '$picked = "a"\n$rows = @Query("rows", {})\n<Segmented value={$picked}><Each items={$rows} as="row"><Option value={row.id}>{row.name}</Option></Each></Segmented>\n<Choices><Choice context={"Picked " + $picked}>Choose</Choice></Choices>',
+            { id: 'block', final: true, querySchemas: { rows: source.args } }
+        ),
+        revision: 'rev'
+    };
+    const session = new ChatSession({
+        info: r.session.info,
+        items: [{ ...r.item, ui: [block] }],
+        uiAccess: { reply: { readable: true } },
+        provider: claudeProvider,
+        command: ['unused'],
+        env: () => ({}),
+        emit: () => {},
+        persist: () => {},
+        persistSoon: () => {}
+    });
+    const queries = new ChatUiQueries({ ...r.host, sources: { rows: source } });
+    const payload = { ...r.payload, query: '$rows' };
+    const reading = await queries.query(session, payload);
+    expect(reading.state).toBe('fresh');
+
+    const again = await queries.query(session, { ...payload, values: { $picked: 'b' } });
+    expect(again).toMatchObject({ state: 'fresh', readId: reading.readId });
+    expect(await queries.query(session, { ...payload, values: { $picked: 'z' } })).toMatchObject({ state: 'refused' });
+
+    const choice = block.nodes[1]!.children[0]!;
+    const choose = { ...r.payload, choiceId: choice.id, reads: { $rows: reading.readId! }, values: { $picked: 'b' } };
+    expect(await queries.choiceValues(session, choose)).toEqual({
+        $rows: [
+            { id: 'a', name: 'A' },
+            { id: 'b', name: 'B' }
+        ]
+    });
+    await expect(queries.choiceValues(session, { ...choose, values: { $picked: 'z' } })).rejects.toThrow('allowed values');
+});

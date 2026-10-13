@@ -31,6 +31,8 @@ export interface ChatUiHost {
 
 interface CachedReading {
     key: string;
+    // The key without the arguments: one query of one block, whatever it was read with.
+    identity: string;
     chatId: string;
     reading: ChatUiQueryReading;
 }
@@ -71,6 +73,8 @@ export class ChatUiQueries {
     private readonly cache = new Map<string, CachedReading>();
     // The read id of the newest reading per cache key, which a remount or a second client is answered with.
     private readonly latest = new Map<string, string>();
+    // The read id of the newest reading per query identity, whose options are the ones a person picks from.
+    private readonly newest = new Map<string, string>();
     private readonly reading = new Map<string, Promise<ChatUiQueryReading>>();
     private readonly attempts = new Map<string, number>();
     private readonly active = new Map<string, number>();
@@ -237,7 +241,7 @@ export class ChatUiQueries {
         let authorAccess: unknown;
         try {
             ({ source, block, item } = this.stored(session, payload));
-            args = uiQueryArguments(block, payload.query, payload.values);
+            args = uiQueryArguments(block, payload.query, payload.values, {}, this.heldValues(session, item, block));
             args = source.args.parse(args) as Record<string, UiValue>;
             authorAccess = await this.access(session, item);
             if (authorAccess === null) {
@@ -292,8 +296,9 @@ export class ChatUiQueries {
                     throw new UiQueryError('refused-query', 'result-too-large', 'The UI query result is too large.');
                 }
                 const reading: ChatUiQueryReading = { state: 'fresh', value, readId: randomUUID(), readAt: Date.now() };
-                this.cache.set(reading.readId!, { key, chatId: session.id, reading });
+                this.cache.set(reading.readId!, { key, identity, chatId: session.id, reading });
                 this.latest.set(key, reading.readId!);
+                this.newest.set(identity, reading.readId!);
                 while (this.cache.size > 128) {
                     this.evict(this.cache.keys().next().value!);
                 }
@@ -336,14 +341,31 @@ export class ChatUiQueries {
         if (access === null) {
             throw new UiQueryError('refused-query', 'access-unavailable', 'The writer’s original access is unavailable.');
         }
+        const frozen = item.uiQueries?.blocks[block.id];
+        const readIdOf = (name: string): string | undefined =>
+            payload.reads !== undefined && Object.hasOwn(payload.reads, name) ? payload.reads[name] : undefined;
+        // What the person saw, by the read ids it names; each one is checked against its arguments below.
+        const seen: Record<string, unknown> = Object.create(null);
+        for (const name of names) {
+            const readId = readIdOf(name);
+            const cached = readId === undefined ? undefined : this.cache.get(readId);
+            const reading =
+                cached?.identity === JSON.stringify([session.id, item.id, block.id, block.revision, name])
+                    ? cached.reading
+                    : frozen?.revision === block.revision
+                      ? frozen?.readings[name]
+                      : undefined;
+            if (readId !== undefined && reading?.readId === readId && reading.state === 'fresh') {
+                seen[name] = reading.value;
+            }
+        }
         for (const name of names) {
             const { source } = this.stored(session, { ...payload, query: name });
-            const args = source.args.parse(uiQueryArguments(block, name, payload.values)) as Record<string, UiValue>;
+            const args = source.args.parse(uiQueryArguments(block, name, payload.values, {}, seen)) as Record<string, UiValue>;
             await source.authorize(session.info, access, args);
-            const readId = payload.reads !== undefined && Object.hasOwn(payload.reads, name) ? payload.reads[name] : undefined;
+            const readId = readIdOf(name);
             const key = JSON.stringify([session.id, item.id, block.id, block.revision, name, args]);
             const cached = readId === undefined ? undefined : this.cache.get(readId);
-            const frozen = item.uiQueries?.blocks[block.id];
             const snapshot = frozen?.revision === block.revision ? frozen?.readings[name] : undefined;
             const reading =
                 readId === undefined
@@ -399,6 +421,25 @@ export class ChatUiQueries {
         if (cached && this.latest.get(cached.key) === readId) {
             this.latest.delete(cached.key);
         }
+        if (cached && this.newest.get(cached.identity) === readId) {
+            this.newest.delete(cached.identity);
+        }
+    }
+
+    /* The newest fresh value of every query of a block, or the frozen one, for checking an input chosen from what they read. */
+    private heldValues(session: ChatSession, item: ChatAssistantItem, block: UiBlock): Record<string, unknown> {
+        const frozen = item.uiQueries?.blocks[block.id];
+        const values: Record<string, unknown> = Object.create(null);
+        for (const name of Object.keys(block.queries)) {
+            const readId = this.newest.get(JSON.stringify([session.id, item.id, block.id, block.revision, name]));
+            const reading =
+                (readId === undefined ? undefined : this.cache.get(readId)?.reading) ??
+                (frozen?.revision === block.revision ? frozen?.readings[name] : undefined);
+            if (reading?.state === 'fresh') {
+                values[name] = reading.value;
+            }
+        }
+        return values;
     }
 
     private linkReading(value: unknown): ChatUiLinkReading {
