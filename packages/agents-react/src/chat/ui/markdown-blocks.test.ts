@@ -60,6 +60,69 @@ describe('splitMarkdownBlocks', () => {
     });
 });
 
+describe('a code fence at the top level', () => {
+    test('is a block of its own, also right under a line of text, with the blank lines under it', () => {
+        const text = 'Run this:\n```sh\nls\n```\n\nThen this.';
+        expect(texts(text)).toEqual(['Run this:\n', '```sh\nls\n```\n\n', 'Then this.']);
+        expect(splitMarkdownBlocks(text)[1]!.fence).toEqual({ marker: '```', info: 'sh', body: 'ls', closed: true, source: '```sh\nls\n```' });
+    });
+
+    test('ends at the line after its closing fence, whatever that line is', () => {
+        expect(texts('```ts\na\n```\n  indented\n- item')).toEqual(['```ts\na\n```\n', '  indented\n- item']);
+        expect(texts('```ts\na\n```\n```sh\nb\n```')).toEqual(['```ts\na\n```\n', '```sh\nb\n```']);
+    });
+
+    test('reads its marker, info string and body the way markdown does', () => {
+        const fence = (text: string) => splitMarkdownBlocks(text).at(-1)!.fence;
+        expect(fence('~~~~ js  title="a b"  \nx\n~~~\n~~~~~ \n')).toEqual({
+            marker: '~~~~',
+            info: 'js  title="a b"',
+            body: 'x\n~~~',
+            closed: true,
+            source: '~~~~ js  title="a b"  \nx\n~~~\n~~~~~ '
+        });
+        expect(fence('  ```\n  two\n   three\n one\n\tfour\n  ```')!.body).toBe('two\n three\none\n  four');
+        expect(fence('```bash\r\nprintf one\r\n\r\nprintf two\r\n```\r\n')).toMatchObject({ body: 'printf one\r\n\r\nprintf two', closed: true });
+        expect(fence('```ts\nopen\n')).toEqual({ marker: '```', info: 'ts', body: 'open', closed: false, source: '```ts\nopen\n' });
+        expect(fence('```ts\nopen\n\n')).toMatchObject({ body: 'open\n', closed: false });
+        expect(fence('```')).toEqual({ marker: '```', info: '', body: '', closed: false, source: '```' });
+    });
+
+    test('is no fence where markdown reads the line otherwise', () => {
+        const fences = (text: string) => splitMarkdownBlocks(text).filter((block) => block.fence !== undefined).length;
+        // A backtick in the info string of a backtick fence, indented code, and a language markdown decodes.
+        expect(fences('``` a`b\ntext')).toBe(0);
+        expect(fences('Text\n    ```\nmore')).toBe(0);
+        expect(fences('\t```\ncode')).toBe(0);
+        expect(fences('```c\\+\\+\nint x;\n```')).toBe(0);
+        expect(texts('```c\\+\\+\nint x;\n```\nAfter')).toEqual(['```c\\+\\+\nint x;\n```\n', 'After']);
+    });
+
+    test('belongs to a list item it is indented into, and ends one it is not', () => {
+        const fences = (text: string) => splitMarkdownBlocks(text).map((block) => block.fence !== undefined);
+        expect(fences('1. Step\n   ```sh\n   ls\n   ```\n2. Next\n   ```sh\n   pwd\n   ```')).toEqual([false]);
+        expect(fences('- one\n  - two\n    ```ts\n    x\n    ```')).toEqual([false]);
+        expect(fences('- item\n```ts\nx\n```')).toEqual([false, true]);
+        expect(fences('- item\n ```ts\nx\n```')).toEqual([false, true]);
+        expect(fences('- item\n  ```ts\n  x\n  ```\n\nText\n\n  ```ts\nx\n  ```')).toEqual([false, false, true]);
+    });
+
+    test('is left to markdown past a line markdown may read either way', () => {
+        // Under a line of text, `2.` may start a list or continue the paragraph.
+        expect(splitMarkdownBlocks('Text\n2. two\n   ```ts\n   x\n   ```').every((block) => block.fence === undefined)).toBe(true);
+        // A fence inside raw HTML is part of the HTML.
+        expect(splitMarkdownBlocks('<pre>\n```\n</pre>\n\n```ts\na\n\nb\n```').every((block) => block.fence === undefined)).toBe(true);
+    });
+
+    test('a blank line inside raw HTML that runs to a marker is no place to cut', () => {
+        expect(texts('<!--\n\n-->\n\nAfter')).toEqual(['<!--\n\n-->\n\n', 'After']);
+    });
+
+    test('a lone carriage return keeps the text in one piece', () => {
+        expect(texts('One\r\n\r```ts\nx\n```')).toEqual(['One\r\n\r```ts\nx\n```']);
+    });
+});
+
 describe('settledBlocksText', () => {
     test('holds back the block still being written', () => {
         expect(settledBlocksText('First paragraph.\n\nSecond, still')).toBe('First paragraph.\n\n');
@@ -92,6 +155,12 @@ describe('settledBlocksText', () => {
         expect(settledBlocksText('**Note:** read this.\n\nNext')).toBe('**Note:** read this.\n\n');
         // Right under a line of text, a bold line continues that paragraph.
         expect(settledBlocksText('Intro\n**Setup**\n\nInstall')).toBe('Intro\n**Setup**\n\n');
+    });
+
+    test('settles the text above a fence once the fence opens, and the fence once a line follows it', () => {
+        expect(settledBlocksText('Intro\n```ts\na')).toBe('Intro\n');
+        expect(settledBlocksText('Intro\n```ts\na\n```\n')).toBe('Intro\n');
+        expect(settledBlocksText('Intro\n```ts\na\n```\nNext')).toBe('Intro\n```ts\na\n```\n');
     });
 
     test('holds a heading above a code block until the fence closes', () => {

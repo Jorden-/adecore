@@ -12,12 +12,14 @@ import { splitMarkdownBlocks } from './markdown-blocks';
 import { rehypeChips, type ChipOptions } from './rehype-chips';
 import { rehypeFadeWords } from './rehype-fade';
 import { remarkHtmlAsText } from './remark-html-as-text';
-import { useChatHost, type FileRef, type ShellCodeBlockContext } from '../../host';
+import { useChatHost, type ChatHost, type FileRef, type ShellCodeBlockContext } from '../../host';
 import { useFileLinkCwd, useFileLinkScopeId, useFileLinkTarget, useOpenFileLink } from './file-links';
 import { ErrorBoundary, FileIcon, Icon } from '@adecore/ui';
 import { useTranslation } from 'react-i18next';
 
 type ShellCodeBlockReply = Pick<ShellCodeBlockContext, 'scopeId' | 'chatId' | 'itemId'> & { streaming: boolean };
+
+type ShellFence = Pick<ShellCodeBlockContext, 'language' | 'code'> & { closed: boolean };
 
 const ShellCodeBlockReplyContext = createContext<ShellCodeBlockReply | null>(null);
 const BlockCodeContext = createContext(false);
@@ -27,6 +29,18 @@ interface MarkdownNode {
     children?: MarkdownNode[];
     position?: { start: { offset?: number }; end: { offset?: number } };
     data?: { hProperties?: Record<string, unknown> };
+}
+
+/* The command a shell fence holds, read from the fence as written, so it keeps the indentation and line endings it has. */
+function shellFence(source: string): ShellFence | null {
+    const opening = /^ {0,3}(`{3,}|~{3,})[ \t]*(sh|bash|zsh)[ \t]*\r?\n/.exec(source);
+    if (opening === null) {
+        return null;
+    }
+    const body = source.slice(opening[0].length);
+    const closing = /(?:^|\r?\n) {0,3}(`{3,}|~{3,})[ \t]*$/.exec(body);
+    const closed = closing !== null && closing[1]![0] === opening[1]![0] && closing[1]!.length >= opening[1]!.length;
+    return { language: opening[2] as ShellFence['language'], code: closed ? body.slice(0, closing.index) : body, closed };
 }
 
 /* Only root children qualify; Markdown's parser decides whether a fence belongs to a list or quote. */
@@ -41,25 +55,30 @@ function remarkShellCodeBlocks() {
             if (start === undefined || end === undefined) {
                 continue;
             }
-            const raw = String(file.value).slice(start, end);
-            const opening = /^ {0,3}(`{3,}|~{3,})[ \t]*(sh|bash|zsh)[ \t]*\r?\n/.exec(raw);
-            if (opening === null) {
+            const shell = shellFence(String(file.value).slice(start, end));
+            if (shell === null) {
                 continue;
             }
-            const body = raw.slice(opening[0].length);
-            const closing = /(?:^|\r?\n) {0,3}(`{3,}|~{3,})[ \t]*$/.exec(body);
-            const closed = closing !== null && closing[1]![0] === opening[1]![0] && closing[1]!.length >= opening[1]!.length;
             node.data = {
                 ...node.data,
                 hProperties: {
                     ...node.data?.hProperties,
-                    'data-shell-language': opening[2],
-                    'data-shell-code': closed ? body.slice(0, closing.index) : body,
-                    'data-shell-closed': closed
+                    'data-shell-language': shell.language,
+                    'data-shell-code': shell.code,
+                    'data-shell-closed': shell.closed
                 }
             };
         }
     };
+}
+
+/* What the host adds to a shell fence of a main reply, which is complete once the fence closed and the reply stopped. */
+function shellCodeBlockActions(reply: ShellCodeBlockReply | null, shell: ShellFence | null, render: ChatHost['renderShellCodeBlock']): ReactNode {
+    if (reply === null || shell === null) {
+        return undefined;
+    }
+    const { scopeId, chatId, itemId } = reply;
+    return render?.({ scopeId, chatId, itemId, language: shell.language, code: shell.code, complete: !reply.streaming && shell.closed });
 }
 
 function languageOf(className: string | undefined): string {
@@ -223,25 +242,16 @@ function ReplyCode({ className, children, node }: { className?: string; children
     const properties = node?.properties;
     const language = properties?.['data-shell-language'];
     const code = properties?.['data-shell-code'];
-    const context: ShellCodeBlockContext | null =
-        reply !== null && (language === 'sh' || language === 'bash' || language === 'zsh') && typeof code === 'string'
-            ? {
-                  scopeId: reply.scopeId,
-                  chatId: reply.chatId,
-                  itemId: reply.itemId,
-                  language,
-                  code,
-                  complete: !reply.streaming && properties?.['data-shell-closed'] === true
-              }
+    const shell: ShellFence | null =
+        (language === 'sh' || language === 'bash' || language === 'zsh') && typeof code === 'string'
+            ? { language, code, closed: properties?.['data-shell-closed'] === true }
             : null;
     const text = String(children ?? '');
     if (block && languageOf(className) === 'mermaid') {
         return <Diagram code={text.replace(/\n$/, '')} />;
     }
     if (block) {
-        return (
-            <CodeBlock code={text.replace(/\n$/, '')} lang={languageOf(className)} actions={context !== null ? renderShellCodeBlock?.(context) : undefined} />
-        );
+        return <CodeBlock code={text.replace(/\n$/, '')} lang={languageOf(className)} actions={shellCodeBlockActions(reply, shell, renderShellCodeBlock)} />;
     }
     return <InlineCode text={text} />;
 }
@@ -299,10 +309,43 @@ const ReplyBlock = memo(function ReplyBlock({ text, fade, open, reply }: { text:
 });
 
 /*
- * A reply in a chat thread, parsed a block at a time so a delta only parses the block that grows.
- * While it streams every new word fades in, and a fence that has not closed yet is highlighted a
- * line at a time as it grows. `arriving` fades in each block as it is added instead, for a reply
- * that is shown a block at a time.
+ * A code fence at the top level of a reply, drawn as markdown draws it but without parsing, so a word
+ * added to a long fence costs no more than one added to a short one. It is the same tree whether the
+ * fence is open or closed, so closing it keeps the lines its code block already has.
+ */
+const ReplyFence = memo(function ReplyFence({
+    info,
+    body,
+    source,
+    open,
+    reply
+}: {
+    info: string;
+    body: string;
+    source: string;
+    open: boolean;
+    reply?: ShellCodeBlockReply;
+}) {
+    const { renderShellCodeBlock } = useChatHost();
+    // The class markdown gives the code, read back the way a parsed fence's is.
+    const lang = languageOf(`language-${info.split(/[ \t]/, 1)[0]}`);
+    const shell = reply === undefined ? null : shellFence(source);
+    return (
+        <CodeStreamingContext.Provider value={open}>
+            {lang === 'mermaid' ? (
+                <Diagram code={body} />
+            ) : (
+                <CodeBlock code={body} lang={lang} actions={shellCodeBlockActions(reply ?? null, shell, renderShellCodeBlock)} />
+            )}
+        </CodeStreamingContext.Provider>
+    );
+});
+
+/*
+ * A reply in a chat thread, parsed a block at a time so a delta only parses the block that grows,
+ * and a code fence at the top level not at all. While it streams every new word fades in, and a fence
+ * that has not closed yet is highlighted a line at a time as it grows. `arriving` fades in each block
+ * as it is added instead, for a reply that is shown a block at a time.
  */
 export const ReplyMarkdown = memo(function ReplyMarkdown({
     text,
@@ -318,10 +361,21 @@ export const ReplyMarkdown = memo(function ReplyMarkdown({
     const blocks = useMemo(() => splitMarkdownBlocks(text), [text]);
     return (
         <div className="chat-markdown prose prose-sm max-w-none text-sm" data-arriving={arriving || undefined}>
-            {blocks.map((block, index) => (
+            {blocks.map((block, index) =>
                 // Blocks only ever grow at the end, so the place of a block is a stable key.
-                <ReplyBlock key={index} text={block.text} fade={streaming} open={streaming && block.openFence} reply={reply} />
-            ))}
+                block.fence !== undefined ? (
+                    <ReplyFence
+                        key={index}
+                        info={block.fence.info}
+                        body={block.fence.body}
+                        source={block.fence.source}
+                        open={streaming && !block.fence.closed}
+                        reply={reply}
+                    />
+                ) : (
+                    <ReplyBlock key={index} text={block.text} fade={streaming} open={streaming && block.openFence} reply={reply} />
+                )
+            )}
         </div>
     );
 });
