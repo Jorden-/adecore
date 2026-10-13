@@ -207,7 +207,10 @@ export function deriveFoldingRanges(
         }
     }
     if (options.indentation) {
-        result.push(...indentationFolds(lineCount, getLine, tabWidth(options), minimum));
+        // One push per fold: a long file has more of them than V8 takes as arguments in one call.
+        for (const fold of indentationFolds(lineCount, getLine, tabWidth(options), minimum)) {
+            result.push(fold);
+        }
     }
     result.sort((left, right) => left.startLine - right.startLine || right.endLine - left.endLine);
     return dedupeFoldingRanges(result);

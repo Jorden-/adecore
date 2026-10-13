@@ -51,7 +51,8 @@ function reindent(source: EditSource, from: number, text: string, options: Paste
     const measured = widths.filter((width, index): width is number => width !== null && !(anchored && index === 0));
     const trailingBreak = isBlank(lines.at(-1)!);
     if (measured.length > 0) {
-        const delta = target - Math.min(...measured);
+        // A reduce, not a spread: a paste of a few hundred thousand lines is more arguments than V8 takes in one call.
+        const delta = target - measured.reduce((least, width) => Math.min(least, width));
         for (const [index, entry] of lines.entries()) {
             const width = widths[index];
             if (width === null || width === undefined || (anchored && index === 0)) {

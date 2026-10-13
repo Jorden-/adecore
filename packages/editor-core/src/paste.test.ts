@@ -101,6 +101,13 @@ describe('paste indentation', () => {
         paste('\t¦', 'a\nb', '\ta\n\tb¦', { insertSpaces: false });
     });
 
+    it('moves a block too long to spread into one call', () => {
+        const model = new DocumentModel('    ');
+        model.setSelections([{ anchor: 4, head: 4 }]);
+        model.paste('  a\n'.repeat(1_000_000), { language: 'typescript' });
+        expect(model.getText().startsWith('    a\n    a\n')).toBe(true);
+    });
+
     it('treats every caret on its own', () => {
         paste('f(\n    ¦\n)\ng(\n¦\n)', 'a\nb\nc', 'f(\n    a\n    b\n    c¦\n)\ng(\na\nb\nc¦\n)');
     });
