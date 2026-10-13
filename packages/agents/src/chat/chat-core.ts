@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import {
     ChatAttachmentUploadsSchema,
     generatedImageAttachment,
+    HOST_TASK_ORIGIN,
     type AgentKind,
     type ChatAttachment,
     type ChatAttachResult,
@@ -675,7 +676,7 @@ export class ChatCore {
         if (row.status !== 'running') {
             return;
         }
-        if (row.origin === 'ruimte') {
+        if (row.origin === HOST_TASK_ORIGIN) {
             throw new ChatError('chat-unsupported', 'This row stands for work the host runs; stop it there');
         }
         session.stopSubagent(toolUseId);

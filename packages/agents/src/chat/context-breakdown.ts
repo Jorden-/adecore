@@ -1,4 +1,4 @@
-import { attachmentImageMime, type ChatContextBreakdown, type ChatItem } from '@adecore/agent-contracts';
+import { attachmentImageMime, HOST_TASK_ORIGIN, type ChatContextBreakdown, type ChatItem } from '@adecore/agent-contracts';
 
 // A rough rate for prose and code alike; scaling to the CLI's own total absorbs the error.
 const CHARS_PER_TOKEN = 4;
@@ -60,7 +60,7 @@ export function estimateContextBreakdown(items: readonly ChatItem[], contextToke
             }
             case 'subagent':
                 // A row the host drew for work it delegated stands for that work; the call that made it is a tool row of its own.
-                if (item.origin !== 'ruimte') {
+                if (item.origin !== HOST_TASK_ORIGIN) {
                     toolOutput += textTokens(item.prompt ?? '') + textTokens(item.result ?? '');
                 }
                 break;

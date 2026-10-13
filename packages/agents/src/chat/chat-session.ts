@@ -20,7 +20,7 @@ import type {
     ModelSelection,
     RuntimeMode
 } from '@adecore/agent-contracts';
-import { GeneratedImageInputSchema, notResumedNote } from '@adecore/agent-contracts';
+import { GeneratedImageInputSchema, HOST_TASK_ORIGIN, notResumedNote } from '@adecore/agent-contracts';
 import { resolveUiChoice, UI_FENCE_LANGUAGE, UiFailure, uiHasFence, uiMayReferenceHost } from '@adecore/intelligent-ui';
 import type { UiCompileOptions } from '@adecore/intelligent-ui/compiler';
 import { UiStream, type UiStreamPreview } from '@adecore/intelligent-ui/stream';
@@ -1204,7 +1204,7 @@ export class ChatSession {
             const settled =
                 item.kind === 'turn' && item.state === 'running'
                     ? { ...item, state: 'aborted' as const, endedAt: now }
-                    : item.kind === 'subagent' && item.origin !== 'ruimte' && item.status === 'running'
+                    : item.kind === 'subagent' && item.origin !== HOST_TASK_ORIGIN && item.status === 'running'
                       ? { ...item, status: 'failed' as const, finishedAt: now }
                       : settleStoredItem(item, null);
             if (settled !== item) {
@@ -1427,7 +1427,9 @@ export class ChatSession {
     /* Marks every running subagent of the CLI's own as stopped, for a person stopping the turn together with them. */
     markSubagentsStopped(): void {
         this.markStopped(
-            this.thread.list().filter((item): item is ChatSubagentItem => item.kind === 'subagent' && item.status === 'running' && item.origin !== 'ruimte')
+            this.thread
+                .list()
+                .filter((item): item is ChatSubagentItem => item.kind === 'subagent' && item.status === 'running' && item.origin !== HOST_TASK_ORIGIN)
         );
     }
 

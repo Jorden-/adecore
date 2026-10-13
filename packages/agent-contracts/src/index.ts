@@ -107,6 +107,7 @@ export {
     ChatToolItemSchema,
     ChatSubagentUsageSchema,
     type ChatSubagentUsage,
+    HOST_TASK_ORIGIN,
     ChatSubagentItemSchema,
     ChatApprovalDecisionSchema,
     type ChatApprovalDecision,

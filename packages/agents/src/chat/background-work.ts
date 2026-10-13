@@ -1,4 +1,4 @@
-import type { AgentKind, ChatBackgroundTask, ChatItem, ChatSubagentItem, ChatToolItem } from '@adecore/agent-contracts';
+import { HOST_TASK_ORIGIN, type AgentKind, type ChatBackgroundTask, type ChatItem, type ChatSubagentItem, type ChatToolItem } from '@adecore/agent-contracts';
 
 export type BackgroundWork = ChatSubagentItem | ChatToolItem;
 
@@ -10,7 +10,7 @@ export type BackgroundWork = ChatSubagentItem | ChatToolItem;
  * work it delegated itself (origin `ruimte` on the wire) is that work's own.
  */
 export function isBackgroundWork(item: ChatItem): item is BackgroundWork {
-    return (item.kind === 'subagent' && item.background && item.origin !== 'ruimte') || (item.kind === 'tool' && item.name === 'Workflow');
+    return (item.kind === 'subagent' && item.background && item.origin !== HOST_TASK_ORIGIN) || (item.kind === 'tool' && item.name === 'Workflow');
 }
 
 export function runsInBackground(item: BackgroundWork): boolean {

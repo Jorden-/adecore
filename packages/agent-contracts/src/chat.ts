@@ -493,6 +493,9 @@ export type ChatSubagentUsage = z.infer<typeof ChatSubagentUsageSchema>;
  * ordinary items that carry `parentToolUseId`, so streaming keeps working; the timeline gathers
  * them under this row. `result` is the report it ended with, as markdown.
  */
+// The `origin` of a subagent row a host opened with a task of its own rather than the CLI with its tool; a legacy spelling that stored threads carry.
+export const HOST_TASK_ORIGIN = 'ruimte';
+
 export const ChatSubagentItemSchema = z.object({
     ...base,
     kind: z.literal('subagent'),
@@ -521,8 +524,7 @@ export const ChatSubagentItemSchema = z.object({
     // Where the CLI keeps this subagent's own conversation; set once the daemon found it.
     native: z.object({ agentId: z.string().optional(), threadId: z.string().optional() }).optional(),
     // Who opened it: the CLI with its own tool, or a verb with `--task` that made a node; absent is `native`.
-    // The second value keeps its legacy spelling, since stored threads carry it.
-    origin: z.enum(['native', 'ruimte']).optional(),
+    origin: z.enum(['native', HOST_TASK_ORIGIN]).optional(),
     // The node a `--task` opened, whose own conversation this row stands for.
     childId: z.string().optional(),
     // Set for an agent a subagent opened, with the id of that subagent's own Agent call; its row hangs under that one.
