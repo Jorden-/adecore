@@ -69,6 +69,8 @@ const raceAbort = <T>(promise: Promise<T>, signal: AbortSignal | undefined): Pro
 export const createDatabaseClient = (transport: DatabaseTransport, options: DatabaseClientOptions = {}): DatabaseClient => {
     const createId = options.createId ?? (() => crypto.randomUUID());
     const live = new Map<string, Map<string, ReturnType<typeof createSession>>>();
+    // Every session that opened on the helper and has not closed, also one a newer session replaced on its channel.
+    const held = new Set<ReturnType<typeof createSession>>();
     const schemaListeners = new Set<(change: SchemaChange) => void>();
 
     const channelsOf = (connectionId: string): Map<string, ReturnType<typeof createSession>> => {
@@ -151,6 +153,7 @@ export const createDatabaseClient = (transport: DatabaseTransport, options: Data
             }
 
             track();
+            held.add(created);
             opening ??= send('open', { connection: connection.config })
                 .then((result) => (opened = result))
                 .finally(() => {
@@ -205,6 +208,7 @@ export const createDatabaseClient = (transport: DatabaseTransport, options: Data
                 }
             }
 
+            held.delete(created);
             const current = opened ?? (opening === null ? null : await opening.catch(() => null));
             opened = null;
 
@@ -310,14 +314,22 @@ export const createDatabaseClient = (transport: DatabaseTransport, options: Data
             return created.session;
         },
         async disconnect(connectionId) {
-            const existing = [...(live.get(connectionId)?.values() ?? [])];
+            const existing = new Set(live.get(connectionId)?.values());
+            for (const entry of held) {
+                if (entry.session.connection.id === connectionId) {
+                    existing.add(entry);
+                }
+            }
             live.delete(connectionId);
-            await Promise.all(existing.map((entry) => entry.close()));
+            await Promise.all([...existing].map((entry) => entry.close()));
         },
         async dispose() {
-            const all = [...live.values()].flatMap((channels) => [...channels.values()]);
+            const all = new Set([...live.values()].flatMap((channels) => [...channels.values()]));
+            for (const entry of held) {
+                all.add(entry);
+            }
             live.clear();
-            await Promise.all(all.map((entry) => entry.close()));
+            await Promise.all([...all].map((entry) => entry.close()));
         }
     };
 };

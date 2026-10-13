@@ -586,6 +586,23 @@ describe('closing', () => {
         expect(client.session({ ...connection, id: 'c2' })).toBe(other);
     });
 
+    test('closes a replaced session that opens again on dispose and disconnect', async () => {
+        for (const end of ['dispose', 'disconnect'] as const) {
+            const { transport, calls } = scripted();
+            const client = createDatabaseClient(transport);
+            const old = client.session(connection);
+            await old.schemas();
+            await old.close();
+            const newer = client.session(connection);
+            await newer.schemas();
+            await old.schemas();
+
+            await (end === 'dispose' ? client.dispose() : client.disconnect('c1'));
+            const closed = calls.filter((call) => call.method === 'close').map((call) => (call.params as { session: string }).session);
+            expect(closed.sort()).toEqual(['s1', 's2', 's3']);
+        }
+    });
+
     test('tracks a session that opens again after it closed, so disconnect reaches it', async () => {
         const { transport, calls } = scripted();
         const client = createDatabaseClient(transport);
