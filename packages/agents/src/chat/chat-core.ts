@@ -174,6 +174,8 @@ export class ChatCore {
     protected readonly creating = new Map<string, Promise<ChatInfo>>();
     protected readonly sinks = new ClientSinks<AgentEvent>((clientId) => this.composerPreferences.forget(clientId));
     protected readonly attached = new Map<string, Set<string>>();
+    // How often a chat's bookmarks or visuals changed, so an attach can tell that its read went stale before it joined.
+    private readonly listChanges = new Map<string, number>();
     protected readonly coalescers = new Map<string, DeltaCoalescer>();
     protected readonly subagents: SubagentReader;
     /* Where Claude Code keeps the projects of its default account on this machine; empty when it has none. */
@@ -232,11 +234,13 @@ export class ChatCore {
         this.env = definedEnv(options.env ?? process.env);
         // Only whoever reads the thread has anything to point a bookmark at or to place a visual in, so the lists go where the thread goes.
         this.bookmarks?.listen((chatId, bookmarks) => {
+            this.listChanged(chatId);
             for (const clientId of this.attached.get(chatId) ?? []) {
                 this.sinks.to(clientId, { event: 'chat.bookmarks', payload: { chatId, bookmarks } });
             }
         });
         this.visuals?.listen((chatId, visuals) => {
+            this.listChanged(chatId);
             for (const clientId of this.attached.get(chatId) ?? []) {
                 this.sinks.to(clientId, { event: 'chat.visuals', payload: { chatId, visuals } });
             }
@@ -532,9 +536,10 @@ export class ChatCore {
     }
 
     /*
-     * `attach` with the chat's bookmarks and visuals. They are read before the client joins, so a
-     * change written after the read reaches it as `chat.bookmarks` or `chat.visuals` and never falls
-     * between the two. A file that cannot be read leaves its list out rather than the thread.
+     * `attach` with the chat's bookmarks and visuals. They are read before the client joins, and
+     * read again when either changed during the read, so a change reaches the client in the answer
+     * or as `chat.bookmarks` or `chat.visuals` and never falls between the two. A file that cannot be
+     * read leaves its list out rather than the thread.
      */
     async attachWithBookmarks(chatId: string, clientId: string, historyLimit?: number, since?: number): Promise<ChatAttachResult> {
         this.require(chatId);
@@ -542,12 +547,22 @@ export class ChatCore {
             console.error(`The ${what} of chat ${chatId} could not be read:`, errorText(e));
             return undefined;
         };
-        const [bookmarks, visuals] = await Promise.all([
-            this.bookmarks?.read(chatId).catch(unreadable('bookmarks')),
-            this.visuals?.list(chatId).catch(unreadable('visuals'))
-        ]);
+        let bookmarks: ChatBookmark[] | undefined;
+        let visuals: ChatVisual[] | undefined;
+        let changes: number | undefined;
+        do {
+            changes = this.listChanges.get(chatId);
+            [bookmarks, visuals] = await Promise.all([
+                this.bookmarks?.read(chatId).catch(unreadable('bookmarks')),
+                this.visuals?.list(chatId).catch(unreadable('visuals'))
+            ]);
+        } while (this.listChanges.get(chatId) !== changes);
         const result = this.attach(chatId, clientId, historyLimit, since);
         return { ...result, ...(bookmarks === undefined ? {} : { bookmarks }), ...(visuals === undefined ? {} : { visuals }) };
+    }
+
+    private listChanged(chatId: string): void {
+        this.listChanges.set(chatId, (this.listChanges.get(chatId) ?? 0) + 1);
     }
 
     /* Marks a message of the chat's own thread; a message that already has one keeps it. */
@@ -909,6 +924,7 @@ export class ChatCore {
         this.activity.delete(chatId);
         this.chats.delete(chatId);
         this.attached.delete(chatId);
+        this.listChanges.delete(chatId);
         this.announced.delete(chatId);
         const snapshot = session.thread.snapshot();
         this.forgotten(chatId);

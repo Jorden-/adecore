@@ -100,7 +100,9 @@ export class AttachmentStore {
 
     /* Where the files of one chat are; a store that keeps more of a chat's files beside them writes them here. */
     folderOf(chatId: string): string {
-        return join(this.dir, encodeURIComponent(chatId));
+        // `encodeURIComponent` leaves `.` and `..` as they are, and those would name this folder or the host's own.
+        const segment = chatId === '.' || chatId === '..' ? chatId.replaceAll('.', '%2E') : encodeURIComponent(chatId);
+        return join(this.dir, segment);
     }
 }
 

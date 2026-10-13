@@ -42,7 +42,9 @@ export function spawnChatProcess(options: ChatSpawnOptions): ChatProcess {
         env: options.env,
         stdio: ['pipe', 'pipe', 'pipe'],
         // A group of its own, so ending the chat also ends what its agent started (a dev server, a watcher).
-        detached: true
+        // On Windows that would open a console window of its own instead; `taskkill` reaches the tree there.
+        detached: process.platform !== 'win32',
+        windowsHide: true
     });
     // Node reports a missing executable as an event after the call; a start that failed says so on the spot.
     child.on('error', () => undefined);
@@ -74,14 +76,37 @@ export function spawnChatProcess(options: ChatSpawnOptions): ChatProcess {
         },
         stdout: Readable.toWeb(child.stdout) as unknown as ReadableStream<Uint8Array>,
         stderr: Readable.toWeb(child.stderr) as unknown as ReadableStream<Uint8Array>,
-        kill: (signal) => {
-            try {
-                process.kill(-pid, signal);
-            } catch {
-                // Nothing of the group is left to signal.
-            }
-        }
+        kill: (signal) => killProcessTree(pid, signal)
     };
+}
+
+export interface ProcessTreeKillOptions {
+    platform?: NodeJS.Platform;
+    kill?(pid: number, signal: NodeJS.Signals): void;
+    run?(command: string[]): void;
+}
+
+/* Signals a process and everything it started. Windows has no process groups and no SIGTERM, so there the tree is ended at once. */
+export function killProcessTree(pid: number, signal: 'SIGTERM' | 'SIGKILL', options: ProcessTreeKillOptions = {}): void {
+    const { platform = process.platform, kill = process.kill, run = runQuietly } = options;
+    if (platform === 'win32') {
+        run(['taskkill', '/pid', String(pid), '/t', '/f']);
+        return;
+    }
+    try {
+        kill(-pid, signal);
+    } catch {
+        // Nothing of the group is left to signal.
+    }
+}
+
+function runQuietly([command, ...args]: string[]): void {
+    if (command === undefined) {
+        return;
+    }
+    const child = spawn(command, args, { stdio: 'ignore', windowsHide: true });
+    // A tree that already ended makes taskkill fail, which is what the caller wanted anyway.
+    child.on('error', () => undefined);
 }
 
 // After stdin closed, a CLI that is still around is not going to say more.

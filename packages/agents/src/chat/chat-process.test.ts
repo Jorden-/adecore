@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, jest, test } from 'bun:test';
-import { ChatChild, StreamTail, type ChatSpawnOptions } from './chat-process.ts';
+import { ChatChild, killProcessTree, StreamTail, type ChatSpawnOptions } from './chat-process.ts';
 
 /* A process that only records what it is told, and exits when the test says so. */
 function fakeChild(onExit: (exitCode: number | null, stderr: string | null) => void = () => undefined) {
@@ -107,6 +107,49 @@ describe('ChatChild', () => {
         clean.say('bye\n');
         clean.exit(0);
         expect(await cleanReport.exit).toEqual([0, null]);
+    });
+});
+
+describe('killProcessTree', () => {
+    test('signals the process group on a platform that has one', () => {
+        const signaled: Array<[number, string]> = [];
+        const started: string[][] = [];
+        killProcessTree(4242, 'SIGTERM', {
+            platform: 'darwin',
+            kill: (pid, signal) => signaled.push([pid, signal]),
+            run: (command) => started.push(command)
+        });
+        expect(signaled).toEqual([[-4242, 'SIGTERM']]);
+        expect(started).toEqual([]);
+    });
+
+    test('ends the whole tree with taskkill on Windows, which has no process groups', () => {
+        const signaled: Array<[number, string]> = [];
+        const started: string[][] = [];
+        for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
+            killProcessTree(4242, signal, {
+                platform: 'win32',
+                kill: (pid, sent) => signaled.push([pid, sent]),
+                run: (command) => started.push(command)
+            });
+        }
+        expect(signaled).toEqual([]);
+        expect(started).toEqual([
+            ['taskkill', '/pid', '4242', '/t', '/f'],
+            ['taskkill', '/pid', '4242', '/t', '/f']
+        ]);
+    });
+
+    test('a group that is already gone is no error', () => {
+        expect(() =>
+            killProcessTree(4242, 'SIGKILL', {
+                platform: 'linux',
+                kill: () => {
+                    throw Object.assign(new Error('gone'), { code: 'ESRCH' });
+                },
+                run: () => undefined
+            })
+        ).not.toThrow();
     });
 });
 

@@ -1,4 +1,4 @@
-import { readFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { readFile, readdir, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
@@ -49,6 +49,17 @@ describe('AttachmentStore', () => {
     test('a chat id that looks like a path cannot reach outside the folder', async () => {
         const saved = await store.save('../escape', upload('x.txt', 'text/plain'));
         expect(dirname(saved.path)).toBe(join(home, 'attachments', '..%2Fescape'));
+    });
+
+    test('a chat id of dots stays a folder inside the attachments', async () => {
+        await writeFile(join(home, 'sentinel.txt'), 'kept');
+        await mkdir(join(home, 'attachments', 'other'), { recursive: true });
+        expect(store.folderOf('..')).toBe(join(home, 'attachments', '%2E%2E'));
+        expect(store.folderOf('.')).toBe(join(home, 'attachments', '%2E'));
+        await store.removeAll('..');
+        await store.removeAll('.');
+        expect(await readFile(join(home, 'sentinel.txt'), 'utf8')).toBe('kept');
+        expect(await readdir(join(home, 'attachments'))).toEqual(['other']);
     });
 
     test('removeAll drops everything the chat attached', async () => {
