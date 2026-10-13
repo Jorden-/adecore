@@ -3,6 +3,11 @@
    room for whatever else on the page draws with WebGL. */
 export const DEFAULT_WEBGL_CONTEXTS = 10;
 
+/* Output moves a context at most once in this window, and only away from a holder that was quiet
+   for as long. Without it, more writing terminals than slots trade contexts on every chunk, and
+   each switch rebuilds an atlas and can resize the pty, which makes the program write again. */
+export const OUTPUT_SWITCH_INTERVAL_MS = 1000;
+
 export interface SlotChange {
     granted: string[];
     revoked: string[];
@@ -11,6 +16,8 @@ export interface SlotChange {
 interface Member {
     /* Stamp of the last focus, write or request; the ranking is this number, high to low. */
     seq: number;
+    /* When the terminal last asked, was focused or was written to, on the clock of the slots. */
+    activeAt: number;
     holding: boolean;
     /* The browser took this terminal's context away, so it stays out of the running until a focus. */
     blocked: boolean;
@@ -28,9 +35,13 @@ export class WebglSlots {
     private cap: number;
     private focusedId: string | null = null;
     private stamp = 0;
+    private outputSwitchedAt = Number.NEGATIVE_INFINITY;
+    private readonly now: () => number;
 
-    constructor(cap: number = DEFAULT_WEBGL_CONTEXTS) {
+    /* `now` is a clock in milliseconds. */
+    constructor(cap: number = DEFAULT_WEBGL_CONTEXTS, now: () => number = () => performance.now()) {
         this.cap = Math.max(1, cap);
+        this.now = now;
     }
 
     /* The terminals holding a context, highest ranked first. */
@@ -52,8 +63,9 @@ export class WebglSlots {
         const member = this.members.get(id);
         if (member) {
             member.seq = ++this.stamp;
+            member.activeAt = this.now();
         } else {
-            this.members.set(id, { seq: ++this.stamp, holding: false, blocked: false });
+            this.members.set(id, { seq: ++this.stamp, activeAt: this.now(), holding: false, blocked: false });
         }
         return this.reconcile();
     }
@@ -76,6 +88,7 @@ export class WebglSlots {
             return nothing();
         }
         member.seq = ++this.stamp;
+        member.activeAt = this.now();
         // Focusing is how a terminal that lost its context asks for a new one.
         member.blocked = false;
         return this.reconcile();
@@ -95,9 +108,26 @@ export class WebglSlots {
         if (!member) {
             return nothing();
         }
+        const now = this.now();
         member.seq = ++this.stamp;
+        member.activeAt = now;
         // A holder that climbs stays a holder; only a waiter can change who holds what.
-        return member.holding ? nothing() : this.reconcile();
+        if (member.holding || now - this.outputSwitchedAt < OUTPUT_SWITCH_INTERVAL_MS) {
+            return nothing();
+        }
+        const target = this.target();
+        const evictsBusyHolder = [...this.members].some(
+            ([other, entry]) => entry.holding && !target.has(other) && now - entry.activeAt < OUTPUT_SWITCH_INTERVAL_MS
+        );
+        // The waiter keeps its new rank; its next write tries again, and so does any request, focus or release.
+        if (evictsBusyHolder) {
+            return nothing();
+        }
+        const change = this.reconcile(target);
+        if (change.granted.length > 0 || change.revoked.length > 0) {
+            this.outputSwitchedAt = now;
+        }
+        return change;
     }
 
     /* The browser reported a context loss, free the slot and wait for a focus before asking again. */
@@ -128,9 +158,12 @@ export class WebglSlots {
         return this.members.get(id)?.seq ?? -1;
     }
 
-    private reconcile(): SlotChange {
+    private target(): Set<string> {
         const eligible = this.ranked().filter((id) => this.members.get(id)?.blocked !== true);
-        const target = new Set(eligible.slice(0, this.cap));
+        return new Set(eligible.slice(0, this.cap));
+    }
+
+    private reconcile(target: Set<string> = this.target()): SlotChange {
         const granted: string[] = [];
         const revoked: string[] = [];
         for (const [id, member] of this.members) {

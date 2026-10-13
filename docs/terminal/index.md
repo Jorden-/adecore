@@ -61,7 +61,7 @@ HTTP and HTTPS URLs in the output and OSC 8 hyperlinks share one handler. Withou
 
 ## WebGL
 
-`webgl` draws with WebGL instead of the DOM, which is faster on a busy screen. A browser keeps about 16 contexts per page and silently drops the oldest, so every terminal with `webgl` shares one budget of ten: the focused one first, then the ones written to most recently. A terminal that loses its context falls back to the DOM and asks again on its next `focus()`. `webglTerminals()` lists the terminals that hold one, highest ranked first.
+`webgl` draws with WebGL instead of the DOM, which is faster on a busy screen. A browser keeps about 16 contexts per page and silently drops the oldest, so every terminal with `webgl` shares one budget of ten: the focused one first, then the ones written to most recently. Output moves a context at most once a second, and only away from a terminal that has been quiet for a second, so more busy terminals than contexts do not trade them on every write. A terminal that loses its context falls back to the DOM and asks again on its next `focus()`. `webglTerminals()` lists the terminals that hold one, highest ranked first.
 
 The WebGL addon loads on the first grant. Register its import with the [prefetcher](/ui/utilities/lazy-loading) of `@adecore/ui` to have it ready before then:
 

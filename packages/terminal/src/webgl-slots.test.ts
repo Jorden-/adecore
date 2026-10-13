@@ -1,9 +1,44 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_WEBGL_CONTEXTS, WebglSlots } from './webgl-slots.ts';
+import { DEFAULT_WEBGL_CONTEXTS, OUTPUT_SWITCH_INTERVAL_MS, WebglSlots, type SlotChange } from './webgl-slots.ts';
 
 const requestAll = (slots: WebglSlots, ids: string[]): void => {
     for (const id of ids) {
         slots.request(id);
+    }
+};
+
+const fakeClock = (): { now: () => number; advance: (ms: number) => void } => {
+    let time = 0;
+    return {
+        now: () => time,
+        advance: (ms) => {
+            time += ms;
+        }
+    };
+};
+
+const switched = (change: SlotChange): boolean => change.granted.length > 0 || change.revoked.length > 0;
+
+/* Writes to the terminals in turn, one every `gap` ms for `duration` ms, and returns when a write moved a context. */
+const roundRobin = (gap: number, duration: number): number[] => {
+    const clock = fakeClock();
+    const slots = new WebglSlots(2, clock.now);
+    const ids = ['a', 'b', 'c'];
+    requestAll(slots, ids);
+    const switches: number[] = [];
+    for (let time = 0, turn = 0; time < duration; time += gap, turn++) {
+        clock.advance(gap);
+        if (switched(slots.touch(ids[turn % ids.length]!))) {
+            switches.push(time + gap);
+        }
+        expect(slots.holders()).toHaveLength(2);
+    }
+    return switches;
+};
+
+const atMostOnePerInterval = (switches: number[]): void => {
+    for (let i = 1; i < switches.length; i++) {
+        expect(switches[i]! - switches[i - 1]!).toBeGreaterThanOrEqual(OUTPUT_SWITCH_INTERVAL_MS);
     }
 };
 
@@ -78,10 +113,56 @@ describe('WebglSlots', () => {
     });
 
     test('output promotes a waiter over an idle holder', () => {
-        const slots = new WebglSlots(2);
+        const clock = fakeClock();
+        const slots = new WebglSlots(2, clock.now);
         requestAll(slots, ['a', 'b', 'c']);
         expect(slots.holders().sort()).toEqual(['b', 'c']);
+        clock.advance(OUTPUT_SWITCH_INTERVAL_MS);
         expect(slots.touch('a')).toEqual({ granted: ['a'], revoked: ['b'] });
+    });
+
+    test('output does not take a context from a holder that was active within the interval', () => {
+        const clock = fakeClock();
+        const slots = new WebglSlots(2, clock.now);
+        requestAll(slots, ['a', 'b', 'c']);
+        clock.advance(OUTPUT_SWITCH_INTERVAL_MS - 1);
+        expect(slots.touch('a')).toEqual({ granted: [], revoked: [] });
+        expect(slots.holders().sort()).toEqual(['b', 'c']);
+        clock.advance(1);
+        expect(slots.touch('a')).toEqual({ granted: ['a'], revoked: ['b'] });
+    });
+
+    test('output moves a context at most once per interval, even away from idle holders', () => {
+        const clock = fakeClock();
+        const slots = new WebglSlots(2, clock.now);
+        requestAll(slots, ['a', 'b', 'c', 'd']);
+        clock.advance(OUTPUT_SWITCH_INTERVAL_MS);
+        expect(slots.touch('a')).toEqual({ granted: ['a'], revoked: ['c'] });
+        // d is as idle as c was, but the last switch is too recent.
+        expect(slots.touch('b')).toEqual({ granted: [], revoked: [] });
+        clock.advance(OUTPUT_SWITCH_INTERVAL_MS);
+        expect(slots.touch('b')).toEqual({ granted: ['b'], revoked: ['d'] });
+    });
+
+    test('a waiter held back by output takes its slot on the next request', () => {
+        const clock = fakeClock();
+        const slots = new WebglSlots(2, clock.now);
+        requestAll(slots, ['a', 'b', 'c']);
+        slots.touch('a');
+        expect(slots.release('c')).toEqual({ granted: ['a'], revoked: [] });
+    });
+
+    test('three terminals writing in turn over two slots keep their contexts', () => {
+        expect(roundRobin(10, 10_000)).toEqual([]);
+    });
+
+    test('three terminals writing slowly in turn over two slots switch at most once per interval', () => {
+        for (const gap of [250, 400, 500, 700, 1000, 1500]) {
+            const switches = roundRobin(gap, 20_000);
+            atMostOnePerInterval(switches);
+        }
+        // Quiet enough between writes that a holder goes idle, so output still moves contexts.
+        expect(roundRobin(1500, 20_000).length).toBeGreaterThan(0);
     });
 
     test('output on a holder decides nothing', () => {
