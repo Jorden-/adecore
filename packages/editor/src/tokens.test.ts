@@ -130,6 +130,18 @@ describe('TokenCache', () => {
         expect(cache.colored).toBe(4);
     });
 
+    // V8 overflows from about 200k arguments in one call and JavaScriptCore from somewhere under a million.
+    test('takes hundreds of thousands of lines pasted into the middle of a colored document', () => {
+        for (const count of [300_000, 1_000_000]) {
+            const { model, cache, edit } = setup('a\n/* c\nd */\ne');
+            cache.advance(10, 1000);
+            expect(() => edit(2, 2, 'x\n'.repeat(count))).not.toThrow();
+            expect(model.getLineCount()).toBe(count + 4);
+            expect(cache.tokensOf(count + 1)).toBeNull();
+            expect(colors(cache, count + 4).slice(count + 2)).toEqual(['comment', 'code']);
+        }
+    });
+
     test('starts over for a new tokenizer, and has no colors without one', () => {
         const { cache, counter } = setup('a\nb');
         cache.advance(10, 1000);

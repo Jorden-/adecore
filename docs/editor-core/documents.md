@@ -80,7 +80,7 @@ Edits with the same `historyGroup` join one undo step until something closes the
 
 `getSnapshot()` returns an `EditorSnapshot`: `text`, `selections`, `revision`, `canUndo` and `canRedo`. Its `text` is read lazily from the rope of that revision, so a snapshot kept across later edits still returns its own text.
 
-`subscribe(listener)` returns a `Disposable` and calls the listener after every change, synchronously, with a fresh snapshot. It does not call it right away. A snapshot of a text change adds three fields:
+`subscribe(listener)` returns a `Disposable` and calls the listener after every change, synchronously, with a fresh snapshot. It does not call it right away. A listener that throws is reported with `console.error`; the change stands, the call that made it does not throw, and the listeners after it still run. A snapshot of a text change adds three fields:
 
 - `source`: what made the change.
 - `changes`: one list of `DocumentChange`s (`from`, `to`, `insertedLength`) per transaction in the step, each in the coordinates of the text before that transaction. An undo of a typing group has one list per keystroke.

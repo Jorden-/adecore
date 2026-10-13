@@ -128,7 +128,8 @@ export class TokenCache {
         const old = this.entries[lastOld];
         this.pivotLine = old ? lastNew : -1;
         this.pivotState = old?.state;
-        this.entries.splice(firstLine, lastOld - firstLine + 1, ...new Array<undefined>(lastNew - firstLine + 1));
+        // Not a spread into splice: a paste of a few hundred thousand lines would overflow the call stack.
+        this.entries = this.entries.slice(0, firstLine).concat(new Array<undefined>(lastNew - firstLine + 1).fill(undefined), this.entries.slice(lastOld + 1));
         this.reusableFrom = lastNew + 1;
     }
 

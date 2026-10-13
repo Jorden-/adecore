@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 import { DocumentModel } from './document.ts';
 
 describe('simultaneous document transactions', () => {
@@ -356,6 +356,28 @@ describe('content edits', () => {
         });
         model.undo();
         expect(seen).toEqual([{ start: { line: 0, column: 5 }, end: { line: 0, column: 6 }, text: '' }]);
+    });
+});
+
+describe('listeners', () => {
+    it('reports a listener that throws and still tells the ones after it', () => {
+        const model = new DocumentModel('one');
+        const failure = new Error('listener failed');
+        const reported = spyOn(console, 'error').mockImplementation(() => undefined);
+        const heard: string[] = [];
+        try {
+            model.subscribe(() => {
+                throw failure;
+            });
+            model.subscribe((snapshot) => heard.push(snapshot.text));
+            expect(model.applyEdits([{ from: 3, to: 3, text: '!' }])).toBe(true);
+            expect(model.undo()).toBe(true);
+            expect(heard).toEqual(['one!', 'one']);
+            expect(reported).toHaveBeenCalledTimes(2);
+            expect(reported.mock.calls[0]).toContain(failure);
+        } finally {
+            reported.mockRestore();
+        }
     });
 });
 

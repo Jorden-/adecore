@@ -2237,7 +2237,12 @@ export class DocumentModel {
             }
         }
         for (const listener of this.listeners) {
-            listener(snapshot);
+            try {
+                listener(snapshot);
+            } catch (error) {
+                // The text has changed by now, so a failing listener must not throw at the caller or keep the others, such as a language server's sync, from hearing it.
+                console.error('A document listener failed.', error);
+            }
         }
     }
 }
