@@ -76,7 +76,7 @@ Each chat keeps its draft while the composer is away; see [Persistence](/agents-
 
 The stash is a shelf of prompts shared by every chat: Mod+S puts the draft there and `StashPicker` lists them. A restored prompt brings back its text, mentions and skills, not its files.
 
-A normal send during a turn queues the message until the current turn finishes. Hold Option or Alt when clicking Send or pressing Enter to steer Claude or Codex at its next input boundary. The host can reverse these behaviors with `useSendDelivery`. The composer passes `delivery: "steer"` or `delivery: "queue"` in `ChatSendExtras`. A backend without steering keeps the message queued. Queued messages can be sent at once, or taken back into the draft to edit, which merges with what was typed since.
+A normal send during a turn queues the message until the current turn finishes. Hold Option or Alt when clicking Send or pressing Enter to steer the running agent at its next input boundary. The host can reverse these behaviors with `useSendDelivery`. The composer passes `delivery: "steer"` or `delivery: "queue"` in `ChatSendExtras`. Steering is offered only where the provider reports the [`steer` capability](/agent-contracts/providers-and-accounts#providers); without it every send queues, and a backend without steering keeps the message queued. Queued messages can be sent at once, or taken back into the draft to edit, which merges with what was typed since.
 
 ## Holding a prompt card
 
