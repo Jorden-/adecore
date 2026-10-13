@@ -216,6 +216,14 @@ export class ChatClient {
         await this.transport.request('chat.clear', { chatId, ...(force ? { force: true } : {}) });
     }
 
+    /*
+     * Ends the chat's CLI and keeps its conversation, which the next message resumes in a fresh process
+     * that reads its skills, plugins and servers again; refused with `chat-busy` while the chat works.
+     */
+    async restart(chatId: string): Promise<void> {
+        await this.transport.request('chat.restart', { chatId });
+    }
+
     async kill(chatId: string): Promise<void> {
         this.mounted.delete(chatId);
         this.sink.forget(chatId);

@@ -2,6 +2,7 @@ import { chatStorageKey, chatStorageLegacyKeys, createChatStore, onChatStorageCo
 import type { AgentKind, ChatPreferencesPayload, ModelSelection, ProviderInfo, ProviderAccounts, RuntimeMode } from '@adecore/agent-contracts';
 import { persistedJson } from './persisted-json';
 import { DEFAULT_READING_WIDTH, isChatReadingWidth, type ChatReadingWidth } from './reading-width';
+import { DEFAULT_SEND_KEY, isChatSendKey, type ChatSendKey } from './send-key';
 
 const storageKey = (): string => chatStorageKey('preferences');
 
@@ -17,6 +18,8 @@ export interface ChatPreferences {
     accountByMachine: Record<string, Partial<Record<AgentKind, string>>>;
     /* How wide a chat of its own reads. It never reaches a machine. */
     readingWidth: ChatReadingWidth;
+    /* Which key sends from the composer. It never reaches a machine either. */
+    sendKey: ChatSendKey;
     /* When a person last changed any of it; what settles whose pick a machine uses when several clients told it one. */
     changedAt: number;
 }
@@ -28,6 +31,7 @@ export const DEFAULT_CHAT_PREFERENCES: ChatPreferences = {
     terminalRuntimeMode: 'full-access',
     accountByMachine: {},
     readingWidth: DEFAULT_READING_WIDTH,
+    sendKey: DEFAULT_SEND_KEY,
     changedAt: 0
 };
 
@@ -49,6 +53,7 @@ export function parseChatPreferences(raw: string | null): ChatPreferences {
             terminalRuntimeMode: stored.terminalRuntimeMode ?? DEFAULT_CHAT_PREFERENCES.terminalRuntimeMode,
             accountByMachine: { ...stored.accountByMachine },
             readingWidth: isChatReadingWidth(stored.readingWidth) ? stored.readingWidth : DEFAULT_READING_WIDTH,
+            sendKey: isChatSendKey(stored.sendKey) ? stored.sendKey : DEFAULT_SEND_KEY,
             changedAt: typeof stored.changedAt === 'number' ? stored.changedAt : 0
         };
     } catch {
@@ -164,6 +169,11 @@ export function rememberChatPreferences(patch: Partial<ChatPreferences>): void {
 /* The reading width leaves `changedAt` alone: it is no pick a machine weighs against another client's. */
 export function rememberReadingWidth(readingWidth: ChatReadingWidth): void {
     store({ ...useChatPreferences.getState(), readingWidth });
+}
+
+/* Leaves `changedAt` alone, like the reading width. */
+export function rememberSendKey(sendKey: ChatSendKey): void {
+    store({ ...useChatPreferences.getState(), sendKey });
 }
 
 export function rememberChatSelection(provider: AgentKind, selection: ModelSelection): void {

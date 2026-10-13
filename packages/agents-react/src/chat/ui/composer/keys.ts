@@ -1,11 +1,15 @@
 import type { SyntaxNode, Tree } from '@lezer/common';
+import { modSends, type ChatSendKey } from '../../send-key';
 
-export type EnterAction = 'send' | 'newline' | 'continue-list' | 'leave-list';
+/* `send-alternate` sends with the delivery a running turn does not get by default; `send-and-new` also opens a new chat once it went. */
+export type EnterAction = 'send' | 'send-alternate' | 'send-and-new' | 'newline' | 'continue-list' | 'leave-list';
 
 export interface EnterKeys {
     shift: boolean;
     /* Cmd on macOS, Ctrl elsewhere. */
     mod: boolean;
+    /* Option on macOS. */
+    alt?: boolean;
 }
 
 export interface ListItem {
@@ -23,6 +27,12 @@ export interface EnterContext {
     list: ListItem | null;
     /* The caret's offset in its line. */
     column: number;
+    /* Which key sends; `enter` when left out. */
+    sendKey?: ChatSendKey;
+    /* The message runs over more than one line, where `mod-enter-multiline` lets Enter add a line. */
+    multiline?: boolean;
+    /* The host opens a new chat after a send, which Mod+Alt+Enter asks for. */
+    startsNewChat?: boolean;
 }
 
 const LIST_ITEM = /^([ \t]*)(?:([-*+])|(\d{1,9})([.)]))([ \t]+)(\[[ xX]\](?:[ \t]+|$))?/;
@@ -41,23 +51,35 @@ export function listItemAt(line: string): ListItem | null {
 /*
  * Enter sends, except where whoever types is still writing: inside a fence nobody has closed yet
  * it adds a line, and in a list it starts the next item, or leaves the list from an empty one, so
- * a second Enter breaks out. Shift adds a plain line and Mod sends from anywhere.
+ * a second Enter breaks out. Shift adds a plain line and Mod sends from anywhere. Where the send key
+ * is Mod+Enter, Enter adds a line instead of sending. Alt sends the other way (queue or steer), and so
+ * does Mod+Shift+Enter where Mod+Enter is the send key; Mod+Alt+Enter is the send that opens a new chat.
  */
-export function enterAction(keys: EnterKeys, { inOpenFence, list, column }: EnterContext): EnterAction {
+export function enterAction(
+    keys: EnterKeys,
+    { inOpenFence, list, column, sendKey = 'enter', multiline = false, startsNewChat = false }: EnterContext
+): EnterAction {
+    const modOnly = modSends(sendKey, multiline);
     if (keys.mod) {
-        return 'send';
+        if (keys.alt && startsNewChat) {
+            return 'send-and-new';
+        }
+        return keys.alt || (modOnly && keys.shift) ? 'send-alternate' : 'send';
     }
     if (keys.shift || inOpenFence) {
         return 'newline';
     }
-    if (list === null) {
-        return 'send';
+    if (list !== null) {
+        // A caret in front of the marker moves the item down rather than splitting its marker.
+        if (column < list.prefix.length) {
+            return 'newline';
+        }
+        return list.empty ? 'leave-list' : 'continue-list';
     }
-    // A caret in front of the marker moves the item down rather than splitting its marker.
-    if (column < list.prefix.length) {
-        return 'newline';
+    if (keys.alt) {
+        return 'send-alternate';
     }
-    return list.empty ? 'leave-list' : 'continue-list';
+    return modOnly ? 'newline' : 'send';
 }
 
 /* The innermost fenced code block around `pos`, if any. */

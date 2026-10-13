@@ -617,5 +617,20 @@
       "label": "Volledig",
       "hint": "Zo breed als de weergave."
     }
+  },
+  "sendKey": {
+    "label": "Versturen met",
+    "enter": {
+      "label": "Enter",
+      "hint": "Enter verstuurt en Shift+Enter voegt een regel toe."
+    },
+    "mod-enter-multiline": {
+      "label": "Enter, {{mod}}+Enter bij meer regels",
+      "hint": "Enter verstuurt een bericht van één regel. Heeft het meer regels, dan voegt Enter een regel toe en verstuurt {{mod}}+Enter."
+    },
+    "mod-enter": {
+      "label": "{{mod}}+Enter",
+      "hint": "Enter voegt een regel toe en {{mod}}+Enter verstuurt."
+    }
   }
 }

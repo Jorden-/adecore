@@ -112,6 +112,10 @@ export function chatHandlers(chats: ChatCore, providers: ProviderRegistry): { [T
             await chats.kill(payload.chatId);
             return {};
         },
+        'chat.restart': async (payload) => {
+            await chats.restart(payload.chatId);
+            return {};
+        },
         'chat.list': () => ({ chats: chats.list() })
     };
 }

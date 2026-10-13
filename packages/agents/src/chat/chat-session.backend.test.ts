@@ -774,3 +774,35 @@ describe('the HEAD a turn checkpoint is taken on', () => {
         await unborn.session.dispose();
     });
 });
+
+describe('restarting the agent session', () => {
+    test('ends the process, forgets what it announced and resumes the conversation in a fresh one', async () => {
+        const run = replacementRig();
+        run.session.send('first');
+        await flush();
+        run.event({ type: 'session', agentSessionId: 'agent-session', model: null, slashCommands: ['review'], skills: ['old-skill'] });
+        run.done();
+        await run.session.restart();
+        expect(run.instances[0]!.stopped).toBe(true);
+        expect(run.session.info.running).toBe(false);
+        expect(run.session.info.skills).toBeUndefined();
+        expect(run.session.info.agentSessionId).toBe('agent-session');
+        run.session.send('second');
+        await flush();
+        expect(run.instances).toHaveLength(2);
+        expect(run.instances[1]!.launch.resume).toBe('agent-session');
+        await run.session.dispose();
+    });
+
+    test('is refused while a turn runs or the process holds a background agent', async () => {
+        const run = replacementRig();
+        run.session.send('first');
+        await flush();
+        expect(() => run.session.restart()).toThrow(expect.objectContaining({ code: 'chat-busy' }));
+        run.agent();
+        run.done();
+        expect(() => run.session.restart()).toThrow(expect.objectContaining({ code: 'chat-busy' }));
+        expect(run.instances[0]!.stopped).toBe(false);
+        await run.session.dispose();
+    });
+});

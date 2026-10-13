@@ -195,4 +195,9 @@ export class SkillIndex {
         this.cache.set(key, { at: Date.now(), skills });
         return skills;
     }
+
+    /* Drops the scan of one CLI in one folder, so the next look reads the disk again. */
+    forget(kind: AgentKind, cwd: string): void {
+        this.cache.delete(`${kind}:${cwd}`);
+    }
 }

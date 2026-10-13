@@ -310,6 +310,11 @@ export interface ChatHost {
     };
     /* Offers a fork of the chat after one of its turns; null offers none. */
     fork: ((chatId: string, turnId: string) => void) | null;
+    /*
+     * Opens a new chat beside this one on its CLI, model and settings, with the focus in its composer,
+     * once Mod+Alt+Enter sent a message from it; null leaves that key sending the other way, like Alt+Enter.
+     */
+    openNewChat: ((scopeId: string, chatId: string) => void) | null;
     openSettings(section: 'providers' | 'agents'): void;
     /* Whether the host lets a chat go on by itself once a limit it stopped on lifts. */
     useResumeAtReset(scopeId: string): boolean;
@@ -364,6 +369,7 @@ const DEFAULT_HOST: ChatHost = {
     tasks: { useTasks: () => undefined, useTask: () => null },
     confirm: { stopSubagents: (_scopeId, _chatId, run) => run(), stopTask: (_scopeId, _childId, _title, run) => run() },
     fork: null,
+    openNewChat: null,
     openSettings: () => undefined,
     useResumeAtReset: () => true,
     useComposerPlaceholder: () => null,

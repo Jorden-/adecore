@@ -115,6 +115,8 @@ export const AGENT_REQUEST_SCHEMAS = {
     'usage.limits': { payload: EmptySchema, result: UsageLimitsSnapshotSchema },
     'usage.refreshLimits': { payload: EmptySchema, result: UsageLimitsSnapshotSchema },
     'chat.kill': { payload: ChatTargetPayloadSchema, result: EmptySchema },
+    // Ends the chat's CLI and keeps the conversation, which the next message resumes in a fresh process.
+    'chat.restart': { payload: ChatTargetPayloadSchema, result: EmptySchema },
     'chat.list': { payload: EmptySchema, result: ChatListResultSchema }
 } as const;
 

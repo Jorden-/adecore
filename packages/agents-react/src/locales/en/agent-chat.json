@@ -617,5 +617,20 @@
       "label": "Full",
       "hint": "As wide as the view."
     }
+  },
+  "sendKey": {
+    "label": "Send with",
+    "enter": {
+      "label": "Enter",
+      "hint": "Enter sends and Shift+Enter adds a line."
+    },
+    "mod-enter-multiline": {
+      "label": "Enter, {{mod}}+Enter for more lines",
+      "hint": "Enter sends a message of one line. Once it has more lines, Enter adds a line and {{mod}}+Enter sends."
+    },
+    "mod-enter": {
+      "label": "{{mod}}+Enter",
+      "hint": "Enter adds a line and {{mod}}+Enter sends."
+    }
   }
 }

@@ -797,6 +797,14 @@ export class ChatCore {
         return session.skills(() => this.skillIndex.list(session.info.provider, session.info.cwd));
     }
 
+    /* Ends the chat's CLI and keeps its conversation; the next message resumes it in a process that reads its skills and plugins again. */
+    async restart(chatId: string): Promise<void> {
+        const session = this.require(chatId);
+        const ended = session.restart();
+        this.skillIndex.forget(session.info.provider, session.info.cwd);
+        await ended;
+    }
+
     compact(chatId: string): void {
         const session = this.require(chatId);
         if (session.busy) {

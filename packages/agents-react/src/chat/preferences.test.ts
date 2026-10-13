@@ -79,6 +79,7 @@ describe('reading what is stored', () => {
             terminalRuntimeMode: 'supervised',
             accountByMachine: { local: { claude: 'claude_work' }, studio: { codex: 'codex_client' } },
             readingWidth: 'narrow',
+            sendKey: 'mod-enter',
             changedAt: 42
         };
         expect(parseChatPreferences(JSON.stringify(stored))).toEqual(stored as ChatPreferences);
@@ -87,6 +88,11 @@ describe('reading what is stored', () => {
     test('a reading width this build does not know is the default one', () => {
         expect(parseChatPreferences(JSON.stringify({ readingWidth: 'wide' })).readingWidth).toBe('comfortable');
         expect(parseChatPreferences(JSON.stringify({ readingWidth: 'full' })).readingWidth).toBe('full');
+    });
+
+    test('a send key this build does not know is Enter', () => {
+        expect(parseChatPreferences(JSON.stringify({ sendKey: 'shift-enter' })).sendKey).toBe('enter');
+        expect(parseChatPreferences(JSON.stringify({ sendKey: 'mod-enter-multiline' })).sendKey).toBe('mod-enter-multiline');
     });
 
     test('preferences written before the moment of a change was kept count as the oldest pick', () => {

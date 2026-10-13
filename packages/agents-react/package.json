@@ -269,6 +269,11 @@
             "types": "./dist/chat/runtime-modes.d.ts",
             "default": "./dist/chat/runtime-modes.js"
         },
+        "./chat/send-key": {
+            "source": "./src/chat/send-key.ts",
+            "types": "./dist/chat/send-key.d.ts",
+            "default": "./dist/chat/send-key.js"
+        },
         "./chat/stash": {
             "source": "./src/chat/stash.ts",
             "types": "./dist/chat/stash.d.ts",

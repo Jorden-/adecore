@@ -9,6 +9,8 @@ function fenceAt(doc: string, pos: number = doc.length): boolean {
 const ENTER = { shift: false, mod: false };
 const SHIFT = { shift: true, mod: false };
 const MOD = { shift: false, mod: true };
+const ALT = { shift: false, mod: false, alt: true };
+const MOD_ALT = { shift: false, mod: true, alt: true };
 const PROSE: EnterContext = { inOpenFence: false, list: null, column: 0 };
 const FENCE: EnterContext = { inOpenFence: true, list: null, column: 0 };
 
@@ -47,6 +49,38 @@ describe('enterAction', () => {
         expect(enterAction(MOD, FENCE)).toBe('send');
         expect(enterAction({ shift: true, mod: true }, PROSE)).toBe('send');
         expect(enterAction(MOD, itemContext('- one'))).toBe('send');
+    });
+
+    test('sends the other way with Alt, where Enter or Mod+Enter would send', () => {
+        expect(enterAction(ALT, PROSE)).toBe('send-alternate');
+        expect(enterAction(MOD_ALT, FENCE)).toBe('send-alternate');
+        expect(enterAction(ALT, FENCE)).toBe('newline');
+        expect(enterAction(ALT, itemContext('- one'))).toBe('continue-list');
+    });
+
+    test('sends and opens a new chat with Mod+Alt only where the host opens one', () => {
+        expect(enterAction(MOD_ALT, { ...PROSE, startsNewChat: true })).toBe('send-and-new');
+        expect(enterAction(MOD_ALT, { ...FENCE, startsNewChat: true, sendKey: 'mod-enter' })).toBe('send-and-new');
+        expect(enterAction(MOD_ALT, PROSE)).toBe('send-alternate');
+    });
+
+    test('adds a line on Enter and sends on Mod+Enter where Mod+Enter is the send key', () => {
+        const always: EnterContext = { ...PROSE, sendKey: 'mod-enter' };
+        expect(enterAction(ENTER, always)).toBe('newline');
+        expect(enterAction(MOD, always)).toBe('send');
+        expect(enterAction({ shift: true, mod: true }, always)).toBe('send-alternate');
+        expect(enterAction(ALT, always)).toBe('send-alternate');
+        expect(enterAction(ENTER, { ...itemContext('- one'), sendKey: 'mod-enter' })).toBe('continue-list');
+    });
+
+    test('sends a single line on Enter and asks Mod+Enter of more lines in the multiline mode', () => {
+        const single: EnterContext = { ...PROSE, sendKey: 'mod-enter-multiline' };
+        const lines: EnterContext = { ...single, multiline: true };
+        expect(enterAction(ENTER, single)).toBe('send');
+        expect(enterAction({ shift: true, mod: true }, single)).toBe('send');
+        expect(enterAction(ENTER, lines)).toBe('newline');
+        expect(enterAction(MOD, lines)).toBe('send');
+        expect(enterAction({ shift: true, mod: true }, lines)).toBe('send-alternate');
     });
 });
 

@@ -38,6 +38,7 @@ A patch replaces top-level fields only: to change one function of `code`, `promp
 | `tasks`                            | No tasks                                           | `useTasks` and `useTask`: the tasks behind subagent rows your app opened itself.                       |
 | `confirm`                          | Runs at once                                       | `stopSubagents` and `stopTask` get a `run` to call once a person confirmed.                            |
 | `fork(chatId, turnId)`             | No fork action                                     | Offers a fork after a turn; where it lands is up to you.                                               |
+| `openNewChat(scopeId, chatId)`     | Mod+Alt+Enter sends the other way, like Alt+Enter  | Opens a new chat beside this one on its CLI, model and settings, with the focus in its composer, once Mod+Alt+Enter sent a message and the host took it. |
 | `openSettings(section)`            | Nothing                                            | Opens your settings on `providers` or `agents`.                                                        |
 | `useResumeAtReset(scopeId)`        | `true`                                             | Whether a chat may go on by itself once the limit it stopped on lifts.                                 |
 | `useComposerPlaceholder(scopeId, chatId)` | The chat's own                              | The first words of an empty composer.                                                                  |

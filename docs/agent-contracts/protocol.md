@@ -45,7 +45,7 @@ A frame arrives as `unknown` because the receiving end checks it. `onFrame` answ
 | Group                  | Requests                                                                                              |
 | ---------------------- | ----------------------------------------------------------------------------------------------------- |
 | Open and read          | `chat.create`, `chat.list`, `chat.attach`, `chat.detach`, `chat.history`                              |
-| Send and control       | `chat.send`, `chat.unqueue`, `chat.sendNow`, `chat.cancel`, `chat.compact`, `chat.clear`, `chat.kill` |
+| Send and control       | `chat.send`, `chat.unqueue`, `chat.sendNow`, `chat.cancel`, `chat.compact`, `chat.clear`, `chat.restart`, `chat.kill` |
 | Answer                 | `chat.approve`, `chat.answer`, `chat.dismiss`                                                         |
 | Configure              | `chat.configure`, `chat.setPreferences`, `skills.list`, `provider.list`                               |
 | Turns and forks        | `chat.turnDiff`, `chat.fork`, `chat.forkInfo`, `chat.summarize`, `chat.continueOn`                    |

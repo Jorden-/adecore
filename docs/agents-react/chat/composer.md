@@ -26,7 +26,7 @@ import { Composer } from '@adecore/agents-react/chat/ui/Composer';
 
 `onSend(text, extras)` gets the trimmed text and `ChatSendExtras`: the `mentions`, `skills` and referenced `chats` picked, and the `attachments` as uploads. A quote becomes a Markdown quote above the text. The paths and skill names are also in the text; the lists are what the thread draws as chips.
 
-`onSend` returns nothing and the composer clears its draft at once, without waiting for the host. If a send can fail in your app, keep the text and files until `send` resolves, so a person can try again.
+`onSend` may return nothing, and the composer clears its draft at once, without waiting for the host. If a send can fail in your app, keep the text and files until `send` resolves, so a person can try again. Return a promise of whether the host took the message, and a send that also opens a new chat waits for it: Mod+Alt+Enter sends, and once the promise resolves `true` (or once `onSend` returned nothing) calls the host's `openNewChat(scopeId, chatId)`. Without `openNewChat`, Mod+Alt+Enter sends the other way, like Alt+Enter.
 
 Before the first message, picking another CLI's model calls `onRetarget(provider, selection)`, which moves the empty chat. After it, or with `providerFixed`, the picker offers only the chat's own CLI.
 
@@ -34,12 +34,17 @@ Before the first message, picking another CLI's model calls `onRetarget(provider
 
 `Mod` is Command on macOS and Control elsewhere. A key inside an IME composition belongs to the composition, and a key the host's `isAppShortcut` claims passes through.
 
+Which key sends is the person's `sendKey` in the [chat preferences](/agents-react/guide/persistence): `enter` (the default) sends on Enter, `mod-enter-multiline` sends a message of one line on Enter and one of more lines on Mod+Enter only, and `mod-enter` sends on Mod+Enter only. Where Enter does not send, it adds a line. The send button's tooltip shows the key that sends what is in the box. A settings page of your own can offer the three with `CHAT_SEND_KEYS`, `sendKeyLabel` and `sendKeyHint` from `chat/send-key` and `rememberSendKey` from `chat/preferences`.
+
 | Key                         |                                                                              |
 | --------------------------- | ---------------------------------------------------------------------------- |
-| Enter                       | Sends, except inside a code fence that is not closed yet, where it adds a line. |
+| Enter                       | Sends, except inside a code fence that is not closed yet, where it adds a line. Adds a line where Mod+Enter is the send key. |
 | Enter in a list             | Starts the next item; on an empty item, leaves the list.                     |
 | Shift+Enter                 | A new line.                                                                  |
 | Mod+Enter                   | Sends from anywhere.                                                         |
+| Alt+Enter                   | Sends the other way while a turn runs: steers instead of queueing, or the reverse. |
+| Mod+Shift+Enter             | Sends the other way too, where Mod+Enter is the send key.                    |
+| Mod+Alt+Enter               | Sends, then opens a new chat through the host's `openNewChat`; without it, sends the other way. |
 | Tab, Shift+Tab in a fence   | Indent and outdent. Outside a fence, Tab moves the focus.                     |
 | Up and Down in a picker     | Move through it; Enter or Tab picks.                                         |
 | Up in an empty box          | Brings back an earlier message, up to the last 50; Escape puts it back.      |
@@ -85,7 +90,7 @@ While a person types, a prompt card (an approval or a question) stays out of the
 | `disabled`               | `boolean`                                                 | Nothing can be sent or answered, such as while the host is away.      |
 | `readOnly`               | `boolean`                                                 | Nothing can be written, while the chat's prompts can still be answered. `false` by default. |
 | `providerFixed`          | `boolean`                                                 | The chat belongs to one CLI; the picker offers only its models.       |
-| `onSend`                 | `(text: string, extras: ChatSendExtras) => void`          |                                                                       |
+| `onSend`                 | `(text: string, extras: ChatSendExtras) => void \| Promise<boolean>` | A promise says whether the host took the message.          |
 | `onRetarget`             | `(provider: AgentKind, selection: ModelSelection) => Promise<void>` |                                                              |
 | `answerPromptsElsewhere` | `() => void`                                              | The prompts are answered somewhere else; the composer only points there. |
 

@@ -30,6 +30,7 @@ The names and payloads are those of the [agent protocol](/agent-contracts/protoc
 | `loadEarlier(chatId, cursor)`           | Reads the 60 items before the oldest one held. One read per chat at a time.                      |
 | `inspect(chatId)`                       | Reads up to 100 items once, without keeping the chat attached, for a preview.                    |
 | `clear(chatId, force?)`                 | Starts the chat over; refused with `chat-busy` during a turn unless `force`.                     |
+| `restart(chatId)`                       | Ends the chat's CLI and keeps the conversation, which the next message resumes in a fresh process; refused with `chat-busy` while the chat works. |
 | `kill(chatId)`                          | Forgets the chat here and asks the host to remove it.                                            |
 | `listSkills(chatId)`                    | What the chat's CLI runs as a skill, for the `$` picker.                                         |
 | `addBookmark`, `renameBookmark`, `removeBookmark` | Answer the chat's whole bookmark list.                                                 |

@@ -50,7 +50,8 @@ import { dismissResumeCompaction, useResumeCompactionDismissal } from '../resume
 import { composerStopLabel, composerStopOf } from '../subagent-list';
 import { PROMPT_MAX_CHARS, pasteBecomesAttachment, pastedTextName, promptGuard, usableSlashCommands } from '../guards';
 import { withQuote } from '../quote';
-import { rememberChatAccount, rememberChatPreferences, rememberChatSelection } from '../preferences';
+import { rememberChatAccount, rememberChatPreferences, rememberChatSelection, useChatPreferences } from '../preferences';
+import { sendShortcut } from '../send-key';
 import { STASH_SHORTCUT, stashDraft, type StashedPrompt, useStash } from '../stash';
 import { jumpToTimelineItem, pageTimeline, scrollTimelineToEnd, subscribeTimelineEnd, timelineAtEnd } from '../timeline-scroll';
 import { ChatActivity } from './ChatActivity';
@@ -77,7 +78,6 @@ import {
     Icon,
     IconButton,
     isModHeld,
-    KEY_SHORTCUTS,
     matchesShortcut,
     Menu,
     MiddleTruncate,
@@ -120,7 +120,8 @@ interface ComposerProps {
     readOnly?: boolean;
     /* Opened for one CLI from a menu. The model is the remembered one and there is nothing to pick. */
     providerFixed: boolean;
-    onSend(text: string, extras: ChatSendExtras): void;
+    /* A promise says whether the host took the message, which a send that also opens a new chat waits for. */
+    onSend(text: string, extras: ChatSendExtras): void | Promise<boolean>;
     /* Another provider's model was picked before the first message; whatever holds the chat has to follow. */
     onRetarget(provider: AgentKind, selection: ModelSelection): Promise<void>;
 }
@@ -159,6 +160,14 @@ function hintedPlaceholder(lead: string, joiner: string, hints: ReadonlyArray<{ 
     root.append(lead, extra);
     return root;
 }
+
+type SendHow = 'default' | 'alternate' | 'and-new';
+
+const SEND_HOW: Readonly<Record<'send' | 'send-alternate' | 'send-and-new', SendHow>> = {
+    send: 'default',
+    'send-alternate': 'alternate',
+    'send-and-new': 'and-new'
+};
 
 function sendLabelKey(busy: boolean, canSteer: boolean, delivery: 'queue' | 'steer'): string {
     if (!busy) {
@@ -236,6 +245,7 @@ function usePromptHold(): PromptHold & { noteInput(): void; setComposing(composi
 export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabled, readOnly = false, providerFixed, onSend, onRetarget }: ComposerProps) {
     const { t } = useTranslation('agent-chat');
     const sendDelivery = chatHost().useSendDelivery();
+    const sendKey = useChatPreferences((preferences) => preferences.sendKey);
     const canSteer = info.provider === 'claude' || info.provider === 'codex';
     const [draft, setDraft] = useState<ChatDraft>(() => readDraft(chatId));
     const [historyIndex, setHistoryIndex] = useState<number | null>(null);
@@ -377,7 +387,10 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
         };
     }, [scope, info.cwd, mention]);
 
-    /* The host's skill list, once per chat and again once the CLI announced its own after the first message. */
+    /*
+     * The host's skill list, once per chat, again once the CLI announced its own after the first message,
+     * and again when its process comes or goes, which is when a restart reads new skills.
+     */
     useEffect(() => {
         let stale = false;
         scope.chats
@@ -391,7 +404,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
         return () => {
             stale = true;
         };
-    }, [scope, chatId, info.skills]);
+    }, [scope, chatId, info.skills, info.running]);
 
     const history = useMemo(() => {
         const prompts: Array<{ text: string; mentions: string[] }> = [];
@@ -681,7 +694,23 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
         setDraft((current) => ({ ...current, attachments: current.attachments.filter((_, i) => i !== index) }));
     };
 
-    const submit = (alternate = false): void => {
+    /* Opens the host's new chat once the host took the message; a host that answers nothing took it. */
+    const afterSend = (sent: void | Promise<boolean>, andNew: boolean): void => {
+        const openNewChat = chatHost().openNewChat;
+        if (!andNew || openNewChat === null) {
+            return;
+        }
+        void Promise.resolve(sent)
+            .then((taken) => {
+                if (taken !== false) {
+                    openNewChat(scope.id, chatId);
+                }
+            })
+            .catch(() => undefined);
+    };
+
+    const submit = (how: SendHow = 'default'): void => {
+        const alternate = how === 'alternate';
         const delivery = canSteer && (alternate ? sendDelivery === 'queue' : sendDelivery === 'steer') ? 'steer' : 'queue';
         const trimmed = text.trim();
         if (isEmptyDraft(draft) || !writable || guard.tooLong) {
@@ -709,11 +738,11 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
         // Whoever sends wants to see what comes back, wherever they were reading.
         scrollTimelineToEnd(chatId, 'instant');
         if (commandQuery !== null && chosen && !chosen.local) {
-            onSend(`/${chosen.name}`, {});
+            afterSend(onSend(`/${chosen.name}`, {}), how === 'and-new');
             clearDraft();
             return;
         }
-        onSend(withQuote(quote, trimmed), {
+        const sent = onSend(withQuote(quote, trimmed), {
             delivery,
             mentions: presentMentions(trimmed, draft.mentions),
             skills: presentSkills(trimmed, draft.skills),
@@ -721,6 +750,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
             quoteSource: quote !== '' && quoteSource !== null ? { itemId: quoteSource } : undefined,
             attachments: draft.attachments
         });
+        afterSend(sent, how === 'and-new');
         clearDraft();
         setMention(null);
         setSkillQuery(null);
@@ -943,26 +973,35 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
             const line = state.doc.lineAt(head);
             const list = from === to && !inCode(tree, state.doc.toString(), head) ? listItemAt(line.text) : null;
             const action = enterAction(
-                { shift: e.shiftKey, mod: isModHeld(e, isApplePlatform()) },
-                { inOpenFence: inOpenFence(tree, head), list, column: head - line.from }
+                { shift: e.shiftKey, mod: isModHeld(e, isApplePlatform()), alt: e.altKey },
+                {
+                    inOpenFence: inOpenFence(tree, head),
+                    list,
+                    column: head - line.from,
+                    sendKey,
+                    multiline: state.doc.lines > 1,
+                    startsNewChat: chatHost().openNewChat !== null
+                }
             );
             if (action === 'newline') {
                 return insertNewline(view);
             }
-            if (action === 'continue-list' && list) {
-                view.dispatch({
-                    changes: { from: head, insert: `\n${list.next}` },
-                    selection: { anchor: head + 1 + list.next.length },
-                    scrollIntoView: true,
-                    userEvent: 'input'
-                });
+            if (action === 'continue-list') {
+                if (list) {
+                    view.dispatch({
+                        changes: { from: head, insert: `\n${list.next}` },
+                        selection: { anchor: head + 1 + list.next.length },
+                        scrollIntoView: true,
+                        userEvent: 'input'
+                    });
+                }
                 return true;
             }
             if (action === 'leave-list') {
                 view.dispatch({ changes: { from: line.from, to: line.to }, selection: { anchor: line.from }, userEvent: 'delete' });
                 return true;
             }
-            submit(e.altKey);
+            submit(SEND_HOW[action]);
             return true;
         }
         const { from, to } = view.state.selection.main;
@@ -1440,11 +1479,11 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                                 </Tooltip>
                             )}
                             {(!busy || !isEmptyDraft(draft)) && (
-                                <Tooltip label={t(sendLabelKey(busy, canSteer, sendDelivery))} kbd={KEY_SHORTCUTS.modEnter} name>
+                                <Tooltip label={t(sendLabelKey(busy, canSteer, sendDelivery))} kbd={sendShortcut(sendKey, text.includes('\n'))} name>
                                     <button
                                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-text hover:brightness-90 disabled:opacity-50 disabled:hover:brightness-100"
                                         disabled={isEmptyDraft(draft) || !writable || guard.tooLong}
-                                        onClick={(event) => submit(event.altKey)}
+                                        onClick={(event) => submit(event.altKey ? 'alternate' : 'default')}
                                     >
                                         <Icon icon={ArrowUp} size={16} />
                                     </button>

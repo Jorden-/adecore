@@ -1174,6 +1174,27 @@ export class ChatSession {
         this.options.persist();
     }
 
+    /*
+     * Ends the CLI and keeps the conversation: the next message starts a fresh process that resumes it,
+     * and with it the skills, plugins and servers the CLI reads at its start. Refused while a turn runs or
+     * the process still holds work, a request or a background command, since those would end with it.
+     */
+    restart(): Promise<void> {
+        if (this.thread.info.activeTurnId !== null || this.processInUse()) {
+            throw new ChatError('chat-busy', `Chat ${this.id} is still working; stop it before restarting its agent session`);
+        }
+        this.clearStartWarning();
+        this.clearWorkflowWarnings();
+        const backend = this.backend;
+        this.backend = null;
+        this.starting = null;
+        this.launchedSelection = null;
+        // What the init frame of the process that goes announced; a skill added since would be filtered out by it.
+        this.emit([this.thread.patchInfo({ running: false, effectiveRuntimeMode: undefined, permissionMode: undefined, skills: undefined })]);
+        this.options.persist();
+        return backend?.dispose() ?? Promise.resolve();
+    }
+
     /* Ends the process and stops listening to it, as the host goes down; the thread stays as it is. */
     freeze(): void {
         this.clearUi();

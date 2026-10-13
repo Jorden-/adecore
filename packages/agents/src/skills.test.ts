@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { discoverSkills, parseFrontmatter, pluginSkillRoots } from './skills.ts';
+import { discoverSkills, parseFrontmatter, pluginSkillRoots, SkillIndex } from './skills.ts';
 
 let home = '';
 let project = '';
@@ -93,5 +93,17 @@ describe('discoverSkills', () => {
 describe('pluginSkillRoots', () => {
     test('a missing plugin file is not an error', async () => {
         expect(await pluginSkillRoots(join(home, 'nowhere'))).toEqual([]);
+    });
+});
+
+describe('SkillIndex', () => {
+    test('keeps a scan for a while and reads the disk again once a folder is forgotten', async () => {
+        const index = new SkillIndex({ home });
+        const before = await index.list('claude', project);
+        await writeSkill(join(project, '.claude', 'skills'), 'fresh', '---\nname: fresh\ndescription: New.\n---\n');
+        expect(await index.list('claude', project)).toEqual(before);
+        index.forget('claude', project);
+        expect((await index.list('claude', project)).map((skill) => skill.name)).toContain('fresh');
+        await rm(join(project, '.claude', 'skills', 'fresh'), { recursive: true });
     });
 });

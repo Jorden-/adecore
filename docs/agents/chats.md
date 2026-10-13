@@ -45,6 +45,7 @@ A clear and `chat.kill` take a chat's visuals along. A core of your own that for
 | `chat.cancel`                           | Stops the turn and keeps the conversation. With `subagents`, also ends the agents the chat opened. |
 | `chat.clear`                            | Starts the chat over. Refused with `chat-busy` during a turn, unless `force`.                    |
 | `chat.compact`                          | Folds the context, natively or by prompt, as the CLI's `compaction` capability says.             |
+| `chat.restart`                          | Ends the CLI and keeps the conversation: the next message resumes it in a fresh process, which reads its skills, plugins and servers again. Drops the skill scan of the chat's folder. Refused with `chat-busy` while a turn runs or the process still holds a request or background work. |
 | `chat.kill`                             | Removes the chat: its record, log, attachments, bookmarks and visuals, and ends its CLI.         |
 | Detaching or disconnecting              | Stops streaming to that client. The chat goes on.                                                |
 | `host.close()`, `ChatCore.shutdown()`   | Writes every thread and ends every CLI, and settles once they exited.                            |
