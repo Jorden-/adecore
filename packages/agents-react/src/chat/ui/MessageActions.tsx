@@ -11,9 +11,9 @@ import { useChatScope } from '../../scope';
 import { useChatRow, useChats } from '../../state/chats';
 import { ButtonGroup, copyText, IconButton, Tooltip } from '@adecore/ui';
 import { formatClock, formatDateTime, useFormatLocale } from '@adecore/ui/format';
+import { TIMESTAMP_FORMAT } from './timestamp-format';
 
 const COPIED_MS = 1500;
-const TIMESTAMP_FORMAT: Intl.DateTimeFormatOptions = { dateStyle: 'full', timeStyle: 'medium' };
 
 type MessageRow = Extract<TimelineRow, { kind: 'user' | 'assistant' }>;
 

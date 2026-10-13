@@ -689,6 +689,11 @@
             "types": "./dist/chat/ui/markdown-blocks.d.ts",
             "default": "./dist/chat/ui/markdown-blocks.js"
         },
+        "./chat/ui/timestamp-format": {
+            "source": "./src/chat/ui/timestamp-format.ts",
+            "types": "./dist/chat/ui/timestamp-format.d.ts",
+            "default": "./dist/chat/ui/timestamp-format.js"
+        },
         "./chat/ui/quote-selection": {
             "source": "./src/chat/ui/quote-selection.ts",
             "types": "./dist/chat/ui/quote-selection.d.ts",

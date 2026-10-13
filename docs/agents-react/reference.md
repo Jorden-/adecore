@@ -136,6 +136,7 @@ Many props and options are not exported types. Derive them where you need one, a
 | [`chat/ui/remark-html-as-text`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/remark-html-as-text.ts) | `remarkHtmlAsText` |
 | [`chat/ui/reply-context`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/reply-context.ts) | `ReplyContext`, `UiReplyNavigationContext` |
 | [`chat/ui/reveal`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/reveal.ts) | `REVEAL_FADE_MS`, `REVEAL_TAU_MS`, `REVEAL_MIN_CPS`, `REVEAL_FINISH_MIN_CPS`, `REVEAL_MAX_FRAME_MS`, `REVEAL_MAX_HELD_WORD`, `advanceReveal`, `revealBoundary`, `RevealedText`, `useRevealedText` |
+| [`chat/ui/timestamp-format`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/timestamp-format.ts) | `TIMESTAMP_FORMAT` |
 | [`chat/ui/useToggleSet`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/useToggleSet.ts) | `ToggleSet`, `useToggleSet` |
 | [`chat/ui/visual-theme`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/visual-theme.ts) | `VisualTokens`, `visualThemeOf`, `backgroundBehind`, `useVisualTheme` |
 
