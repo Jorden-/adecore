@@ -316,6 +316,7 @@ export {
     ProviderAccountWatchLoginPayloadSchema,
     type ProviderAccountWatchLoginPayload
 } from './provider-accounts.ts';
+export { isRecord } from './record.ts';
 export {
     TaskStatusSchema,
     type TaskStatus,

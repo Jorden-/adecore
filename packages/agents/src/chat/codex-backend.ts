@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { accessSync, constants } from 'node:fs';
-import { attachmentImageMime, type ChatGoal, type ChatGoalAction, type ChatSkill } from '@adecore/agent-contracts';
+import { isRecord, attachmentImageMime, type ChatGoal, type ChatGoalAction, type ChatSkill } from '@adecore/agent-contracts';
 import { errorText } from '../error-text.ts';
 import { codexServiceTier, codexThreadOptions } from '../providers/codex.ts';
 import type { ApprovalDecision, BackendEvent, BackendHost, BackendLaunch, ChatBackend, TurnInput } from './backend.ts';
@@ -10,10 +10,6 @@ import { attachmentNote } from './input.ts';
 
 function textInput(text: string) {
     return [{ type: 'text', text, text_elements: [] }];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /* The enabled skills of a `skills/list` answer; Codex reports one entry per folder it was asked about. */

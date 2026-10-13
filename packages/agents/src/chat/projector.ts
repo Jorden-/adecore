@@ -8,6 +8,7 @@ import type {
     ChatToolProgress,
     ChatTurnLimit
 } from '@adecore/agent-contracts';
+import { isRecord } from '@adecore/agent-contracts';
 import { clipText } from '@adecore/agent-contracts/text';
 import type { BackendEvent } from './backend.ts';
 import { estimateContextBreakdown } from './context-breakdown.ts';
@@ -38,10 +39,6 @@ export function isMainAgentOutput(event: BackendEvent): boolean {
  */
 function startsAgentTurn(event: BackendEvent): boolean {
     return isMainAgentOutput(event) || ((event.type === 'approval.requested' || event.type === 'question.requested') && event.background !== true);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function str(value: unknown): string | null {

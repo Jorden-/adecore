@@ -8,15 +8,12 @@ import type {
     ChatWorkflowAgent,
     ChatWorkflowPhase
 } from '@adecore/agent-contracts';
+import { isRecord } from '@adecore/agent-contracts';
 import { readClaudeEvent } from '../usage/limits/normalize.ts';
 import { claudeRuntimeMode } from '../providers/claude.ts';
 import type { ApprovalDecision, BackendEvent } from './backend.ts';
 
 type Frame = Record<string, unknown>;
-
-function isRecord(value: unknown): value is Frame {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function str(value: unknown): string | null {
     return typeof value === 'string' ? value : null;

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { link, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
-import { attachmentImageMime, type ChatAttachment, type ChatAttachmentUpload } from '@adecore/agent-contracts';
+import { isRecord, attachmentImageMime, type ChatAttachment, type ChatAttachmentUpload } from '@adecore/agent-contracts';
 
 // The extension the file gets on disk when its name does not carry a usable one.
 const EXTENSIONS: Record<string, string> = {
@@ -104,10 +104,6 @@ export class AttachmentStore {
         const segment = chatId === '.' || chatId === '..' ? chatId.replaceAll('.', '%2E') : encodeURIComponent(chatId);
         return join(this.dir, segment);
     }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 // What an attachment looked like before the files moved out of the thread: the bytes inline.

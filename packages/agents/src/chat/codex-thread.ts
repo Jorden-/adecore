@@ -1,14 +1,11 @@
 import type { ChatItem } from '@adecore/agent-contracts';
+import { isRecord } from '@adecore/agent-contracts';
 import { errorText } from '../error-text.ts';
 import type { SpawnChatProcess } from './chat-process.ts';
 import { CodexProtocol } from './codex-protocol.ts';
 import { CodexTransport, DEFAULT_CODEX_CLIENT, type CodexClientInfo } from './codex-transport.ts';
 import { ChatError } from './errors.ts';
 import { readingThread, settledReading } from './subagent-projection.ts';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 export interface ThreadItemsParams {
     threadId: string;

@@ -1,11 +1,8 @@
 import { open, stat } from 'node:fs/promises';
+import { isRecord } from '@adecore/agent-contracts';
 
 // The end of a transcript is all the question needs; a final line longer than this reads as undecided.
 const TAIL_BYTES = 1024 * 1024;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 /* How a subagent's own transcript says it ended: when, and the text of its last message. */
 export interface SubagentSettlement {

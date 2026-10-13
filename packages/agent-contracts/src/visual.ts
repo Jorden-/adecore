@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isRecord } from './record.ts';
 import { visualViewportScript } from './visual-viewport.ts';
 
 /*
@@ -160,10 +161,6 @@ export function visualOpenLinkRequest(id: VisualRequestId, url: string) {
 // What the app answers an open-link request with, whether it opened the link or not.
 export function visualOpenLinkResult(id: VisualRequestId) {
     return { jsonrpc: '2.0', id, result: {} } as const;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function sizeOf(value: unknown): number | undefined {

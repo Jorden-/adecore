@@ -1,4 +1,5 @@
 import type { AgentKind } from '@adecore/agent-contracts';
+import { isRecord } from '@adecore/agent-contracts';
 import { withTimeout } from '../../async.ts';
 import { CodexTransport, type CodexClientInfo } from '../../chat/codex-transport.ts';
 import { runProcess } from '../../run-process.ts';
@@ -18,10 +19,6 @@ export type AskAccount = (kind: AgentKind, command: readonly string[], env: Reco
 
 function text(value: unknown): string | null {
     return typeof value === 'string' && value !== '' ? value : null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /* `claude auth status --json`, as Claude Code 2.1.282 prints it: `loggedIn`, `email`, `orgName`, `subscriptionType`. */

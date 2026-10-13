@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { ChatHistoryResult, ChatItem } from '@adecore/agent-contracts';
+import { isRecord } from '@adecore/agent-contracts';
 import { readLines } from '../title-file.ts';
 import { ClaudeProtocol } from './claude-protocol.ts';
 import { readingThread, settledReading } from './subagent-projection.ts';
@@ -9,10 +10,6 @@ import type { ThreadProjector } from './projector.ts';
 import type { ChatThread } from './thread.ts';
 
 const CHUNK_BYTES = 4 * 1024 * 1024;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function str(value: unknown): string | null {
     return typeof value === 'string' && value !== '' ? value : null;

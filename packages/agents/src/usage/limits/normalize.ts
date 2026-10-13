@@ -1,4 +1,5 @@
 import type { UsageLimitsProvider, UsageProvider, UsageWindow } from '@adecore/agent-contracts';
+import { isRecord } from '@adecore/agent-contracts';
 
 /* Everything a full read of a provider says about its plan, ready to be published as it is. */
 export interface ProviderReading {
@@ -20,10 +21,6 @@ const MINUTE_MS = 60_000;
 const FIVE_HOURS_MS = 5 * 60 * MINUTE_MS;
 const WEEK_MS = 7 * 24 * 60 * MINUTE_MS;
 const MONTH_MS = 30 * 24 * 60 * MINUTE_MS;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function num(value: unknown): number | null {
     return typeof value === 'number' && Number.isFinite(value) ? value : null;

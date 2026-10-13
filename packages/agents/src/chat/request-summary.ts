@@ -1,8 +1,11 @@
-import { CHAT_REQUEST_LIMITS, type ChatApprovalItem, type ChatQuestionItem, type ChatRequestApproval, type ChatRequestSummary } from '@adecore/agent-contracts';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+import {
+    isRecord,
+    CHAT_REQUEST_LIMITS,
+    type ChatApprovalItem,
+    type ChatQuestionItem,
+    type ChatRequestApproval,
+    type ChatRequestSummary
+} from '@adecore/agent-contracts';
 
 function str(value: unknown): string | null {
     return typeof value === 'string' ? value : null;

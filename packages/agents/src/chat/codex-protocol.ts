@@ -1,5 +1,6 @@
 import { generatedImage } from './generated-image.ts';
 import type { ChatFileChange, ChatGoal, ChatGoalStatus, ChatQuestion, ChatTurnLimit, UsageWindow } from '@adecore/agent-contracts';
+import { isRecord } from '@adecore/agent-contracts';
 import { readCodexLimits } from '../usage/limits/normalize.ts';
 import { codexRuntimeMode } from '../providers/codex.ts';
 import type { ApprovalDecision, BackendEvent } from './backend.ts';
@@ -12,10 +13,6 @@ type CodexRpcId = number | string;
 type CodexAnswer = { kind: 'respond'; rpcId: CodexRpcId; result: unknown } | { kind: 'steer'; text: string };
 
 type Frame = Record<string, unknown>;
-
-function isRecord(value: unknown): value is Frame {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function str(value: unknown): string | null {
     return typeof value === 'string' ? value : null;

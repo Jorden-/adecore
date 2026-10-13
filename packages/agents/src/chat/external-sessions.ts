@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { clipText } from '@adecore/agent-contracts';
+import { clipText, isRecord } from '@adecore/agent-contracts';
 import { isForkOrSubagent } from '../usage/readers/codex.ts';
 import { claudeProjectSlug, spokenText } from './claude-transcript.ts';
 
@@ -40,7 +40,7 @@ function records(head: string): Array<Record<string, unknown>> {
         }
         try {
             const parsed: unknown = JSON.parse(line);
-            return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? [parsed as Record<string, unknown>] : [];
+            return isRecord(parsed) ? [parsed] : [];
         } catch {
             return [];
         }
