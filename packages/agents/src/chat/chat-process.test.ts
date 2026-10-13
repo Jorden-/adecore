@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, jest, test } from 'bun:test';
-import { ChatChild, killProcessTree, LineSplitter, StreamTail, type ChatSpawnOptions } from './chat-process.ts';
+import { ChatChild, killProcessTree, LineSplitter, readStreamLines, StreamTail, type ChatSpawnOptions } from './chat-process.ts';
 
 /* A process that only records what it is told, and exits when the test says so. */
 function fakeChild(onExit: (exitCode: number | null, stderr: string | null) => void = () => undefined) {
@@ -239,5 +239,63 @@ describe('LineSplitter', () => {
         splitter.end();
         expect(lines).toEqual(['{"fits":1}', '<dropped>', '{"next":2}', '<dropped>']);
         expect(overflows()).toBe(2);
+    });
+});
+
+describe('readStreamLines', () => {
+    // One chunk per read, so a failure comes after the chunks before it rather than in place of them.
+    const streamOf = (chunks: Uint8Array[], failure?: Error) => {
+        const left = [...chunks];
+        return new ReadableStream<Uint8Array>({
+            pull(controller) {
+                const chunk = left.shift();
+                if (chunk !== undefined) {
+                    controller.enqueue(chunk);
+                } else if (failure) {
+                    controller.error(failure);
+                } else {
+                    controller.close();
+                }
+            }
+        });
+    };
+
+    test('reads a frame split over several chunks, inside a character too, as one line', async () => {
+        const bytes = new TextEncoder().encode('{"text":"Übersicht"}\n{"done":true}');
+        // Cut between the two bytes of the Ü and inside the second frame.
+        const chunks = [bytes.slice(0, 9), bytes.slice(9, 10), bytes.slice(10, 25), bytes.slice(25)];
+        const lines: string[] = [];
+        await readStreamLines(
+            streamOf(chunks),
+            (line) => lines.push(line),
+            () => lines.push('<dropped>')
+        );
+        expect(lines).toEqual(['{"text":"Übersicht"}', '{"done":true}']);
+    });
+
+    test('rejects a read that failed, after the lines that came before it', async () => {
+        const lines: string[] = [];
+        const read = readStreamLines(
+            streamOf([new TextEncoder().encode('{"a":1}\n{"b"')], new Error('pipe closed')),
+            (line) => lines.push(line),
+            () => undefined
+        );
+        await expect(read).rejects.toThrow('pipe closed');
+        expect(lines).toEqual(['{"a":1}']);
+    });
+
+    test('drops a frame past the limit and reads on', async () => {
+        const lines: string[] = [];
+        let overflows = 0;
+        await readStreamLines(
+            streamOf([new TextEncoder().encode('0123456789abc\n{"ok":1}\n')]),
+            (line) => lines.push(line),
+            () => {
+                overflows += 1;
+            },
+            10
+        );
+        expect(lines).toEqual(['{"ok":1}']);
+        expect(overflows).toBe(1);
     });
 });

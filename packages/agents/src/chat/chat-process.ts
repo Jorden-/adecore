@@ -226,6 +226,33 @@ export class LineSplitter {
     }
 }
 
+/*
+ * Hands every line of a CLI's output to `onLine` until the stream ends, through a `LineSplitter`.
+ * A read that fails rejects, after every line that came before it was handed on.
+ */
+export async function readStreamLines(
+    stream: ReadableStream<Uint8Array>,
+    onLine: (line: string) => void,
+    onOverflow: () => void,
+    max = MAX_LINE_LENGTH
+): Promise<void> {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    const lines = new LineSplitter(onLine, onOverflow, max);
+    try {
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) {
+                break;
+            }
+            lines.push(decoder.decode(value, { stream: true }));
+        }
+        lines.end();
+    } finally {
+        reader.releaseLock();
+    }
+}
+
 export interface ChatChildOptions extends Omit<ChatSpawnOptions, 'onExit'> {
     spawn?: SpawnChatProcess;
     // `stderr` is the tail of what the CLI wrote there, for an exit with an error code only.

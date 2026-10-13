@@ -1,5 +1,5 @@
 import { errorText } from '../error-text.ts';
-import { ChatChild, LineSplitter, MAX_LINE_LENGTH, type SpawnChatProcess } from './chat-process.ts';
+import { ChatChild, MAX_LINE_LENGTH, readStreamLines, type SpawnChatProcess } from './chat-process.ts';
 
 export type CodexFrame = Record<string, unknown>;
 
@@ -171,27 +171,16 @@ export class CodexTransport {
     }
 
     private async readLines(): Promise<void> {
-        const reader = this.child.process.stdout.getReader();
-        const decoder = new TextDecoder();
-        const lines = new LineSplitter(
-            (line) => this.readLine(line),
-            () => this.failed(new Error(`Codex wrote a frame of more than ${MAX_LINE_LENGTH / 1_000_000} million characters, which was dropped`))
-        );
         try {
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) {
-                    break;
-                }
-                lines.push(decoder.decode(value, { stream: true }));
-            }
-            lines.end();
+            await readStreamLines(
+                this.child.process.stdout,
+                (line) => this.readLine(line),
+                () => this.failed(new Error(`Codex wrote a frame of more than ${MAX_LINE_LENGTH / 1_000_000} million characters, which was dropped`))
+            );
         } catch (error) {
             if (!this.closed) {
                 this.broken(error);
             }
-        } finally {
-            reader.releaseLock();
         }
     }
 
