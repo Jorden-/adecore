@@ -154,7 +154,7 @@ A `DatabaseError` has a `code` (a `DatabaseErrorCode`), a `message`, the five ch
 | Code                 | Sent by              | Meaning                                                                                                                                                           |
 | -------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `invalid-request`    | Host, helper         | The request does not have the shape of the protocol, or its id is already running.                                                                                |
-| `unknown-session`    | Host, helper         | The session was closed, belongs to another owner, or belonged to a helper that has exited.                                                                        |
+| `unknown-session`    | Host, helper         | The session was closed, belongs to another owner, belonged to a helper that has exited, or lost its connection to the server.                                     |
 | `connect-failed`     | Helper               | The server or the file could not be reached or opened.                                                                                                            |
 | `auth-failed`        | Helper               | The server turned the credentials down.                                                                                                                           |
 | `tunnel-failed`      | Helper               | The SSH or Docker tunnel did not come up. `message` holds what `ssh` or `docker` said.                                                                            |
@@ -178,6 +178,7 @@ The host talks to the helper over its standard streams, one JSON message per lin
 - The host stops a helper whose `protocol` differs from its own, or that writes no ready line within `readyTimeoutMs` (10000 by default). The request that started it fails with `helper-unavailable`.
 - Then one request per line on stdin and one response per line on stdout. An empty line is ignored, and a line that is not a valid request gets `invalid-request`, with its id when one could be read.
 - Requests run concurrently, so responses can arrive in another order; the `id` matches them. Requests on one session queue up in the order they arrived, on its single connection.
+- A session whose connection to MySQL or MariaDB is lost (a killed connection, `wait_timeout`, a dropped tunnel) ends. The request that ran into it, and every request queued behind it, answer `unknown-session`.
 - `cancel` interrupts the statement on SQLite, and runs `KILL QUERY` from a second connection on MySQL. The cancelled request answers `cancelled`, except a write that completed, which answers its result.
 - stderr holds log lines for a person, one per line, and is not part of the protocol. `spawnHelper` hands each to `onLog`.
 - A line can be megabytes, such as a page of rows with long cells.

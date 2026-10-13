@@ -61,9 +61,11 @@ struct SessionHandle {
 
 type Running = Arc<Mutex<HashMap<String, Arc<RequestState>>>>;
 
+type Sessions = Arc<Mutex<HashMap<String, Arc<SessionHandle>>>>;
+
 /// Routes requests to sessions. Requests on one session queue up in the order they were submitted.
 pub struct Dispatcher {
-    sessions: Mutex<HashMap<String, Arc<SessionHandle>>>,
+    sessions: Sessions,
     running: Running,
     counter: AtomicU64,
 }
@@ -77,7 +79,7 @@ impl Default for Dispatcher {
 impl Dispatcher {
     pub fn new() -> Self {
         Dispatcher {
-            sessions: Mutex::new(HashMap::new()),
+            sessions: Sessions::default(),
             running: Arc::new(Mutex::new(HashMap::new())),
             counter: AtomicU64::new(0),
         }
@@ -198,7 +200,17 @@ impl Dispatcher {
                 gate: gate.clone(),
             }),
         );
-        tokio::spawn(session_worker(engine, commands, self.running.clone(), slot, gate));
+        tokio::spawn(session_worker(
+            Worker {
+                session: session.clone(),
+                sessions: self.sessions.clone(),
+                running: self.running.clone(),
+                slot,
+                gate,
+            },
+            engine,
+            commands,
+        ));
 
         to_json(OpenResult { session, server })
     }
@@ -361,7 +373,24 @@ where
     })
 }
 
-async fn session_worker(mut engine: Engine, mut commands: mpsc::UnboundedReceiver<Command>, running: Running, slot: Slot, gate: Gate) {
+/// What the worker of a session shares with the dispatcher.
+struct Worker {
+    session: String,
+    sessions: Sessions,
+    running: Running,
+    slot: Slot,
+    gate: Gate,
+}
+
+async fn session_worker(worker: Worker, mut engine: Engine, mut commands: mpsc::UnboundedReceiver<Command>) {
+    let Worker {
+        session,
+        sessions,
+        running,
+        slot,
+        gate,
+    } = worker;
+
     while let Some(Command { id, state, call, reply }) = commands.recv().await {
         // Waits out a kill still on its way to the request before, which would otherwise stop this one. The slot is empty
         // until this request takes it, so no new kill can start in between.
@@ -407,13 +436,28 @@ async fn session_worker(mut engine: Engine, mut commands: mpsc::UnboundedReceive
             Ok(finished) => finished,
             Err(e) => {
                 let _ = reply.send(Err(DatabaseError::internal(format!("The session failed unexpectedly: {e}."))));
-                fail_queued(&mut commands, &running);
+                fail_queued(&mut commands, &running, || DatabaseError::internal("The session ended unexpectedly."));
 
                 return;
             }
         };
 
         engine = returned;
+
+        // Nothing can run on the session again, so it goes; `unknown-session` tells a client to open a new one for what it retries.
+        if let Err(error) = &outcome
+            && error.connection_lost
+        {
+            locked(&sessions).remove(&session);
+            let _ = reply.send(Err(DatabaseError::new(
+                ErrorCode::UnknownSession,
+                format!("The connection of session \"{session}\" was lost, so the session closed. {}", error.message),
+            )));
+            fail_queued(&mut commands, &running, || DatabaseError::unknown_session(&session));
+            let _ = tokio::time::timeout(CLOSE_TIMEOUT, engine.close()).await;
+
+            return;
+        }
 
         // A server may end an interrupted query without an error (MySQL's `SLEEP` does), and a committed write stays committed.
         let outcome = match outcome {
@@ -429,12 +473,12 @@ async fn session_worker(mut engine: Engine, mut commands: mpsc::UnboundedReceive
 }
 
 /// Answers what waits in the queue of a session that can no longer serve it.
-fn fail_queued(commands: &mut mpsc::UnboundedReceiver<Command>, running: &Running) {
+fn fail_queued(commands: &mut mpsc::UnboundedReceiver<Command>, running: &Running, error: impl Fn() -> DatabaseError) {
     commands.close();
 
     while let Ok(command) = commands.try_recv() {
         locked(running).remove(&command.id);
-        let _ = command.reply.send(Err(DatabaseError::internal("The session ended unexpectedly.")));
+        let _ = command.reply.send(Err(error()));
     }
 }
 

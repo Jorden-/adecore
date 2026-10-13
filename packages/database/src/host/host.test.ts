@@ -268,6 +268,20 @@ describe('owners', () => {
         expect(errorCode(await host.handle(rows('r3', session), 'a'))).toBe('unknown-session');
     });
 
+    test('forgets a session the helper answers unknown-session for', async () => {
+        const { host, helpers } = harness({ hold: ['rows'] });
+        const session = sessionOf(await host.handle(open('r1'), 'a'));
+        const pending = host.handle(rows('r2', session), 'a');
+        await tick();
+        helpers[0]!.fail(helpers[0]!.held[0]!.id, 'unknown-session');
+        expect(errorCode(await pending)).toBe('unknown-session');
+
+        const before = helpers[0]!.written.length;
+        expect(errorCode(await host.handle(rows('r3', session), 'a'))).toBe('unknown-session');
+        await host.release('a');
+        expect(helpers[0]!.written).toHaveLength(before);
+    });
+
     test('does not register a session when the open fails', async () => {
         const { host, helpers } = harness({ hold: ['open'] });
         const pending = host.handle(open('r1'), 'a');

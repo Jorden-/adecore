@@ -56,8 +56,8 @@ export interface ExecuteOptions extends RequestOptions {
 
 /*
  * One open connection. It opens on its first request, and opens again when the host lost it (a helper
- * that exited); a read is then sent once more, a write or an `execute` fails with `unknown-session`,
- * since nobody can tell whether it ran.
+ * that exited, or a connection the server closed); a read is then sent once more, a write or an
+ * `execute` fails with `unknown-session`, since nobody can tell whether it ran.
  */
 export interface DatabaseSession {
     readonly connection: Connection;

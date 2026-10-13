@@ -897,6 +897,34 @@ async fn cancels_a_running_query() {
     sandbox.finish().await;
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn a_lost_connection_ends_its_session() {
+    let Some(mut sandbox) = Sandbox::new("lost").await else {
+        return;
+    };
+    sandbox.script("CREATE TABLE kept (id INT); INSERT INTO kept VALUES (1)").await;
+    let rows = json!({ "table": "kept", "offset": 0, "limit": 5 });
+    let connection = sandbox.script("SELECT CONNECTION_ID()").await["results"][0]["rows"][0][0].clone();
+
+    let killer = sandbox.client.open(sandbox.target.config(json!({}))).await;
+    sandbox
+        .client
+        .ok("execute", json!({ "session": killer, "sql": format!("KILL {connection}") }))
+        .await;
+
+    let lost = sandbox.error("rows", rows.clone()).await;
+    assert_eq!(lost["code"], "unknown-session", "{lost}");
+    let gone = sandbox.error("tables", json!({})).await;
+    assert_eq!(gone["code"], "unknown-session", "{gone}");
+
+    // What a client does on `unknown-session`: it opens the connection again and sends the read once more.
+    sandbox.session = sandbox.client.open(sandbox.target.config(json!({}))).await;
+    assert_eq!(sandbox.ok("rows", rows).await["rows"], json!([[1]]));
+
+    sandbox.client.ok("close", json!({ "session": killer })).await;
+    sandbox.finish().await;
+}
+
 impl Sandbox {
     fn db(&mut self) -> scenarios::Db<'_> {
         scenarios::Db {

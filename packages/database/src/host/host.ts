@@ -319,6 +319,12 @@ export const createDatabaseHost = (options: DatabaseHostOptions): DatabaseHost =
             sessions.delete(request.params.session);
         }
 
+        // The helper ends a session whose connection to the server was lost.
+        const target = sessionOf(request);
+        if (target !== null && !response.ok && response.error.code === 'unknown-session') {
+            sessions.delete(target);
+        }
+
         if (request.method !== 'open' || !response.ok) {
             return { ...response, id: request.id } as DatabaseResponse;
         }

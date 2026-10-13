@@ -1087,6 +1087,7 @@ impl MysqlEngine {
 
             match self.run_statement(&statement, limit, cell_limit, started).await {
                 Ok(result) => results.push(result),
+                Err(error) if error.connection_lost => return Err(error),
                 Err(error) if error.sql_state.as_deref() == Some(QUERY_INTERRUPTED_STATE) || cancelled.load(Ordering::SeqCst) => {
                     return Err(DatabaseError::cancelled());
                 }

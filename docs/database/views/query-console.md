@@ -26,7 +26,7 @@ While a run is busy, Run becomes Cancel, with a spinner beside it, which aborts 
 
 The editor is a plain text area without highlighting or completion. Tab and Shift and Tab indent and outdent the lines a selection touches, and a new line keeps the indent of the one above. An app can draw its own editor instead; see [Your own editor](#your-own-editor).
 
-A run is never sent twice. When the helper exited and the session was lost, the console shows the `unknown-session` error instead of running the SQL again.
+A run is never sent twice. When the session was lost, because the helper exited or the connection to the server dropped, the console shows the `unknown-session` error instead of running the SQL again.
 
 ## Results
 

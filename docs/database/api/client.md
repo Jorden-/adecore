@@ -66,7 +66,7 @@ Every method but `close` takes `RequestOptions` last, which is `{ signal? }`; `E
 
 ## Retry rules
 
-The host loses its sessions when the helper exits, and the next request on such a session fails with `unknown-session`. The session retries only where that is safe:
+The host loses its sessions when the helper exits, and the helper ends a session whose connection to the server was lost. The next request on such a session fails with `unknown-session`. The session retries only where that is safe:
 
 - A read (`schemas`, `tables`, `structure`, `rows`, `count`, `cell` and `page`) opens the connection again and is sent once more.
 - `apply`, `execute`, `transaction`, `export` and `import` are not sent again, since nobody can tell whether they ran. The call fails with `unknown-session`, and the next call opens a new connection.
