@@ -179,15 +179,35 @@ function selectionTransaction(plans: readonly SelectionEdit[]): SelectionTransac
             edits.push(plan);
         }
     }
+    // What the edits before each one add to the text, so a caret finds its shift by a binary search.
+    const shifts = [0];
+    for (const edit of edits) {
+        shifts.push(shifts.at(-1)! + edit.text.length - (edit.to - edit.from));
+    }
     const selections = plans.map((plan) => {
-        const delta = edits.filter((edit) => edit.from < plan.from).reduce((sum, edit) => sum + edit.text.length - (edit.to - edit.from), 0);
+        let low = 0;
+        let high = edits.length;
+        while (low < high) {
+            const middle = (low + high) >>> 1;
+            if (edits[middle]!.from < plan.from) {
+                low = middle + 1;
+            } else {
+                high = middle;
+            }
+        }
+        const delta = shifts[low]!;
         return { anchor: plan.from + delta + plan.anchor, head: plan.from + delta + plan.head };
     });
     return { edits, selections };
 }
 
 function splitsCluster(rope: TextRope, offset: number): boolean {
-    return splitsSurrogate(rope, offset) || (rope.charAt(offset - 1) === '\r' && rope.charAt(offset) === '\n');
+    const before = rope.charAt(offset - 1);
+    // One read of the rope settles most offsets, which follow neither a `\r` nor the first half of a surrogate pair.
+    if (before === '\r') {
+        return rope.charAt(offset) === '\n';
+    }
+    return /[\ud800-\udbff]/.test(before) && splitsSurrogate(rope, offset);
 }
 
 /* Clamps to the document and moves back off the middle of a surrogate pair or a CRLF. */
@@ -232,33 +252,32 @@ function deletionStep(rope: TextRope, offset: number, direction: -1 | 1): number
 }
 
 /*
- * Clamps every selection and merges the ones that overlap or touch, so the result is disjoint. The
- * last one stays the primary caret, and a merge that takes it in keeps it last.
+ * Clamps every selection and merges the ones that overlap or touch, so the result is disjoint. A merged
+ * selection takes the place and the direction of the last added of the ones it holds, so the primary caret stays last.
  */
 function normalizeSelections(rope: TextRope, selections: readonly Selection[]): Selection[] {
     const input = selections.length > 0 ? selections : [{ anchor: 0, head: 0 }];
-    const result: { selection: Selection; primary: boolean }[] = [];
-    for (const [position, raw] of input.entries()) {
-        let selection = { anchor: offsetIn(rope, raw.anchor), head: offsetIn(rope, raw.head) };
-        let primary = position === input.length - 1;
-        let { from, to } = rangeOf(selection);
-        for (let index = result.length - 1; index >= 0; index--) {
-            const other = rangeOf(result[index]!.selection);
-            if (from <= other.to && to >= other.from) {
-                from = Math.min(from, other.from);
-                to = Math.max(to, other.to);
-                primary ||= result[index]!.primary;
-                result.splice(index, 1);
-                selection = selection.anchor > selection.head ? { anchor: to, head: from } : { anchor: from, head: to };
-            }
+    const clamped = input.map((raw) => {
+        const anchor = offsetIn(rope, raw.anchor);
+        return { anchor, head: raw.head === raw.anchor ? anchor : offsetIn(rope, raw.head) };
+    });
+    const order = clamped.map((selection, index) => ({ ...rangeOf(selection), index })).sort((left, right) => left.from - right.from);
+    const groups: { from: number; to: number; last: number }[] = [];
+    for (const { from, to, index } of order) {
+        const group = groups.at(-1);
+        if (group !== undefined && from <= group.to) {
+            group.to = Math.max(group.to, to);
+            group.last = Math.max(group.last, index);
+        } else {
+            groups.push({ from, to, last: index });
         }
-        result.push({ selection, primary });
     }
-    const primary = result.findIndex((entry) => entry.primary);
-    if (primary !== result.length - 1) {
-        result.push(...result.splice(primary, 1));
-    }
-    return result.map((entry) => entry.selection);
+    return groups
+        .sort((left, right) => left.last - right.last)
+        .map((group) => {
+            const selection = clamped[group.last]!;
+            return selection.anchor > selection.head ? { anchor: group.to, head: group.from } : { anchor: group.from, head: group.to };
+        });
 }
 
 function inverseChanges(changes: readonly DocumentChange[]): DocumentChange[] {

@@ -2111,12 +2111,18 @@ export class EditorView {
         const firstLine = rows[0]?.line ?? 0;
         const lastLine = lastRow?.kind === 'text' ? lastRow.lastLine : (lastRow?.line ?? 0);
         const highlighted = this.highlightedLines(firstLine, lastLine);
+        const shownFrom = this.model.offsetAt({ line: firstLine, column: 0 });
+        const shownTo = lastLine + 1 < this.model.getLineCount() ? this.model.offsetAt({ line: lastLine + 1, column: 0 }) : this.model.getLength();
         paintGutter(this.gutterLines, this.layout, rows, {
             lineNumber: (line) => this.lineNumberLabel(line),
             changes: this.changedLines(rows),
             attribution: this.attributedLines(firstLine, lastLine),
             highlights: highlighted,
-            activeLines: new Set(selections.map((selection) => this.model.positionAt(selection.head).line)),
+            activeLines: new Set(
+                selections
+                    .filter((selection) => selection.head >= shownFrom && selection.head <= shownTo)
+                    .map((selection) => this.model.positionAt(selection.head).line)
+            ),
             foldable,
             lineLabel: (line) => this.lineLabelProvider?.(line) ?? null,
             foldName: (line, collapsed) => this.foldName(line, collapsed),
