@@ -25,13 +25,43 @@ export function autoLines(block: MergeBlock): string[] | null {
     }
 }
 
+const QUOTES = new Set(['"', "'", '`']);
+
+/* A line with every run of whitespace outside a quoted string made one space; inside one, whitespace is the string's value. */
+function squashedLine(body: string): string {
+    let squashed = '';
+    let quote: string | null = null;
+    for (let index = 0; index < body.length; index += 1) {
+        const char = body[index]!;
+        if (quote !== null) {
+            squashed += char;
+            if (char === '\\' && index + 1 < body.length) {
+                index += 1;
+                squashed += body[index];
+            } else if (char === quote) {
+                quote = null;
+            }
+        } else if (/\s/.test(char)) {
+            if (!squashed.endsWith(' ')) {
+                squashed += ' ';
+            }
+        } else {
+            squashed += char;
+            if (QUOTES.has(char)) {
+                quote = char;
+            }
+        }
+    }
+    return squashed;
+}
+
 function squashed(lines: readonly string[]): string {
     return lines
         .map((line) => {
             const body = line.trim();
             // Indentation is meaning in Python, YAML or a Makefile, so only a blank line loses its own.
             const indent = body === '' ? '' : line.slice(0, line.length - line.trimStart().length);
-            return `${indent}${body.replace(/\s+/g, ' ')}`;
+            return `${indent}${squashedLine(body)}`;
         })
         .join('\n');
 }
@@ -61,8 +91,10 @@ function covers(base: readonly string[], outer: readonly string[], inner: readon
 
 /*
  * What the wand makes of a conflict, or null for one that needs a person after all. It closes only
- * sides that differ in whitespace inside or after a line, and a side that already holds every line
- * of the other without putting back what the other deleted. Anything else is a choice it never guesses.
+ * sides that differ in whitespace inside or after a line, outside a quoted string, and a side that
+ * already holds every line of the other without putting back what the other deleted. Anything else
+ * is a choice it never guesses. A regular expression or a string that spans lines is not told
+ * from code, so whitespace in one still counts as spacing.
  */
 export function wandLines(block: MergeBlock): string[] | null {
     if (block.kind !== 'conflict') {
@@ -119,7 +151,10 @@ export function draftOf(blocks: readonly MergeBlock[], answered: ReadonlyMap<num
     const spans: MergeSpan[] = [];
     for (const [index, block] of blocks.entries()) {
         const from = lines.length;
-        lines.push(...(answered.get(index) ?? autoLines(block) ?? block.ours));
+        // One push per line: a block of a few hundred thousand lines is more arguments than V8 takes in one call.
+        for (const line of answered.get(index) ?? autoLines(block) ?? block.ours) {
+            lines.push(line);
+        }
         spans.push({ block: index, kind: block.kind, from, to: lines.length });
     }
     return { lines, spans };

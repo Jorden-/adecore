@@ -25,6 +25,11 @@ describe('patchFits', () => {
         expect(patchFits(PATCH, ORIGINAL, `zero\n${ORIGINAL.replace('three', 'THREE')}`, false)).toBe(false);
     });
 
+    test('a patch cut off before its hunk ended fits nothing', () => {
+        expect(patchFits('@@ -1,100 +1,100 @@\n', 'old', 'different', false)).toBe(false);
+        expect(patchFits(PATCH.replace(' four\n', ''), ORIGINAL, ORIGINAL.replace('three', 'THREE'), false)).toBe(false);
+    });
+
     test('a patch without hunks fits nothing', () => {
         expect(patchFits('diff --git a/x b/x\nold mode 100644\nnew mode 100755\n', 'a\n', 'a\n', false)).toBe(false);
     });

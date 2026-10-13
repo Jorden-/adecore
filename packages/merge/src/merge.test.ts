@@ -146,6 +146,13 @@ describe('draftOf', () => {
     });
 });
 
+test('a draft of a block too long to spread into one call', () => {
+    const long = Array.from({ length: 1_000_000 }, (_, index) => `line ${index}`);
+    const draft = draftOf([{ kind: 'stable', base: long, ours: long, theirs: long }]);
+    expect(draft.lines).toHaveLength(1_000_000);
+    expect(draft.spans).toEqual([{ block: 0, kind: 'stable', from: 0, to: 1_000_000 }]);
+});
+
 describe('wandLines', () => {
     test('sides that differ only in whitespace take ours', () => {
         const blocks = splitBlocks(['a'], ['const x = 1;'], ['const  x   = 1;']);
@@ -182,7 +189,12 @@ describe('wandLines', () => {
         { name: 'indentation is not whitespace', base: ['    x = 1'], ours: ['    x = 2'], theirs: ['x = 2'], wand: null },
         { name: 'a tab is not four spaces', base: ['\tx = 1'], ours: ['\tx = 2'], theirs: ['    x = 2'], wand: null },
         { name: 'whitespace inside and after a line still is', base: ['    x = 1'], ours: ['    x = 2;'], theirs: ['    x  =  2;  '], wand: ['    x = 2;'] },
-        { name: 'a blank line is blank however indented', base: ['x = 1'], ours: ['x = 2', ''], theirs: ['x = 2', '    '], wand: ['x = 2', ''] }
+        { name: 'a blank line is blank however indented', base: ['x = 1'], ours: ['x = 2', ''], theirs: ['x = 2', '    '], wand: ['x = 2', ''] },
+        { name: 'whitespace inside a string is its value', base: ['s = "x";'], ours: ['const s = "a  b";'], theirs: ['const s = "a b";'], wand: null },
+        { name: 'and so it is in single quotes and backticks', base: ['x'], ours: ["f('a b', `c  d`)"], theirs: ["f('a  b', `c d`)"], wand: null },
+        { name: 'an escaped quote does not end the string', base: ['x'], ours: ['s = "a\\"  b"'], theirs: ['s = "a\\" b"'], wand: null },
+        { name: 'whitespace outside a string still is', base: ['x'], ours: ['s = "a  b";'], theirs: ['s  =   "a  b";  '], wand: ['s = "a  b";'] },
+        { name: 'and so it is between two strings', base: ['x'], ours: ['f("a  b", "c")'], theirs: ['f("a  b",   "c")'], wand: ['f("a  b", "c")'] }
     ];
 
     for (const entry of cases) {
