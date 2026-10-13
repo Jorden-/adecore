@@ -16,7 +16,7 @@ export class Prefetcher {
     private running: Promise<void> | null = null;
     private loading = false;
     private readonly whenIdle: WhenIdle;
-    /* Asked on every start, since a person can turn data saving on while the page runs. */
+    /* Asked on every ask and again before every load, since a person can turn data saving on while the page runs. */
     private readonly allowed: () => boolean;
 
     constructor(whenIdle: WhenIdle, allowed: () => boolean = () => true) {
@@ -78,6 +78,11 @@ export class Prefetcher {
         try {
             for (let load = this.queue.shift(); load; load = this.queue.shift()) {
                 await new Promise<void>((resolve) => this.whenIdle(resolve));
+                if (!this.allowed()) {
+                    // Data saving came on while it waited; a later ask may queue it again.
+                    this.queued.delete(load);
+                    continue;
+                }
                 this.loading = true;
                 try {
                     await load();

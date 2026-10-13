@@ -111,4 +111,24 @@ describe('prefetching lazy modules', () => {
         prefetcher.register(loader('git', log));
         expect(log).toEqual([]);
     });
+
+    test('loads nothing that was waiting for an idle moment when data saving came on, and loads it once it goes off again', async () => {
+        const waiting: (() => void)[] = [];
+        const log: string[] = [];
+        let allowed = true;
+        const prefetcher = new Prefetcher((run) => waiting.push(run), () => allowed);
+        const workspace = loader('workspace', log);
+        prefetcher.register(workspace);
+        const done = prefetcher.prefetchEverything();
+        allowed = false;
+        waiting.shift()!();
+        await done;
+        expect(log).toEqual([]);
+
+        allowed = true;
+        const again = prefetcher.prefetch(workspace);
+        waiting.shift()!();
+        await again;
+        expect(log).toEqual(['start workspace', 'end workspace']);
+    });
 });
