@@ -36,18 +36,21 @@ export function DiffOverlays({
                     return null;
                 }
                 const text = t('diff.hidden', { count: formatNumber(Math.max(row.oldCount, row.newCount)) });
-                const isBlocked = blocked?.has(row.id) === true;
                 return createPortal(
                     <div className="adecore-editor-diff-gap">
-                        {row.unfoldable ? (
-                            <Tooltip label={t('diff.contextLimit')} disabled={!isBlocked}>
+                        {row.unfoldable && blocked?.has(row.id) === true ? (
+                            <Tooltip label={t('diff.contextLimit')}>
                                 {/* A disabled button gets no pointer events, so the hint hangs on a wrapper. */}
                                 <span className="inline-flex">
-                                    <Button size="xs" disabled={isBlocked} onClick={() => unfold(row.id)}>
+                                    <Button size="xs" disabled>
                                         {text}
                                     </Button>
                                 </span>
                             </Tooltip>
+                        ) : row.unfoldable ? (
+                            <Button size="xs" onClick={() => unfold(row.id)}>
+                                {text}
+                            </Button>
                         ) : (
                             <span>{text}</span>
                         )}
