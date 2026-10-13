@@ -31,7 +31,7 @@ import {
 } from './geometry.ts';
 import { splitPanes, updateSplitLayout, type SplitCommand, type SplitLayout, type SplitPane } from './model.ts';
 import { TabStrip, type TabStripItem, type TabStripProps } from './TabStrip.tsx';
-import { dropPreviewPath, rectPreview, tabPreview, type DropPreviewShape } from './preview.ts';
+import { dropPreviewPath, rectPreview, sameDropPreview, tabPreview, type DropPreviewShape } from './preview.ts';
 
 export interface SplitViewInfo {
     paneId: string;
@@ -150,6 +150,7 @@ function Divider({
                 event.preventDefault();
                 cleanup.current?.();
                 const element = event.currentTarget;
+                const view = element.ownerDocument.defaultView;
                 const pointerId = event.pointerId;
                 const start = horizontal ? event.clientX : event.clientY;
                 const parent = element.parentElement;
@@ -157,16 +158,46 @@ function Divider({
                 const scale = horizontal ? (rect?.width ?? 1) / (parent?.clientWidth || 1) : (rect?.height ?? 1) / (parent?.clientHeight || 1);
                 element.dataset.resizing = '';
                 element.focus();
+                // A pointer reports more often than the screen draws; one resize per frame is all that shows.
+                let frame = 0;
+                let pending: PointerEvent | null = null;
+                const apply = (): void => {
+                    frame = 0;
+                    const next = pending;
+                    pending = null;
+                    if (next) {
+                        const delta = ((horizontal ? next.clientX : next.clientY) - start) / (scale || 1);
+                        onResize(resizeSplit(divider, delta, next.altKey, 8 / (scale || 1), minimumResizeShare));
+                    }
+                };
                 const move = (next: PointerEvent): void => {
                     if (next.pointerId !== pointerId) {
                         return;
                     }
-                    const delta = ((horizontal ? next.clientX : next.clientY) - start) / (scale || 1);
-                    onResize(resizeSplit(divider, delta, next.altKey, 8 / (scale || 1), minimumResizeShare));
+                    pending = next;
+                    if (frame !== 0) {
+                        return;
+                    }
+                    if (view) {
+                        frame = view.requestAnimationFrame(apply);
+                    } else {
+                        apply();
+                    }
+                };
+                const release = (): void => {
+                    if (frame !== 0) {
+                        view?.cancelAnimationFrame(frame);
+                        apply();
+                    }
+                    end();
                 };
                 const end = (): void => {
+                    if (frame !== 0) {
+                        view?.cancelAnimationFrame(frame);
+                        frame = 0;
+                    }
                     element.removeEventListener('pointermove', move);
-                    element.removeEventListener('pointerup', end);
+                    element.removeEventListener('pointerup', release);
                     element.removeEventListener('pointercancel', end);
                     element.removeEventListener('lostpointercapture', end);
                     element.ownerDocument.defaultView?.removeEventListener('blur', end);
@@ -179,7 +210,7 @@ function Divider({
                 cleanup.current = end;
                 element.setPointerCapture(pointerId);
                 element.addEventListener('pointermove', move);
-                element.addEventListener('pointerup', end);
+                element.addEventListener('pointerup', release);
                 element.addEventListener('pointercancel', end);
                 element.addEventListener('lostpointercapture', end);
                 element.ownerDocument.defaultView?.addEventListener('blur', end);
@@ -243,6 +274,14 @@ export function SplitView({
     const [dragging, setDragging] = useState(false);
     const drag = useRef<(SplitDrag & { width: number }) | null>(null);
     const [preview, setPreview] = useState<DropPreviewShape | null>(null);
+    // A dragover fires many times a second; only a different shape is worth a render.
+    const shownPreview = useRef<DropPreviewShape | null>(null);
+    const showPreview = useCallback((shape: DropPreviewShape | null): void => {
+        if (!sameDropPreview(shownPreview.current, shape)) {
+            shownPreview.current = shape;
+            setPreview(shape);
+        }
+    }, []);
     const latest = useRef({ value, onValueChange });
     useLayoutEffect(() => {
         latest.current = { value, onValueChange };
@@ -290,8 +329,8 @@ export function SplitView({
     const stopDrag = useCallback((): void => {
         drag.current = null;
         setDragging(false);
-        setPreview(null);
-    }, []);
+        showPreview(null);
+    }, [showPreview]);
     useEffect(() => {
         if (!dragging) {
             return;
@@ -391,9 +430,9 @@ export function SplitView({
             return null;
         }
         const header = Math.min(barHeight, rect.height);
-        const strip = paneElement(root.current, 'splitHeader', rect.pane.id);
-        const tabRects = Array.from(strip?.querySelectorAll('[data-document-tab]') ?? [], (element) => element.getBoundingClientRect());
         const inHeader = y < rect.y + header;
+        const strip = inHeader ? paneElement(root.current, 'splitHeader', rect.pane.id) : undefined;
+        const tabRects = Array.from(strip?.querySelectorAll('[data-document-tab]') ?? [], (element) => element.getBoundingClientRect());
         const side = inHeader ? undefined : (splitSideAt(rect, x, y) ?? 'center');
         const index = inHeader ? tabGapAt(tabRects, event.clientX) : undefined;
         const target: SplitDropTarget = { paneId: rect.pane.id, side, index };
@@ -493,11 +532,11 @@ export function SplitView({
             onDragOver: (event: DragEvent<HTMLDivElement>) => {
                 props.onDragOver?.(event);
                 if (event.defaultPrevented) {
-                    setPreview(null);
+                    showPreview(null);
                     return;
                 }
                 const drop = locateDrop(event);
-                setPreview(drop?.shape ?? null);
+                showPreview(drop?.shape ?? null);
                 if (drop) {
                     event.preventDefault();
                     event.dataTransfer.dropEffect = drag.current ? 'move' : 'copy';
@@ -506,7 +545,7 @@ export function SplitView({
             onDragLeave: (event: DragEvent<HTMLDivElement>) => {
                 props.onDragLeave?.(event);
                 if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) {
-                    setPreview(null);
+                    showPreview(null);
                 }
             },
             onDrop: (event: DragEvent<HTMLDivElement>) => {

@@ -5,6 +5,7 @@ import {
     useContext,
     useEffect,
     useLayoutEffect,
+    useMemo,
     useRef,
     useState,
     type ComponentProps,
@@ -65,16 +66,25 @@ export type TabsRootProps = Omit<ComponentProps<typeof BaseTabs.Root>, 'onValueC
 /* Holds the picked tab itself, uncontrolled or not, so a tab picked from the menu of the strip changes it too. */
 export function TabsRoot({ value, defaultValue = 0, onValueChange, ...props }: TabsRootProps) {
     const [own, setOwn] = useState<TabsValue>(defaultValue);
-    const current = value === undefined ? own : value;
-    const select = (next: TabsValue): void => {
-        if (value === undefined) {
-            setOwn(next);
-        }
-        onValueChange?.(next);
-    };
+    const controlled = value !== undefined;
+    const current = controlled ? value : own;
+    // The latest handler without a new context for every render of a parent that writes it inline.
+    const latest = useRef(onValueChange);
+    useLayoutEffect(() => {
+        latest.current = onValueChange;
+    });
+    const selection = useMemo(() => {
+        const select = (next: TabsValue): void => {
+            if (!controlled) {
+                setOwn(next);
+            }
+            latest.current?.(next);
+        };
+        return { value: current, select };
+    }, [controlled, current]);
     return (
-        <SelectionContext value={{ value: current, select }}>
-            <BaseTabs.Root value={current} onValueChange={(next) => select(next)} {...props} />
+        <SelectionContext value={selection}>
+            <BaseTabs.Root value={current} onValueChange={(next) => selection.select(next)} {...props} />
         </SelectionContext>
     );
 }

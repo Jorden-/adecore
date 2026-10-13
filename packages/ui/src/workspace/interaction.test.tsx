@@ -17,6 +17,7 @@ let setAppearance: (value: WorkspaceLayout) => void;
 let current: SplitLayout;
 let mounts = 0;
 let unmounts = 0;
+let viewRenders = 0;
 
 function Editor({ id }: { id: string }) {
     const [value, setValue] = useState(id);
@@ -39,7 +40,16 @@ function Harness({ onClose, initial, minimumSize }: { onClose?(id: string): void
     }, [value]);
     return (
         <Workspace layout={layout} toolbar={<span>Toolbar</span>} sidebar={<span>Sidebar</span>}>
-            <SplitView value={value} onValueChange={setValue} renderView={(id) => <Editor id={id} />} onClose={onClose} minimumSize={minimumSize} />
+            <SplitView
+                value={value}
+                onValueChange={setValue}
+                renderView={(id) => {
+                    viewRenders++;
+                    return <Editor id={id} />;
+                }}
+                onClose={onClose}
+                minimumSize={minimumSize}
+            />
         </Workspace>
     );
 }
@@ -214,6 +224,65 @@ describe.skipIf(typeof document === 'undefined')('workspace interaction', () => 
         expect(container.querySelector('input[aria-label="draft-two"]')).toBe(editor);
         expect(mounts).toBe(6);
         expect(unmounts).toBe(0);
+    });
+    test('renders once for a drop zone however often the pointer moves inside it', async () => {
+        await mount(<Harness />);
+        const dragEvent = (type: string, x: number, y: number): Event => {
+            const event = new Event(type, { bubbles: true, cancelable: true });
+            const transfer = { setData: () => {}, effectAllowed: 'all', dropEffect: 'none', types: [] };
+            Object.defineProperties(event, { clientX: { value: x }, clientY: { value: y }, dataTransfer: { value: transfer } });
+            return event;
+        };
+        const view = container.querySelector<HTMLElement>('.ade-split-view')!;
+        await change(() => container.querySelector('[data-document-tab="a"] [role="tab"]')!.dispatchEvent(dragEvent('dragstart', 20, 10)));
+        await change(() => view.dispatchEvent(dragEvent('dragover', 780, 200)));
+        expect(view.querySelector('.ade-split-preview')).not.toBeNull();
+        const settled = viewRenders;
+        for (const x of [776, 770, 764, 790]) {
+            await change(() => view.dispatchEvent(dragEvent('dragover', x, 210)));
+        }
+        expect(viewRenders).toBe(settled);
+        await change(() => view.dispatchEvent(dragEvent('dragover', 20, 200)));
+        expect(viewRenders).toBeGreaterThan(settled);
+    });
+    test('resizes once per frame while the divider is dragged', async () => {
+        const initial: SplitLayout = {
+            root: {
+                type: 'split',
+                id: 'row',
+                axis: 'horizontal',
+                sizes: [0.5, 0.5],
+                children: ['a', 'b'].map((id) => ({ type: 'pane', id, views: [id], active: id }))
+            },
+            focused: 'a',
+            maximized: null
+        };
+        const frames: FrameRequestCallback[] = [];
+        const original = window.requestAnimationFrame;
+        window.requestAnimationFrame = (callback) => frames.push(callback);
+        try {
+            await mount(<Harness initial={initial} />);
+            const divider = container.querySelector<HTMLElement>('[role="separator"]')!;
+            divider.setPointerCapture = () => {};
+            divider.hasPointerCapture = () => false;
+            const pointer = (type: string, x: number): PointerEvent => new PointerEvent(type, { bubbles: true, pointerId: 1, button: 0, clientX: x });
+            await change(() => divider.dispatchEvent(pointer('pointerdown', 400)));
+            await change(() => {
+                for (const x of [380, 360, 340]) {
+                    divider.dispatchEvent(pointer('pointermove', x));
+                }
+            });
+            expect((current.root as SplitBranch).sizes).toEqual([0.5, 0.5]);
+            expect(frames).toHaveLength(1);
+            await change(() => frames.shift()!(0));
+            const sizes = (current.root as SplitBranch).sizes;
+            expect(sizes[0]).toBeLessThan(0.5);
+            await change(() => divider.dispatchEvent(pointer('pointermove', 300)));
+            await change(() => divider.dispatchEvent(pointer('pointerup', 300)));
+            expect((current.root as SplitBranch).sizes[0]).toBeLessThan(sizes[0]!);
+        } finally {
+            window.requestAnimationFrame = original;
+        }
     });
     test('leaves an asynchronously approved close to the application', async () => {
         const requests: string[] = [];

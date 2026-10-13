@@ -61,6 +61,23 @@ export function tabPreview(drop: TabDrop, origin: { x: number; y: number }): Dro
     };
 }
 
+export function sameDropPreview(left: DropPreviewShape | null, right: DropPreviewShape | null): boolean {
+    if (left === null || right === null) {
+        return left === right;
+    }
+    return (
+        left.x === right.x &&
+        left.y === right.y &&
+        left.width === right.width &&
+        left.height === right.height &&
+        left.barHeight === right.barHeight &&
+        left.tabLeft === right.tabLeft &&
+        left.tabWidth === right.tabWidth &&
+        left.tabTop === right.tabTop &&
+        left.radius === right.radius
+    );
+}
+
 /*
  * The outline of a tab grown into the body under it, as one closed path so no line runs between the
  * two. The commands are the same whatever the numbers are (an arc of radius 0 is a straight line), so

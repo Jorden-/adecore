@@ -1,4 +1,4 @@
-import { useId, type ReactNode, type Ref } from 'react';
+import { useId, useMemo, type ReactNode, type Ref } from 'react';
 import clsx from 'clsx';
 import { useRender } from '@base-ui/react/use-render';
 import { FieldContext } from './field-context.ts';
@@ -85,6 +85,7 @@ export function Field({ label, hint, error, group = false, orientation = 'vertic
     const hasHint = isShown(hint);
     const hasError = isShown(error);
     const describedBy = [hasHint ? `${id}-hint` : null, hasError ? `${id}-error` : null].filter((part) => part !== null).join(' ') || undefined;
+    const control = useMemo(() => (group ? null : { id: `${id}-control`, describedBy, invalid: hasError }), [group, id, describedBy, hasError]);
     return (
         <div
             ref={ref}
@@ -99,9 +100,7 @@ export function Field({ label, hint, error, group = false, orientation = 'vertic
                 </FieldLabel>
             )}
             {/* A group describes itself, so an input inside it stays unconnected rather than taking an id nothing points at. */}
-            <FieldContext value={group ? null : { id: `${id}-control`, describedBy, invalid: hasError }}>
-                {horizontal ? <div className="col-start-2 min-w-0">{children}</div> : children}
-            </FieldContext>
+            <FieldContext value={control}>{horizontal ? <div className="col-start-2 min-w-0">{children}</div> : children}</FieldContext>
             {/* The stack already puts 6px above each line, so neither takes the margin a standalone hint has. */}
             {hasHint && (
                 <p id={`${id}-hint`} className={clsx(HINT, horizontal && 'col-start-2')}>

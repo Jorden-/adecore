@@ -21,6 +21,16 @@ export function visibleRows(model: FileTree): FileTreeVisibleRow[] {
     return model.getVisibleRows(0, model.getVisibleCount()).map((row) => ({ ...row, path: pathOfRow(row) }));
 }
 
+/* The `count` rows from `start` and one on each side, for a neighbor's selection, without copying the whole list. */
+export function visibleRowsAround(model: FileTree, start: number, count: number): FileTreeVisibleRow[] {
+    const first = Math.max(0, start - 1);
+    const last = Math.min(model.getVisibleCount() - 1, start + count);
+    if (last < first) {
+        return [];
+    }
+    return model.getVisibleRows(first, last).map((row) => ({ ...row, path: pathOfRow(row) }));
+}
+
 export function applyExpansion(model: FileTree, collapsed: ReadonlySet<string>, keyOf?: FoldKeyOf): void {
     for (let pass = 0; pass < EXPANSION_PASSES; pass++) {
         const { collapse, expand } = expansionChanges(visibleRows(model), collapsed, keyOf);

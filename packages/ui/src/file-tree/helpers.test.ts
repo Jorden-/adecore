@@ -11,6 +11,7 @@ import {
     resetExpandedPaths,
     selectOnly,
     visibleRows,
+    visibleRowsAround,
     withoutClosedBranches
 } from './helpers.ts';
 
@@ -54,6 +55,23 @@ describe('file tree model behavior', () => {
         expect(model.getSelectedPaths()).toEqual(['three']);
         selectOnly(model, null);
         expect(model.getSelectedPaths()).toEqual([]);
+        model.cleanUp();
+    });
+
+    test('copies a window of rows and its two neighbors, not the whole list', () => {
+        const model = new Model({ paths: Array.from({ length: 10_000 }, (_, i) => `file-${String(i).padStart(5, '0')}.ts`) });
+        const original = model.getVisibleRows.bind(model);
+        let copied = 0;
+        model.getVisibleRows = (start, end) => {
+            const rows = original(start, end);
+            copied += rows.length;
+            return rows;
+        };
+        const rows = visibleRowsAround(model, 5000, 40);
+        expect(rows.map((row) => row.index)).toEqual(Array.from({ length: 42 }, (_, i) => 4999 + i));
+        expect(copied).toBe(42);
+        expect(visibleRowsAround(model, 0, 40)[0]!.index).toBe(0);
+        expect(visibleRowsAround(model, 9990, 40).at(-1)!.index).toBe(9999);
         model.cleanUp();
     });
 });

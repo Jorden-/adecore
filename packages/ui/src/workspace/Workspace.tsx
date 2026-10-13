@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import clsx from 'clsx';
 import { useRender } from '@base-ui/react/use-render';
 import { WorkspaceContext, type WorkspaceLayout } from './context.ts';
@@ -70,5 +70,9 @@ export function Workspace({
             )
         }
     });
-    return <WorkspaceContext value={{ layout, edges: { top: !hasToolbar, right: !rightOpen, bottom: true, left: !leftOpen } }}>{element}</WorkspaceContext>;
+    const context = useMemo(
+        () => ({ layout, edges: { top: !hasToolbar, right: !rightOpen, bottom: true, left: !leftOpen } }),
+        [layout, hasToolbar, rightOpen, leftOpen]
+    );
+    return <WorkspaceContext value={context}>{element}</WorkspaceContext>;
 }

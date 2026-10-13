@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { FileTree, FileTreeVisibleRow } from '@pierre/trees';
-import { pathOfRow, visibleRows } from './helpers.ts';
+import { pathOfRow, visibleRows, visibleRowsAround } from './helpers.ts';
 import { FILE_TREE_CSS } from './style.ts';
 
 export interface RowSlot {
@@ -10,12 +10,72 @@ export interface RowSlot {
     decoration: HTMLElement;
 }
 
-interface Port {
+export interface Port {
     rowElement: HTMLElement;
     control: HTMLElement;
     decoration: HTMLElement;
     lightControl: HTMLElement;
     lightDecoration: HTMLElement;
+}
+
+/*
+ * The rows of the mounted window, read from the spacer beta.6 puts above it (its first index times the
+ * row height), so a scroll frame copies those and not every visible row. The whole list stands in when
+ * the spacer is missing or the model already moved past what is mounted.
+ */
+function mountedRows(model: FileTree, shadow: ShadowRoot, elements: readonly HTMLElement[]): FileTreeVisibleRow[] {
+    const spacer = shadow.querySelector<HTMLElement>('[data-file-tree-virtualized-sticky-offset]');
+    const offset = spacer === null ? Number.NaN : Number.parseFloat(spacer.style.height);
+    const itemHeight = model.getItemHeight();
+    if (!Number.isFinite(offset) || itemHeight <= 0) {
+        return visibleRows(model);
+    }
+    // A folder pinned to the top leaves the flow, but still takes its index in the window.
+    const pinned = shadow.querySelectorAll('[data-file-tree-sticky-row="true"]').length;
+    const rows = visibleRowsAround(model, Math.round(offset / itemHeight), elements.length + pinned);
+    const paths = new Set(rows.map((row) => row.path));
+    return elements.every((element) => element.dataset.itemPath === undefined || paths.has(element.dataset.itemPath)) ? rows : visibleRows(model);
+}
+
+/*
+ * Lines the ports up with their rows: every size first, then the spaces they reserve, then every offset,
+ * then the ports, so a pass forces two layouts at most however many rows are mounted.
+ */
+export function positionPorts(ports: Iterable<Port>): void {
+    const spaced = [...ports].map((port) => ({
+        port,
+        control: port.lightControl.childNodes.length > 0 ? Math.ceil(port.lightControl.getBoundingClientRect().width) + 6 : 0,
+        decoration: port.lightDecoration.childNodes.length > 0 ? Math.ceil(port.lightDecoration.getBoundingClientRect().width) + 6 : 0
+    }));
+    for (const { port, control, decoration } of spaced) {
+        setSpace(port.rowElement, '--adecore-tree-control-space', control);
+        setSpace(port.rowElement, '--adecore-tree-decoration-space', decoration);
+    }
+    const placed = spaced.map(({ port, control, decoration }) => {
+        const row = port.rowElement;
+        const content = row.querySelector<HTMLElement>('[data-item-section="content"]');
+        const icon = row.querySelector<HTMLElement>('[data-item-section="icon"]');
+        return {
+            port,
+            top: `${row.offsetTop}px`,
+            controlLeft: `${row.offsetLeft + (icon?.offsetLeft ?? 4) - control}px`,
+            decorationLeft: `${row.offsetLeft + (content === null ? row.offsetWidth - decoration - 2 : content.offsetLeft + content.offsetWidth + 6)}px`
+        };
+    });
+    for (const { port, top, controlLeft, decorationLeft } of placed) {
+        port.control.style.top = top;
+        port.control.style.left = controlLeft;
+        port.decoration.style.top = top;
+        port.decoration.style.left = decorationLeft;
+    }
+}
+
+// An unchanged space is left alone, so a pass that only scrolled measures once.
+function setSpace(row: HTMLElement, name: string, space: number): void {
+    const value = `${space}px`;
+    if (row.style.getPropertyValue(name) !== value) {
+        row.style.setProperty(name, value);
+    }
 }
 
 // beta.6 owns button rows. Sibling slots keep real controls outside those buttons and in the app's stylesheet.
@@ -35,23 +95,7 @@ export function useFileTreeSlots(model: FileTree, frame: HTMLElement | null, lab
         let pending = false;
         let snapshot: string | null = null;
 
-        const position = (): void => {
-            for (const port of ports.values()) {
-                const row = port.rowElement;
-                const content = row.querySelector<HTMLElement>('[data-item-section="content"]');
-                const icon = row.querySelector<HTMLElement>('[data-item-section="icon"]');
-                const control = port.lightControl;
-                const decoration = port.lightDecoration;
-                const controlSpace = control.childNodes.length > 0 ? Math.ceil(control.getBoundingClientRect().width) + 6 : 0;
-                const decorationSpace = decoration.childNodes.length > 0 ? Math.ceil(decoration.getBoundingClientRect().width) + 6 : 0;
-                row.style.setProperty('--adecore-tree-control-space', `${controlSpace}px`);
-                row.style.setProperty('--adecore-tree-decoration-space', `${decorationSpace}px`);
-                port.control.style.top = `${row.offsetTop}px`;
-                port.control.style.left = `${row.offsetLeft + (icon?.offsetLeft ?? 4) - controlSpace}px`;
-                port.decoration.style.top = `${row.offsetTop}px`;
-                port.decoration.style.left = `${row.offsetLeft + (content === null ? row.offsetWidth - decorationSpace - 2 : content.offsetLeft + content.offsetWidth + 6)}px`;
-            }
-        };
+        const position = (): void => positionPorts(ports.values());
 
         const resize = new ResizeObserver(position);
         const dropPort = (port: Port): void => {
@@ -106,11 +150,12 @@ export function useFileTreeSlots(model: FileTree, frame: HTMLElement | null, lab
                 resize.observe(current);
             }
             shadow.querySelector('[role="tree"]')?.setAttribute('aria-label', label);
-            const rows = visibleRows(model);
-            const byPath = new Map(rows.map((row) => [pathOfRow(row), row]));
             const elements = [
                 ...shadow.querySelectorAll<HTMLElement>('[data-type="item"]:not([data-item-parked="true"]):not([data-file-tree-sticky-row="true"])')
             ];
+            const rows = mountedRows(model, shadow, elements);
+            const byPath = new Map(rows.map((row) => [pathOfRow(row), row]));
+            const byIndex = new Map(rows.map((row) => [row.index, row]));
             const live = new Set(elements);
             for (const [element, port] of ports) {
                 if (!live.has(element)) {
@@ -126,8 +171,8 @@ export function useFileTreeSlots(model: FileTree, frame: HTMLElement | null, lab
                     continue;
                 }
                 element.dataset.interactive = 'true';
-                element.dataset.joinedStart = String(row.isSelected && rows[row.index - 1]?.isSelected === true);
-                element.dataset.joinedEnd = String(row.isSelected && rows[row.index + 1]?.isSelected === true);
+                element.dataset.joinedStart = String(row.isSelected && byIndex.get(row.index - 1)?.isSelected === true);
+                element.dataset.joinedEnd = String(row.isSelected && byIndex.get(row.index + 1)?.isSelected === true);
                 let port = ports.get(element);
                 if (port === undefined) {
                     serial++;

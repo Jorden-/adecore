@@ -12,17 +12,19 @@ function Harness({
     onLoad,
     onContext,
     onDrag,
-    resetKey
+    resetKey,
+    paths = ['src/one.ts', 'src/two.ts', 'README.md']
 }: {
     onActivate?(path: string): void;
     onLoad?(path: string): void;
     onContext?(path: string | null): void;
     onDrag?(path: string | null): void;
     resetKey?: string;
+    paths?: string[];
 }) {
     const [checked, setChecked] = useState(false);
     const { model } = useFileTree({
-        paths: ['src/one.ts', 'src/two.ts', 'README.md'],
+        paths,
         initialExpansion: 'open',
         flattenEmptyDirectories: true,
         dragAndDrop: { canDrag: () => true, canDrop: () => false }
@@ -336,6 +338,30 @@ describe.skipIf(typeof document === 'undefined')('file tree interaction', () => 
             document.createRange = originalRange;
             globalThis.getComputedStyle = originalStyle;
         }
+    });
+
+    test('copies only the mounted rows when it scrolls through a long tree', async () => {
+        const paths = Array.from({ length: 10_000 }, (_, i) => `src/file-${String(i).padStart(5, '0')}.ts`);
+        await mount(<Harness paths={paths} />);
+        const original = exposed.getVisibleRows.bind(exposed);
+        const copied: number[] = [];
+        exposed.getVisibleRows = (start, end) => {
+            const rows = original(start, end);
+            copied.push(rows.length);
+            return rows;
+        };
+        const scroller = exposed.getFileTreeContainer()!.shadowRoot!.querySelector<HTMLElement>('[data-file-tree-virtualized-scroll]')!;
+        for (const index of [1000, 3000, 5000]) {
+            await change(() => {
+                scroller.scrollTop = index * exposed.getItemHeight();
+                scroller.dispatchEvent(new Event('scroll'));
+            });
+            await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        expect(container.querySelector('[aria-label="Viewed src/file-05000.ts"]')).not.toBeNull();
+        expect(copied.length).toBeGreaterThan(0);
+        // The mounted window and a neighbor on each side, never the 10,001 visible rows.
+        expect(Math.max(...copied)).toBeLessThan(100);
     });
 
     test('refreshes port contents after props change and removes slots on unmount', async () => {
