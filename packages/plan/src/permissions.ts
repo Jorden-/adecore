@@ -38,21 +38,18 @@ function mayState(plan: Plan, step: PlanStep, state: PlanStepState, actor: PlanA
 
 /*
  * Adding under a leaf takes its state away, which may not happen to a state a person set. Its state
- * then follows from the sub-steps, so a leaf only a person checks takes only sub-steps a person checks.
+ * then follows from the sub-steps, so a step only a person checks takes only sub-steps a person checks.
  */
-function mayHoldChildren(plan: Plan, under: string | undefined, added: readonly PlanChecks[]): PlanVerdict {
-    if (under === undefined) {
+function mayHoldChildren(plan: Plan, under: string | undefined, after: string | undefined, added: readonly PlanChecks[]): PlanVerdict {
+    const parent = under !== undefined ? locateItem(plan, under)?.item : after !== undefined ? locateItem(plan, after)?.parent : null;
+    if (parent?.type !== 'step') {
         return ALLOWED;
     }
-    const location = locateItem(plan, under);
-    if (location?.item.type !== 'step' || isParentStep(location.item)) {
-        return ALLOWED;
+    if (!isParentStep(parent) && holdsPersonState(parent)) {
+        return refuse('set-by-person', `A person set "${parent.id}" to ${parent.state}; a sub-step would take that state away`);
     }
-    if (holdsPersonState(location.item)) {
-        return refuse('set-by-person', `A person set "${under}" to ${location.item.state}; a sub-step would take that state away`);
-    }
-    if (effectiveChecks(plan, location.item) === 'person' && added.some((checks) => checks !== 'person')) {
-        return refuse('person-only', `Only a person checks "${under}", so a sub-step under it is one a person checks too`);
+    if (effectiveChecks(plan, parent) === 'person' && added.some((checks) => checks !== 'person')) {
+        return refuse('person-only', `Only a person checks "${parent.id}", so a sub-step under it is one a person checks too`);
     }
     return ALLOWED;
 }
@@ -104,7 +101,7 @@ export function canApply(op: PlanOp, actor: PlanActor, plan: Plan): PlanVerdict 
             return ALLOWED;
         }
         case 'add':
-            return mayHoldChildren(plan, op.under, op.type === 'step' ? [op.checks ?? plan.meta.checks] : []);
+            return mayHoldChildren(plan, op.under, op.after, op.type === 'step' ? [op.checks ?? plan.meta.checks] : []);
         case 'edit': {
             const location = locateItem(plan, op.id);
             if (!location) {
@@ -142,6 +139,7 @@ export function canApply(op: PlanOp, actor: PlanActor, plan: Plan): PlanVerdict 
             return mayHoldChildren(
                 plan,
                 op.under,
+                op.after,
                 allSteps([location.item]).map((step) => effectiveChecks(plan, step))
             );
         }

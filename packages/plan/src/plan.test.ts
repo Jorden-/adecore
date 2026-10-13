@@ -308,6 +308,21 @@ describe('structure', () => {
         expect(codeOf(apply(gated, [{ op: 'add', type: 'step', title: 'Sub', under: 'gate' }], 'agent'))).toBeUndefined();
     });
 
+    test('a person-only gate stays protected after its first child, including insertion after that child', () => {
+        const original = planOf([step('gate', { checks: 'person' }), step('b')]);
+        const expanded = applied(apply(original, [{ op: 'add', type: 'step', id: 'review', title: 'Review', under: 'gate', checks: 'person' }], 'agent')).plan;
+        const ops: PlanOp[] = [
+            { op: 'add', type: 'step', title: 'Agent task', under: 'gate', checks: 'agent' },
+            { op: 'add', type: 'step', title: 'Agent task', after: 'review', checks: 'agent' },
+            { op: 'move', id: 'b', under: 'gate' },
+            { op: 'move', id: 'b', after: 'review' }
+        ];
+        for (const op of ops) {
+            expect(codeOf(apply(expanded, [op], 'agent'))).toBe('person-only');
+        }
+        expect(codeOf(apply(expanded, [{ op: 'add', type: 'step', title: 'Second review', after: 'review', checks: 'person' }], 'agent'))).toBeUndefined();
+    });
+
     test('adds after an item beside it and mints ids that are free', () => {
         const plan = planOf([step('m1'), step('b')]);
         const result = applied(apply(plan, [{ op: 'add', type: 'step', title: 'Between', after: 'm1' }], 'agent'));
