@@ -24,6 +24,22 @@ export interface WindowsOptions {
     /* The key an app kept its one window under before it had several, where a first window without bounds of its own opens. */
     formerKey?: string;
     platform?: NodeJS.Platform;
+    /* The timer that asks for the quit again once `confirmQuit` said yes, replaced in a test. */
+    setTimeout?: (run: () => void, ms: number) => unknown;
+}
+
+/* What a quit `confirmQuit` decides on is about. `update` is a quit an install started, after it closed the windows. */
+export interface QuitRequest {
+    update: boolean;
+}
+
+export interface AttachOptions {
+    /*
+     * Asked once per quit, before any window closes; the quit waits while the answer is pending, so this
+     * is also where the app finishes what has to end first. False keeps the app open. A throw lets the
+     * quit go ahead, so a broken check never traps the app.
+     */
+    confirmQuit?: (request: QuitRequest) => boolean | Promise<boolean>;
 }
 
 interface Entry {
@@ -91,6 +107,12 @@ export const createWindows = (options: WindowsOptions) => {
     let started = false;
     // Off macOS the app quits with its last window, after that window already left the session.
     let quitsWithLastWindow = false;
+    // The app's last `before-quit`. Its windows stay in the session as they close, unless a listener after ours kept the app open.
+    let quitEvent: { readonly defaultPrevented: boolean } | null = null;
+    let quitConfirmed = false;
+    let confirming = false;
+    let installing = false;
+    const later = options.setTimeout ?? ((run, ms) => setTimeout(run, ms));
 
     const alive = (): Entry[] => [...entries.values()].filter((entry) => !entry.window.isDestroyed());
 
@@ -165,9 +187,16 @@ export const createWindows = (options: WindowsOptions) => {
             toFront(id);
             options.onFront?.(window);
         });
-        window.on('close', () => {
+        window.on('close', (event) => {
             if (quitsWithLastWindow && alive().length === 1) {
                 markQuit();
+            } else if (quitEvent !== null && !quitEvent.defaultPrevented) {
+                if (event.defaultPrevented) {
+                    // A window that stays open stops Electron's quit, so a window that closes later is a person's doing.
+                    quitEvent = null;
+                } else {
+                    markQuit();
+                }
             }
         });
         window.on('closed', () => {
@@ -203,6 +232,22 @@ export const createWindows = (options: WindowsOptions) => {
         for (const { key, state } of windows) {
             create(key, 'session', state);
         }
+    };
+
+    const resume = (): void => {
+        quitting = false;
+        quitEvent = null;
+        quitConfirmed = false;
+        installing = false;
+        writeSession();
+    };
+
+    /* The quit does not happen. Windows it already closed, the last one off macOS or all of them for an install, come back as they were. */
+    const stay = (): void => {
+        if (quitting && started && alive().length === 0) {
+            restore();
+        }
+        resume();
     };
 
     return {
@@ -364,16 +409,35 @@ export const createWindows = (options: WindowsOptions) => {
             }
         },
 
-        /* From the moment the app quits, windows that close stay in the session, so the next start opens them again. */
+        /*
+         * From the moment the app quits, windows that close stay in the session, so the next start opens
+         * them again. `attach` calls it for a quit that goes ahead; an app only needs it without `attach`.
+         */
         quit: markQuit,
+
+        /*
+         * The updater's `onQuit`: true right before an install quits the app, after which the windows
+         * it closes stay in the session; false when the install failed and the app stays.
+         */
+        quitForUpdate: (going: boolean): void => {
+            if (going) {
+                installing = true;
+                markQuit();
+            } else {
+                stay();
+            }
+        },
 
         /*
          * What every app with this set of windows does with its app's events: a second instance raises
          * the window in front, a click on the dock icon with no window open opens the last session's
-         * again, pending bounds are written at quit, and off macOS the app quits with its last window
-         * while that window stays in the session. Call it before `app.whenReady()`, and `restore()` once ready.
+         * again, a quit that goes ahead keeps its windows in the session, pending bounds are written at
+         * quit, and off macOS the app quits with its last window while that window stays in the session.
+         * With `confirmQuit`, a quit waits for its answer. Call it before `app.whenReady()`, and
+         * `restore()` once ready.
          */
-        attach: (app: Pick<App, 'on' | 'quit'>): void => {
+        attach: (app: Pick<App, 'on' | 'quit'>, attachOptions: AttachOptions = {}): void => {
+            const { confirmQuit } = attachOptions;
             const platform = options.platform ?? process.platform;
             quitsWithLastWindow = platform !== 'darwin';
             app.on('second-instance', () => {
@@ -389,6 +453,29 @@ export const createWindows = (options: WindowsOptions) => {
                     restore();
                 }
             });
+            app.on('before-quit', (event) => {
+                if (confirmQuit === undefined || quitConfirmed) {
+                    quitEvent = event;
+                    return;
+                }
+                event.preventDefault();
+                if (confirming) {
+                    return;
+                }
+                confirming = true;
+                void new Promise<boolean>((resolve) => resolve(confirmQuit({ update: installing })))
+                    .catch(() => true)
+                    .then((go) => {
+                        confirming = false;
+                        if (!go) {
+                            stay();
+                            return;
+                        }
+                        quitConfirmed = true;
+                        // A quit asked from inside this event would be undone by the one still running, so it waits for a task of its own.
+                        later(() => app.quit(), 0);
+                    });
+            });
             app.on('will-quit', () => options.state.flush());
             app.on('window-all-closed', () => {
                 if (quitsWithLastWindow) {
@@ -397,11 +484,8 @@ export const createWindows = (options: WindowsOptions) => {
             });
         },
 
-        /* The quit did not go ahead after all, such as an update that failed to install: a window that closes leaves the session again. */
-        resume: (): void => {
-            quitting = false;
-            writeSession();
-        }
+        /* The quit did not go ahead after all: a window that closes leaves the session again. `attach` calls it when `confirmQuit` says no. */
+        resume
     };
 };
 

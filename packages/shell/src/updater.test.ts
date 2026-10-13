@@ -93,11 +93,15 @@ describe('createUpdater', () => {
         expect(updater.state()).toMatchObject({ status: 'current', version: undefined });
     });
 
-    test('an error keeps only its first line', () => {
+    test('an error keeps only its first line, beside a code the page words', () => {
         const { updater, emit } = setup();
         updater.start();
         emit('error', new Error('HttpError: 500\nset-cookie: secret'));
-        expect(updater.state()).toMatchObject({ status: 'error', error: 'HttpError: 500' });
+        expect(updater.state()).toMatchObject({ status: 'error', error: 'HttpError: 500', errorCode: 'failed' });
+        emit('error', new Error('404 Not Found\nset-cookie: secret'));
+        expect(updater.state()).toMatchObject({ status: 'error', error: '404 Not Found', errorCode: 'no-feed' });
+        emit('checking-for-update');
+        expect(updater.state()).toMatchObject({ status: 'checking', error: null, errorCode: null });
     });
 
     test('the first preference starts the hourly check, and a second one starts no second timer', async () => {
@@ -221,9 +225,9 @@ describe('createUpdater', () => {
 });
 
 describe('describeUpdateError', () => {
-    test('keeps the first line and says what a 404 on the feed means', () => {
-        expect(describeUpdateError('')).toBe('No reason given.');
-        expect(describeUpdateError('404 Not Found\nheaders')).toBe('No release feed found. There is no published release yet, or the repository is private.');
-        expect(describeUpdateError(`${'x'.repeat(250)}\nmore`)).toBe(`${'x'.repeat(200)}…`);
+    test('returns a code and the first line as it was, never a sentence of its own', () => {
+        expect(describeUpdateError('')).toEqual({ code: 'failed', detail: null });
+        expect(describeUpdateError('404 Not Found\nheaders')).toEqual({ code: 'no-feed', detail: '404 Not Found' });
+        expect(describeUpdateError(`${'x'.repeat(250)}\nmore`)).toEqual({ code: 'failed', detail: `${'x'.repeat(200)}…` });
     });
 });

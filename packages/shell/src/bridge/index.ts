@@ -5,5 +5,5 @@
 
 export { MENU_ROLES, type MenuNode, type MenuRole, type MenuSpec } from './menu.ts';
 export type { ThemeState } from './theme.ts';
-export type { UpdateState } from './update.ts';
+export type { UpdateErrorCode, UpdateState } from './update.ts';
 export { compareVersions, isVersion } from './versions.ts';

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { BrowserWindow, Rectangle, WebContents } from 'electron';
 import { createWindowState, type WindowStateStorage } from './window-state.ts';
-import { CASCADE, createWindows, type WindowOrigin } from './windows.ts';
+import { CASCADE, createWindows, type QuitRequest, type WindowOrigin } from './windows.ts';
 
 const DISPLAY = { workArea: { x: 0, y: 25, width: 2560, height: 1415 } };
 
@@ -29,6 +29,17 @@ const emitter = () => {
         }
     };
     return { on, once: on, emit };
+};
+
+/* An Electron event a listener can prevent, as `before-quit` and a window's `close` hand out. */
+const preventable = () => {
+    const event = {
+        defaultPrevented: false,
+        preventDefault: () => {
+            event.defaultPrevented = true;
+        }
+    };
+    return event;
 };
 
 let nextId = 1;
@@ -66,8 +77,11 @@ const fakeWindow = (bounds: Rectangle) => {
         show: () => void calls.push('show'),
         focus: () => void calls.push('focus')
     };
-    const close = (): void => {
-        events.emit('close');
+    const close = (event = preventable()): void => {
+        events.emit('close', event);
+        if (event.defaultPrevented) {
+            return;
+        }
         state.destroyed = true;
         events.emit('closed');
     };
@@ -102,6 +116,60 @@ const setup = (sessionText: string | null = null, stateText: string | null = nul
     });
     return { windows, created, session, fronts };
 };
+
+type AttachedApp = Parameters<ReturnType<typeof createWindows>['attach']>[0];
+
+/* Listeners in the order they were added, as Electron calls them; `quit` only counts, a test emits what follows. */
+const fakeApp = () => {
+    const events = emitter();
+    let quits = 0;
+    const app = { on: events.on, quit: () => void quits++ } as unknown as AttachedApp;
+    const beforeQuit = () => {
+        const event = preventable();
+        events.emit('before-quit', event);
+        return event;
+    };
+    return { app, events, beforeQuit, quits: () => quits };
+};
+
+/* A `setTimeout` that runs only when the test says so. */
+const manualTimer = () => {
+    const pending: (() => void)[] = [];
+    return {
+        setTimeout: (run: () => void) => void pending.push(run),
+        flush: () => {
+            for (const run of pending.splice(0)) {
+                run();
+            }
+        }
+    };
+};
+
+const setupAttached = (platform: NodeJS.Platform = 'darwin') => {
+    const timer = manualTimer();
+    const session = memory();
+    const state = createWindowState({
+        storage: memory().storage,
+        displays: () => [DISPLAY],
+        defaults: { width: 1440, height: 900 },
+        setTimeout: () => null
+    });
+    const created: { key: string | null; fake: Fake }[] = [];
+    const windows = createWindows({
+        state,
+        session: session.storage,
+        platform,
+        setTimeout: timer.setTimeout,
+        create: (key, bounds) => {
+            const fake = fakeWindow({ x: 10, y: 40, width: bounds.width, height: bounds.height });
+            created.push({ key, fake });
+            return fake.window;
+        }
+    });
+    return { windows, created, session, timer, ...fakeApp() };
+};
+
+const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 const sessionOf = (keys: (string | null)[]): string => JSON.stringify({ version: 1, windows: keys });
 
@@ -406,6 +474,188 @@ describe('createWindows', () => {
         expect(quits).toBe(1);
         listeners.get('activate')!();
         expect(fakes).toHaveLength(3);
+    });
+
+    test('a quit that goes ahead keeps its windows in the session, without the app calling quit()', () => {
+        const { windows, created, session, app, beforeQuit } = setupAttached();
+        windows.attach(app);
+        windows.restore();
+        windows.open('a');
+        expect(beforeQuit().defaultPrevented).toBe(false);
+        for (const { fake } of created) {
+            fake.close();
+        }
+        expect(session.keys()).toEqual([null, 'a']);
+    });
+
+    test('a quit a later before-quit listener holds back leaves the session as it was', () => {
+        const { windows, created, session, app, events, beforeQuit } = setupAttached();
+        windows.attach(app);
+        events.on('before-quit', (event) => (event as ReturnType<typeof preventable>).preventDefault());
+        windows.open('a');
+        windows.open('b');
+        beforeQuit();
+        created[0]!.fake.close();
+        expect(session.keys()).toEqual(['b']);
+        windows.setState(created[1]!.fake.window, 'tabs');
+        expect((JSON.parse(session.storage.read()!) as { states?: unknown[] }).states).toEqual(['tabs']);
+    });
+
+    test('a window that keeps itself open stops the quit from marking the session', () => {
+        const { windows, created, session, app, beforeQuit } = setupAttached();
+        windows.attach(app);
+        windows.open('a');
+        windows.open('b');
+        beforeQuit();
+        const held = preventable();
+        held.preventDefault();
+        created[0]!.fake.close(held);
+        expect(windows.all()).toHaveLength(2);
+        created[1]!.fake.close();
+        expect(session.keys()).toEqual(['a']);
+    });
+
+    test('an app that still calls quit() and resume() from its own before-quit keeps working', () => {
+        const { windows, created, session, app, events, beforeQuit } = setupAttached();
+        windows.attach(app);
+        let goes = false;
+        events.on('before-quit', (event) => {
+            if (goes) {
+                windows.quit();
+                return;
+            }
+            (event as ReturnType<typeof preventable>).preventDefault();
+            windows.resume();
+        });
+        windows.open('a');
+        windows.open('b');
+        beforeQuit();
+        created[0]!.fake.close();
+        expect(session.keys()).toEqual(['b']);
+        goes = true;
+        beforeQuit();
+        created[1]!.fake.close();
+        expect(session.keys()).toEqual(['b']);
+    });
+
+    test('confirmQuit holds the quit while it asks, once, and a no keeps the app as it was', async () => {
+        const { windows, created, session, app, beforeQuit, quits, timer } = setupAttached();
+        const asked: QuitRequest[] = [];
+        let answer: (go: boolean) => void = () => {};
+        windows.attach(app, {
+            confirmQuit: (request) => {
+                asked.push(request);
+                return new Promise((resolve) => {
+                    answer = resolve;
+                });
+            }
+        });
+        windows.open('a');
+        windows.open('b');
+        expect(beforeQuit().defaultPrevented).toBe(true);
+        expect(beforeQuit().defaultPrevented).toBe(true);
+        expect(asked).toEqual([{ update: false }]);
+        answer(false);
+        await settle();
+        timer.flush();
+        expect(quits()).toBe(0);
+        created[0]!.fake.close();
+        expect(session.keys()).toEqual(['b']);
+        expect(beforeQuit().defaultPrevented).toBe(true);
+        expect(asked).toHaveLength(2);
+    });
+
+    test('a yes from confirmQuit quits again in a task of its own, and that quit keeps the windows', async () => {
+        const { windows, created, session, app, beforeQuit, quits, timer } = setupAttached();
+        windows.attach(app, { confirmQuit: () => true });
+        windows.open('a');
+        windows.open('b');
+        expect(beforeQuit().defaultPrevented).toBe(true);
+        await settle();
+        expect(quits()).toBe(0);
+        timer.flush();
+        expect(quits()).toBe(1);
+        expect(beforeQuit().defaultPrevented).toBe(false);
+        created[0]!.fake.close();
+        created[1]!.fake.close();
+        expect(session.keys()).toEqual(['a', 'b']);
+    });
+
+    test('a confirmQuit that throws lets the quit go ahead', async () => {
+        const { windows, app, beforeQuit, quits, timer } = setupAttached();
+        windows.attach(app, {
+            confirmQuit: () => {
+                throw new Error('broken');
+            }
+        });
+        beforeQuit();
+        await settle();
+        timer.flush();
+        expect(quits()).toBe(1);
+    });
+
+    test('off macOS a no brings back the last window, which closed on its way to the quit', async () => {
+        const { windows, created, session, app, events, beforeQuit, quits } = setupAttached('linux');
+        windows.attach(app, { confirmQuit: () => false });
+        windows.restore();
+        windows.open('a');
+        created[0]!.fake.close();
+        created[1]!.fake.close();
+        events.emit('window-all-closed');
+        expect(quits()).toBe(1);
+        beforeQuit();
+        await settle();
+        expect(created.slice(2).map(({ key }) => key)).toEqual(['a']);
+        expect(session.keys()).toEqual(['a']);
+        windows.open('b');
+        created[2]!.fake.close();
+        expect(session.keys()).toEqual(['b']);
+    });
+
+    test('an install quits with its windows in the session, and asks confirmQuit as an update', async () => {
+        const { windows, created, session, app, beforeQuit, timer, quits } = setupAttached();
+        const asked: QuitRequest[] = [];
+        windows.attach(app, {
+            confirmQuit: (request) => {
+                asked.push(request);
+                return true;
+            }
+        });
+        windows.open('a');
+        windows.open('b');
+        windows.quitForUpdate(true);
+        created[0]!.fake.close();
+        created[1]!.fake.close();
+        beforeQuit();
+        await settle();
+        timer.flush();
+        expect(asked).toEqual([{ update: true }]);
+        expect(quits()).toBe(1);
+        expect(session.keys()).toEqual(['a', 'b']);
+    });
+
+    test('a failed install brings back the windows it closed and lets them leave the session again', () => {
+        const { windows, created, session } = setupAttached();
+        windows.restore();
+        windows.open('a');
+        windows.quitForUpdate(true);
+        created[0]!.fake.close();
+        created[1]!.fake.close();
+        windows.quitForUpdate(false);
+        expect(created.slice(2).map(({ key }) => key)).toEqual([null, 'a']);
+        created[2]!.fake.close();
+        expect(session.keys()).toEqual(['a']);
+    });
+
+    test('a failed install that closed nothing only lets windows leave the session again', () => {
+        const { windows, created, session } = setupAttached();
+        windows.open('a');
+        windows.open('b');
+        windows.quitForUpdate(true);
+        windows.quitForUpdate(false);
+        expect(created).toHaveLength(2);
+        created[0]!.fake.close();
+        expect(session.keys()).toEqual(['b']);
     });
 
     test('on macOS the app stays when its last window closes, and that window leaves the session', () => {

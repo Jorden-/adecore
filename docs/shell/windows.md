@@ -27,7 +27,7 @@ windows.attach(app);
 app.whenReady().then(() => windows.restore());
 ```
 
-`attach` answers what every app with a set of windows does with its app's events: a second instance raises the window in front, a click on the dock icon with no window open opens the last session again, pending bounds are written at quit, and off macOS the app quits with its last window while that window stays in the session.
+`attach` answers what every app with a set of windows does with its app's events: a second instance raises the window in front, a click on the dock icon with no window open opens the last session again, a quit that goes ahead keeps its windows in the session, pending bounds are written at quit, and off macOS the app quits with its last window while that window stays in the session. [Quitting](#quitting) covers an app that asks first.
 
 `create` builds and loads the window; the package passes the bounds to construct it with and follows the window from then on, so `create` never calls `windowState.track` itself. A new window whose key has no bounds of its own sits a little beside the one in front (`CASCADE`).
 
@@ -73,12 +73,22 @@ Every IPC handler resolves its window from the sender instead of assuming one: `
 
 ## Quitting
 
-A window that closes leaves the session, so closing one of three windows opens two next time. Call `quit()` once a quit goes ahead: from then on the windows that close stay in the session, and the next start opens all of them.
+A window that closes leaves the session, so closing one of three windows opens two next time. A window that closes because the app quits stays in it, and the next start opens all of them. `attach` tells the two apart: once `before-quit` went by and no listener kept the app open, the windows that close belong to the quit. Off macOS, where the app quits with its last window, that window stays in the session too.
+
+An app that asks before quitting, or has something to finish first, passes `confirmQuit`. It runs once per quit, before any window closes, and the quit waits until it answers. `true` lets the quit go ahead, `false` keeps the app as it was, and a throw lets the quit go ahead, so a broken check never traps the app. A window that closed on its way to the quit, the last one off macOS, opens again on a `false`.
 
 ```ts
-app.on('before-quit', () => windows.quit());
+windows.attach(app, {
+    confirmQuit: async ({ update }) => {
+        if (!update && (await workIsRunning()) && !(await askToStopWork())) {
+            return false;
+        }
+        await server.close();
+        return true;
+    }
+});
 ```
 
-Off macOS, where the app quits with its last window, `attach` marks the quit as that window closes, so it stays in the session.
+`update` is true for a quit an [update install](/shell/updater#installing) started. `AttachOptions` and `QuitRequest` are exported types. Once `confirmQuit` says yes, the quit is asked again in a task of its own; `setTimeout` in the options replaces that timer in a test.
 
-An app that asks before quitting calls it only on the path where the quit proceeds. When a quit still does not happen, `resume()` lets closing windows leave the session again. An update install closes the windows before `before-quit`; the [updater](/shell/updater#installing)'s `onQuit` covers that.
+`quit()` and `resume()` stay for an app that does not pass `confirmQuit` and decides in its own `before-quit` listener: `quit()` once the quit goes ahead, `resume()` when it does not happen after all. A listener that only calls `event.preventDefault()`, such as to hide the app instead, needs neither: a quit held back that way marks nothing.

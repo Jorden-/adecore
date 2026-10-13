@@ -1,23 +1,23 @@
 import type { AppUpdater } from 'electron-updater';
-import type { UpdateState } from './bridge/update.ts';
+import type { UpdateErrorCode, UpdateState } from './bridge/update.ts';
 
 /* Often enough that a release lands the same day, rarely enough to be invisible. */
 export const UPDATE_INTERVAL_MS = 60 * 60 * 1000;
 
 /*
  * electron-updater puts the whole HTTP exchange in the message of a failed check: every response
- * header, the session cookie among them. Only the first line travels, and a 404 on the feed gets the
- * sentence that says what went wrong.
+ * header, the session cookie among them. Only the first line travels. The words are the page's, in
+ * the person's language, so the shell sends a code beside that line and no sentence of its own.
  */
-export const describeUpdateError = (message: string): string => {
+export const describeUpdateError = (message: string): { code: UpdateErrorCode; detail: string | null } => {
     const first = message.split('\n')[0]?.trim();
     if (!first) {
-        return 'No reason given.';
+        return { code: 'failed', detail: null };
     }
-    if (first.startsWith('404')) {
-        return 'No release feed found. There is no published release yet, or the repository is private.';
-    }
-    return first.length > 200 ? `${first.slice(0, 200)}…` : first;
+    return {
+        code: first.startsWith('404') ? 'no-feed' : 'failed',
+        detail: first.length > 200 ? `${first.slice(0, 200)}…` : first
+    };
 };
 
 export interface UpdaterOptions {
@@ -33,7 +33,7 @@ export interface UpdaterOptions {
     /*
      * True right before installing quits the app, false when that install failed and the app stays.
      * electron-updater closes the windows before the app's own `before-quit`, so this is where a set of
-     * windows learns the quit is coming (`windows.quit()` and `windows.resume()`).
+     * windows learns the quit is coming: pass `windows.quitForUpdate`.
      */
     onQuit?: (quitting: boolean) => void;
     log?: (message: string, error: unknown) => void;
@@ -91,14 +91,15 @@ export const createUpdater = (options: UpdaterOptions) => {
                 // The page owns the preference and sends it before the first check, so nothing downloads
                 // behind the back of someone who turned it off.
                 loaded.autoDownload = false;
-                loaded.on('checking-for-update', () => setState({ status: 'checking', error: null }));
-                loaded.on('update-available', (info) => setState({ status: 'available', version: info.version, error: null }));
-                loaded.on('update-not-available', () => setState({ status: 'current', version: undefined, error: null }));
+                loaded.on('checking-for-update', () => setState({ status: 'checking', error: null, errorCode: null }));
+                loaded.on('update-available', (info) => setState({ status: 'available', version: info.version, error: null, errorCode: null }));
+                loaded.on('update-not-available', () => setState({ status: 'current', version: undefined, error: null, errorCode: null }));
                 loaded.on('download-progress', (progress) => setState({ status: 'downloading', percent: progress.percent }));
                 loaded.on('update-downloaded', (info) => setState({ status: 'ready', version: info.version, percent: 100 }));
                 loaded.on('error', (e) => {
                     installFailed();
-                    setState({ status: 'error', error: describeUpdateError(e.message) });
+                    const { code, detail } = describeUpdateError(e.message);
+                    setState({ status: 'error', error: detail, errorCode: code });
                 });
                 updater = loaded;
                 setState({ status: 'idle' });

@@ -34,7 +34,7 @@ onFromApp('update:install', () => updater.install());
 | `available` | `version` is newer and not downloaded. |
 | `downloading` | `percent` of it is in. |
 | `ready` | Downloaded; `install` restarts into it. |
-| `error` | `error` says why, in one line. |
+| `error` | `errorCode` says why, `error` holds the first line of the message. |
 
 ## Who decides to download
 
@@ -44,17 +44,17 @@ The page owns the preference. Nothing downloads and no timer runs until the page
 
 ## Installing
 
-`install()` quits into the downloaded build and answers whether it did: without a build that is `ready` it does nothing. electron-updater closes the windows before the app's own `before-quit` runs, so `onQuit(true)` comes right before the install, and `onQuit(false)` when the install fails and the app stays. With a [set of windows](/shell/windows) that is where the session learns about the quit:
+`install()` quits into the downloaded build and answers whether it did: without a build that is `ready` it does nothing. electron-updater closes the windows before the app's own `before-quit` runs, so `onQuit(true)` comes right before the install, and `onQuit(false)` when the install fails and the app stays. With a [set of windows](/shell/windows) that is where the session learns about the quit, and the windows that the install closes stay in it. If the install fails, the windows it closed open again:
 
 ```ts
 const updater = createUpdater({
     // ...
-    onQuit: (quitting) => (quitting ? windows.quit() : windows.resume())
+    onQuit: windows.quitForUpdate
 });
 ```
 
 ## Errors
 
-electron-updater puts the whole HTTP exchange in the message of a failed check, cookies included. `describeUpdateError` keeps the first line only, cut at 200 characters, and turns a 404 on the feed into a sentence that says there is no published release, or that the repository is private. A failed check, download or install also goes to `log`, which is `console.error` by default.
+electron-updater puts the whole HTTP exchange in the message of a failed check, cookies included. `describeUpdateError` returns `{ code, detail }`: `detail` is the first line only, cut at 200 characters, or `null` when the message is empty. The shell sends no sentence of its own, because the page speaks the person's language. `code` is an `UpdateErrorCode`. `no-feed` is a 404 on the feed: there is no published release yet, or the repository is private. Anything else is `failed`. The state carries the two as `errorCode` and `error`, so the page words the code and can show the line under it. A failed check, download or install also goes to `log`, which is `console.error` by default.
 
-`UpdaterOptions`, `Updater` and `UpdateState` are exported types; `UpdateState` comes from `@adecore/shell/bridge`, so the page reads it too.
+`UpdaterOptions`, `Updater`, `UpdateState` and `UpdateErrorCode` are exported types; the last two come from `@adecore/shell/bridge`, so the page reads them too.
