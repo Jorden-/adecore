@@ -27,9 +27,9 @@ import { settledBlocksText } from '../markdown-blocks';
 import { WHOLE_FADE_CLASS } from '../rehype-fade';
 import { useRevealedText } from '../reveal';
 import { formatAgo, formatElapsedShort, formatMoment, formatTokens } from '@adecore/ui/format';
-import { Icon, Tooltip, useTickingText } from '@adecore/ui';
+import { Icon, MiddleTruncate, Tooltip, useTickingText } from '@adecore/ui';
 import { thoughtLine, thoughtPreview } from '../../logic/thought';
-import { toolSummary } from '../../logic/tools';
+import { toolSummary, toolSummaryIsPath } from '../../logic/tools';
 import { ROW_GUTTER } from '../icons';
 import { useOpenForFind } from '../find-reveal';
 import { ReplyContext, UiReplyNavigationContext } from '../reply-context';
@@ -529,7 +529,13 @@ export function ApprovalHistoryRow({ item }: { item: ChatApprovalItem }) {
             <span className={clsx(ROW_GUTTER, item.decision === 'deny' && 'text-status-error')}>{DECISION_ICON[item.decision]}</span>
             <span className={clsx(item.decision === 'deny' && 'text-status-error')}>{t(`rows.approval.${item.decision}`)}</span>
             <span className="text-text-muted">{item.toolName}</span>
-            <span className="min-w-0 truncate font-mono">{toolSummary(item.toolName, item.input)}</span>
+            <span className="min-w-0 truncate font-mono">
+                {toolSummaryIsPath(item.toolName, item.input) ? (
+                    <MiddleTruncate text={toolSummary(item.toolName, item.input)} />
+                ) : (
+                    toolSummary(item.toolName, item.input)
+                )}
+            </span>
         </div>
     );
 }

@@ -32,6 +32,19 @@ export function toolSummary(name: string, input: unknown): string {
     return '';
 }
 
+// The input keys whose value is a file a call is about.
+const PATH_KEYS = new Set(['file_path', 'notebook_path']);
+
+/* Whether the one line of a call is the path of a file, which a row cuts in the middle so the name stays. */
+export function toolSummaryIsPath(name: string, input: unknown): boolean {
+    const known = toolEntry(name);
+    if (known === undefined || !isRecord(input)) {
+        return false;
+    }
+    const key = known.summary.find((candidate) => str(input[candidate]) !== null);
+    return key !== undefined && PATH_KEYS.has(key);
+}
+
 /* The command of a shell call, as it was run; null for any other call or one without a command. */
 export function shellCommand(name: string, input: unknown): string | null {
     if (toolEntry(name)?.shell !== true || !isRecord(input)) {

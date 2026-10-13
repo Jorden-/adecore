@@ -80,6 +80,7 @@ import {
     KEY_SHORTCUTS,
     matchesShortcut,
     Menu,
+    MiddleTruncate,
     PromptDialog,
     Surface,
     Tooltip,
@@ -1207,7 +1208,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                                                     >
                                                         <FileIcon path={path} size={14} />
                                                         <span className="truncate font-mono text-text">{name}</span>
-                                                        {dir && <span className="min-w-0 truncate text-text-faint">{dir}</span>}
+                                                        {dir && <MiddleTruncate text={dir} tooltip={false} className="text-text-faint" />}
                                                     </button>
                                                 );
                                             })}

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import i18next from 'i18next';
 import { TOOL_CATALOG } from './tool-catalog';
-import { isFileChange, readImagePath, toolSummary } from './tools';
+import { isFileChange, readImagePath, toolSummary, toolSummaryIsPath } from './tools';
 
 describe('the tool catalog', () => {
     test('has a sentence for every name that groups, which locales.test.ts then holds Dutch to', () => {
@@ -33,5 +33,19 @@ describe('the tool catalog', () => {
         expect(isFileChange('Read')).toBe(false);
         expect(readImagePath('NotebookRead', { file_path: '/a/plot.png' })).toBe('/a/plot.png');
         expect(readImagePath('Edit', { file_path: '/a/plot.png' })).toBeNull();
+    });
+});
+
+describe('toolSummaryIsPath', () => {
+    test('a file call is about its path', () => {
+        expect(toolSummaryIsPath('Read', { file_path: '/repo/src/index.ts' })).toBe(true);
+        expect(toolSummaryIsPath('NotebookEdit', { notebook_path: 'analysis.ipynb' })).toBe(true);
+    });
+
+    test('a command, a pattern or an unknown tool is not', () => {
+        expect(toolSummaryIsPath('Bash', { command: 'ls' })).toBe(false);
+        expect(toolSummaryIsPath('Grep', { pattern: 'src/.*' })).toBe(false);
+        expect(toolSummaryIsPath('mcp__fs__read', { file_path: 'a.ts' })).toBe(false);
+        expect(toolSummaryIsPath('Read', null)).toBe(false);
     });
 });

@@ -24,6 +24,8 @@ Only the rows on screen are drawn. The thread follows new text while it is scrol
 
 A message has its actions under it on hover: bookmark, fork (only with a host `fork`) and copy. A right click adds copying the message, its code or its Markdown, and selecting text in a reply offers to quote it into the composer. A bookmark marks its message with a line across the thread.
 
+The path of a file a call reads or writes, in its line and in the line of an approval, and a file in the changed files card, is cut in the middle when it does not fit, so the folder it starts in and the name it ends with both stay in sight ([`MiddleTruncate`](/ui/display/middle-truncate)). The cut part is still in the line for a copy or a find, and a tooltip shows the whole path.
+
 ## Props
 
 | Prop      | Type        |                                                                                                    |

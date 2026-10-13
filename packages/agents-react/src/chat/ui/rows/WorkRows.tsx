@@ -16,6 +16,7 @@ import {
     toolCallLines,
     toolStartedAt,
     toolSummary,
+    toolSummaryIsPath,
     unifiedChanges,
     type FileChange
 } from '../../logic/tools';
@@ -27,7 +28,7 @@ import { useChatScope } from '../../../scope';
 import { useCurrentItem } from '../../../state/chats';
 import { useTimelineFlash } from '../../timeline-flash';
 import { formatClockDuration, formatElapsedShort } from '@adecore/ui/format';
-import { Icon, Spinner, useTickingText } from '@adecore/ui';
+import { Icon, MiddleTruncate, Spinner, useTickingText } from '@adecore/ui';
 import { ROW_GUTTER, toolIcon } from '../icons';
 import { AnsiOutput } from '../AnsiOutput';
 import { RowTime } from '../RowTime';
@@ -59,6 +60,7 @@ export function ToggleLine({
     label,
     detail,
     command,
+    path,
     open = false,
     onToggle,
     failed,
@@ -72,6 +74,8 @@ export function ToggleLine({
     detail?: string;
     /* Draws `detail` as a shell command, in the colors of the code theme. */
     command?: boolean;
+    /* `detail` is the path of a file, cut in the middle so its name stays in sight. */
+    path?: boolean;
     open?: boolean;
     onToggle?(): void;
     failed?: boolean;
@@ -93,7 +97,7 @@ export function ToggleLine({
             <span className={clsx('shrink-0', live && 'chat-live-text')}>{label}</span>
             {detail && (
                 <span data-find-field="summary" className="min-w-0 truncate font-mono text-text-faint">
-                    {command ? <ShellCommand command={detail} /> : detail}
+                    {command ? <ShellCommand command={detail} /> : path ? <MiddleTruncate text={detail} /> : detail}
                 </span>
             )}
             <span className="grow" />
@@ -143,7 +147,7 @@ function ChangedFileLine({
                 onClick={onToggle}
             >
                 <Icon icon={ChevronRight} size={12} className={clsx('shrink-0 text-text-faint transition-transform', open && 'rotate-90')} />
-                <span className="min-w-0 truncate font-mono text-text">{path}</span>
+                <MiddleTruncate text={path} className="font-mono text-text" />
                 <span className="grow" />
                 {trailing}
             </button>
@@ -259,6 +263,7 @@ export function WorkRow({
                 label={label ?? tool.name}
                 detail={summary}
                 command={detail === undefined && summary === shellCommand(tool.name, tool.input)}
+                path={detail === undefined && toolSummaryIsPath(tool.name, tool.input)}
                 open={open && opens}
                 onToggle={opens ? () => setOpen((o) => !o) : undefined}
                 failed={failed ?? tool.state === 'error'}
@@ -291,6 +296,7 @@ export function WorkLiveRow({ chatId, tool: derived }: { chatId: string; tool: C
                 label={tool.name}
                 detail={summary || tool.progress?.description || ''}
                 command={summary !== '' && summary === shellCommand(tool.name, tool.input)}
+                path={summary !== '' && toolSummaryIsPath(tool.name, tool.input)}
                 open={open && opens}
                 onToggle={opens ? () => setOpen((o) => !o) : undefined}
                 trailing={<RunningFor startedAt={toolStartedAt(tool)} />}
