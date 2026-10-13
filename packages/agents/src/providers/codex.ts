@@ -58,6 +58,7 @@ export const CODEX_CAPABILITIES: ProviderCapabilities = {
     denyReason: false,
     allowAlways: true,
     asyncQuestions: true,
+    steer: true,
     compaction: 'native',
     reportsCost: false,
     reportsContextWindow: true,

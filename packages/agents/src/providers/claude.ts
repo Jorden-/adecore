@@ -101,6 +101,7 @@ export const CLAUDE_CAPABILITIES: ProviderCapabilities = {
     denyReason: true,
     allowAlways: true,
     asyncQuestions: false,
+    steer: true,
     compaction: 'prompt',
     reportsCost: true,
     /*

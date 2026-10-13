@@ -90,6 +90,7 @@ import {
 } from '@adecore/ui';
 import { useChatRow, waitingRequestsOf } from '../../state/chats';
 import { useProviders } from '../../state/providers';
+import { canSteer } from '../../providers/provider-abilities';
 
 const SEARCH_DEBOUNCE_MS = 80;
 // What fits above the composer without turning the picker into a file tree.
@@ -169,11 +170,11 @@ const SEND_HOW: Readonly<Record<'send' | 'send-alternate' | 'send-and-new', Comp
     'send-and-new': 'and-new'
 };
 
-function sendLabelKey(busy: boolean, canSteer: boolean, delivery: 'queue' | 'steer'): string {
+function sendLabelKey(busy: boolean, steerable: boolean, delivery: 'queue' | 'steer'): string {
     if (!busy) {
         return 'composer.send';
     }
-    if (!canSteer) {
+    if (!steerable) {
         return 'composer.queueButton';
     }
     return delivery === 'steer' ? 'composer.steerButton' : 'composer.queueWithSteerButton';
@@ -247,7 +248,6 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
     const { t } = useTranslation('agent-chat');
     const sendDelivery = host.useSendDelivery();
     const sendKey = useChatPreferences((preferences) => preferences.sendKey);
-    const canSteer = info.provider === 'claude' || info.provider === 'codex';
     const [draft, setDraft] = useState<ChatDraft>(() => readDraft(chatId));
     const [historyIndex, setHistoryIndex] = useState<number | null>(null);
     const [menuIndex, setMenuIndex] = useState(0);
@@ -286,6 +286,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
     const provider = providers.find((entry) => entry.kind === info.provider);
     // Absent until the host answered `provider.list`, so only an explicit false hides anything.
     const capabilities = provider?.capabilities;
+    const steerable = canSteer(capabilities);
     const compaction = capabilities?.compaction;
     const goals = capabilities?.goals;
     const dismissedTurnId = useResumeCompactionDismissal(chatId);
@@ -714,7 +715,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
 
     const submit = (how: ComposerSend = 'default'): void => {
         const alternate = how === 'alternate';
-        const delivery = canSteer && (alternate ? sendDelivery === 'queue' : sendDelivery === 'steer') ? 'steer' : 'queue';
+        const delivery = steerable && (alternate ? sendDelivery === 'queue' : sendDelivery === 'steer') ? 'steer' : 'queue';
         const trimmed = text.trim();
         if (isEmptyDraft(draft) || !writable || guard.tooLong) {
             return;
@@ -1490,7 +1491,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                                 </Tooltip>
                             )}
                             {(!busy || !isEmptyDraft(draft)) && (
-                                <Tooltip label={t(sendLabelKey(busy, canSteer, sendDelivery))} kbd={sendShortcut(sendKey, text.includes('\n'))} name>
+                                <Tooltip label={t(sendLabelKey(busy, steerable, sendDelivery))} kbd={sendShortcut(sendKey, text.includes('\n'))} name>
                                     <button
                                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-text hover:brightness-90 disabled:opacity-50 disabled:hover:brightness-100"
                                         disabled={isEmptyDraft(draft) || !writable || guard.tooLong}

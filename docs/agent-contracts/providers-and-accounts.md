@@ -38,6 +38,7 @@ A catalog is the models of one provider, as a host ships it and as a newer copy 
 | `attachments`, `mentions` | Whether a message may carry files and `@` paths.                                  |
 | `denyReason`, `allowAlways` | Whether a denial carries a reason, and whether a rule can be remembered.        |
 | `asyncQuestions`       | A question the person may leave while the turn goes on.                              |
+| `steer`                | A message sent while a turn runs can join that turn; absent where it cannot.         |
 | `compaction`           | Folding the context: `native`, as a prompt (`prompt`), or `none`.                    |
 | `reportsCost`, `reportsContextWindow`, `reportsThinking` | What the CLI tells about a turn.                   |
 | `slashCommands`        | Whether the CLI takes slash commands.                                                |

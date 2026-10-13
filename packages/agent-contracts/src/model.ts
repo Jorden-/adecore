@@ -109,6 +109,9 @@ export const ProviderCapabilitiesSchema = z.object({
     allowAlways: z.boolean(),
     // A question the person may leave alone while the turn goes on.
     asyncQuestions: z.boolean(),
+    // Whether a message sent while a turn runs can join that turn rather than wait for the next;
+    // absent where it cannot, which is also what a host from before this field reports.
+    steer: z.boolean().optional(),
     // Folding the context: a call of its own, a slash command sent as a turn, or nothing.
     compaction: z.enum(['native', 'prompt', 'none']),
     reportsCost: z.boolean(),
