@@ -96,4 +96,17 @@ describe('the service of the npm package', () => {
         expect(definitionRunsProgram(plist, NPM_MAC.program)).toBe(true);
         expect(definitionRunsProgram(plist, '/bin/other')).toBe(false);
     });
+
+    test('ignores program keys in XML comments and nested dictionaries', () => {
+        const other = launchAgentPlist({ ...NPM_MAC, program: '/bin/other', environment: { Program: NPM_MAC.program } });
+        expect(definitionRunsProgram(other, NPM_MAC.program)).toBe(false);
+        const commented = other.replace('<dict>', `<dict><!-- <key>Program</key><string>${NPM_MAC.program}</string> -->`);
+        expect(definitionRunsProgram(commented, NPM_MAC.program)).toBe(false);
+    });
+
+    test('ignores a commented systemd ExecStart', () => {
+        const other = systemdUnit({ ...NPM_LINUX, program: '/bin/other' });
+        const commented = other.replace('[Service]', `[Service]\n#ExecStart="${NPM_LINUX.program}" `);
+        expect(definitionRunsProgram(commented, NPM_LINUX.program)).toBe(false);
+    });
 });

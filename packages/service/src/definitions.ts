@@ -92,21 +92,75 @@ export function systemdUnit(spec: ServiceSpec): string {
     return lines.join('\n');
 }
 
-/* What a launch agent starts: its `Program`, which launchd prefers, or else the first of its `ProgramArguments`. */
+/* Only keys of the outer plist dictionary identify the executable; nested environment keys are data. */
 function launchAgentProgram(definition: string): string | null {
-    const match =
-        /<key>Program<\/key>\s*<string>([^<]*)<\/string>/.exec(definition) ??
-        /<key>ProgramArguments<\/key>\s*<array>\s*<string>([^<]*)<\/string>/.exec(definition);
-    return match?.[1] ?? null;
+    const xml = definition.replace(/<!--[\s\S]*?-->/g, '');
+    if (xml.includes('<!--')) {
+        return null;
+    }
+    const entries = new Map<string, string>();
+    let depth = 0;
+    let key: string | null = null;
+    let start = 0;
+    for (const token of xml.matchAll(/<(\/?)(dict|array)\s*>|<key>([^<]*)<\/key>/g)) {
+        if (token[3] !== undefined) {
+            if (depth !== 1) {
+                continue;
+            }
+            if (key !== null) {
+                entries.set(key, xml.slice(start, token.index));
+            }
+            key = token[3];
+            if (entries.has(key)) {
+                return null;
+            }
+            start = token.index + token[0].length;
+        } else if (token[1] === '') {
+            depth++;
+        } else {
+            depth--;
+            if (depth === 0) {
+                if (key !== null) {
+                    entries.set(key, xml.slice(start, token.index));
+                }
+                const program = entries.get('Program');
+                return program !== undefined
+                    ? (/^\s*<string>([^<]*)<\/string>\s*$/.exec(program)?.[1] ?? null)
+                    : (/^\s*<array>\s*<string>([^<]*)<\/string>/.exec(entries.get('ProgramArguments') ?? '')?.[1] ?? null);
+            }
+        }
+    }
+    return null;
+}
+
+function systemdRunsProgram(definition: string, program: string): boolean {
+    let service = false;
+    let commands: string[] = [];
+    for (const raw of definition.split('\n')) {
+        const line = raw.trim();
+        if (line.startsWith('#') || line.startsWith(';')) {
+            continue;
+        }
+        if (/^\[.*\]$/.test(line)) {
+            service = line === '[Service]';
+            continue;
+        }
+        const command = service ? /^ExecStart\s*=\s*(.*)$/.exec(line)?.[1] : undefined;
+        if (command !== undefined) {
+            if (command === '') {
+                commands = [];
+            } else {
+                commands.push(command);
+            }
+        }
+    }
+    const executable = unitWord(program, true);
+    return commands.length > 0 && commands.every((command) => command === executable || command.startsWith(`${executable} `));
 }
 
 /*
  * Callers sharing a service identity can check executable ownership before replacing its definition.
  */
 export function definitionRunsProgram(definition: string, program: string): boolean {
-    return (
-        launchAgentProgram(definition) === xmlText(program) ||
-        definition.includes(`ExecStart=${unitWord(program, true)} `) ||
-        definition.includes(`ExecStart=${unitWord(program, true)}\n`)
-    );
+    return definition.trimStart().startsWith('<') ? launchAgentProgram(definition) === xmlText(program) : systemdRunsProgram(definition, program);
 }
