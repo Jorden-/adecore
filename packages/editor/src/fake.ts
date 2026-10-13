@@ -52,13 +52,137 @@ import type {
     EditorWidget
 } from './types.ts';
 import { emit, type Listener, subscribe } from './listeners.ts';
-import { changedSpan } from '@adecore/editor-core';
+import { changedSpan, changedSpans } from '@adecore/editor-core';
 import { mapTrackedRange } from './tracked-range.ts';
 
+interface OffsetSelection {
+    anchor: number;
+    head: number;
+}
+
+interface Edit {
+    from: number;
+    to: number;
+    text: string;
+}
+
+interface HistoryState {
+    text: string;
+    selections: readonly OffsetSelection[];
+}
+
+const LINE_BREAK = /\r\n|\r|\n/g;
+
+/* Where each line starts and where its text ends, before its line break: `\r\n`, a lone `\r` or `\n`, as the real document counts them. */
+function linesOf(text: string): { start: number; end: number }[] {
+    const lines: { start: number; end: number }[] = [];
+    let start = 0;
+    for (const match of text.matchAll(LINE_BREAK)) {
+        lines.push({ start, end: match.index });
+        start = match.index + match[0].length;
+    }
+    lines.push({ start, end: text.length });
+    return lines;
+}
+
+function isHighSurrogate(code: number): boolean {
+    return code >= 0xd800 && code <= 0xdbff;
+}
+
+function isLowSurrogate(code: number): boolean {
+    return code >= 0xdc00 && code <= 0xdfff;
+}
+
+/* Clamps to the text and moves back off the middle of a CRLF or a surrogate pair, as the real document does. */
+function clampOffset(text: string, value: number): number {
+    const offset = Math.max(0, Math.min(text.length, Number.isFinite(value) ? Math.trunc(value) : 0));
+    const splitsBreak = text[offset - 1] === '\r' && text[offset] === '\n';
+    const splitsPair = isHighSurrogate(text.charCodeAt(offset - 1)) && isLowSurrogate(text.charCodeAt(offset));
+    return splitsBreak || splitsPair ? offset - 1 : offset;
+}
+
 function positionIn(text: string, offset: number): EditorPosition {
-    const before = text.slice(0, Math.max(0, offset));
-    const lines = before.split('\n');
-    return { line: lines.length - 1, character: lines.at(-1)!.length };
+    const at = clampOffset(text, offset);
+    const lines = linesOf(text);
+    let line = lines.length - 1;
+    while (line > 0 && lines[line]!.start > at) {
+        line--;
+    }
+    return { line, character: Math.min(at, lines[line]!.end) - lines[line]!.start };
+}
+
+function offsetIn(text: string, position: EditorPosition): number {
+    const lines = linesOf(text);
+    const line = lines[Math.max(0, Math.min(Number.isFinite(position.line) ? Math.trunc(position.line) : 0, lines.length - 1))]!;
+    const character = Math.max(0, Math.min(Number.isFinite(position.character) ? Math.trunc(position.character) : 0, line.end - line.start));
+    return clampOffset(text, line.start + character);
+}
+
+/* The line of a one-based line number, clamped to the text. */
+function lineNumbered(text: string, line: number): { start: number; end: number } {
+    const lines = linesOf(text);
+    return lines[Math.min(Math.max(1, Math.trunc(line) || 1), lines.length) - 1]!;
+}
+
+/* Clamps every selection and merges those that overlap or touch, each merge taking the place and direction of the last given of them, as the real document does. */
+function normalized(text: string, selections: readonly OffsetSelection[]): OffsetSelection[] {
+    const input = selections.length > 0 ? selections : [{ anchor: 0, head: 0 }];
+    const clamped = input.map((raw) => {
+        const anchor = clampOffset(text, raw.anchor);
+        return { anchor, head: raw.head === raw.anchor ? anchor : clampOffset(text, raw.head) };
+    });
+    const order = clamped
+        .map((selection, index) => ({ from: Math.min(selection.anchor, selection.head), to: Math.max(selection.anchor, selection.head), index }))
+        .sort((left, right) => left.from - right.from);
+    const groups: { from: number; to: number; last: number }[] = [];
+    for (const { from, to, index } of order) {
+        const group = groups.at(-1);
+        if (group !== undefined && from <= group.to) {
+            group.to = Math.max(group.to, to);
+            group.last = Math.max(group.last, index);
+        } else {
+            groups.push({ from, to, last: index });
+        }
+    }
+    return groups
+        .sort((left, right) => left.last - right.last)
+        .map((group) => {
+            const selection = clamped[group.last]!;
+            return selection.anchor > selection.head ? { anchor: group.to, head: group.from } : { anchor: group.from, head: group.to };
+        });
+}
+
+/* The edits in order and without repeats, or null where two overlap, which the real document refuses. */
+function orderedEdits(edits: readonly Edit[]): Edit[] | null {
+    const sorted = [...edits].sort((left, right) => left.from - right.from || left.to - right.to);
+    const unique: Edit[] = [];
+    for (const edit of sorted) {
+        const previous = unique.at(-1);
+        if (previous !== undefined && edit.from === previous.from && edit.to === previous.to && edit.text === previous.text) {
+            continue;
+        }
+        if (previous !== undefined && (edit.from < previous.to || (edit.from === previous.from && edit.to === previous.to))) {
+            return null;
+        }
+        unique.push(edit);
+    }
+    return unique;
+}
+
+/* Where an offset lands after ordered edits: one inside a replaced stretch, or at an insertion, ends up behind the new text. */
+function mapOffset(offset: number, edits: readonly Edit[]): number {
+    let delta = 0;
+    for (const edit of edits) {
+        if (edit.to > offset) {
+            return edit.from <= offset ? edit.from + delta + edit.text.length : offset + delta;
+        }
+        delta += edit.text.length - (edit.to - edit.from);
+    }
+    return offset + delta;
+}
+
+function rangeIn(text: string, selection: OffsetSelection): EditorRange {
+    return { start: positionIn(text, Math.min(selection.anchor, selection.head)), end: positionIn(text, Math.max(selection.anchor, selection.head)) };
 }
 
 /* An editor without a DOM, for tests: `type`, `save` and `blur` do what a person would, the rest says what the host asked of it. */
@@ -82,6 +206,12 @@ export class FakeEditor implements Editor {
     findQuery: EditorFindQuery | null = null;
     findState: EditorFindState = { count: 0, current: null };
     private text: string;
+    /* The primary selection last, as in the real editor. */
+    private selections: OffsetSelection[] = [{ anchor: 0, head: 0 }];
+    /* Where the caret listeners last heard the caret was. */
+    private caretOffset = 0;
+    private undoStack: { before: HistoryState; after: HistoryState }[] = [];
+    private redoStack: { before: HistoryState; after: HistoryState }[] = [];
     private readonly changes = new Set<Listener>();
     private readonly textChanges = new Set<(change: EditorTextChange) => void>();
     private readonly saves = new Set<Listener>();
@@ -103,16 +233,27 @@ export class FakeEditor implements Editor {
         this.revealedLine = options.line ?? null;
         this.column = options.column ?? null;
         this.scrollTop = options.scrollTop ?? null;
+        if (options.line !== undefined) {
+            const line = lineNumbered(this.text, options.line);
+            const offset = Math.min(line.end, line.start + Math.max(0, (options.column ?? 1) - 1));
+            this.selections = [{ anchor: offset, head: offset }];
+            this.caretOffset = offset;
+        }
     }
 
-    /* A person's edit: the text changes and every change listener hears it. A read-only editor refuses it, as the real editor does. */
+    /* A person's edit: the text changes, the caret lands behind what changed and every change listener hears it. A read-only editor refuses it, as the real editor does. */
     type(text: string): void {
         this.assertLive();
-        if (this.readOnly || text === this.text) {
+        const span = changedSpan(this.text, text);
+        if (this.readOnly || span === null) {
             return;
         }
-        this.replaceText(text, 'input');
-        emit(this.changes);
+        const edit = { from: span.start, to: span.end, text: span.text };
+        const end = span.start + span.text.length;
+        const others = this.selections
+            .slice(0, -1)
+            .map((selection) => ({ anchor: mapOffset(selection.anchor, [edit]), head: mapOffset(selection.head, [edit]) }));
+        this.edit([edit], 'input', false, () => [...others, { anchor: end, head: end }]);
     }
 
     /* Mod+S inside the editor. */
@@ -132,42 +273,109 @@ export class FakeEditor implements Editor {
         return this.text;
     }
 
+    /* Split into the stretches the real editor splits it into, so the carets and tracked ranges follow it alike. */
     setText(text: string): void {
         this.assertLive();
-        this.replaceText(text);
+        const spans = changedSpans(this.text, text).map((span) => ({ from: span.start, to: span.end, text: span.text }));
+        this.edit(orderedEdits(spans) ?? [], 'external', false);
     }
 
-    /* The text becomes `text`, and listeners of the text hear the one stretch that differs, as the real editor reports it. */
-    private replaceText(text: string, source: EditorTextChange['source'] = 'external', selections?: readonly EditorRange[]): void {
-        const span = changedSpan(this.text, text);
-        const before = this.text;
-        this.text = text;
-        if (span === null) {
-            return;
+    /*
+     * Ordered edits as one step of the history, and the listeners told in the real editor's order: the caret's,
+     * the text's, then the change listeners for anything but a change from outside. `place` puts the selections
+     * in the new text; without it they follow the edits. False when the text stays as it was.
+     */
+    private edit(
+        edits: readonly Edit[],
+        source: EditorTextChange['source'],
+        mergeUndo: boolean,
+        place?: (text: string) => readonly OffsetSelection[]
+    ): boolean {
+        const before = this.state();
+        if (!this.rewrite(edits, source, place)) {
+            return false;
         }
-        // As in the real editor the caret lands behind what was typed, and listeners of the caret hear it before those of the text.
+        const last = this.undoStack.at(-1);
+        if (mergeUndo && last !== undefined && last.after.text === before.text) {
+            last.after = this.state();
+        } else {
+            this.undoStack.push({ before, after: this.state() });
+        }
+        this.redoStack = [];
         if (source !== 'external') {
-            if (selections === undefined) {
-                this.moveCaret(positionIn(text, span.start + span.text.length));
-            } else {
-                this.setSelections(selections);
-            }
+            emit(this.changes);
         }
-        this.followTracked(span.start, span.end, span.text.length);
+        return true;
+    }
+
+    private rewrite(edits: readonly Edit[], source: EditorTextChange['source'], place?: (text: string) => readonly OffsetSelection[]): boolean {
+        const before = this.text;
+        let text = before;
+        for (let index = edits.length - 1; index >= 0; index--) {
+            const edit = edits[index]!;
+            text = text.slice(0, edit.from) + edit.text + text.slice(edit.to);
+        }
+        if (text === before) {
+            return false;
+        }
+        const changed = edits.filter((edit) => before.slice(edit.from, edit.to) !== edit.text);
+        this.text = text;
+        this.selections = normalized(
+            text,
+            place?.(text) ?? this.selections.map((selection) => ({ anchor: mapOffset(selection.anchor, edits), head: mapOffset(selection.head, edits) }))
+        );
+        this.followTracked(changed);
         this.ghost = null;
+        this.announceCaret();
+        // Last to first, so each change's range is also where it stands once the ones after it are applied, as the real editor reports them.
         const change: EditorTextChange = {
             source,
-            changes: [{ range: { start: positionIn(before, span.start), end: positionIn(before, span.end) }, text: span.text }]
+            changes: [...changed]
+                .reverse()
+                .map((edit) => ({ range: { start: positionIn(before, edit.from), end: positionIn(before, edit.to) }, text: edit.text }))
         };
         emit(this.textChanges, change);
+        return true;
+    }
+
+    private state(): HistoryState {
+        return { text: this.text, selections: this.selections.map((selection) => ({ ...selection })) };
+    }
+
+    /* Undo or redo, which the real editor reports as changes of a command and refuses while the text is read only. */
+    private restore(direction: 'undo' | 'redo'): boolean {
+        const [from, to] = direction === 'undo' ? [this.undoStack, this.redoStack] : [this.redoStack, this.undoStack];
+        const entry = this.readOnly ? undefined : from.pop();
+        if (entry === undefined) {
+            return false;
+        }
+        to.push(entry);
+        const state = direction === 'undo' ? entry.before : entry.after;
+        const span = changedSpan(this.text, state.text);
+        if (span === null) {
+            this.select(state.selections);
+        } else {
+            this.rewrite([{ from: span.start, to: span.end, text: span.text }], 'command', () => state.selections);
+        }
+        emit(this.changes);
+        return true;
+    }
+
+    /* Tells the caret listeners where the primary caret is, when it moved since they last heard. */
+    private announceCaret(): void {
+        const head = this.selections.at(-1)!.head;
+        if (head !== this.caretOffset) {
+            this.caretOffset = head;
+            emit(this.carets, positionIn(this.text, head));
+        }
     }
 
     private readonly tracked = new Set<{ from: number; to: number; lost: boolean }>();
 
-    /* The fake sees one change per edit, the stretch that differs, so a range it tracks is lost a little sooner than the real editor's. */
-    private followTracked(from: number, to: number, insertedLength: number): void {
+    private followTracked(edits: readonly Edit[]): void {
+        const changes = edits.map((edit) => ({ from: edit.from, to: edit.to, insertedLength: edit.text.length }));
         for (const entry of this.tracked) {
-            const mapped = mapTrackedRange(entry.from, entry.to, [{ from, to, insertedLength }]);
+            const mapped = mapTrackedRange(entry.from, entry.to, changes);
             if (mapped === null) {
                 this.tracked.delete(entry);
                 entry.lost = true;
@@ -202,13 +410,7 @@ export class FakeEditor implements Editor {
     }
 
     offsetAt(position: EditorPosition): number {
-        const lines = this.text.split('\n');
-        let offset = 0;
-        for (let line = 0; line < Math.min(position.line, lines.length - 1); line++) {
-            offset += lines[line]!.length + 1;
-        }
-        const current = lines[Math.min(position.line, lines.length - 1)]!;
-        return offset + Math.min(position.character, current.length);
+        return offsetIn(this.text, position);
     }
 
     onChange(listener: Listener): () => void {
@@ -229,6 +431,9 @@ export class FakeEditor implements Editor {
     revealLine(line: number, reveal: EditorReveal = 'center'): void {
         this.revealedLine = line;
         this.lastReveal = reveal;
+        const { start } = lineNumbered(this.text, line);
+        this.selections = [{ anchor: start, head: start }];
+        this.announceCaret();
     }
 
     /* Counts plain occurrences only; the matcher itself is the editor's, and a test here is about the host's side. */
@@ -557,7 +762,6 @@ export class FakeEditor implements Editor {
     /* What the host marked and highlighted last. */
     markers: readonly EditorMarker[] = [];
     highlights: readonly EditorHighlight[] = [];
-    caret: EditorPosition = { line: 0, character: 0 };
     /* Where `rectAt` puts a position, which a test can move to simulate scrolling. */
     origin = { left: 100, top: 100 };
     charSize = { width: 8, height: 20 };
@@ -633,7 +837,17 @@ export class FakeEditor implements Editor {
     }
 
     getCaret(): EditorPosition {
-        return this.caret;
+        return positionIn(this.text, this.selections.at(-1)!.head);
+    }
+
+    /* The primary caret; setting it tells no listener. */
+    get caret(): EditorPosition {
+        return this.getCaret();
+    }
+
+    set caret(position: EditorPosition) {
+        const offset = this.offsetAt(position);
+        this.selections = [...this.selections.slice(0, -1), { anchor: offset, head: offset }];
     }
 
     /* The folds the host asked to keep. */
@@ -647,8 +861,16 @@ export class FakeEditor implements Editor {
         return this.scrollTop ?? 0;
     }
 
-    /* The selection a person made; without one the caret. */
-    selection: EditorRange | null = null;
+    /* The primary selection, or null when it is only a caret; setting it tells no listener. */
+    get selection(): EditorRange | null {
+        const primary = this.selections.at(-1)!;
+        return primary.anchor === primary.head ? null : rangeIn(this.text, primary);
+    }
+
+    set selection(range: EditorRange | null) {
+        const head = this.offsetAt(range?.end ?? this.getCaret());
+        this.selections = [...this.selections.slice(0, -1), { anchor: range === null ? head : this.offsetAt(range.start), head }];
+    }
 
     /* A test supplies the measured height; this fake has no layout. */
     contentHeight = 0;
@@ -661,7 +883,7 @@ export class FakeEditor implements Editor {
     }
 
     getLineHeight(line: number): number {
-        return Number.isInteger(line) && line >= 0 && line < this.text.split('\n').length ? this.charSize.height : 0;
+        return Number.isInteger(line) && line >= 0 && line < linesOf(this.text).length ? this.charSize.height : 0;
     }
 
     getBaseLineHeight(): number {
@@ -677,32 +899,29 @@ export class FakeEditor implements Editor {
     }
 
     getSelection(): EditorRange {
-        return this.selection ?? { start: this.caret, end: this.caret };
+        return rangeIn(this.text, this.selections.at(-1)!);
     }
-
-    /* The other selections of the editor; the primary one is always last. */
-    private otherSelections: EditorRange[] = [];
 
     /* The other carets of the editor, which a test sets. */
     get otherCarets(): EditorPosition[] {
-        return this.otherSelections.map((range) => range.end);
+        return this.selections.slice(0, -1).map((selection) => positionIn(this.text, selection.head));
     }
 
     set otherCarets(positions: EditorPosition[]) {
-        this.otherSelections = positions.map((position) => ({ start: position, end: position }));
+        const others = positions.map((position) => this.offsetAt(position)).map((offset) => ({ anchor: offset, head: offset }));
+        this.selections = normalized(this.text, [...others, this.selections.at(-1)!]);
     }
 
     getSelections(): EditorRange[] {
-        return [...this.otherSelections, this.getSelection()];
+        return this.selections.map((selection) => rangeIn(this.text, selection));
     }
 
     setSelections(ranges: readonly EditorRange[], reveal: EditorReveal = 'relative'): void {
-        const last = ranges.at(-1);
-        if (last === undefined) {
+        if (ranges.length === 0) {
             return;
         }
-        this.otherSelections = ranges.slice(0, -1).map((range) => ({ ...range }));
-        this.setSelection(last, reveal);
+        this.lastReveal = reveal;
+        this.select(ranges.map((range) => ({ anchor: this.offsetAt(range.start), head: this.offsetAt(range.end) })));
     }
 
     getIndentation(): EditorIndentation {
@@ -710,24 +929,28 @@ export class FakeEditor implements Editor {
     }
 
     setCaret(position: EditorPosition, reveal: EditorReveal = 'relative'): void {
+        const offset = this.offsetAt(position);
         this.lastReveal = reveal;
-        this.caret = position;
-        this.revealedLine = position.line + 1;
-        this.moveCaret(position);
+        this.revealedLine = positionIn(this.text, offset).line + 1;
+        this.select([{ anchor: offset, head: offset }]);
     }
 
     setSelection(range: EditorRange, reveal: EditorReveal = 'relative'): void {
         this.lastReveal = reveal;
-        this.caret = range.end;
-        this.selection = range;
-        emit(this.carets, range.end);
+        this.select([{ anchor: this.offsetAt(range.start), head: this.offsetAt(range.end) }]);
     }
 
-    /* The caret a person's click or key moved. */
+    private select(selections: readonly OffsetSelection[]): void {
+        this.selections = normalized(this.text, selections);
+        this.announceCaret();
+    }
+
+    /* The caret a person's click or key moved, which the caret listeners hear even where it already was, so a test can replay a move. The other carets stay. */
     moveCaret(position: EditorPosition): void {
-        this.caret = position;
-        this.selection = null;
-        emit(this.carets, position);
+        const offset = this.offsetAt(position);
+        this.selections = normalized(this.text, [...this.selections.slice(0, -1), { anchor: offset, head: offset }]);
+        this.caretOffset = this.selections.at(-1)!.head;
+        emit(this.carets, positionIn(this.text, this.caretOffset));
     }
 
     onCaret(listener: (position: EditorPosition) => void): () => void {
@@ -807,44 +1030,25 @@ export class FakeEditor implements Editor {
         return [...this.keys].some((handler) => handler(full));
     }
 
-    /* The fake keeps no undo history, so `mergeUndo` changes nothing here. It keeps no selection direction either, so a test of `mapSelections` keeping a backward selection needs the real editor. */
     applyEdits(edits: readonly EditorContentChange[], options: EditorApplyEditsOptions = {}): boolean {
-        if (this.readOnly || edits.length === 0) {
+        const ordered = orderedEdits(edits.map((edit) => ({ from: this.offsetAt(edit.range.start), to: this.offsetAt(edit.range.end), text: edit.text })));
+        if (this.readOnly || ordered === null || ordered.length === 0) {
             return false;
         }
-        let text = this.text;
-        const ordered = edits
-            .map((edit) => ({ from: this.offsetAt(edit.range.start), to: this.offsetAt(edit.range.end), text: edit.text }))
-            .sort((a, b) => b.from - a.from);
-        for (const edit of ordered) {
-            text = text.slice(0, edit.from) + edit.text + text.slice(edit.to);
-        }
-        // The other carets follow the text as the real editor's do: one inside a replaced stretch ends behind what replaced it.
-        const others = this.otherSelections.map((range) => ({ anchor: this.offsetAt(range.start), head: this.offsetAt(range.end) }));
-        const follow = (offset: number): number => {
-            let delta = 0;
-            for (const edit of [...ordered].reverse()) {
-                if (offset < edit.from) {
-                    break;
-                }
-                if (offset < edit.to || (offset === edit.from && edit.from === edit.to)) {
-                    return edit.from + delta + edit.text.length;
-                }
-                delta += edit.text.length - (edit.to - edit.from);
-            }
-            return offset + delta;
-        };
-        const moved = others.map((range) => ({ anchor: follow(range.anchor), head: follow(range.head) }));
-        const mapped = options.mapSelections && this.getSelections().map((range) => options.mapSelections!(range));
-        this.replaceText(text, 'command', mapped);
-        if (mapped === undefined) {
-            this.otherSelections = moved.map((range) => ({
-                start: positionIn(text, Math.min(range.anchor, range.head)),
-                end: positionIn(text, Math.max(range.anchor, range.head))
-            }));
-        }
-        emit(this.changes);
-        return true;
+        const { mapSelections } = options;
+        const mapped =
+            mapSelections &&
+            this.selections.map((selection) => ({ backward: selection.head < selection.anchor, range: mapSelections(rangeIn(this.text, selection)) }));
+        // A backward selection stays backward, as the real editor places it.
+        const place =
+            mapped &&
+            ((text: string): OffsetSelection[] =>
+                mapped.map(({ backward, range }) => {
+                    const from = offsetIn(text, range.start);
+                    const to = offsetIn(text, range.end);
+                    return backward ? { anchor: to, head: from } : { anchor: from, head: to };
+                }));
+        return this.edit(ordered, 'command', options.mergeUndo === true, place);
     }
 
     setTheme(theme: EditorTheme): void {
@@ -864,12 +1068,12 @@ export class FakeEditor implements Editor {
         return this.readOnly;
     }
 
-    /* The commands run, in order; the fake has no commands of its own to carry out. */
+    /* The commands run, in order; of its own the fake carries out only undo and redo. */
     readonly commands: EditorRunCommand[] = [];
 
     runCommand(command: EditorRunCommand): boolean {
         this.commands.push(command);
-        return false;
+        return command === 'undo' || command === 'redo' ? this.restore(command) : false;
     }
 
     focus(): void {

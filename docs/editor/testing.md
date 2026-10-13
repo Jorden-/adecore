@@ -52,4 +52,4 @@ editor.type('two'); // the whole text becomes 'two'
 editor.save();
 ```
 
-The fake is coarser than the editor. `type` replaces the whole text and reports the one stretch that changed, so a tracked range is lost sooner than in the real editor. `runCommand` only records the command, and `find` counts plain occurrences. Use `mountEditor` for anything that depends on how the text changes.
+The fake keeps the text, the selections and the history as the editor does: lines end at `\r\n`, a lone `\r` or `\n`, selections that overlap merge, the carets follow `applyEdits` and `setText`, and undo and redo take back a step. One contract test runs against both, so the two stay in step. It is coarser elsewhere. `type` replaces the whole text and reports the one stretch that changed, so a tracked range in that stretch is lost sooner than in the real editor. `runCommand` records every command and carries out only undo and redo, and `find` counts plain occurrences. Use `mountEditor` for anything that depends on keys, commands or drawing.

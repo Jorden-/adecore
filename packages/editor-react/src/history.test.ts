@@ -53,7 +53,7 @@ describe('back and forward', () => {
         editor.moveCaret(at(2, 4));
         await language.navigation.go('definition');
         expect(visits).toEqual([{ uri: other, position: at(5, 3) }]);
-        const secondEditor = engine.mount({} as HTMLElement, { text: '\n\n\n\n\n\n', theme: 'light' });
+        const secondEditor = engine.mount({} as HTMLElement, { text: '\n\n\n\n\nlet target = 1;\n', theme: 'light' });
         const second = new EditorLanguage(project, secondEditor, other, 'typescript', new ManualTimers());
         open.push(second);
         await second.document.ready;
