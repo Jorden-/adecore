@@ -41,6 +41,14 @@ The view's `setText` does exactly this.
 scanBrackets('call(items[0]').pairs; // Map { 10 => 12, 12 => 10 }
 ```
 
+`document.matchBracket(offset, language?, limit?)` pairs the one bracket at `offset` as `scanBrackets` would, without lexing the whole document for it. The document keeps the lexer's state at checkpoints a few kilobytes apart, so after an edit it lexes only the stretch the edit is in, and a far mate costs a walk over the checkpoints. It returns a `BracketMatch` whose `mate` is the offset of the partner, or `undefined` for a bracket without one, and `undefined` itself where no bracket of the code stands, such as in a string or a comment. With `limit` it lexes at most about that many characters and returns `null` when that was not enough; the work is kept, so asking again goes on from there. A view that highlights the brackets at the carets passes a limit per frame, so an edit at many carets of a large document never holds up a keystroke.
+
+```ts
+const document = new DocumentModel('call(items[0])');
+document.matchBracket(4); // { mate: 13 }
+document.matchBracket(13); // { mate: 4 }
+```
+
 ## Words
 
 `isWordBoundary(text, offset, camel, isStart)` says whether a word starts or ends at an offset, where a run of punctuation counts as a word. `isHumpBoundary(text, offset, isStart)` says whether the offset splits a camel hump, a digit run or an underscore from the word around it. `wordBoundary(text, offset, direction, camel?)` returns the next stop in a direction, never inside a surrogate pair or between `\r` and `\n`. `text` is a string or any `WordText`: an object with `length` and `charAt`.
@@ -64,7 +72,7 @@ scanBrackets('call(items[0]').pairs; // Map { 10 => 12, 12 => 10 }
 | `EditorCommand`, `CommandOptions`, `TypeTextOptions`                                         | Commands and their options                                              |
 | `FindOptions`, `FindNextOptions`, `FindMatch`, `ReplaceOptions`, `ReplaceAllOptions`         | Search                                                                  |
 | `FoldingOptions`, `FoldingRange`, `FoldRole`, `FoldHints`, `FoldSymbolHint`, `FoldRangeHint` | Folding                                                                 |
-| `TextSpan`, `BracketIndex`, `WordText`                                                       | Helper results and inputs                                               |
+| `TextSpan`, `BracketIndex`, `BracketMatch`, `WordText`                                       | Helper results and inputs                                               |
 
 Large dense edit batches rebuild the rope in one pass and emit one `contentEdits` stretch covering the changed region. Small or sparse batches retain separate content edits and share unchanged rope branches. In both cases the snapshot keeps the individual offset changes for annotations, maps selections with their existing affinity, and records one undo step.
 

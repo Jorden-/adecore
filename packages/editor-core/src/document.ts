@@ -14,7 +14,8 @@ import { lexicalFolds } from './lexical-folds.ts';
 import { rangeOf, whitespaceOf } from './line-text.ts';
 import { isQuote, replacesComparison, surround, swapQuotes } from './typing-handlers.ts';
 import { scanBrackets } from './brackets.ts';
-import type { BracketIndex } from './brackets.ts';
+import type { BracketIndex, BracketMatch } from './brackets.ts';
+import { BracketTracker } from './bracket-tracker.ts';
 import { hasSmartSemicolon, isPhp } from './lexical.ts';
 import { clampInteger, TextRope, ROPE_CHUNK_SIZE } from './rope.ts';
 import type { DocumentLine } from './rope.ts';
@@ -323,6 +324,17 @@ function editsOf(rope: TextRope, edits: readonly TextEdit[]): ContentEdit[] {
  * either end, and is a little more than the change when two of them are far apart.
  */
 function stretchEdits(before: TextRope, after: TextRope, transactions: readonly (readonly DocumentChange[])[]): ContentEdit[] {
+    const stretch = stretchOf(before, after, transactions);
+    if (stretch === undefined) {
+        return [];
+    }
+    return [
+        { start: positionIn(before, stretch.from), end: positionIn(before, stretch.to), text: after.slice(stretch.from, stretch.from + stretch.insertedLength) }
+    ];
+}
+
+/* The one change in the coordinates of `before` that holds every change of the transactions, or undefined when they change nothing. */
+function stretchOf(before: TextRope, after: TextRope, transactions: readonly (readonly DocumentChange[])[]): DocumentChange | undefined {
     let length = before.length;
     let prefix = Number.POSITIVE_INFINITY;
     let suffix = Number.POSITIVE_INFINITY;
@@ -336,15 +348,15 @@ function stretchEdits(before: TextRope, after: TextRope, transactions: readonly 
         length += delta;
     }
     if (!Number.isFinite(prefix)) {
-        return [];
+        return undefined;
     }
     const kept = Math.min(Math.max(0, suffix), before.length - prefix, after.length - prefix);
     const oldEnd = before.length - kept;
     const newEnd = after.length - kept;
     if (oldEnd === prefix && newEnd === prefix) {
-        return [];
+        return undefined;
     }
-    return [{ start: positionIn(before, prefix), end: positionIn(before, oldEnd), text: after.slice(prefix, newEnd) }];
+    return { from: prefix, to: oldEnd, insertedLength: newEnd - prefix };
 }
 
 /* An occurrence selected with its caret `shift` characters into it, as the caret stood in the selection it repeats. */
@@ -382,6 +394,7 @@ export class DocumentModel {
     occurrencesExhausted = false;
     private closers = new CloserTracker();
     private bracketCache?: { revision: number; language: string; index: BracketIndex };
+    private bracketTracker = new BracketTracker(() => this.rope);
     private scriptCache?: { revision: number; sources: Map<number, { limit: number; text?: string; index?: BracketIndex }> };
 
     constructor(text = '') {
@@ -415,6 +428,16 @@ export class DocumentModel {
     /* Plain UTF-16 substring semantics, so it can cut a surrogate pair in half. */
     slice(from: number, to: number): string {
         return this.rope.slice(from, to);
+    }
+
+    /*
+     * Where the bracket at `offset` pairs, as `scanBrackets` pairs it, with no mate for one it leaves unmatched.
+     * Undefined where no bracket of the code stands, such as in a string or a comment. An edit lexes only the few
+     * kilobytes around it again, so this stays cheap on every keystroke of a large document. With `limit` it lexes
+     * at most about that many characters and returns null when that was not enough; asking again goes on from there.
+     */
+    matchBracket(offset: number, language = 'typescript', limit?: number): BracketMatch | null | undefined {
+        return this.bracketTracker.match(offset, language, limit);
     }
 
     getSelections(): readonly Selection[] {
@@ -516,15 +539,16 @@ export class DocumentModel {
         const before = this.state();
         const firstLine = this.rope.lineAt(changed[0]!.from);
         const previous = this.rope;
+        const changes = changed.map((edit) => ({ from: edit.from, to: edit.to, insertedLength: edit.text.length }));
         this.rope = next;
         this.invalidate();
         this.typingContexts.invalidate(firstLine);
+        this.bracketTracker.edited(previous, next, changes);
         this.selections = normalizeSelections(this.rope, nextSelections);
         this.closers.map(changed);
         this.closers.prune(this.selections);
         this.revision++;
         const after = this.state();
-        const changes = changed.map((edit) => ({ from: edit.from, to: edit.to, insertedLength: edit.text.length }));
         const last = this.undoStack.at(-1);
         const joinsGroup =
             options.historyGroup &&
@@ -2211,6 +2235,8 @@ export class DocumentModel {
         this.invalidate();
         this.closers.clear();
         this.typingContexts.invalidate();
+        const stretch = stretchOf(previous, state.rope, changes);
+        this.bracketTracker.edited(previous, state.rope, stretch === undefined ? [] : [stretch]);
         this.selections = state.selections.map((selection) => ({ ...selection }));
         this.revision++;
         this.groupOpen = false;

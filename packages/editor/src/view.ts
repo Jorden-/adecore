@@ -9,8 +9,6 @@ import {
     type FoldingRange,
     indentationColumn,
     replacementText,
-    scanBrackets,
-    type BracketIndex,
     type Selection as EditorSelection
 } from '@adecore/editor-core';
 import { createSearchClient, type EditorSearchClientOptions } from './search-client.ts';
@@ -124,6 +122,8 @@ const MIN_OVERSCAN = 400;
 const COLOR_SLICE_MS = 8;
 const FIRST_PAINT_MS = 12;
 const FOLD_DELAY_MS = 300;
+/* How much text one frame lexes to pair the brackets at the carets; a large document edited all over takes a few frames. */
+const BRACKET_FRAME_LIMIT = 256 * 1024;
 
 /* The space between the last character of a line and what the host puts after it. */
 const LINE_ACTION_GAP = 28;
@@ -308,11 +308,11 @@ export class EditorView {
     /* The folds somebody already decided on, a person or the defaults, so a later answer of a server leaves them as they are. */
     private settled = new Set<number>();
     private foldTimer: ReturnType<typeof setTimeout> | undefined;
+    private bracketTimer: ReturnType<typeof setTimeout> | undefined;
     private colorTimer: ReturnType<typeof setTimeout> | undefined;
     private noticeTimer: ReturnType<typeof setTimeout> | undefined;
     private liveTimer: ReturnType<typeof setTimeout> | undefined;
     private lineLabelProvider: ((line: number) => string | null) | null = null;
-    private bracketCache: { revision: number; language: string | undefined; index: BracketIndex } | undefined;
     private wrapWidth: number | null = null;
     /* The offset a click past the end of a wrapped visual line chose, which its caret is drawn at the end of that line for. */
     private rowEndCaret: number | null = null;
@@ -968,7 +968,7 @@ export class EditorView {
                 ranges,
                 this.model,
                 (from, to) => this.model.slice(from, to),
-                (offset) => this.brackets().pairs.get(offset)
+                (offset) => this.model.matchBracket(offset, this.settings.language)?.mate
             )
         );
         const anchors = new Set(this.foldRanges.map((range) => range.from));
@@ -1331,25 +1331,16 @@ export class EditorView {
         return candidates.find((at) => at >= 0 && /[()[\]{}]/.test(this.model.slice(at, at + 1)));
     }
 
-    private brackets(): BracketIndex {
-        if (this.bracketCache?.revision !== this.revision || this.bracketCache.language !== this.settings.language) {
-            this.bracketCache = {
-                revision: this.revision,
-                language: this.settings.language,
-                index: scanBrackets(this.model.getText(), this.settings.language)
-            };
-        }
-        return this.bracketCache.index;
-    }
-
     /* The offset a bracket at the caret pairs with, if it is one. */
     matchingBracket(selection: { anchor: number; head: number }): { at: number; mate: number | undefined } | null {
         const at = this.bracketAt(Math.min(selection.anchor, selection.head), Math.max(selection.anchor, selection.head), selection.head);
-        return at === undefined ? null : { at, mate: this.brackets().pairs.get(at) };
+        return at === undefined ? null : { at, mate: this.model.matchBracket(at, this.settings.language)?.mate };
     }
 
-    unmatchedBracket(at: number): boolean {
-        return this.brackets().unmatched.has(at);
+    /* Draws the highlights of the brackets at the carets that the last frame ran out of lexing for. */
+    private scheduleBrackets(): void {
+        clearTimeout(this.bracketTimer);
+        this.bracketTimer = setTimeout(() => this.requestRender(), 0);
     }
 
     /* A point of the screen in the coordinates of the content, undoing the scale a canvas puts on a node. */
@@ -2199,18 +2190,28 @@ export class EditorView {
             }
         }
         const seen = new Set<number>();
-        for (const selection of selections) {
-            const bracket = this.matchingBracket(selection);
-            if (!bracket) {
+        for (const [index, selection] of selections.entries()) {
+            // A caret off screen has no bracket to draw, except the primary one, whose mate may be on screen.
+            if (index < selections.length - 1 && (selection.head < visibleFrom - 1 || selection.head > visibleTo + 1)) {
                 continue;
             }
-            if (bracket.mate === undefined) {
-                if (this.unmatchedBracket(bracket.at)) {
-                    marks.push({ className: 'se-bracket-unmatched', rects: this.paintRectangles(bracket.at, bracket.at + 1, rows) });
-                }
+            const at = this.bracketAt(Math.min(selection.anchor, selection.head), Math.max(selection.anchor, selection.head), selection.head);
+            if (at === undefined) {
                 continue;
             }
-            for (const offset of [bracket.at, bracket.mate]) {
+            const match = this.model.matchBracket(at, this.settings.language, BRACKET_FRAME_LIMIT);
+            if (match === null) {
+                this.scheduleBrackets();
+                break;
+            }
+            if (match === undefined) {
+                continue;
+            }
+            if (match.mate === undefined) {
+                marks.push({ className: 'se-bracket-unmatched', rects: this.paintRectangles(at, at + 1, rows) });
+                continue;
+            }
+            for (const offset of [at, match.mate]) {
                 if (!seen.has(offset)) {
                     seen.add(offset);
                     marks.push({ className: 'se-bracket-match', rects: this.paintRectangles(offset, offset + 1, rows) });
@@ -2811,6 +2812,7 @@ export class EditorView {
         this.subscription.dispose();
         this.resizeObserver?.disconnect();
         this.blockObserver?.disconnect();
+        clearTimeout(this.bracketTimer);
         clearTimeout(this.foldTimer);
         clearTimeout(this.colorTimer);
         clearTimeout(this.noticeTimer);

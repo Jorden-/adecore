@@ -183,6 +183,19 @@ describe('brackets', () => {
         model.setSelections([{ anchor: 2, head: 2 }]);
         expect(host.querySelectorAll('.se-bracket-unmatched').length).toBe(1);
     });
+
+    test('marks the mates a frame had no time to lex for in the frames after it', async () => {
+        const { host, model, view } = mount(`${'const value = compute(alpha, beta);\n'.repeat(60_000)}f(a)`);
+        const caret = model.getLength() - 2;
+        model.setSelections([{ anchor: caret, head: caret }]);
+        view.revealCaret();
+        view.render();
+        expect(host.querySelectorAll('.se-bracket-match').length).toBe(0);
+        for (let frame = 0; frame < 40 && host.querySelectorAll('.se-bracket-match').length === 0; frame++) {
+            await new Promise((resolve) => setTimeout(resolve, 5));
+        }
+        expect(host.querySelectorAll('.se-bracket-match').length).toBe(2);
+    });
 });
 
 describe('the notice', () => {

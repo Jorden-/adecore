@@ -1,7 +1,9 @@
 export const openers: Readonly<Record<string, string>> = { '(': ')', '[': ']', '{': '}' };
 
 /* Words after which a `/` starts a regex and a `{` an object or a block, not a division or a statement end. */
-const expressionWords = /^(return|throw|case|yield|await|new|delete|typeof|void|in|of|instanceof)$/;
+const expressionWords = new Set(['return', 'throw', 'case', 'yield', 'await', 'new', 'delete', 'typeof', 'void', 'in', 'of', 'instanceof']);
+const expressionInitials = new Set([...expressionWords].map((word) => word[0]));
+const expressionPunctuation = new Set('=,:;!?+-*%&|^~<>');
 
 /* Whether a `#` at this index stands where a word would start, after whitespace, a separator or an opener. */
 export function startsWord(text: string, at: number): boolean {
@@ -100,14 +102,23 @@ export function hasSmartSemicolon(language: string): boolean {
 }
 
 export function isWordCharacter(character: string): boolean {
+    const code = character.charCodeAt(0);
+    if (code < 128) {
+        return (code >= 97 && code <= 122) || (code >= 65 && code <= 90) || (code >= 48 && code <= 57) || code === 95 || code === 36;
+    }
     return /[\p{L}\p{N}_$]/u.test(character);
 }
 
 export function startsExpression(word: string): boolean {
-    return expressionWords.test(word);
+    return expressionWords.has(word);
+}
+
+/* `startsExpression` for the word from `from` to `to` in `text`, which cuts the word out only when it could be one. */
+export function startsExpressionAt(text: string, from: number, to: number): boolean {
+    return to - from >= 2 && to - from <= 10 && expressionInitials.has(text[from]!) && expressionWords.has(text.slice(from, to));
 }
 
 /* Whether what follows a punctuation character is an expression, so a `/` there is a regex. */
 export function startsExpressionAfter(character: string): boolean {
-    return /[=,:;!?+\-*%&|^~<>]/.test(character);
+    return expressionPunctuation.has(character);
 }
