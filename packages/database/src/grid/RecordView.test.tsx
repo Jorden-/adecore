@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import i18next from 'i18next';
 import { UIProvider } from '@adecore/ui';
+import { setFormatSource } from '@adecore/ui/format';
+import { fakeFormatSource } from '@adecore/ui/testing';
 import { DatabaseProvider } from '../DatabaseProvider.tsx';
 import type { DatabaseClient } from '../client/types.ts';
 import { EnumPicker } from './EnumPicker.tsx';
@@ -55,6 +57,31 @@ describe('RecordView', () => {
         expect(markup).toContain('>varchar(255)</span>');
         expect(markup).toContain('value="Ada"');
         expect(markup).toContain('value="7"');
+    });
+
+    test('keeps identifiers exact in read-only fields while amounts use region notation', () => {
+        const source = fakeFormatSource();
+        source.set({ region: 'nl-NL' });
+        const previous = setFormatSource(source);
+        try {
+            const markup = renderToStaticMarkup(
+                <UIProvider i18n={i18n} formatSource={source}>
+                    <DatabaseProvider client={{} as DatabaseClient} numberNotation="region">
+                        {view(0, {
+                            columns: [
+                                { name: 'person_id', type: 'bigint', kind: 'integer' },
+                                { name: 'amount', type: 'decimal(10,2)', kind: 'decimal' }
+                            ],
+                            rows: [{ key: 'row:0', number: 1, cells: ['9007199254740993', '12900.50'] }]
+                        })}
+                    </DatabaseProvider>
+                </UIProvider>
+            );
+            expect(markup).toContain('value="9007199254740993"');
+            expect(markup).toContain('value="12.900,50"');
+        } finally {
+            setFormatSource(previous);
+        }
     });
 
     test('shows NULL and DEFAULT as placeholders of an empty field', () => {

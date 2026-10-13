@@ -9,7 +9,7 @@ import { CODE_TEXT } from '../code-text.ts';
 import type { EditValue, Value } from '../protocol/index.ts';
 import { ValueEditor } from '../value/ValueEditor.tsx';
 import { isNumericKind } from '../sql.ts';
-import { cellView, copyTextOf, isPreview, numeralText, type NumberNotation } from './display.ts';
+import { columnNotation, cellView, copyTextOf, isPreview, numeralText, type NumberNotation } from './display.ts';
 import { draftOf, parseDraft } from './edit-value.ts';
 import { parseEnumType } from './enum-type.ts';
 import { EnumPicker } from './EnumPicker.tsx';
@@ -313,7 +313,7 @@ export function RecordView({
                                                 ref={(node) => {
                                                     fields.current[position] = node;
                                                 }}
-                                                value={active ? editing.draft : textOf(cell, column.kind, notation, !editableField)}
+                                                value={active ? editing.draft : textOf(cell, column.kind, columnNotation(column, notation), !editableField)}
                                                 placeholder={placeholder}
                                                 readOnly={!editableField || (preview && (!active || editing.loading))}
                                                 className={clsx(CODE_TEXT, 'min-w-0 flex-1', row.state === 'deleted' && 'line-through')}

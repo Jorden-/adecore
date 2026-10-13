@@ -29,7 +29,7 @@ import { NO_COLUMN_SELECTION, selectColumn, shownSelection, type ColumnSelection
 import { displayOrder, hideColumn, pinnedCount, showAllColumns, togglePin, type ColumnView } from './column-view.ts';
 import { COPY_FORMATS, formatCopy, type CopyFormat, type CopyInput } from './copy-formats.ts';
 import { CopyAsMenu } from './CopyAsMenu.tsx';
-import { cellView, copyTextOf, isPreview, type CellView, type NumberNotation } from './display.ts';
+import { columnNotation, cellView, copyTextOf, isPreview, type CellView, type NumberNotation } from './display.ts';
 import { draftOf, parseDraft } from './edit-value.ts';
 import { parseEnumType } from './enum-type.ts';
 import { GridHeaderCell, type HeaderActions } from './GridHeaderCell.tsx';
@@ -130,7 +130,7 @@ const estimateWidths = (columns: readonly GridColumn[], rows: readonly GridRow[]
     columns.map((column, index) =>
         estimateColumnWidth(
             column.name,
-            rows.slice(0, 50).map((row) => textOf(cellView(row.cells[index] ?? null, column.kind, notation))),
+            rows.slice(0, 50).map((row) => textOf(cellView(row.cells[index] ?? null, column.kind, columnNotation(column, notation)))),
             column.primaryKey === true
         )
     );
@@ -610,7 +610,7 @@ export function DataGrid({
                 index,
                 fitColumnWidth(
                     column.name,
-                    rows.map((row) => textOf(cellView(row.cells[index] ?? null, column.kind, notation))),
+                    rows.map((row) => textOf(cellView(row.cells[index] ?? null, column.kind, columnNotation(column, notation)))),
                     column.primaryKey === true
                 )
             );

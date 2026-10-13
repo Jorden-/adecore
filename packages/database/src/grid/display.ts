@@ -1,6 +1,7 @@
 import { formatBytes, formatNumeral } from '@adecore/ui/format';
 import type { BinaryValue, Cell, EditValue, ValueKind } from '../protocol/index.ts';
 import { isNumericKind } from '../sql.ts';
+import type { GridColumn } from './types.ts';
 
 /* What a cell shows: a cell of a result, or the column's default for a value an edit set to `DEFAULT`. */
 export type Shown = Cell | { readonly kind: 'default' };
@@ -46,6 +47,18 @@ export const numeralText = (numeral: string | number, notation: NumberNotation):
     const formatted = formatNumeral(numeral);
     return formatted === String(numeral).trim() ? String(numeral) : formatted;
 };
+
+/* Identifiers are labels, even when the database stores their characters as a number. */
+export function columnNotation(column: GridColumn, notation: NumberNotation): NumberNotation {
+    const identifierName = (name: string): boolean => /^(?:id|.+_id)$/i.test(name) || /(?:Id|ID)$/.test(name);
+    return column.primaryKey === true ||
+        column.foreignKey === true ||
+        column.autoIncrement === true ||
+        identifierName(column.name) ||
+        (column.source !== undefined && identifierName(column.source.column))
+        ? 'database'
+        : notation;
+}
 
 const cut = (text: string): string => (text.length > DISPLAY_LIMIT ? `${text.slice(0, DISPLAY_LIMIT)}${ELLIPSIS}` : text);
 

@@ -204,10 +204,31 @@ describe('DataGrid numbers in a Dutch region', () => {
 
     test('draws the cells of numeric columns in the region notation', () => {
         const markup = renderIn('region');
-        expect(markup).toContain('>9.007.199.254.740.993<');
+        expect(markup).toContain('>9007199254740993<');
         expect(markup).toContain('>12.900,50<');
         expect(markup).toContain('>-0,25<');
         expect(markup).toContain('>1234<');
+    });
+
+    test('keys and ID names stay exact while an ordinary integer uses region notation', () => {
+        const identifierColumns: GridColumn[] = [
+            { name: 'serial', kind: 'integer', type: 'int', primaryKey: true },
+            { name: 'owner', kind: 'integer', type: 'int', foreignKey: true },
+            { name: 'sequence', kind: 'integer', type: 'int', autoIncrement: true },
+            { name: 'person_id', kind: 'integer', type: 'int' },
+            { name: 'personId', kind: 'integer', type: 'int' },
+            { name: 'alias', kind: 'integer', type: 'int', source: { schema: 'app', table: 'person', column: 'person_id' } },
+            { name: 'paid', kind: 'integer', type: 'int' }
+        ];
+        const markup = renderToStaticMarkup(
+            <UIProvider i18n={i18n} formatSource={source}>
+                <DatabaseProvider client={client} numberNotation="region">
+                    <DataGrid label="Identifiers" columns={identifierColumns} rows={[{ key: 'row', number: 1, cells: identifierColumns.map(() => 1234567) }]} />
+                </DatabaseProvider>
+            </UIProvider>
+        );
+        expect(markup.match(/>1234567</g)).toHaveLength(6);
+        expect(markup).toContain('>1.234.567<');
     });
 
     test('draws them as the server wrote them in the database notation', () => {

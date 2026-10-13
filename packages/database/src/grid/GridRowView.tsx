@@ -5,7 +5,7 @@ import { formatNumber } from '@adecore/ui/format';
 import { CODE_TEXT } from '../code-text.ts';
 import { CellEditor, type EditMove } from './CellEditor.tsx';
 import { cellIdOf } from './cell-id.ts';
-import { cellView, type CellView, type NumberNotation } from './display.ts';
+import { columnNotation, cellView, type CellView, type NumberNotation } from './display.ts';
 import type { EnumType } from './enum-type.ts';
 import { EnumPicker } from './EnumPicker.tsx';
 import { ROW_HEIGHT } from './layout.ts';
@@ -88,7 +88,7 @@ export const GridRowView = memo(function GridRowView({ row, index, selected, foc
     const cells = order.map((columnIndex, position) => {
         const column = columns[columnIndex]!;
         const cell = row.cells[columnIndex] ?? null;
-        const view = cellView(cell, column.kind, notation);
+        const view = cellView(cell, column.kind, columnNotation(column, notation));
         const cellPosition = { row: index, column: columnIndex };
         const isFocused = focusedColumn === columnIndex;
         const ranged = picked.has(columnIndex) || (position >= rangeStart && position <= rangeEnd && rangeStart >= 0);
