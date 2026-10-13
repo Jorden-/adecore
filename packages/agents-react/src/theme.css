@@ -184,6 +184,15 @@
     --tw-prose-th-borders: var(--border);
     --tw-prose-td-borders: var(--border);
 }
+/* A muted `Markdown`, such as a thought the model had before it answered. */
+.prose.chat-markdown[data-muted] {
+    --tw-prose-body: var(--text-muted);
+    --tw-prose-headings: var(--text-muted);
+    --tw-prose-bold: var(--text-muted);
+    --tw-prose-quotes: var(--text-muted);
+    --tw-prose-code: var(--text-muted);
+    --tw-prose-pre-code: var(--text-muted);
+}
 /* Headings stay on the app's scale, which is flatter than the one prose brings. */
 .chat-markdown :is(h1, h2, h3, h4) { font-weight: 600; line-height: round(1.3em, 1px); }
 .chat-markdown h1 { font-size: var(--text-lg); }

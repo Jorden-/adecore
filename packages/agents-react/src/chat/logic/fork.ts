@@ -133,6 +133,7 @@ export function turnIdOfRow(row: TimelineRow): string | null {
         case 'user':
         case 'assistant':
         case 'thinking':
+        case 'live-thought':
         case 'subagent':
         case 'approval':
         case 'question':

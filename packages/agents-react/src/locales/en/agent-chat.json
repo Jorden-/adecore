@@ -103,7 +103,8 @@
     },
     "thinking": {
       "live": "Thinking…",
-      "thoughtFor": "Thought for {{duration}}"
+      "thoughtFor": "Thought for {{duration}}",
+      "thought": "Thought"
     },
     "note": {
       "hide": "Hide",

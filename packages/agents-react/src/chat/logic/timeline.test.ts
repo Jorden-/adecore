@@ -429,6 +429,52 @@ describe('thinking rows', () => {
     });
 });
 
+describe('the live thought', () => {
+    const running: ChatItem = { id: 't2', kind: 'turn', createdAt: 1000, turnId: 't2', state: 'running', endedAt: null, costUsd: 0 };
+    const asked: ChatItem = { id: 'u2', kind: 'user', createdAt: 1000, turnId: 't2', text: 'fix it' };
+    const thought = (id: string, text = 'The entry is written first.'): ChatItem => ({
+        id,
+        kind: 'thinking',
+        createdAt: 1000,
+        turnId: 't2',
+        text,
+        streaming: false,
+        endedAt: 2000
+    });
+    const call = (id: string, state: ChatToolItem['state']): ChatToolItem => ({ ...tool(id, 'Bash', { command: 'bun test' }, state, 't2'), createdAt: 3000 });
+    const kinds = (items: ChatItem[], activeTurnId: string | null = 't2') => deriveTimelineRows(items, { ...options, activeTurnId }).map((row) => row.kind);
+
+    test('stands over the running call the latest thought led to', () => {
+        const rows = deriveTimelineRows([running, asked, thought('k1'), call('r1', 'done'), call('b1', 'running')], { ...options, activeTurnId: 't2' });
+        expect(rows.map((row) => row.kind)).toEqual(['user', 'thinking', 'work', 'live-thought', 'work-live', 'working']);
+        expect(rows[3]).toMatchObject({ id: 'live-thought-k1', item: { id: 'k1' }, at: 3000 });
+    });
+
+    test('is left out where the thought stands right above the call', () => {
+        expect(kinds([running, asked, thought('k1'), call('b1', 'running')])).toEqual(['user', 'thinking', 'work-live', 'working']);
+    });
+
+    test('follows only the latest thought, and none that came after the call', () => {
+        const rows = deriveTimelineRows([running, asked, thought('k1'), call('r1', 'done'), thought('k2'), call('r2', 'done'), call('b1', 'running')], {
+            ...options,
+            activeTurnId: 't2'
+        });
+        expect(rows.find((row) => row.kind === 'live-thought')).toMatchObject({ id: 'live-thought-k2' });
+        expect(kinds([running, asked, call('r1', 'done'), call('b1', 'running'), thought('k1')])).not.toContain('live-thought');
+    });
+
+    test('waits for a call that runs and for a thought with words', () => {
+        expect(kinds([running, asked, thought('k1'), call('r1', 'done'), call('r2', 'done')])).not.toContain('live-thought');
+        expect(kinds([running, asked, thought('k1', ''), call('r1', 'done'), call('b1', 'running')])).not.toContain('live-thought');
+    });
+
+    test('is gone once the turn settles', () => {
+        const settled: ChatItem = { ...running, state: 'done', endedAt: 9000 } as ChatTurnItem;
+        const items = [settled, asked, thought('k1'), call('r1', 'done'), call('b1', 'running')];
+        expect(deriveTimelineRows(items, { ...options, expandedTurns: new Set(['t2']) }).map((row) => row.kind)).not.toContain('live-thought');
+    });
+});
+
 test("a subagent's handback call reads as its report, and one without a message stays a tool call", () => {
     const items: ChatItem[] = [
         tool('b1', 'Bash', { command: 'git diff' }, 'done', 'x'),

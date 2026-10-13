@@ -326,23 +326,28 @@ export const MessageMarkdown = memo(function MessageMarkdown({ text, mentions, s
     );
 });
 
-/* `breaks` is for person-authored notes; applying it to CLI markdown would change its layout. */
+/*
+ * `breaks` is for person-authored notes; applying it to CLI markdown would change its layout. `muted`
+ * sets the text a step back, for what stands beside an answer rather than being one.
+ */
 export const Markdown = memo(function Markdown({
     text,
     breaks = false,
     fileLinks = true,
+    muted = false,
     rehypePlugins,
     componentOverrides
 }: {
     text: string;
     breaks?: boolean;
     fileLinks?: boolean;
+    muted?: boolean;
     rehypePlugins?: Options['rehypePlugins'];
     componentOverrides?: Components;
 }) {
     const renderComponents = useMemo(() => ({ ...(fileLinks ? components : plainComponents), ...componentOverrides }), [fileLinks, componentOverrides]);
     return (
-        <div className="chat-markdown prose prose-sm max-w-none text-sm">
+        <div className="chat-markdown prose prose-sm max-w-none text-sm" data-muted={muted || undefined}>
             <ReactMarkdown remarkPlugins={breaks ? PLUGINS_WITH_BREAKS : PLUGINS} rehypePlugins={rehypePlugins} components={renderComponents}>
                 {text}
             </ReactMarkdown>

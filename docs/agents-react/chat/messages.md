@@ -14,7 +14,7 @@ Three renderers, for three kinds of text. All of them write GitHub-flavored Mark
 
 - `MessageMarkdown({ text, mentions?, skills? })` is what a person sent. A line break is a line break, a tag typed without backticks stays text, and the files and skills picked in the composer are chips again.
 - `ReplyMarkdown({ text, streaming, arriving? })` is a reply. It parses a block at a time, so a streamed word only parses the block that grows. While `streaming`, new words fade in and a code fence that is still open is highlighted as it grows; `arriving` fades in each block instead.
-- `Markdown({ text, breaks?, fileLinks?, rehypePlugins?, componentOverrides? })` is any other text, such as a note from your app. `breaks` keeps line breaks, and `fileLinks` (on by default) turns paths into links through the host's `fileLinks`.
+- `Markdown({ text, breaks?, fileLinks?, muted?, rehypePlugins?, componentOverrides? })` is any other text, such as a note from your app. `breaks` keeps line breaks, `fileLinks` (on by default) turns paths into links through the host's `fileLinks`, and `muted` sets the text a step back, the way a thought is drawn.
 
 A path becomes a link only when the host's `fileLinks.target(text, cwd)` finds one in it. `FileLinkContext` gives the folder a relative path counts from; the thread sets it to the chat's own `cwd`.
 

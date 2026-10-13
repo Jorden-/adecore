@@ -21,13 +21,14 @@ import { jumpToTimelineItem } from '../../timeline-scroll';
 import { useProviders } from '../../../state/providers';
 import { ChatReferenceChip } from '../ChatReferenceChip';
 import { ImageThumb } from '../ImageView';
-import { MessageMarkdown, ReplyMarkdown } from '../Markdown';
+import { Markdown, MessageMarkdown, ReplyMarkdown } from '../Markdown';
 import { FadingWords } from '../FadingWords';
 import { settledBlocksText } from '../markdown-blocks';
 import { WHOLE_FADE_CLASS } from '../rehype-fade';
 import { useRevealedText } from '../reveal';
 import { formatAgo, formatElapsedShort, formatMoment, formatTokens } from '@adecore/ui/format';
 import { Icon, Tooltip, useTickingText } from '@adecore/ui';
+import { thoughtLine, thoughtPreview } from '../../logic/thought';
 import { toolSummary } from '../../logic/tools';
 import { ROW_GUTTER } from '../icons';
 import { useOpenForFind } from '../find-reveal';
@@ -329,7 +330,8 @@ export function AssistantRow({ chatId, item: derived }: { chatId: string; item: 
 
 /*
  * What the model thought before it answered. It shimmers while it streams and folds itself away
- * once the answer starts, because the thought is worth a glance and rarely worth reading twice.
+ * once the answer starts, because the thought is worth a glance and rarely worth reading twice:
+ * folded, it shows the heading it opens with or itself on one line, and opened, it reads as Markdown.
  */
 export function ThinkingRow({ chatId, item: derived }: { chatId: string; item: ChatThinkingItem }) {
     const { t } = useTranslation('agent-chat');
@@ -342,27 +344,68 @@ export function ThinkingRow({ chatId, item: derived }: { chatId: string; item: C
     // Whole, the thought stays behind "Thinking…" until it is done and then folds like any other.
     const shown = open || reveal.active || (settled !== null && settled !== '');
     const text = settled ?? reveal.text;
+    const live = useMemo(() => (item.streaming && mode !== 'whole' ? thoughtLine(text) : ''), [item.streaming, mode, text]);
+    const preview = useMemo(() => (item.streaming ? '' : thoughtPreview(item.text)), [item.streaming, item.text]);
+    const duration = formatElapsedShort((item.endedAt ?? item.createdAt) - item.createdAt);
     useOpenForFind(item.id, 'text', setOpen);
     return (
         <div data-find-item={item.id} className="-mx-1 px-1 pb-2">
-            <button className="flex items-center gap-2 text-xs text-text-muted hover:text-text" disabled={item.streaming} onClick={() => setOpen((o) => !o)}>
+            <button
+                className="flex w-full min-w-0 items-center gap-2 text-left text-xs text-text-muted hover:text-text"
+                disabled={item.streaming}
+                aria-expanded={item.streaming ? undefined : open}
+                onClick={() => setOpen((o) => !o)}
+            >
                 <span className={ROW_GUTTER}>
                     <Icon icon={Brain} size={12} />
                 </span>
                 {item.streaming ? (
-                    <span className="chat-live-text">{t('rows.thinking.live')}</span>
+                    <span className="chat-live-text min-w-0 truncate">{live || t('rows.thinking.live')}</span>
+                ) : preview === '' ? (
+                    <>
+                        <span>{t('rows.thinking.thoughtFor', { duration })}</span>
+                        <Icon icon={ChevronDown} size={12} className={clsx('shrink-0 transition-transform', open && 'rotate-180')} />
+                    </>
                 ) : (
                     <>
-                        <span>{t('rows.thinking.thoughtFor', { duration: formatElapsedShort((item.endedAt ?? item.createdAt) - item.createdAt) })}</span>
-                        <Icon icon={ChevronDown} size={12} className={clsx('transition-transform', open && 'rotate-180')} />
+                        <span className="min-w-0 truncate">{open ? t('rows.thinking.thought') : preview}</span>
+                        <span className="grow" />
+                        <span className="shrink-0 text-text-faint tabular-nums">{duration}</span>
+                        <Icon icon={ChevronDown} size={12} className={clsx('shrink-0 transition-transform', open && 'rotate-180')} />
                     </>
                 )}
             </button>
             {shown && text !== '' && (
-                <div data-find-field="text" className="mt-1 border-l border-border pl-2.5 text-sm whitespace-pre-wrap text-text-faint select-text">
-                    {reveal.active ? <FadingWords text={reveal.text} /> : text}
+                <div data-find-field="text" className="mt-1 border-l border-border pl-2.5 select-text">
+                    {reveal.active ? (
+                        <div className="text-sm whitespace-pre-wrap text-text-faint">
+                            <FadingWords text={reveal.text} />
+                        </div>
+                    ) : (
+                        <Markdown text={text} muted />
+                    )}
                 </div>
             )}
+        </div>
+    );
+}
+
+/*
+ * The latest thought of a running turn over the call it led to, as its heading or first sentence,
+ * so what the model found stays in view while it checks it. Nothing while the thought has no line yet.
+ */
+export function LiveThoughtRow({ chatId, item: derived }: { chatId: string; item: ChatThinkingItem }) {
+    const item = useCurrentItem(chatId, derived);
+    const line = useMemo(() => thoughtLine(item.text), [item.text]);
+    if (line === '') {
+        return null;
+    }
+    return (
+        <div className="-mx-1 mb-0.5 flex min-h-7 items-start gap-2 px-1 py-1 text-xs text-text-muted">
+            <span className={ROW_GUTTER}>
+                <Icon icon={Brain} size={12} />
+            </span>
+            <span className="line-clamp-4 min-w-0 wrap-anywhere select-text">{line}</span>
         </div>
     );
 }

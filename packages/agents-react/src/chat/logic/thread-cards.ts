@@ -32,6 +32,8 @@ function rowTime(row: TimelineRow): number | null {
             return row.tool.createdAt;
         case 'work-group':
             return row.tools[0]?.createdAt ?? null;
+        case 'live-thought':
+            return row.at;
         case 'working':
             return Number.POSITIVE_INFINITY;
         default:

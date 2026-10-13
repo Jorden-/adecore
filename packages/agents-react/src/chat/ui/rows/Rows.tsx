@@ -3,7 +3,18 @@ import { ErrorBoundary } from '@adecore/ui';
 import type { ThreadCard } from '../../../host';
 import type { TimelineRow } from '../../logic/timeline';
 import type { SubagentStep } from '../../subagent-view';
-import { AgentTurnRow, ApprovalHistoryRow, AssistantRow, CompactionRow, NoteRow, QuestionHistoryRow, ReportRow, ThinkingRow, UserRow } from './MessageRows';
+import {
+    AgentTurnRow,
+    ApprovalHistoryRow,
+    AssistantRow,
+    CompactionRow,
+    LiveThoughtRow,
+    NoteRow,
+    QuestionHistoryRow,
+    ReportRow,
+    ThinkingRow,
+    UserRow
+} from './MessageRows';
 import { isImageGeneration } from '../../logic/generated-image';
 import { ForksRow } from './ForksRow';
 import { GeneratedImageRow } from './GeneratedImageRow';
@@ -52,6 +63,8 @@ export function Row({ row, chatId, toggleGroup, toggleTurn, toggleSubagent, open
             return <ReportRow id={row.id} text={row.text} />;
         case 'thinking':
             return <ThinkingRow chatId={chatId} item={row.item} />;
+        case 'live-thought':
+            return <LiveThoughtRow chatId={chatId} item={row.item} />;
         case 'work':
             return isImageGeneration(row.tool) ? <GeneratedImageRow chatId={chatId} tool={row.tool} /> : <WorkRow tool={row.tool} />;
         case 'work-live':

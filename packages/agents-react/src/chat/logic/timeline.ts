@@ -45,6 +45,8 @@ export type TimelineRow =
     | { kind: 'work'; id: string; tool: ChatToolItem }
     | { kind: 'work-group'; id: string; tools: ChatToolItem[]; summary: string; expanded: boolean }
     | { kind: 'work-live'; id: string; tool: ChatToolItem }
+    // The latest thought of a running turn, repeated over the call it led to; `at` is when that call began.
+    | { kind: 'live-thought'; id: string; item: ChatThinkingItem; at: number }
     // A Workflow call the machine reports phases and agents for, drawn with them under it.
     | { kind: 'workflow'; id: string; tool: ChatToolItem; workflow: ChatWorkflow }
     | ({ kind: 'subagent' } & SubagentBranch)
@@ -363,6 +365,27 @@ function lastAssistantRow(rows: TimelineRow[]): TimelineRow | null {
     return null;
 }
 
+/*
+ * The rows of a running turn with its latest thought over the call it led to, so what the model
+ * found does not scroll away behind the next tool line. Nothing when that call follows the thought
+ * directly, where the thought's own row already shows it, or when a newer thought came after the call.
+ */
+function withLiveThought(rows: TimelineRow[], items: readonly ChatItem[]): TimelineRow[] {
+    const thoughtAt = items.findLastIndex((item) => item.kind === 'thinking' && parentOf(item) === null);
+    const thought = items[thoughtAt];
+    if (thought?.kind !== 'thinking' || thought.text === '') {
+        return rows;
+    }
+    const after = new Set(items.slice(thoughtAt + 1).map((item) => item.id));
+    const index = rows.findIndex((row) => row.kind === 'work-live' && after.has(row.tool.id));
+    const call = rows[index];
+    const previous = rows[index - 1];
+    if (call?.kind !== 'work-live' || (previous?.kind === 'thinking' && previous.id === thought.id)) {
+        return rows;
+    }
+    return [...rows.slice(0, index), { kind: 'live-thought', id: `live-thought-${thought.id}`, item: thought, at: call.tool.createdAt }, ...rows.slice(index)];
+}
+
 interface TurnChunk {
     turnId: string | null;
     items: ChatItem[];
@@ -411,7 +434,8 @@ export function deriveTimelineRows(items: ChatItem[], options: TimelineOptions):
         }
         const active = turnId === options.activeTurnId || turn?.state === 'running';
         if (!turn || active) {
-            rows.push(...rowsForItems(conversation, options, children));
+            const live = rowsForItems(conversation, options, children);
+            rows.push(...(active ? withLiveThought(live, conversation) : live));
             if (active) {
                 rows.push({ kind: 'working', id: `working-${turnId}`, startedAt: turn?.createdAt ?? Date.now() });
             }

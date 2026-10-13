@@ -16,7 +16,7 @@ The timeline fills its parent and scrolls on its own; every flex parent down to 
 
 ## What it draws
 
-The items become rows. Tool calls in a row fold into one line ("Read 2 files"), a finished turn folds behind how long it worked and what it did, the files a turn changed gather in one card under its reply, and a subagent's own work hangs under its row. A page an agent published stands above its reply when the host draws [visuals](/agents-react/chat/visuals). A tool the package has no word for still draws, with a wrench and the first string of its input.
+The items become rows. Tool calls in a row fold into one line ("Read 2 files"), a finished turn folds behind how long it worked and what it did, the files a turn changed gather in one card under its reply, and a subagent's own work hangs under its row. A page an agent published stands above its reply when the host draws [visuals](/agents-react/chat/visuals). A folded thought shows its opening heading, or the thought on one line, and opens as Markdown. While a turn runs, the heading or first sentence of its latest thought stands over the call it led to. A tool the package has no word for still draws, with a wrench and the first string of its input.
 
 Only the rows on screen are drawn. The thread follows new text while it is scrolled to the end and stops once a person scrolls up or opens a fold. Near the top it loads the page before the oldest it holds and keeps the row being read in place. Once a thread has a few messages, a scrubber along its edge marks every message and bookmark.
 
@@ -55,7 +55,7 @@ The thread has no find of its own. The host's `useTimelineFind(options)` gets th
 
 ## Rows
 
-`Row` draws one `TimelineRow`, and the components it picks from are exported for a thread of your own: `UserRow`, `AssistantRow`, `ThinkingRow`, `ReportRow`, `ReplyHeader`, `NoteRow`, `AgentTurnRow`, `CompactionRow`, `ApprovalHistoryRow` and `QuestionHistoryRow` in `chat/ui/rows/MessageRows`; `WorkRow`, `WorkLiveRow`, `WorkGroupRow`, `WorkingRow`, `RunningFor`, `TurnFoldRow`, `ChangedFilesRow` and `ToggleLine` in `chat/ui/rows/WorkRows`; `SubagentRow`, `SubagentBranchRow`, `TaskRow`, `WorkflowRow`, `ForksRow` and `VisualRow` in files of their own. `deriveTimelineRows(items, options)` turns items into rows the way the timeline does.
+`Row` draws one `TimelineRow`, and the components it picks from are exported for a thread of your own: `UserRow`, `AssistantRow`, `ThinkingRow`, `LiveThoughtRow`, `ReportRow`, `ReplyHeader`, `NoteRow`, `AgentTurnRow`, `CompactionRow`, `ApprovalHistoryRow` and `QuestionHistoryRow` in `chat/ui/rows/MessageRows`; `WorkRow`, `WorkLiveRow`, `WorkGroupRow`, `WorkingRow`, `RunningFor`, `TurnFoldRow`, `ChangedFilesRow` and `ToggleLine` in `chat/ui/rows/WorkRows`; `SubagentRow`, `SubagentBranchRow`, `TaskRow`, `WorkflowRow`, `ForksRow` and `VisualRow` in files of their own. `deriveTimelineRows(items, options)` turns items into rows the way the timeline does.
 
 <Demo src="agents/rows" />
 
