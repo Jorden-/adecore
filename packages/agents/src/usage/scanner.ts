@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, type Hash } from 'node:crypto';
 import { mkdir, open, readFile, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { UsageRoot } from '@adecore/agent-contracts';
@@ -10,48 +10,53 @@ import { claudeMightCarryUsage, parseClaudeLine } from './readers/claude.ts';
 import { cloneCodexState, codexMightCarryUsage, createCodexState, parseCodexLine, type CodexParserState } from './readers/codex.ts';
 import { usageRoots, type UsageRootPath } from './roots.ts';
 
-/* What a file holds from `from` to its end, as it is at the read. */
-async function readFrom(path: string, from: number): Promise<string> {
+const HASH_CHUNK_BYTES = 65536;
+
+interface HashedRead {
+    /* Everything from `from` to the end of the file, as it is at the read. */
+    bytes: Buffer;
+    /* Over the bytes before `from`, left open so the caller can carry it on over `bytes`. */
+    hash: Hash;
+}
+
+/*
+ * Hashes the bytes before `from` and returns the rest, in one pass over one handle, so verifying
+ * what a transcript committed and parsing what it added never reads a byte twice.
+ */
+async function readHashed(path: string, from: number): Promise<HashedRead> {
     const handle = await open(path, 'r');
     try {
+        const hash = createHash('sha256');
+        const chunk = Buffer.alloc(Math.min(from, HASH_CHUNK_BYTES));
+        let offset = 0;
+        while (offset < from) {
+            const { bytesRead } = await handle.read(chunk, 0, Math.min(chunk.length, from - offset), offset);
+            if (bytesRead === 0) {
+                break;
+            }
+            hash.update(chunk.subarray(0, bytesRead));
+            offset += bytesRead;
+        }
         const { size } = await handle.stat();
-        const buffer = Buffer.alloc(Math.max(0, size - from));
+        const bytes = Buffer.alloc(Math.max(0, size - from));
         let filled = 0;
-        while (filled < buffer.length) {
-            const { bytesRead } = await handle.read(buffer, filled, buffer.length - filled, from + filled);
+        while (filled < bytes.length) {
+            const { bytesRead } = await handle.read(bytes, filled, bytes.length - filled, from + filled);
             if (bytesRead === 0) {
                 break;
             }
             filled += bytesRead;
         }
-        return buffer.subarray(0, filled).toString('utf8');
+        return { bytes: bytes.subarray(0, filled), hash };
     } finally {
         await handle.close();
     }
 }
 
-const HASH_CHUNK_BYTES = 65536;
-
-/* Verifies every committed byte: a transcript can be rewritten after an unchanged session header. */
-async function headOf(path: string, length: number): Promise<string> {
-    const handle = await open(path, 'r');
-    try {
-        const buffer = Buffer.alloc(Math.min(length, HASH_CHUNK_BYTES));
-        const hash = createHash('sha256');
-        let offset = 0;
-        while (offset < length) {
-            const { bytesRead } = await handle.read(buffer, 0, Math.min(buffer.length, length - offset), offset);
-            if (bytesRead === 0) {
-                break;
-            }
-            hash.update(buffer.subarray(0, bytesRead));
-            offset += bytesRead;
-        }
-        // Older indexes hashed only the first 4 KB; they cannot establish that the rest stayed unchanged.
-        return `sha256:${hash.digest('base64')}`;
-    } finally {
-        await handle.close();
-    }
+/* Covers every committed byte, since a transcript can be rewritten after an unchanged session header. */
+function headOf(hash: Hash): string {
+    // Older indexes hashed only the first 4 KB; they cannot establish that the rest stayed unchanged.
+    return `sha256:${hash.copy().digest('base64')}`;
 }
 
 export interface ScanReport {
@@ -266,16 +271,16 @@ export class UsageScanner {
         if (known !== undefined && known.provider === provider && known.size === info.size && known.mtimeMs === info.mtimeMs) {
             return false;
         }
+        const appended = known !== undefined && known.provider === provider && info.size > known.size && known.head?.startsWith('sha256:') === true;
+        let read = await readHashed(path, appended ? known.offset : 0);
         // A file only counts as grown while it starts the way it did; one rewritten larger is read again from the start.
-        const grown =
-            known !== undefined &&
-            known.provider === provider &&
-            info.size > known.size &&
-            known.head?.startsWith('sha256:') === true &&
-            (await headOf(path, known.offset)) === known.head;
+        const grown = appended && headOf(read.hash) === known.head;
+        if (appended && !grown) {
+            read = await readHashed(path, 0);
+        }
         const from = grown ? known.offset : 0;
-        const text = await readFrom(path, from);
-        const parsed = parseChunk(text, provider, from, grown ? known.codex : null);
+        const parsed = parseChunk(read.bytes.toString('utf8'), provider, from, grown ? known.codex : null);
+        read.hash.update(read.bytes.subarray(0, parsed.offset - from));
         const before = grown ? known.records : [];
         const entry: IndexedFile = {
             provider,
@@ -286,7 +291,7 @@ export class UsageScanner {
             records: foldByKey([...before, ...withAccount(parsed.records, accountOf)]),
             tail: withAccount(parsed.tail, accountOf),
             codex: parsed.codex,
-            head: await headOf(path, parsed.offset)
+            head: headOf(read.hash)
         };
         this.index.set(path, entry);
         this.dirty = true;

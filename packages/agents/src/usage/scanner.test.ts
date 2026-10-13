@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, test } from 'bun:test';
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { afterEach, describe, expect, spyOn, test } from 'bun:test';
+import { mkdir, mkdtemp, open, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { UsageScanner } from './scanner.ts';
@@ -169,6 +169,42 @@ describe('the usage scanner', () => {
         const reloaded = new UsageScanner(home, roots);
         await reloaded.scan();
         expect(reloaded.records().map((record) => record.dedupeKey)).toEqual(['msg_2', 'msg_3']);
+    });
+
+    test('reads every byte of a cold or grown transcript at most once per scan', async () => {
+        const { home, claude, roots } = await workspace();
+        const path = join(claude, 'a.jsonl');
+        const probe = await open(path, 'w');
+        const read = spyOn(Object.getPrototypeOf(probe), 'read');
+        await probe.close();
+        const bytesRead = async (): Promise<number> => {
+            const results = await Promise.all(read.mock.results.map((result) => result.value as Promise<{ bytesRead: number }>));
+            read.mockClear();
+            return results.reduce((sum, result) => sum + result.bytesRead, 0);
+        };
+        try {
+            const header = `${JSON.stringify({ type: 'session_meta', padding: 'x'.repeat(200_000) })}\n`;
+            let content = header + assistant('msg_1', 0, 40);
+            await writeFile(path, content);
+            const scanner = new UsageScanner(home, roots);
+            await scanner.scan();
+            expect(await bytesRead()).toBe(Buffer.byteLength(content));
+
+            // The line still being written stays out of the hash, so the next append still verifies.
+            content += assistant('msg_2', 5, 60).trimEnd();
+            await writeFile(path, content);
+            await scanner.scan();
+            expect(await bytesRead()).toBe(Buffer.byteLength(content));
+
+            content += `\n${assistant('msg_3', 10, 15)}`;
+            await writeFile(path, content);
+            const reloaded = new UsageScanner(home, roots);
+            await reloaded.scan();
+            expect(await bytesRead()).toBe(Buffer.byteLength(content));
+            expect(reloaded.records().map((record) => record.dedupeKey)).toEqual(['msg_1', 'msg_2', 'msg_3']);
+        } finally {
+            read.mockRestore();
+        }
     });
 
     test('a line still being written is counted once, not twice', async () => {
