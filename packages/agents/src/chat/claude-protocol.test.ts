@@ -203,6 +203,24 @@ describe('ClaudeProtocol', () => {
         ]);
     });
 
+    test('blocks of a message keep counting while other messages come between, and the counts stay bounded', () => {
+        const protocol = new ClaudeProtocol();
+        const text = (id: string, parent?: string) =>
+            protocol.handle({ type: 'assistant', parent_tool_use_id: parent, message: { id, content: [{ type: 'text', text: id }] } });
+        expect(text('long')[0]).toMatchObject({ ref: 'long:t0' });
+        for (let i = 0; i < 100; i++) {
+            text(`agent-${i}`, 'toolu_task');
+        }
+        expect(text('long')[0]).toMatchObject({ ref: 'long:t1' });
+        for (let i = 0; i < 10_000; i++) {
+            text(`msg-${i}`);
+            protocol.handle({ type: 'assistant', message: { id: `msg-${i}`, content: [{ type: 'thinking', thinking: 'hm' }] } });
+        }
+        const counts = protocol as unknown as { frameTextCount: Map<string, number>; frameThinkingCount: Map<string, number> };
+        expect(counts.frameTextCount.size).toBeLessThanOrEqual(256);
+        expect(counts.frameThinkingCount.size).toBeLessThanOrEqual(256);
+    });
+
     test('a tool call and its result carry the CLI tool use id as the ref', () => {
         const protocol = new ClaudeProtocol();
         expect(

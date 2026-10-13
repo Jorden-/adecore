@@ -474,6 +474,11 @@ export class ThreadProjector {
         return event.type === 'tool.started' && this.thread.get(this.itemId(generation, event.ref)) !== undefined;
     }
 
+    /* The item a ref of that generation names, without a walk through the thread. */
+    itemOf(generation: number, ref: string): ChatItem | undefined {
+        return this.thread.get(this.itemId(generation, ref));
+    }
+
     private itemId(generation: number, ref: string): string {
         return `${generation}:${ref}`;
     }

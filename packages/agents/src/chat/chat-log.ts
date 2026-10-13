@@ -66,7 +66,7 @@ export class ChatLog {
     constructor(path: string | null, state: ChatLogState = { seq: 0, resetSeq: 0, lines: [] }) {
         this.path = path;
         this.lines = state.lines;
-        this.bytes = state.lines.reduce((sum, line) => sum + JSON.stringify(line).length + 1, 0);
+        this.bytes = state.lines.reduce((sum, line) => sum + Buffer.byteLength(JSON.stringify(line)) + 1, 0);
         this.seqValue = Math.max(state.seq, state.lines.at(-1)?.seq ?? 0);
         this.resetSeqValue = state.resetSeq;
         const first = state.lines[0];
@@ -107,7 +107,7 @@ export class ChatLog {
         }
         const text = `${JSON.stringify(line)}\n`;
         this.lines.push(line);
-        this.bytes += text.length;
+        this.bytes += Buffer.byteLength(text);
         if (this.path !== null) {
             try {
                 this.fd ??= this.open(this.path);
@@ -146,7 +146,7 @@ export class ChatLog {
         this.lines = this.lines.filter((line) => line.seq > seq);
         this.base = seq;
         const text = this.lines.map((line) => `${JSON.stringify(line)}\n`).join('');
-        this.bytes = text.length;
+        this.bytes = Buffer.byteLength(text);
         if (this.path === null) {
             return;
         }

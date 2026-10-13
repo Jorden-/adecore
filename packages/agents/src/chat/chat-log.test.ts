@@ -103,6 +103,18 @@ describe('ChatLog', () => {
         expect(log.size).toBe(0);
     });
 
+    test('counts its size in the bytes the file holds, also for text past ASCII', async () => {
+        const log = new ChatLog(path);
+        log.append(delta('héllo wörld 😀'), 1);
+        log.append(delta('日本語'), 1);
+        log.close();
+        const bytes = (await readFile(path)).byteLength;
+        expect(log.size).toBe(bytes);
+        expect(new ChatLog(null, { seq: 2, resetSeq: 0, lines: parseLog(await readFile(path, 'utf8')) }).size).toBe(bytes);
+        log.compact(1);
+        expect(log.size).toBe((await readFile(path)).byteLength);
+    });
+
     test('picks up where the files left it', () => {
         const lines = [3, 4].map((seq) => ({ seq, at: 1, event: delta(String(seq)) }));
         const log = new ChatLog(path, { seq: 2, resetSeq: 1, lines });

@@ -153,6 +153,20 @@ export function claudeGoalFromCommand(text: string, current: ChatGoal | null): C
     };
 }
 
+// The messages whose blocks are still counted. The frames of one message come close together, so only the newest can still grow.
+const COUNTED_MESSAGES = 256;
+
+/* The ordinal of the next block of `messageId`; a count moves to the back on every block and the oldest goes. */
+function nextOrdinal(counts: Map<string, number>, messageId: string): number {
+    const ordinal = counts.get(messageId) ?? 0;
+    counts.delete(messageId);
+    counts.set(messageId, ordinal + 1);
+    if (counts.size > COUNTED_MESSAGES) {
+        counts.delete(counts.keys().next().value!);
+    }
+    return ordinal;
+}
+
 /*
  * One check of the goal's Stop hook that found it not met yet: a synthetic user message the CLI feeds the
  * agent before it goes on, which names the objective in brackets. Undefined for any other message.
@@ -617,13 +631,11 @@ export class ClaudeProtocol {
                 continue;
             }
             if (block.type === 'text') {
-                const ordinal = this.frameTextCount.get(messageId) ?? 0;
-                this.frameTextCount.set(messageId, ordinal + 1);
+                const ordinal = nextOrdinal(this.frameTextCount, messageId);
                 // A subagent's text is its own report, not the thread's answer; the parent says whose row it is.
                 events.push({ type: 'text.done', ref: this.textRef(messageId, ordinal), text: str(block.text) ?? '', ...(parentRef ? { parentRef } : {}) });
             } else if (block.type === 'thinking' && !parentRef) {
-                const ordinal = this.frameThinkingCount.get(messageId) ?? 0;
-                this.frameThinkingCount.set(messageId, ordinal + 1);
+                const ordinal = nextOrdinal(this.frameThinkingCount, messageId);
                 events.push({ type: 'thinking.done', ref: this.thinkingRef(messageId, ordinal), text: str(block.thinking) ?? '' });
             } else if (block.type === 'tool_use') {
                 events.push({

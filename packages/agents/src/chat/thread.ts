@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { AgentStatus, ChatApprovalItem, ChatEvent, ChatHistoryResult, ChatInfo, ChatItem, ChatQuestionItem } from '@adecore/agent-contracts';
+import { appendToolOutput } from '@adecore/agent-contracts/text';
 import { ChatError } from './errors.ts';
 import { requestSummaries } from './request-summary.ts';
 
@@ -65,7 +66,7 @@ export class ChatThread {
         }
         if (item?.kind === 'tool' && item.state === 'running') {
             const progress = item.progress ?? { startedAt: null, description: null, output: null };
-            this.items.set(itemId, { ...item, progress: { ...progress, output: (progress.output ?? '') + text } });
+            this.items.set(itemId, { ...item, progress: { ...progress, output: appendToolOutput(progress.output, text) } });
             return { type: 'delta', itemId, text };
         }
         return null;

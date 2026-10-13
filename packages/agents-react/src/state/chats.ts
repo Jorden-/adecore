@@ -11,6 +11,7 @@ import type {
     ChatQuestionItem,
     ChatVisual
 } from '@adecore/agent-contracts';
+import { appendToolOutput } from '@adecore/agent-contracts/text';
 import { ChatScopeContext, useChatScope } from '../scope';
 
 export interface ChatState {
@@ -194,7 +195,7 @@ export function applyEvent(state: ChatState, event: ChatEvent): ChatState {
             }
             if (item?.kind === 'tool' && item.state === 'running') {
                 const progress = item.progress ?? { startedAt: null, description: null, output: null };
-                const grown = { ...item, progress: { ...progress, output: (progress.output ?? '') + event.text } };
+                const grown = { ...item, progress: { ...progress, output: appendToolOutput(progress.output, event.text) } };
                 return { ...state, items: { ...state.items, [event.itemId]: grown } };
             }
             return state;

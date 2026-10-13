@@ -4,7 +4,7 @@ import { codexProvider } from '../providers/codex-provider.ts';
 import { fakeCodexWith } from './fake-codex.ts';
 import { claudeProvider } from '../providers/claude-provider.ts';
 import type { BackendEvent, BackendLaunch } from './backend.ts';
-import type { ChatProcess, ChatSpawnOptions } from './chat-process.ts';
+import { MAX_LINE_LENGTH, type ChatProcess, type ChatSpawnOptions } from './chat-process.ts';
 import { ChatSession } from './chat-session.ts';
 import { info } from './chat-session.fixture.test.ts';
 import { ClaudeBackend } from './claude-backend.ts';
@@ -372,4 +372,75 @@ test('Claude waits for a steer through the whole turn, and rejects one it never 
     jest.advanceTimersByTime(1);
     expect((await lost) as Error).toMatchObject({ message: 'Claude ended its turn without taking your message' });
     await fake.exit();
+});
+
+/* A process whose stdout the test writes in raw chunks, cut wherever it likes. */
+function rawStdout() {
+    let stdout: ReadableStreamDefaultController<Uint8Array> | null = null;
+    let exit: (code: number | null) => void = () => undefined;
+    const spawn = (options: ChatSpawnOptions): ChatProcess => {
+        exit = options.onExit;
+        return {
+            pid: 4242,
+            stdin: { write: () => 0, flush: () => 0, end: () => 0 },
+            stdout: new ReadableStream<Uint8Array>({
+                start: (controller) => {
+                    stdout = controller;
+                }
+            }),
+            kill: () => undefined
+        };
+    };
+    return {
+        spawn,
+        chunk: (bytes: Uint8Array) => stdout?.enqueue(bytes),
+        end: () => {
+            stdout?.close();
+            exit(0);
+        }
+    };
+}
+
+test('a frame cut over several chunks, in the middle of a character, reads as one frame', async () => {
+    const frame = `${JSON.stringify({ method: 'item/agentMessage/delta', params: { delta: 'héllo 😀 wörld' } })}\n`;
+    const bytes = new TextEncoder().encode(`${frame}${frame}`);
+    const emoji = bytes.indexOf(0xf0);
+    const cli = rawStdout();
+    const frames: unknown[] = [];
+    const transport = new CodexTransport({ ...launch, spawn: cli.spawn, onFrame: (received) => frames.push(received), onExit: () => undefined });
+    for (const [start, end] of [
+        [0, 5],
+        [5, emoji + 2],
+        [emoji + 2, bytes.length - 3],
+        [bytes.length - 3, bytes.length]
+    ] as const) {
+        cli.chunk(bytes.slice(start, end));
+        await flush();
+    }
+    expect(frames).toEqual([JSON.parse(frame), JSON.parse(frame)]);
+    expect(transport.alive).toBe(true);
+    cli.end();
+});
+
+test('a Codex frame past the line limit is dropped and reported, and the frames after it still arrive', async () => {
+    const cli = rawStdout();
+    const frames: unknown[] = [];
+    const failures: Error[] = [];
+    const transport = new CodexTransport({
+        ...launch,
+        spawn: cli.spawn,
+        onFrame: (received) => frames.push(received),
+        onError: (error) => failures.push(error),
+        onExit: () => undefined
+    });
+    const pending = transport.request('thread/start', {}).catch((error: Error) => error);
+    cli.chunk(new Uint8Array(MAX_LINE_LENGTH + 1).fill(0x61));
+    cli.chunk(new TextEncoder().encode(`\n${JSON.stringify({ method: 'after', params: {} })}\n`));
+    await flush();
+    expect(failures.map((error) => error.message)).toEqual([
+        'Codex transport failed: Codex wrote a frame of more than 64 million characters, which was dropped'
+    ]);
+    expect(((await pending) as Error).message).toContain('which was dropped');
+    expect(frames).toEqual([{ method: 'after', params: {} }]);
+    cli.end();
 });

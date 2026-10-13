@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { errorText } from '../error-text.ts';
 import { claudeArgs, claudeEnv, promptPrefix } from '../providers/claude.ts';
 import type { ApprovalDecision, BackendHost, BackendLaunch, ChatBackend, TurnInput } from './backend.ts';
-import { ChatChild } from './chat-process.ts';
+import { ChatChild, LineSplitter, MAX_LINE_LENGTH } from './chat-process.ts';
 import { ClaudeProtocol } from './claude-protocol.ts';
 import { buildUserMessage } from './input.ts';
 
@@ -160,24 +160,23 @@ export class ClaudeBackend implements ChatBackend {
     private async readLines(child: ChatChild): Promise<void> {
         const reader = child.process.stdout.getReader();
         const decoder = new TextDecoder();
-        let buffered = '';
+        const lines = new LineSplitter(
+            (line) => this.readLine(child, line),
+            () => {
+                if (this.child === child) {
+                    this.failed(new Error(`Claude wrote a frame of more than ${MAX_LINE_LENGTH / 1_000_000} million characters, which was dropped`));
+                }
+            }
+        );
         try {
             while (true) {
                 const { value, done } = await reader.read();
                 if (done) {
                     break;
                 }
-                buffered += decoder.decode(value, { stream: true });
-                let newline = buffered.indexOf('\n');
-                while (newline >= 0) {
-                    this.readLine(child, buffered.slice(0, newline));
-                    buffered = buffered.slice(newline + 1);
-                    newline = buffered.indexOf('\n');
-                }
+                lines.push(decoder.decode(value, { stream: true }));
             }
-            if (buffered.trim() !== '') {
-                this.readLine(child, buffered);
-            }
+            lines.end();
         } catch (error) {
             if (this.child === child) {
                 this.broken(error);

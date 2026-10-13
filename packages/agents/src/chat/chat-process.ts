@@ -158,6 +158,74 @@ export class StreamTail {
     }
 }
 
+// Far above any frame either CLI writes, a base64 document in a tool result included; it only bounds a CLI that stopped breaking lines.
+export const MAX_LINE_LENGTH = 64_000_000;
+
+/*
+ * Cuts decoded output into lines. A chunk is searched only for itself and a partial line is joined
+ * once, when its line break comes, so a long line costs its length once. A line longer than `max`
+ * UTF-16 units is dropped whole, with `onOverflow` called once for it, and the next line reads as usual.
+ */
+export class LineSplitter {
+    private readonly onLine: (line: string) => void;
+    private readonly onOverflow: () => void;
+    private readonly max: number;
+    private parts: string[] = [];
+    private length = 0;
+    private dropping = false;
+
+    constructor(onLine: (line: string) => void, onOverflow: () => void, max = MAX_LINE_LENGTH) {
+        this.onLine = onLine;
+        this.onOverflow = onOverflow;
+        this.max = max;
+    }
+
+    push(text: string): void {
+        let start = 0;
+        let newline = text.indexOf('\n');
+        while (newline >= 0) {
+            this.add(text.slice(start, newline));
+            const line = this.take();
+            if (line !== null) {
+                this.onLine(line);
+            }
+            start = newline + 1;
+            newline = text.indexOf('\n', start);
+        }
+        this.add(text.slice(start));
+    }
+
+    /* Hands on what came after the last line break, for a stream that ended without one. */
+    end(): void {
+        const line = this.take();
+        if (line !== null && line !== '') {
+            this.onLine(line);
+        }
+    }
+
+    private add(piece: string): void {
+        if (this.dropping || piece === '') {
+            return;
+        }
+        this.length += piece.length;
+        if (this.length > this.max) {
+            this.parts = [];
+            this.dropping = true;
+            this.onOverflow();
+            return;
+        }
+        this.parts.push(piece);
+    }
+
+    private take(): string | null {
+        const line = this.dropping ? null : this.parts.join('');
+        this.parts = [];
+        this.length = 0;
+        this.dropping = false;
+        return line;
+    }
+}
+
 export interface ChatChildOptions extends Omit<ChatSpawnOptions, 'onExit'> {
     spawn?: SpawnChatProcess;
     // `stderr` is the tail of what the CLI wrote there, for an exit with an error code only.

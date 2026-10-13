@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, jest, test } from 'bun:test';
-import { ChatChild, killProcessTree, StreamTail, type ChatSpawnOptions } from './chat-process.ts';
+import { ChatChild, killProcessTree, LineSplitter, StreamTail, type ChatSpawnOptions } from './chat-process.ts';
 
 /* A process that only records what it is told, and exits when the test says so. */
 function fakeChild(onExit: (exitCode: number | null, stderr: string | null) => void = () => undefined) {
@@ -180,5 +180,64 @@ describe('StreamTail', () => {
         );
         await tail.done;
         expect(tail.lines()).toBeNull();
+    });
+});
+
+describe('LineSplitter', () => {
+    const split = (max?: number) => {
+        const lines: string[] = [];
+        let overflows = 0;
+        const splitter = new LineSplitter(
+            (line) => lines.push(line),
+            () => {
+                overflows += 1;
+                lines.push('<dropped>');
+            },
+            max
+        );
+        return { splitter, lines, overflows: () => overflows };
+    };
+
+    test('joins a line that came over several chunks and hands on what ends without a line break', () => {
+        const { splitter, lines } = split();
+        for (const chunk of ['{"a"', ':1}\n{"b":', '2}\n\n', '{"c":3}']) {
+            splitter.push(chunk);
+        }
+        expect(lines).toEqual(['{"a":1}', '{"b":2}', '']);
+        splitter.end();
+        expect(lines).toEqual(['{"a":1}', '{"b":2}', '', '{"c":3}']);
+    });
+
+    test('searches every character once, however many chunks a line takes', () => {
+        const { splitter, lines } = split();
+        let scanned = 0;
+        // A chunk that counts what is searched in it; the splitter searches nothing but the chunks it is handed.
+        const counted = (text: string): string =>
+            ({
+                length: text.length,
+                slice: (start?: number, end?: number) => text.slice(start, end),
+                indexOf: (search: string, position = 0) => {
+                    scanned += text.length - position;
+                    return text.indexOf(search, position);
+                }
+            }) as unknown as string;
+        const chunk = 'x'.repeat(64 * 1024);
+        for (let i = 0; i < 80; i++) {
+            splitter.push(counted(chunk));
+        }
+        splitter.push(counted('\n'));
+        expect(lines.map((line) => line.length)).toEqual([80 * chunk.length]);
+        expect(scanned).toBe(80 * chunk.length + 1);
+    });
+
+    test('drops a line past the limit whole, says so once, and reads on from the next line', () => {
+        const { splitter, lines, overflows } = split(10);
+        splitter.push('{"fits":1}\n0123456');
+        splitter.push('789abcdef');
+        splitter.push('ghij\n{"next":2}\n');
+        splitter.push('0123456789abc');
+        splitter.end();
+        expect(lines).toEqual(['{"fits":1}', '<dropped>', '{"next":2}', '<dropped>']);
+        expect(overflows()).toBe(2);
     });
 });

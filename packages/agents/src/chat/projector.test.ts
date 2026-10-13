@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { AGENT_EVENT_SCHEMAS, type ChatEvent, type ChatInfo } from '@adecore/agent-contracts';
+import { AGENT_EVENT_SCHEMAS, TOOL_OUTPUT_TAIL, type ChatEvent, type ChatInfo } from '@adecore/agent-contracts';
 import type { BackendEvent } from './backend.ts';
 import { ThreadProjector, stripAgentFooter, summaryLine } from './projector.ts';
 import { ChatThread } from './thread.ts';
@@ -91,6 +91,28 @@ describe('ThreadProjector', () => {
         // Nothing waits under an unknown ref, and a settled call takes no more progress.
         expect(project({ type: 'tool.done', ref: 'nope', output: 'x', state: 'done' })).toEqual([]);
         expect(project({ type: 'tool.progress', ref: 'toolu_1', startedAt: 5, description: null })).toEqual([]);
+    });
+
+    test('a command that prints 50 MB keeps only the tail of it on its item, and so does every progress report', () => {
+        const { thread, project } = setup();
+        project({ type: 'tool.started', ref: 'toolu_1', name: 'Bash', input: { command: 'yes' }, parentRef: null });
+        const chunk = 'y\n'.repeat(32 * 1024);
+        let largest = 0;
+        for (let i = 0; i < 800; i++) {
+            const [delta] = project({ type: 'tool.output', ref: 'toolu_1', text: chunk });
+            expect(delta).toEqual({ type: 'delta', itemId: '1:toolu_1', text: chunk });
+            if (i % 100 === 0) {
+                const [report] = project({ type: 'tool.progress', ref: 'toolu_1', startedAt: 1000, description: null });
+                const reported = report?.type === 'item' && report.item.kind === 'tool' ? (report.item.progress?.output ?? '') : '';
+                largest = Math.max(largest, reported.length);
+            }
+        }
+        const tool = thread.get('1:toolu_1');
+        const output = tool?.kind === 'tool' ? (tool.progress?.output ?? '') : '';
+        expect(output.length).toBeLessThanOrEqual(TOOL_OUTPUT_TAIL);
+        expect(output.endsWith('y\ny\n')).toBe(true);
+        expect(largest).toBeGreaterThan(0);
+        expect(largest).toBeLessThanOrEqual(TOOL_OUTPUT_TAIL);
     });
 
     test('unified diffs ride along on the tool item that settles', () => {

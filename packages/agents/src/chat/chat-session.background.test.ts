@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import type { ChatInfo } from '@adecore/agent-contracts';
 import { ManualClock } from '../outbox/manual-clock.ts';
 import type { BackendEvent } from './backend.ts';
@@ -35,6 +35,30 @@ test('a launched workflow stays open, warns on stalled progress and clears its w
     expect(workflow()).toMatchObject({ state: 'done' });
     expect(() => run.session.stopTask('wf')).toThrow('no such task');
     expect(run.stops()).toBe(0);
+    await run.session.dispose();
+});
+
+test('streamed output and progress keep a workflow alive without a walk through the thread', async () => {
+    const clock = new ManualClock();
+    const run = rig({ clock });
+    run.session.send('launch');
+    await flush();
+    run.event({ type: 'tool.started', ref: 'workflow', name: 'Workflow', input: {}, parentRef: null });
+    run.event({ type: 'tool.started', ref: 'build', name: 'Bash', input: { command: 'make' }, parentRef: null });
+    const list = spyOn(run.session.thread, 'list');
+    for (let i = 0; i < 100; i++) {
+        run.event({ type: 'tool.output', ref: 'build', text: `line ${i}\n` });
+        run.event({ type: 'tool.progress', ref: 'build', startedAt: null, description: null });
+    }
+    expect(list).not.toHaveBeenCalled();
+    list.mockRestore();
+    clock.advance(4 * 60_000);
+    run.event({ type: 'tool.output', ref: 'workflow', text: 'phase two\n' });
+    clock.advance(4 * 60_000);
+    const workflow = run.session.thread.list().find((item) => item.kind === 'tool' && item.name === 'Workflow');
+    expect(workflow).toMatchObject({ state: 'running', workflow: { lastProgressAt: clock.now() - 4 * 60_000, stalledAt: undefined } });
+    clock.advance(60_000);
+    expect(run.session.thread.get(workflow!.id)).toMatchObject({ workflow: { stalledAt: clock.now() } });
     await run.session.dispose();
 });
 

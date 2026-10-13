@@ -46,6 +46,8 @@ Optional arrays such as `queue`, `background`, `skills` and `requests` are absen
 | `note`       | Information, a warning or an error from the host, by `level`.                                                      |
 | `compaction` | The moment the context was folded, with the token count before it when known.                                      |
 
+A running tool's `progress.output` holds only the last `TOOL_OUTPUT_TAIL` UTF-16 units of what it streamed, 64 KiB. A `delta` for a tool item carries only the new text, so a client grows the output with `appendToolOutput(output, text)`, which cuts it the way the host does. Once the call settles, its `output` replaces the progress.
+
 An `assistant` or `tool` item with a `parentToolUseId` is work a subagent did: draw it under that subagent, not as the chat's own answer. A subagent item's `itemsTruncated` says the thread holds only the start of its work; `chat.subagent` reads the rest from the CLI's own transcript. A workflow's agent has no call of its own, so `chat.subagent` names it as `workflowAgentRef(agentId)`, and `workflowAgentIdOf(ref)` reads the id back, or `null` for any other reference.
 
 A turn without `origin` was started by a person, and one without `attempt` ran on one process. A turn that a restart could not take up again is aborted with a warning note that `notResumedNote(reason)` writes; `abortedByMachine(turn, items)` tells such a turn from one a person stopped.

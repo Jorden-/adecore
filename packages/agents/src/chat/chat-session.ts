@@ -11,6 +11,7 @@ import type {
     ChatQuoteSource,
     ChatSkill,
     ChatSubagentItem,
+    ChatToolItem,
     ChatTurnItem,
     ChatUiAnswer,
     ChatUiChoiceOrigin,
@@ -1898,7 +1899,7 @@ export class ChatSession {
         }
         this.emit(projected);
         this.trackSubagentOwner(generation, event);
-        this.watchWorkflows(event);
+        this.watchWorkflows(generation, event);
         if (isMainAgentOutput(event)) {
             this.spokenTurnId = this.thread.info.activeTurnId;
         }
@@ -1968,56 +1969,58 @@ export class ChatSession {
         this.workflowWarnings.clear();
     }
 
-    private watchWorkflows(event: BackendEvent): void {
-        if (
-            !['tool.started', 'tool.progress', 'tool.output', 'tool.done', 'workflow.progress', 'task.started', 'task.done', 'exit', 'failed'].includes(
-                event.type
-            )
-        ) {
+    private watchWorkflows(generation: number, event: BackendEvent): void {
+        if (event.type === 'tool.output' || event.type === 'tool.progress') {
+            // These come by the thousand, and only the call they name can be a workflow they move.
+            const item = this.projector.itemOf(generation, event.ref);
+            if (item?.kind === 'tool' && item.name === 'Workflow') {
+                this.watchWorkflow(item, true);
+            }
             return;
         }
-        const clock = this.options.clock ?? systemClock;
+        if (!['tool.started', 'tool.done', 'workflow.progress', 'task.started', 'task.done', 'exit', 'failed'].includes(event.type)) {
+            return;
+        }
         const ref = 'ref' in event ? event.ref : null;
         for (const item of this.thread.list()) {
-            if (item.kind !== 'tool' || item.name !== 'Workflow') {
-                continue;
+            if (item.kind === 'tool' && item.name === 'Workflow') {
+                this.watchWorkflow(item, ref === item.toolUseId && ['workflow.progress', 'tool.started', 'tool.done', 'task.started'].includes(event.type));
             }
-            const existing = this.workflowWarnings.get(item.id);
-            const progress =
-                ref === item.toolUseId &&
-                ['workflow.progress', 'tool.started', 'tool.progress', 'tool.output', 'tool.done', 'task.started'].includes(event.type);
-            if (item.state !== 'running' || progress) {
-                if (existing !== undefined) {
-                    clock.clearTimeout(existing);
-                    this.workflowWarnings.delete(item.id);
-                }
-            }
-            if (item.state !== 'running' || (!progress && existing !== undefined) || (!progress && item.workflow?.stalledAt !== undefined)) {
-                continue;
-            }
-            if (progress) {
-                this.emit([
-                    this.thread.upsert({
-                        ...item,
-                        workflow: { name: null, phases: [], agents: [], ...item.workflow, lastProgressAt: clock.now(), stalledAt: undefined }
-                    })
-                ]);
-            }
-            this.workflowWarnings.set(
-                item.id,
-                clock.setTimeout(() => {
-                    this.workflowWarnings.delete(item.id);
-                    const current = this.thread.get(item.id);
-                    if (this.frozen || current?.kind !== 'tool' || current.state !== 'running') {
-                        return;
-                    }
-                    this.emit([
-                        this.thread.upsert({ ...current, workflow: { name: null, phases: [], agents: [], ...current.workflow, stalledAt: clock.now() } })
-                    ]);
-                    this.options.persist();
-                }, 5 * 60_000)
-            );
         }
+    }
+
+    private watchWorkflow(item: ChatToolItem, progress: boolean): void {
+        const clock = this.options.clock ?? systemClock;
+        const existing = this.workflowWarnings.get(item.id);
+        if (item.state !== 'running' || progress) {
+            if (existing !== undefined) {
+                clock.clearTimeout(existing);
+                this.workflowWarnings.delete(item.id);
+            }
+        }
+        if (item.state !== 'running' || (!progress && existing !== undefined) || (!progress && item.workflow?.stalledAt !== undefined)) {
+            return;
+        }
+        if (progress) {
+            this.emit([
+                this.thread.upsert({
+                    ...item,
+                    workflow: { name: null, phases: [], agents: [], ...item.workflow, lastProgressAt: clock.now(), stalledAt: undefined }
+                })
+            ]);
+        }
+        this.workflowWarnings.set(
+            item.id,
+            clock.setTimeout(() => {
+                this.workflowWarnings.delete(item.id);
+                const current = this.thread.get(item.id);
+                if (this.frozen || current?.kind !== 'tool' || current.state !== 'running') {
+                    return;
+                }
+                this.emit([this.thread.upsert({ ...current, workflow: { name: null, phases: [], agents: [], ...current.workflow, stalledAt: clock.now() } })]);
+                this.options.persist();
+            }, 5 * 60_000)
+        );
     }
 
     /* Whether the CLI that reports was started on a pick standing for the same window as the chat's own. */
