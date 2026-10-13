@@ -46,7 +46,7 @@ The core, a session per chat, the thread and what is written of it, and the two 
 | [`chat/backend`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/backend.ts) | `BackendLaunch`, `TurnInput`, `ApprovalDecision`, `BackendEvent`, `BackendHost`, `ChatBackend` |
 | [`chat/background-work`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/background-work.ts) | `runningInBackground`, `BackgroundWork` |
 | [`chat/bookmark-store`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/bookmark-store.ts) | `BookmarkStore`, `BookmarkListener` |
-| [`chat/chat-core`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/chat-core.ts) | `InterruptedRun`, `ChatCoreOptions`, `ChatCore` |
+| [`chat/chat-core`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/chat-core.ts) | `InterruptedRun`, `ChatCoreHooks`, `ChatCoreOptions`, `ChatCore` |
 | [`chat/chat-log`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/chat-log.ts) | `COMPACT_ABOVE_BYTES`, `ChatLogLine` |
 | [`chat/chat-process`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/chat-process.ts) | `ChatSpawnOptions`, `SpawnChatProcess`, `spawnChatProcess`, `MAX_LINE_LENGTH`, `LineSplitter`, `ChatChild`, `ChatProcess`, `ChatChildOptions` |
 | [`chat/chat-session`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/chat-session.ts) | `PromptNotes`, `ChatReferences`, `ResumeWords`, `ChatSession`, `TurnCheckpoints`, `ChatSessionOptions`, `LimitResumeHooks`, `ChatSendExtras`, `ResumeDecision` |

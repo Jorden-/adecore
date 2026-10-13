@@ -197,12 +197,8 @@ describe('AgentHost over a port', () => {
         expect(argv[argv.indexOf('--resume') + 1]).toBe(session!);
     });
 
-    test('runs on a core of the app, whose overrides reach the CLI', async () => {
-        class BriefedCore extends ChatCore {
-            protected override instructionsFor(chatId: string): string | null {
-                return `You are the agent of ${chatId}.`;
-            }
-        }
+    test('runs on a core of the app, whose hooks reach the CLI', async () => {
+        class BriefedCore extends ChatCore {}
         await host.close();
         const briefed = await AgentHost.open({
             dataDir,
@@ -211,7 +207,7 @@ describe('AgentHost over a port', () => {
             background: false,
             command: ['claude'],
             spawn: claude.spawn,
-            core: (options) => new BriefedCore(options)
+            core: (options) => new BriefedCore({ ...options, hooks: { instructionsFor: (chatId) => `You are the agent of ${chatId}.` } })
         });
         host = briefed;
         expect(briefed.chats).toBeInstanceOf(BriefedCore);
@@ -229,11 +225,6 @@ describe('AgentHost over a port', () => {
 
     test('hands a chat the folders of its core, and a change starts the next turn in a new process', async () => {
         const reading: string[] = ['/brand/kit'];
-        class ReadingCore extends ChatCore {
-            protected override foldersFor(_chatId: string): readonly string[] {
-                return [...reading];
-            }
-        }
         await host.close();
         host = await AgentHost.open({
             dataDir,
@@ -241,7 +232,7 @@ describe('AgentHost over a port', () => {
             background: false,
             command: ['claude'],
             spawn: claude.spawn,
-            core: (options) => new ReadingCore(options)
+            core: (options) => new ChatCore({ ...options, hooks: { foldersFor: () => [...reading] } })
         });
         const [renderer, utility] = memoryPortPair();
         host.connect(utility);

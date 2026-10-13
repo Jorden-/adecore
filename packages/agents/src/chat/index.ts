@@ -3,7 +3,7 @@ export { AttachmentStore } from './attachment-store.ts';
 export type { BackendLaunch, TurnInput, ApprovalDecision, BackendEvent, BackendHost, ChatBackend } from './backend.ts';
 export { runningInBackground, type BackgroundWork } from './background-work.ts';
 export { BookmarkStore, type BookmarkListener } from './bookmark-store.ts';
-export { type InterruptedRun, type ChatCoreOptions, ChatCore } from './chat-core.ts';
+export { type InterruptedRun, type ChatCoreHooks, type ChatCoreOptions, ChatCore } from './chat-core.ts';
 export { COMPACT_ABOVE_BYTES, type ChatLogLine } from './chat-log.ts';
 export {
     type ChatSpawnOptions,

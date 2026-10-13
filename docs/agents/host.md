@@ -56,39 +56,30 @@ const result = await wiring.handlers['chat.send'](payload, clientId);
 
 ## ChatCore
 
-The chats themselves are a `ChatCore`. A host adds what it knows by overriding its protected methods, which do nothing of their own, and handing a factory as `core`:
+The chats themselves are a `ChatCore`. A host adds what it knows through `ChatCoreOptions.hooks`, a `ChatCoreHooks` whose every hook may be left out, and hands a factory as `core`:
 
 ```ts
 import { resolve } from 'node:path';
-import type { RuntimeMode } from '@adecore/agent-contracts';
-import { ChatCore, type ChatCoreOptions, ChatError } from '@adecore/agents/chat';
+import { ChatCore, type ChatCoreHooks, ChatError } from '@adecore/agents/chat';
 import { narrowerMode } from '@adecore/agents/providers';
 
-class ProjectChats extends ChatCore {
-    private readonly folders: ReadonlySet<string>;
-
-    constructor(options: ChatCoreOptions, folders: ReadonlySet<string>) {
-        super(options);
-        this.folders = folders;
-    }
-
-    protected override async admit(_chatId: string, cwd: string): Promise<void> {
-        if (!this.folders.has(resolve(cwd))) {
-            throw new ChatError('folder-denied', 'This folder is not one of the projects.');
-        }
-    }
-
-    protected override runtimeModeFor(_chatId: string, mode: RuntimeMode): RuntimeMode {
-        return narrowerMode(mode, 'auto');
-    }
+function projectHooks(folders: ReadonlySet<string>): ChatCoreHooks {
+    return {
+        admit: async (_chatId, cwd) => {
+            if (!folders.has(resolve(cwd))) {
+                throw new ChatError('folder-denied', 'This folder is not one of the projects.');
+            }
+        },
+        runtimeModeFor: (_chatId, mode) => narrowerMode(mode, 'auto')
+    };
 }
 
-const host = await AgentHost.open({ dataDir, core: (options) => new ProjectChats(options, projectFolders) });
+const host = await AgentHost.open({ dataDir, core: (options) => new ChatCore({ ...options, hooks: projectHooks(projectFolders) }) });
 ```
 
 `admit` runs every time a chat is created or loaded, from disk too. `resolve` only tidies a path; check what a folder really is before it goes in the set.
 
-| Method                                                         | What the host adds                                                                        |
+| Hook                                                           | What the host adds                                                                        |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `admit(chatId, cwd)`                                           | Throws for a folder the chat may not work in.                                             |
 | `runtimeModeFor(chatId, mode)`                                 | Narrows the mode a chat runs in, whatever its record or its client says.                  |
@@ -102,7 +93,20 @@ const host = await AgentHost.open({ dataDir, core: (options) => new ProjectChats
 | `clearing`, `cleared`, `forgotten`, `removed`, `broadcasted`   | What goes along with a clear or a removal, and a look at every event.                     |
 | `endedAt`, `unownedReason`, `resumeWords`                      | Taking up a turn the host went down in; see [Restarts](/agents/chats#restarts).           |
 
-None of them knows the client; a check of who asks belongs on the wire. `ChatCoreOptions` also takes `checkpoints` (a `TurnCheckpoints` with `take`, `diff` and `settle`, for a tree per turn, and optionally `head`, which records the commit HEAD pointed at when the turn started and settled so a card can say the branch moved during it), `skills`, `onInterruptedRun` and `limitResume`. Without `checkpoints` a turn has no checkpoint; the package runs no git of its own.
+None of them knows the client; a check of who asks belongs on the wire.
+
+A subclass of `ChatCore` still works for methods of the host's own, and passes its hooks to `super` as arrow functions over its own members. The threads, the clients and the writes stay private to the core; a subclass reaches them through the public methods:
+
+| Method                                          | What a host does with it                                                                    |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `get(chatId)`, `isLoading(chatId)`              | The loaded chat, and whether a create of it is under way.                                   |
+| `readChat(chatId)`, `hasStored(chatId)`         | A chat as it stands in memory or on disk, and whether it has a record.                     |
+| `history(chatId, cursor?, limit?)`              | A page of a loaded chat's thread, the newest without a cursor.                              |
+| `writeRecord(chatId, info, items, preambles?)`  | Writes the whole record of a chat nobody loaded, such as a fork, with its files copied over. |
+| `deleteRecord(chatId)`                          | Removes what a chat nobody loaded keeps on disk; false for a loaded one, which `kill` removes. |
+| `sendTo(clientId, event)`                       | Sends one client an event of the host's own.                                                |
+
+`ChatCoreOptions` also takes `checkpoints` (a `TurnCheckpoints` with `take`, `diff` and `settle`, for a tree per turn, and optionally `head`, which records the commit HEAD pointed at when the turn started and settled so a card can say the branch moved during it), `skills`, `onInterruptedRun` and `limitResume`. Without `checkpoints` a turn has no checkpoint; the package runs no git of its own.
 
 ## Electron
 

@@ -104,6 +104,57 @@ const DEFAULT_RESUME_WORDS: ResumeWords = {
     preamble: null
 };
 
+/*
+ * What a host adds to its chats. Every hook may be left out, and does nothing without it; none of them
+ * knows the client, so a check of who asks belongs on the wire.
+ */
+export interface ChatCoreHooks {
+    /* Throws for a folder this chat may not start in; asked every time a chat is loaded, from disk too. */
+    admit?(chatId: string, cwd: string): Promise<void>;
+    /* The model a new chat starts on when the host already knows; the explicit one still wins. */
+    openingSelection?(chatId: string, kind: AgentKind): ModelSelection | undefined;
+    /* The mode a chat runs in, which a host may narrow whatever its record or its client says. */
+    runtimeModeFor?(chatId: string, mode: RuntimeMode): RuntimeMode;
+    /* What the agent is told once at the start of every process of this chat, in place of `instructions`; null for nothing. */
+    instructionsFor?(chatId: string): string | null;
+    /* What of the instructions a resumed thread hears again in front of its next prompt, for a CLI that ignores them on a resume. */
+    resumeNoteFor?(chatId: string): string | null;
+    /*
+     * Folders outside its working directory a chat's agent may reach without asking, absolute. Asked
+     * before every turn, so a host can hand one over for as long as it is needed: a change starts the
+     * next turn in a new process that resumes the thread, and never cuts a turn in flight.
+     */
+    foldersFor?(chatId: string): readonly string[];
+    /* Whether no list of chats shows this one, which `ChatInfo.hidden` says to every client. */
+    hiddenFor?(chatId: string): boolean;
+    /* What the host says in front of a chat's next real prompt, beside what the chat keeps itself. */
+    promptNotesFor?(chatId: string): PromptNotes | undefined;
+    /* How the chats a person attached to a message are named to the agent; without it they are dropped. */
+    referencesFor?(chatId: string): ChatReferences | undefined;
+    /* The environment of this chat's CLI before its account adds its own. */
+    envFor?(chatId: string, base: Record<string, string>): Record<string, string | undefined>;
+    /* A chat just loaded or made, its stored turns settled; whatever the host lays down in it goes here. */
+    opened?(session: ChatSession, stored: ChatRecord | null): Promise<void>;
+    /* What the host keeps in the chat's record beside the thread. */
+    recordExtras?(chatId: string): ChatRecordExtras;
+    /* A clear is about to start; it waits for this. */
+    clearing?(chatId: string): Promise<void>;
+    /* The chat was cleared; what runs before the first await is in the record written right after. */
+    cleared?(chatId: string): Promise<void>;
+    /* The chat left memory for good, before its files go. */
+    forgotten?(chatId: string): void;
+    /* The chat was removed; what the host keeps of it goes along. */
+    removed?(chatId: string, chat: { info: ChatInfo; items: ChatItem[] }): Promise<void>;
+    /* An event of a chat went out, after the observers and before the clients reading its thread. */
+    broadcasted?(chatId: string, event: ChatEvent): void;
+    /* When whoever opened this chat stopped it; a turn from before that is never taken up again. */
+    endedAt?(chatId: string): number | null;
+    /* Why a turn the host went down in stays down when `onInterruptedRun` says no, in the words of the note it ends with. */
+    unownedReason?(chatId: string): string;
+    /* How a turn the host went down in is taken up in this chat. */
+    resumeWords?(chatId: string): Promise<ResumeWords>;
+}
+
 export interface ChatCoreOptions {
     intelligentUi?: ChatUiHost;
     // The info string that marks a UI fence in a reply, for a host that keeps a name of its own.
@@ -155,30 +206,33 @@ export interface ChatCoreOptions {
     };
     // The accounts a chat may run under; without them every chat runs under its CLI's default account.
     accounts?: AccountLaunches;
+    hooks?: ChatCoreHooks;
 }
 
 /*
  * The chats of one host: a `ChatSession` per chat, its record and its log, and the clients that read
  * them. Everything here holds for any host. What a host adds (notes for the agent, rows of its own,
- * what a clear or a removal takes along) it adds by overriding the protected methods below, which
- * do nothing of their own.
+ * what a clear or a removal takes along) it adds through `ChatCoreOptions.hooks`. A subclass may add
+ * methods of its own over the public ones; the state behind them stays here.
  */
 export class ChatCore {
-    protected readonly providers: ProviderRegistry;
-    protected readonly store: ChatStore | null;
+    // The stores the host handed in, which a subclass reads to copy a chat's bookmarks or visuals.
     protected readonly bookmarks: BookmarkStore | null;
     protected readonly visuals: VisualStore | null;
-    protected readonly accounts: AccountLaunches | null;
-    protected readonly attachments: AttachmentStore;
-    protected readonly env: Record<string, string>;
-    protected readonly chats = new Map<string, ChatSession>();
-    protected readonly creating = new Map<string, Promise<ChatInfo>>();
-    protected readonly sinks = new ClientSinks<AgentEvent>((clientId) => this.composerPreferences.forget(clientId));
-    protected readonly attached = new Map<string, Set<string>>();
+    private readonly providers: ProviderRegistry;
+    private readonly store: ChatStore | null;
+    private readonly accounts: AccountLaunches | null;
+    private readonly attachments: AttachmentStore;
+    private readonly env: Record<string, string>;
+    private readonly hooks: ChatCoreHooks;
+    private readonly chats = new Map<string, ChatSession>();
+    private readonly creating = new Map<string, Promise<ChatInfo>>();
+    private readonly sinks = new ClientSinks<AgentEvent>((clientId) => this.composerPreferences.forget(clientId));
+    private readonly attached = new Map<string, Set<string>>();
     // How often a chat's bookmarks or visuals changed, so an attach can tell that its read went stale before it joined.
     private readonly listChanges = new Map<string, number>();
-    protected readonly coalescers = new Map<string, DeltaCoalescer>();
-    protected readonly subagents: SubagentReader;
+    private readonly coalescers = new Map<string, DeltaCoalescer>();
+    private readonly subagents: SubagentReader;
     /* Where Claude Code keeps the projects of its default account on this machine; empty when it has none. */
     readonly claudeProjectsDir: string;
     readonly composerPreferences = new ComposerPreferences();
@@ -226,6 +280,7 @@ export class ChatCore {
         this.nameChat = options.nameChat ?? null;
         this.onInterruptedRun = options.onInterruptedRun ?? null;
         this.limitResume = options.limitResume ?? null;
+        this.hooks = options.hooks ?? {};
         this.commands = {
             ...(options.command ? { claude: options.command } : {}),
             ...(options.codexCommand ? { codex: options.codexCommand } : {})
@@ -346,6 +401,11 @@ export class ChatCore {
         return this.sinks.subscribe(clientId, sink);
     }
 
+    /* Sends one client an event of the host's own, such as a change to something it follows that no chat event carries. */
+    sendTo(clientId: string, event: AgentEvent): void {
+        this.sinks.to(clientId, event);
+    }
+
     /* Registers a chat; nothing is spawned until the first message. An existing chat answers its current info. */
     create(payload: ChatCreatePayload): Promise<ChatInfo> {
         // A create in flight has the chat in the map before its first prompt is sent, so a second caller waits for all of it.
@@ -371,19 +431,20 @@ export class ChatCore {
         const kind = stored?.info.provider ?? payload.provider ?? 'claude';
         const provider = this.providers.get(kind);
         const catalog = provider.catalog;
-        const selection = catalog.normalize(stored?.info.selection ?? this.openingSelection(payload.chatId, kind) ?? payload.selection);
+        const selection = catalog.normalize(stored?.info.selection ?? this.hooks.openingSelection?.(payload.chatId, kind) ?? payload.selection);
         const cwd = stored?.info.cwd ?? payload.cwd ?? this.env.HOME ?? homedir();
-        await this.admit(payload.chatId, cwd);
+        await this.hooks.admit?.(payload.chatId, cwd);
         // A thread on disk keeps its account too. One it lost still opens, and says why on its next turn.
         // A new one without an account takes the person's pick for this CLI, which is refused rather than replaced when it went.
         const account = stored ? stored.info.account : storedAccount(kind, payload.account ?? this.composerPreferences.for(kind).account);
         if (!stored) {
             this.requireAccount(kind, account);
         }
+        const narrowed = (mode: RuntimeMode): RuntimeMode => (this.hooks.runtimeModeFor ? this.hooks.runtimeModeFor(payload.chatId, mode) : mode);
         // Asked again for a chat on disk, since the host may have listed it since.
-        const hidden = this.hiddenFor(payload.chatId) ? { hidden: true } : {};
+        const hidden = this.hooks.hiddenFor?.(payload.chatId) ? { hidden: true } : {};
         const info: ChatInfo = stored?.info
-            ? { ...withoutHidden(stored.info), runtimeMode: this.runtimeModeFor(payload.chatId, stored.info.runtimeMode), ...hidden }
+            ? { ...withoutHidden(stored.info), runtimeMode: narrowed(stored.info.runtimeMode), ...hidden }
             : {
                   ...hidden,
                   chatId: payload.chatId,
@@ -393,7 +454,7 @@ export class ChatCore {
                   agentSessionId: payload.resume ?? null,
                   model: null,
                   selection,
-                  runtimeMode: this.runtimeModeFor(payload.chatId, payload.runtimeMode ?? 'full-access'),
+                  runtimeMode: narrowed(payload.runtimeMode ?? 'full-access'),
                   status: 'idle',
                   running: false,
                   activeTurnId: null,
@@ -404,10 +465,10 @@ export class ChatCore {
         const resume: ResumeDecision = stored ? await this.owedResume(payload.chatId, stored) : { resumeTurnId: null, reason: null };
         const claudeTitles = this.claudeTitles;
         const nameChat = this.nameChat;
-        const base = this.envFor(payload.chatId, this.env);
+        const base = this.hooks.envFor ? this.hooks.envFor(payload.chatId, this.env) : this.env;
         this.logs.set(payload.chatId, await this.openLog(payload.chatId, stored ?? null));
-        const promptNotes = this.promptNotesFor(payload.chatId);
-        const references = this.referencesFor(payload.chatId);
+        const promptNotes = this.hooks.promptNotesFor?.(payload.chatId);
+        const references = this.hooks.referencesFor?.(payload.chatId);
         const session = new ChatSession({
             info,
             ...(this.uiFenceLanguage ? { uiFenceLanguage: this.uiFenceLanguage } : {}),
@@ -424,9 +485,9 @@ export class ChatCore {
                 return env;
             },
             saveGeneratedImage: (ref, upload) => this.attachments.saveGenerated(payload.chatId, ref, upload),
-            instructions: () => this.instructionsFor(payload.chatId),
-            resumeNote: () => this.resumeNoteFor(payload.chatId),
-            folders: () => this.foldersFor(payload.chatId),
+            instructions: () => (this.hooks.instructionsFor ? this.hooks.instructionsFor(payload.chatId) : this.instructions),
+            resumeNote: () => this.hooks.resumeNoteFor?.(payload.chatId) ?? null,
+            folders: () => this.hooks.foldersFor?.(payload.chatId) ?? [],
             ...(promptNotes ? { promptNotes } : {}),
             ...(references ? { references } : {}),
             ...(this.checkpoints ? { checkpoints: this.checkpoints } : {}),
@@ -448,7 +509,7 @@ export class ChatCore {
             session.settleOwedResume();
             await session.settleOrphanedSubagents();
         }
-        await this.opened(session, stored ?? null);
+        await this.hooks.opened?.(session, stored ?? null);
         return session.info;
     }
 
@@ -623,7 +684,8 @@ export class ChatCore {
         return this.visuals;
     }
 
-    history(chatId: string, cursor: string, limit?: number): ChatHistoryResult {
+    /* The page of a chat's thread before `cursor`, or its newest page without one. */
+    history(chatId: string, cursor?: string, limit?: number): ChatHistoryResult {
         const session = this.require(chatId);
         this.coalescers.get(chatId)?.flush();
         return session.thread.history(limit, cursor);
@@ -701,6 +763,59 @@ export class ChatCore {
     /* Whether a chat has a thread on disk, for work that must not make an empty chat of an id it only remembers. */
     async hasStored(chatId: string): Promise<boolean> {
         return this.chats.has(chatId) || (await this.store?.has(chatId)) === true;
+    }
+
+    /*
+     * Writes the whole record of a chat nobody has loaded, such as a fork's thread before anyone opens it.
+     * The files its messages and generated images point at are copied into its own folder, so removing
+     * the chat they came from leaves them.
+     */
+    async writeRecord(chatId: string, info: ChatInfo, items: ChatItem[], preambles: string[] = []): Promise<void> {
+        if (!this.store) {
+            throw new ChatError('chat-unsupported', 'This host keeps no chat records');
+        }
+        if (this.chats.has(chatId) || this.creating.has(chatId)) {
+            throw new ChatError('chat-busy', `Chat ${chatId} is already loaded`);
+        }
+        const copies = new Map<string, Promise<ChatAttachment>>();
+        const copy = (attachment: ChatAttachment): Promise<ChatAttachment> => {
+            let pending = copies.get(attachment.id);
+            if (!pending) {
+                pending = this.attachments.copy(chatId, attachment);
+                copies.set(attachment.id, pending);
+            }
+            return pending;
+        };
+        const copied = await Promise.all(
+            items.map(async (item): Promise<ChatItem> => {
+                if (item.kind === 'user' && item.attachments?.length) {
+                    return { ...item, attachments: await Promise.all(item.attachments.map(copy)) };
+                }
+                const generated = generatedImageAttachment(item);
+                if (item.kind === 'tool' && generated) {
+                    return { ...item, input: { ...(item.input as Record<string, unknown>), attachment: await copy(generated) } };
+                }
+                return item;
+            })
+        );
+        await this.store.write(chatId, info, copied, { seq: 0, resetSeq: 0 }, preambles);
+    }
+
+    /*
+     * Removes what a chat nobody loaded keeps on disk: its record and log, attachments, bookmarks and
+     * visuals. False, with nothing removed, for a chat that is loaded or loading; `kill` removes that one.
+     */
+    async deleteRecord(chatId: string): Promise<boolean> {
+        if (this.chats.has(chatId) || this.creating.has(chatId)) {
+            return false;
+        }
+        await Promise.all([
+            this.store?.delete(chatId),
+            this.attachments.removeAll(chatId),
+            this.bookmarks?.removeChat(chatId),
+            this.visuals?.removeChat(chatId)
+        ]);
+        return true;
     }
 
     /* The turn a chat took last, read off the record without loading a chat nobody has; null before its first. */
@@ -846,10 +961,10 @@ export class ChatCore {
         if (session.busy && !force) {
             throw new ChatError('chat-busy', `Chat ${chatId} is still working on the previous message`);
         }
-        await this.clearing(chatId);
+        await this.hooks.clearing?.(chatId);
         const ended = session.clear(force);
         // Before the record is written, so what it takes along from the record is gone from the write as well.
-        const cleared = this.cleared(chatId);
+        const cleared = this.hooks.cleared?.(chatId);
         // A debounced write still waiting holds the old thread and must not land after the empty one.
         this.cancelWaiting(chatId);
         // Folded right away: every line before the reset describes a thread that is gone.
@@ -928,7 +1043,7 @@ export class ChatCore {
         this.listChanges.delete(chatId);
         this.announced.delete(chatId);
         const snapshot = session.thread.snapshot();
-        this.forgotten(chatId);
+        this.hooks.forgotten?.(chatId);
         await writing;
         await ended;
         await Promise.all([
@@ -936,7 +1051,7 @@ export class ChatCore {
             this.attachments.removeAll(chatId),
             this.bookmarks?.removeChat(chatId),
             this.visuals?.removeChat(chatId),
-            this.removed(chatId, snapshot)
+            this.hooks.removed?.(chatId, snapshot)
         ]);
     }
 
@@ -982,7 +1097,7 @@ export class ChatCore {
             }
             await this.create({ chatId });
         }
-        await this.chats.get(chatId)?.resume(turnId, attempt, await this.resumeWords(chatId));
+        await this.chats.get(chatId)?.resume(turnId, attempt, (await this.hooks.resumeWords?.(chatId)) ?? DEFAULT_RESUME_WORDS);
     }
 
     /*
@@ -1002,7 +1117,7 @@ export class ChatCore {
             return;
         }
         const turn = session.thread.get(turnId);
-        const ended = this.endedAt(chatId);
+        const ended = this.hooks.endedAt?.(chatId) ?? null;
         if (turn !== undefined && ended !== null && ended >= turn.createdAt) {
             session.lapseResume();
             return;
@@ -1091,7 +1206,7 @@ export class ChatCore {
                     items,
                     { seq: log?.seq ?? 0, resetSeq: log?.resetSeq ?? 0 },
                     session.preambles,
-                    this.recordExtras(chatId),
+                    this.hooks.recordExtras?.(chatId) ?? {},
                     session.uiAccessRecord
                 );
             } catch (e) {
@@ -1110,11 +1225,6 @@ export class ChatCore {
         await this.creating.get(chatId)?.catch(() => undefined);
     }
 
-    protected persist(chatId: string): void {
-        this.cancelWaiting(chatId);
-        void this.persistNow(chatId).catch((e) => console.error(`Chat record for ${chatId} failed:`, errorText(e)));
-    }
-
     protected require(chatId: string): ChatSession {
         const session = this.chats.get(chatId);
         if (!session) {
@@ -1123,93 +1233,9 @@ export class ChatCore {
         return session;
     }
 
-    /* What the agent is told once at the start of every process of this chat; null for nothing. */
-    protected instructionsFor(_chatId: string): string | null {
-        return this.instructions;
-    }
-
-    /* What of the instructions a resumed thread hears again in front of its next prompt, for a CLI that ignores them on a resume. */
-    protected resumeNoteFor(_chatId: string): string | null {
-        return null;
-    }
-
-    /*
-     * Folders outside its working directory a chat's agent may reach without asking, absolute. Asked
-     * before every turn, so a host can hand one over for as long as it is needed: a change starts the
-     * next turn in a new process that resumes the thread, and never cuts a turn in flight.
-     */
-    protected foldersFor(_chatId: string): readonly string[] {
-        return [];
-    }
-
-    /* Whether no list of chats shows this one, which `ChatInfo.hidden` says to every client. */
-    protected hiddenFor(_chatId: string): boolean {
-        return false;
-    }
-
-    /* What the host says in front of a chat's next real prompt, beside what the chat keeps itself. */
-    protected promptNotesFor(_chatId: string): PromptNotes | undefined {
-        return undefined;
-    }
-
-    /* How the chats a person attached to a message are named to the agent; without it they are dropped. */
-    protected referencesFor(_chatId: string): ChatReferences | undefined {
-        return undefined;
-    }
-
-    /* The environment of this chat's CLI before its account adds its own. */
-    protected envFor(_chatId: string, base: Record<string, string>): Record<string, string | undefined> {
-        return base;
-    }
-
-    /* Throws for a folder this chat may not start in; asked every time a chat is loaded. */
-    protected async admit(_chatId: string, _cwd: string): Promise<void> {}
-
-    /* The model a new chat starts on when the host already knows; the explicit one still wins. */
-    protected openingSelection(_chatId: string, _kind: AgentKind): ModelSelection | undefined {
-        return undefined;
-    }
-
-    /* The mode a chat runs in, which a host may narrow whatever its record or its client says. */
-    protected runtimeModeFor(_chatId: string, mode: RuntimeMode): RuntimeMode {
-        return mode;
-    }
-
-    /* A chat just loaded or made, its stored turns settled; whatever the host lays down in it goes here. */
-    protected async opened(_session: ChatSession, _stored: ChatRecord | null): Promise<void> {}
-
-    /* What the host keeps in the chat's record beside the thread. */
-    protected recordExtras(_chatId: string): ChatRecordExtras {
-        return {};
-    }
-
-    /* The chat was cleared; what runs before the first await is in the record written right after. */
-    protected async cleared(_chatId: string): Promise<void> {}
-
-    protected async clearing(_chatId: string): Promise<void> {}
-
-    /* The chat left memory for good, before its files go. */
-    protected forgotten(_chatId: string): void {}
-
-    /* The chat was removed; what the host keeps of it goes along. */
-    protected async removed(_chatId: string, _chat: { info: ChatInfo; items: ChatItem[] }): Promise<void> {}
-
-    /* An event of a chat went out, after the observers and before the clients reading its thread. */
-    protected broadcasted(_chatId: string, _event: ChatEvent): void {}
-
-    /* When whoever opened this chat stopped it; a turn from before that is never taken up again. */
-    protected endedAt(_chatId: string): number | null {
-        return null;
-    }
-
-    /* Why a turn the host went down in stays down when `onInterruptedRun` says no, in the words of the note it ends with. */
-    protected unownedReason(_chatId: string): string {
-        return 'nothing holds this chat any more';
-    }
-
-    /* How a turn the host went down in is taken up in this chat. */
-    protected async resumeWords(_chatId: string): Promise<ResumeWords> {
-        return DEFAULT_RESUME_WORDS;
+    private persist(chatId: string): void {
+        this.cancelWaiting(chatId);
+        void this.persistNow(chatId).catch((e) => console.error(`Chat record for ${chatId} failed:`, errorText(e)));
     }
 
     /* A write that may wait: a long thread is not rewritten for every small change. */
@@ -1251,7 +1277,7 @@ export class ChatCore {
             }
             // A delta held back is already in the thread, so it gets its seq before the snapshot says where it ends.
             this.coalescers.get(chatId)?.flush();
-            const extras = this.recordExtras(chatId);
+            const extras = this.hooks.recordExtras?.(chatId) ?? {};
             const uiAccess = session.uiAccessRecord;
             const unlogged = JSON.stringify([session.preambles, extras, uiAccess]);
             const folds = fold || log.size > COMPACT_ABOVE_BYTES || !log.onDisk;
@@ -1301,7 +1327,7 @@ export class ChatCore {
         for (const sink of this.observers) {
             sink({ event: 'chat.event', payload });
         }
-        this.broadcasted(chatId, event);
+        this.hooks.broadcasted?.(chatId, event);
         for (const clientId of this.attached.get(chatId) ?? []) {
             this.sinks.to(clientId, { event: 'chat.event', payload });
         }
@@ -1374,7 +1400,7 @@ export class ChatCore {
         if (stored.info.agentSessionId === null) {
             return skip('the agent had not started a session to resume yet');
         }
-        const ended = this.endedAt(chatId);
+        const ended = this.hooks.endedAt?.(chatId) ?? null;
         if (ended !== null && ended >= turn.createdAt) {
             return skip('the agent that opened it was stopped');
         }
@@ -1383,7 +1409,7 @@ export class ChatCore {
         }
         try {
             const owed = await this.onInterruptedRun({ chatId, turnId: turn.id, attempt: (turn.attempt ?? 1) + (turn.resumePending ? 0 : 1) });
-            return owed ? { resumeTurnId: turn.id, reason: null } : skip(this.unownedReason(chatId));
+            return owed ? { resumeTurnId: turn.id, reason: null } : skip(this.hooks.unownedReason?.(chatId) ?? 'nothing holds this chat any more');
         } catch (e) {
             console.error(`Owing a resume for chat ${chatId} failed:`, errorText(e));
             return skip(errorText(e));
