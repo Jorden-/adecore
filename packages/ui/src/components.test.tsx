@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import i18next from 'i18next';
+import { create } from 'zustand';
 import { Bug, Cloud, GitBranch, Play, Rocket, Search, Server, X } from 'lucide-react';
 import { ButtonGroup } from './ButtonGroup.tsx';
 import { ColorSwatch } from './ColorSwatch.tsx';
@@ -25,6 +26,8 @@ import { Stepper } from './Stepper.tsx';
 import * as KeyValueList from './key-value-list/index.parts.ts';
 import * as Tabs from './tabs/index.parts.ts';
 import { Surface } from './Surface.tsx';
+import { Toasts } from './Toasts.tsx';
+import { createToastStore, type ToastStore } from './toast-store.ts';
 import { fakeFormatSource } from './testing/fake-source.ts';
 import { UIProvider } from './UIProvider.tsx';
 import { Waveform } from './Waveform.tsx';
@@ -629,5 +632,25 @@ describe('a sliding column', () => {
             expect(markup).toContain('sliding-column');
             expect(markup).toContain(`width:${open ? '380px' : '0'}`);
         }
+    });
+});
+
+describe('the toasts', () => {
+    test('keep their live region in the page while there is nothing to say', () => {
+        const markup = render(<Toasts store={createToastStore()} />);
+        expect(markup).toContain('role="status"');
+        expect(markup).toContain('aria-live="polite"');
+    });
+
+    test('draw an action as a button of the scale', () => {
+        // Server rendering reads a store's initial state, so the toast is in it from the start.
+        const store = create<ToastStore>(() => ({
+            toasts: [{ id: 'save', kind: 'error', title: 'Could not save', action: { label: 'Retry', run: () => {} } }],
+            show: () => 'save',
+            update: () => {},
+            dismiss: () => {}
+        }));
+        const markup = render(<Toasts store={store} />);
+        expect(markup).toMatch(/<button type="button" class="[^"]*\bh-6\b[^"]*">Retry<\/button>/);
     });
 });

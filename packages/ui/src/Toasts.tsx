@@ -2,6 +2,7 @@ import { useState, type ReactNode, type Ref } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { CircleAlert, CircleCheck, Trash, X } from 'lucide-react';
+import { Button } from './Button.tsx';
 import { Icon } from './Icon.tsx';
 import { IconButton } from './IconButton.tsx';
 import { Kbd } from './Kbd.tsx';
@@ -57,9 +58,9 @@ function TimerRing({ deadline, onDismiss }: { deadline: ToastDeadline; onDismiss
 function ActionButton({ action }: { action: ToastAction }) {
     return (
         <span className="flex items-center gap-2">
-            <button className="rounded-sm text-sm font-semibold text-text hover:text-text-muted" onClick={action.run}>
+            <Button size="xs" onClick={action.run}>
                 {action.label}
-            </button>
+            </Button>
             {action.shortcut && <Kbd shortcut={action.shortcut} className="font-sans text-xs text-text-faint" />}
         </span>
     );
@@ -90,7 +91,7 @@ function ToastCard<T extends Toast>({ toast, footer, onDismiss }: { toast: T; fo
                 )}
                 {/* Two or more would squeeze the title beside them, so they get a line of their own. */}
                 {actions.length > 1 && (
-                    <span className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <span className="mt-1 -ml-2 flex flex-wrap items-center gap-x-2 gap-y-1">
                         {actions.map((action) => (
                             <ActionButton key={action.label} action={action} />
                         ))}
@@ -133,9 +134,7 @@ export interface ToastsProps<T extends Toast> {
  */
 export function Toasts<T extends Toast>({ store, footer, className, ref }: ToastsProps<T>) {
     const toasts = store((state) => state.toasts);
-    if (toasts.length === 0) {
-        return null;
-    }
+    // Stays mounted with nothing in it: a screen reader skips what a live region says the moment it is inserted.
     return (
         <div
             ref={ref}
