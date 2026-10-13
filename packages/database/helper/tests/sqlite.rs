@@ -820,6 +820,13 @@ async fn sqlite_pages_statements() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn sqlite_bounds_responses_by_bytes() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut client = Client::new();
+    scenarios::bounds_responses_by_bytes(&mut scenario_db(&mut client, &directory).await).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn sqlite_drives_transactions() {
     let directory = tempfile::tempdir().unwrap();
     let mut client = Client::new();

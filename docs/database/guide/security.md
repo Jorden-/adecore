@@ -11,7 +11,7 @@ Treat whatever reaches `host.handle` as written by code you did not ship, such a
 `host.handle(request, owner)` takes `unknown` and checks it with [`parseRequest`](/database/api/host#parserequest) before anything reaches the helper:
 
 - A request has exactly the keys of its method. An unknown key is refused, so a typo cannot pass for an option the helper ignores.
-- An id is a string of 1 to 200 characters. `limit` is an integer from 1 to 10000, `cellLimit` from 1 to 1048576, and `offset` a safe integer of 0 or more.
+- An id is a string of 1 to 200 characters. `limit` is an integer from 1 to 10000, `cellLimit` from 1 to 1048576, `maxBytes` from 1 to 67108864, and `offset` a safe integer of 0 or more.
 - The path of a SQLite connection or of a file is absolute, since a relative one would resolve against the helper's working directory.
 - A port is an integer from 1 to 65535, a tunnel has the fields of its kind, and a format is one the method takes.
 - A binary value is lowercase hex of whole bytes, and a number is finite.

@@ -8,6 +8,8 @@ pub const MAX_LIMIT: i64 = 10_000;
 pub const DEFAULT_ROWS_CELL_LIMIT: usize = 1024;
 pub const DEFAULT_EXECUTE_LIMIT: usize = 500;
 pub const DEFAULT_EXECUTE_CELL_LIMIT: usize = 65_536;
+pub const DEFAULT_MAX_BYTES: usize = 8 * 1024 * 1024;
+pub const MAX_MAX_BYTES: i64 = 64 * 1024 * 1024;
 
 /// A bound parameter in terms both engines share.
 #[derive(Debug, Clone, PartialEq)]
@@ -60,13 +62,14 @@ pub struct Paging {
     pub limit: usize,
     pub offset: u64,
     pub cell_limit: usize,
+    pub max_bytes: usize,
 }
 
-pub fn paging(limit: i64, offset: i64, cell_limit: Option<i64>) -> Result<Paging> {
-    paging_with(limit, offset, cell_limit, DEFAULT_ROWS_CELL_LIMIT)
+pub fn paging(limit: i64, offset: i64, cell_limit: Option<i64>, max_bytes: Option<i64>) -> Result<Paging> {
+    paging_with(limit, offset, cell_limit, max_bytes, DEFAULT_ROWS_CELL_LIMIT)
 }
 
-pub fn paging_with(limit: i64, offset: i64, cell_limit: Option<i64>, default_cell_limit: usize) -> Result<Paging> {
+pub fn paging_with(limit: i64, offset: i64, cell_limit: Option<i64>, max_bytes: Option<i64>, default_cell_limit: usize) -> Result<Paging> {
     if !(1..=MAX_LIMIT).contains(&limit) {
         return Err(DatabaseError::invalid_request(format!("The limit must be between 1 and {MAX_LIMIT}.")));
     }
@@ -79,6 +82,7 @@ pub fn paging_with(limit: i64, offset: i64, cell_limit: Option<i64>, default_cel
         limit: limit as usize,
         offset: offset as u64,
         cell_limit: resolve_cell_limit(cell_limit, default_cell_limit)?,
+        max_bytes: resolve_max_bytes(max_bytes)?,
     })
 }
 
@@ -87,6 +91,14 @@ pub fn resolve_cell_limit(cell_limit: Option<i64>, default: usize) -> Result<usi
         None => Ok(default),
         Some(value) if value >= 0 => Ok(value as usize),
         Some(_) => Err(DatabaseError::invalid_request("The cell limit must not be negative.")),
+    }
+}
+
+pub fn resolve_max_bytes(max_bytes: Option<i64>) -> Result<usize> {
+    match max_bytes {
+        None => Ok(DEFAULT_MAX_BYTES),
+        Some(value) if (1..=MAX_MAX_BYTES).contains(&value) => Ok(value as usize),
+        Some(_) => Err(DatabaseError::invalid_request(format!("The byte limit must be between 1 and {MAX_MAX_BYTES}."))),
     }
 }
 
@@ -525,12 +537,15 @@ mod tests {
 
     #[test]
     fn validates_paging() {
-        assert!(paging(0, 0, None).is_err());
-        assert!(paging(10_001, 0, None).is_err());
-        assert!(paging(10, -1, None).is_err());
-        assert!(paging(10, 0, Some(-1)).is_err());
-        let page = paging(10_000, 5, None).unwrap();
-        assert_eq!((page.limit, page.offset, page.cell_limit), (10_000, 5, 1024));
+        assert!(paging(0, 0, None, None).is_err());
+        assert!(paging(10_001, 0, None, None).is_err());
+        assert!(paging(10, -1, None, None).is_err());
+        assert!(paging(10, 0, Some(-1), None).is_err());
+        assert!(paging(10, 0, None, Some(0)).is_err());
+        assert!(paging(10, 0, None, Some(MAX_MAX_BYTES + 1)).is_err());
+        let page = paging(10_000, 5, None, None).unwrap();
+        assert_eq!((page.limit, page.offset, page.cell_limit, page.max_bytes), (10_000, 5, 1024, DEFAULT_MAX_BYTES));
+        assert_eq!(paging(10, 0, None, Some(MAX_MAX_BYTES)).unwrap().max_bytes, MAX_MAX_BYTES as usize);
     }
 
     #[test]

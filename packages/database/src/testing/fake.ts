@@ -93,6 +93,7 @@ const SYSTEM_SCHEMAS = ['information_schema', 'mysql', 'performance_schema', 'sy
 const DEFAULT_ROWS_CELL_LIMIT = 1024;
 const DEFAULT_EXECUTE_LIMIT = 500;
 const DEFAULT_EXECUTE_CELL_LIMIT = 65536;
+const DEFAULT_MAX_BYTES = 8388608;
 
 const toTables = (database: FakeDatabase): Map<string, Map<string, Table>> =>
     new Map(
@@ -188,12 +189,25 @@ const toCell = (value: Value, cellLimit: number): Cell => {
 const toResultColumns = (table: Table): ResultColumn[] =>
     table.columns.map(({ name, type, kind }) => ({ name, type, kind, source: { schema: table.schema, table: table.name, column: name } }));
 
-const toRowsResult = (table: Table, rows: readonly (readonly Value[])[], offset: number, limit: number, cellLimit: number): RowsResult => ({
-    columns: toResultColumns(table),
-    rows: rows.slice(offset, offset + limit).map((row) => row.map((value) => toCell(value, cellLimit))),
-    hasMore: rows.length > offset + limit,
-    elapsedMs: 0
-});
+/* What the rows of one response may still take, shared by the results of a script as the helper does. */
+interface ByteBudget {
+    left: number;
+}
+
+const toRowsResult = (table: Table, rows: readonly (readonly Value[])[], offset: number, limit: number, cellLimit: number, budget: ByteBudget): RowsResult => {
+    const page: Cell[][] = [];
+    for (const row of rows.slice(offset, offset + limit)) {
+        const cells = row.map((value) => toCell(value, cellLimit));
+        // Characters rather than bytes: near enough for a fake.
+        const size = JSON.stringify(cells).length;
+        if (page.length > 0 && size > budget.left) {
+            return { columns: toResultColumns(table), rows: page, hasMore: true, elapsedMs: 0 };
+        }
+        budget.left = Math.max(0, budget.left - size);
+        page.push(cells);
+    }
+    return { columns: toResultColumns(table), rows: page, hasMore: rows.length > offset + limit, elapsedMs: 0 };
+};
 
 /* Evaluates the default of a column for a row an insert or an update leaves it out of. */
 const defaultOf = (column: ColumnInfo, table: Table): Value => {
@@ -314,10 +328,10 @@ const selectedTable = (session: Session, sql: string): Table => {
     return findTable(session, session.schema ?? session.schemas.keys().next().value ?? '', name);
 };
 
-const runStatement = (session: Session, sql: string, limit: number, cellLimit: number): StatementResult => {
+const runStatement = (session: Session, sql: string, limit: number, cellLimit: number, budget: ByteBudget): StatementResult => {
     try {
         const table = selectedTable(session, sql);
-        return { kind: 'rows', sql, ...toRowsResult(table, table.rows, 0, limit, cellLimit) };
+        return { kind: 'rows', sql, ...toRowsResult(table, table.rows, 0, limit, cellLimit, budget) };
     } catch (error) {
         if (error instanceof FakeError) {
             return {
@@ -422,9 +436,9 @@ export const fakeDatabaseTransport = (options: FakeDatabaseTransportOptions): Da
                 ddl: table.ddl
             };
         },
-        rows: ({ session, schema, table: name, offset, limit, cellLimit }) => {
+        rows: ({ session, schema, table: name, offset, limit, cellLimit, maxBytes }) => {
             const table = findTable(sessionOf(session), schema, name);
-            return toRowsResult(table, table.rows, offset, limit, cellLimit ?? DEFAULT_ROWS_CELL_LIMIT);
+            return toRowsResult(table, table.rows, offset, limit, cellLimit ?? DEFAULT_ROWS_CELL_LIMIT, { left: maxBytes ?? DEFAULT_MAX_BYTES });
         },
         count: ({ session, schema, table: name }) => ({ count: findTable(sessionOf(session), schema, name).rows.length }),
         cell: ({ session, schema, table: name, key, column }) => {
@@ -452,17 +466,18 @@ export const fakeDatabaseTransport = (options: FakeDatabaseTransportOptions): Da
 
             return { affected: applyChanges(findTable(target, schema, name), changes) };
         },
-        execute: ({ session, sql, schema, limit, cellLimit }) => {
+        execute: ({ session, sql, schema, limit, cellLimit, maxBytes }) => {
             const target = sessionOf(session);
             selectSchema(target, schema);
 
             const results: StatementResult[] = [];
+            const budget = { left: maxBytes ?? DEFAULT_MAX_BYTES };
 
             for (const statement of sql
                 .split(';')
                 .map((part) => part.trim())
                 .filter((part) => part.length > 0)) {
-                const result = runStatement(target, statement, limit ?? DEFAULT_EXECUTE_LIMIT, cellLimit ?? DEFAULT_EXECUTE_CELL_LIMIT);
+                const result = runStatement(target, statement, limit ?? DEFAULT_EXECUTE_LIMIT, cellLimit ?? DEFAULT_EXECUTE_CELL_LIMIT, budget);
                 results.push(result);
 
                 if (result.kind === 'error') {
@@ -472,11 +487,11 @@ export const fakeDatabaseTransport = (options: FakeDatabaseTransportOptions): Da
 
             return { results, inTransaction: target.inTransaction };
         },
-        page: ({ session, sql, schema, offset, limit, cellLimit }) => {
+        page: ({ session, sql, schema, offset, limit, cellLimit, maxBytes }) => {
             const target = sessionOf(session);
             selectSchema(target, schema);
             const table = selectedTable(target, sql);
-            return toRowsResult(table, table.rows, offset, limit, cellLimit ?? DEFAULT_EXECUTE_CELL_LIMIT);
+            return toRowsResult(table, table.rows, offset, limit, cellLimit ?? DEFAULT_EXECUTE_CELL_LIMIT, { left: maxBytes ?? DEFAULT_MAX_BYTES });
         },
         transaction: ({ session, action }) => {
             const target = sessionOf(session);

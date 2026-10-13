@@ -785,7 +785,7 @@ function TableBody({ connection, schema, table, toolbarStart, defaultWhere, defa
                         selection={selectionFigures}
                         onCount={() => void countRows()}
                         onPrevious={() => goToPage(offset - pageSize)}
-                        onNext={() => goToPage(offset + pageSize)}
+                        onNext={() => goToPage(bounds.to)}
                     />
                 </>
             )}

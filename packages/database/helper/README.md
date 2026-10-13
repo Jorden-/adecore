@@ -96,7 +96,8 @@ The contract lives in TypeScript, in `src/protocol` of the package, with shared 
 - `where` and `orderBy` reach the server as written, inside one statement. Each is followed by a newline so a trailing `--` comment cannot swallow the rest. SQLite refuses a second statement when it prepares; MySQL refuses it because `rows` uses the prepared protocol.
 - Integers outside the safe range of a JSON number cross as strings. Decimals, dates, times and datetimes cross as the server's text and are never cut to a preview; text and binary values are cut at `cellLimit`.
 - The MySQL connection asks for found rows rather than changed rows, so an update that sets the same values still counts as a hit in `apply`.
-- `execute` on MySQL sets `sql_select_limit` to the limit plus one for the whole script and restores the default afterwards. An explicit `LIMIT` in a statement overrides it.
+- `execute` on MySQL sets `sql_select_limit` to the limit plus one for the whole script, in the same round trip as the `USE` of `schema`, and restores the default afterwards. An explicit `LIMIT` in a statement overrides it.
+- `rows`, `page` and `execute` stop reading rows at `maxBytes` (8 MiB when left out) of JSON and answer `hasMore`; the results of a script share one budget, and the first row of every result always comes. A response is serialized straight to its line, never to a `serde_json::Value` first. MySQL still reads the rows past the cut off the wire, up to the limit, before the connection takes the next statement.
 - `tls: "verify"` checks the certificate against the bundled Mozilla roots and the host name. A server with a private certificate authority can only use `require`.
 
 ## Limits

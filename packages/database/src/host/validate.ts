@@ -7,6 +7,7 @@ export type ParsedRequest =
 const MAX_ID_LENGTH = 200;
 const MAX_LIMIT = 10000;
 const MAX_CELL_LIMIT = 1048576;
+const MAX_BYTES = 67108864;
 const TLS_MODES = ['disable', 'prefer', 'require', 'verify'];
 const TRANSACTION_ACTIONS = ['begin', 'commit', 'rollback'];
 const EXPORT_FORMATS = ['csv', 'tsv', 'json', 'sql'];
@@ -250,6 +251,8 @@ const exportSource = (input: unknown, label: string): void => {
 
 const cellLimit = (params: Dict): void => optional(params, 'cellLimit', 'params', (limit, name) => integer(limit, name, 1, MAX_CELL_LIMIT));
 
+const maxBytes = (params: Dict): void => optional(params, 'maxBytes', 'params', (limit, name) => integer(limit, name, 1, MAX_BYTES));
+
 const table = (params: Dict): void => {
     filledText(params.session, 'params.session');
     filledText(params.schema, 'params.schema');
@@ -270,13 +273,14 @@ const PARAMS: { readonly [M in DatabaseMethod]: (input: unknown) => void } = {
     },
     structure: (input) => table(shape(input, 'params', TARGET)),
     rows: (input) => {
-        const params = shape(input, 'params', [...TARGET, 'offset', 'limit'], ['where', 'orderBy', 'cellLimit']);
+        const params = shape(input, 'params', [...TARGET, 'offset', 'limit'], ['where', 'orderBy', 'cellLimit', 'maxBytes']);
         table(params);
         optional(params, 'where', 'params', anyText);
         optional(params, 'orderBy', 'params', anyText);
         integer(params.offset, 'params.offset', 0, Number.MAX_SAFE_INTEGER);
         integer(params.limit, 'params.limit', 1, MAX_LIMIT);
         cellLimit(params);
+        maxBytes(params);
     },
     count: (input) => {
         const params = shape(input, 'params', TARGET, ['where']);
@@ -301,21 +305,23 @@ const PARAMS: { readonly [M in DatabaseMethod]: (input: unknown) => void } = {
         params.changes.forEach((change, i) => rowChange(change, `params.changes[${i}]`));
     },
     execute: (input) => {
-        const params = shape(input, 'params', ['session', 'sql'], ['schema', 'limit', 'cellLimit']);
+        const params = shape(input, 'params', ['session', 'sql'], ['schema', 'limit', 'cellLimit', 'maxBytes']);
         filledText(params.session, 'params.session');
         filledText(params.sql, 'params.sql');
         optional(params, 'schema', 'params', filledText);
         optional(params, 'limit', 'params', (limit, name) => integer(limit, name, 1, MAX_LIMIT));
         cellLimit(params);
+        maxBytes(params);
     },
     page: (input) => {
-        const params = shape(input, 'params', ['session', 'sql', 'offset', 'limit'], ['schema', 'cellLimit']);
+        const params = shape(input, 'params', ['session', 'sql', 'offset', 'limit'], ['schema', 'cellLimit', 'maxBytes']);
         filledText(params.session, 'params.session');
         filledText(params.sql, 'params.sql');
         optional(params, 'schema', 'params', filledText);
         integer(params.offset, 'params.offset', 0, Number.MAX_SAFE_INTEGER);
         integer(params.limit, 'params.limit', 1, MAX_LIMIT);
         cellLimit(params);
+        maxBytes(params);
     },
     transaction: (input) => {
         const params = shape(input, 'params', ['session', 'action']);

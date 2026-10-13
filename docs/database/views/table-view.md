@@ -37,7 +37,7 @@ A cell's menu has Filter on (`column = value`, or `IS NULL`), Exclude and Sort b
 
 ## Paging and counting
 
-The status bar shows the rows on the page, the total and the time of the read. Until the rows are counted, the total is a lower bound: a page with more rows after it reads `of 501+`. That figure is a button that counts the rows matching the filters with `count`, which can be slow on a big table; a new filter cancels it. First page and Last page are in the More menu, and Last page counts first when it has to.
+The status bar shows the rows on the page, the total and the time of the read. Until the rows are counted, the total is a lower bound: a page with more rows after it reads `of 501+`. That figure is a button that counts the rows matching the filters with `count`, which can be slow on a big table; a new filter cancels it. First page and Last page are in the More menu, and Last page counts first when it has to. A page of wide rows can hold fewer rows than the page size, since the helper keeps a response under its [byte limit](/database/guide/protocol#methods); Next page then goes on after the last row shown.
 
 ## Selecting and copying
 

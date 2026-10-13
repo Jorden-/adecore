@@ -4,7 +4,7 @@ import type { ResultColumn, SchemaInfo, TableInfo, TableStructure } from './sche
 import type { Cell, EditValue, Value } from './values.ts';
 
 /* Raised whenever a message changes shape, so a host refuses a helper from another release. */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 export type RowKey = Readonly<Record<string, Value>>;
 
@@ -16,7 +16,10 @@ export type RowChange =
 export interface RowsResult {
     readonly columns: readonly ResultColumn[];
     readonly rows: readonly (readonly Cell[])[];
-    /* Whether a row exists past this page, which the helper learns by reading one row more than the limit. */
+    /*
+     * Whether a row exists past this page, which the helper learns by reading one row more than the limit. Also true
+     * when the rows stopped at `maxBytes` before the limit: the next page then starts after the rows that came.
+     */
     readonly hasMore: boolean;
     readonly elapsedMs: number;
 }
@@ -66,6 +69,11 @@ export interface DatabaseMethods {
             readonly limit: number;
             /* Characters of text, or bytes of a binary value, before a cell becomes a preview. 1024 when left out. */
             readonly cellLimit?: number;
+            /*
+             * Bytes of JSON the rows of the response may take, at most 67108864; 8388608 when left out. The rows stop
+             * before the one that would pass it, except the first row of a result, which always comes.
+             */
+            readonly maxBytes?: number;
         };
         result: RowsResult;
     };
@@ -85,6 +93,8 @@ export interface DatabaseMethods {
             readonly limit?: number;
             /* As for `rows`; 65536 when left out. */
             readonly cellLimit?: number;
+            /* As for `rows`, for the results of every statement together. */
+            readonly maxBytes?: number;
         };
         /* `inTransaction` says whether a transaction is open after the last statement, also one the SQL itself began or ended. */
         result: { readonly results: readonly StatementResult[]; readonly inTransaction: boolean };
@@ -102,6 +112,7 @@ export interface DatabaseMethods {
             readonly offset: number;
             readonly limit: number;
             readonly cellLimit?: number;
+            readonly maxBytes?: number;
         };
         result: RowsResult;
     };

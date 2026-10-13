@@ -949,6 +949,15 @@ async fn mysql_pages_statements() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn mysql_bounds_responses_by_bytes() {
+    let Some(mut sandbox) = Sandbox::new("bytes").await else {
+        return;
+    };
+    scenarios::bounds_responses_by_bytes(&mut sandbox.db()).await;
+    sandbox.finish().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn mysql_drives_transactions() {
     let Some(mut sandbox) = Sandbox::new("transaction").await else {
         return;

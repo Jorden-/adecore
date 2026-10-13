@@ -58,6 +58,8 @@ type Run =
 interface PageState {
     readonly offset: number;
     readonly rows: RowsResult;
+    /* Where each page before this one started: a page the byte limit cut short holds fewer rows than `PAGE_SIZE`. */
+    readonly before: readonly number[];
 }
 
 /* Rows in the first page of a result, and in every page after it. */
@@ -345,7 +347,7 @@ export function QueryConsole({
         }
     };
 
-    const loadPage = async (index: number, result: StatementResult, offset: number): Promise<void> => {
+    const loadPage = async (index: number, result: StatementResult, offset: number, before: readonly number[]): Promise<void> => {
         if (session === null) {
             return;
         }
@@ -355,7 +357,7 @@ export function QueryConsole({
         try {
             const rows = await session.page(result.sql, { schema: activeSchema, offset, limit: PAGE_SIZE });
             if (generation.current === mine) {
-                setPages((current) => ({ ...current, [index]: { offset, rows } }));
+                setPages((current) => ({ ...current, [index]: { offset, rows, before } }));
             }
         } catch (error) {
             notify({ tone: 'error', title: t('console.pageFailed'), description: messageOf(error) });
@@ -388,13 +390,14 @@ export function QueryConsole({
     const page = pages[index];
     const shown: StatementResult | undefined = base?.kind === 'rows' && page !== undefined ? { kind: 'rows', sql: base.sql, ...page.rows } : base;
     const offset = page?.offset ?? 0;
+    const before = page?.before ?? [];
     const pager: ResultPager | undefined =
         base?.kind === 'rows' && shown?.kind === 'rows' && engine !== undefined && isPageable(base.sql, engine) && (shown.hasMore || offset > 0)
             ? {
-                  page: offset / PAGE_SIZE + 1,
+                  page: before.length + 1,
                   loading: paging,
-                  onPrevious: () => void loadPage(index, base, Math.max(0, offset - PAGE_SIZE)),
-                  onNext: () => void loadPage(index, base, offset + PAGE_SIZE)
+                  onPrevious: () => void loadPage(index, base, before.at(-1) ?? 0, before.slice(0, -1)),
+                  onNext: () => void loadPage(index, base, offset + shown.rows.length, [...before, offset])
               }
             : undefined;
     const exportBase = files !== undefined && base?.kind === 'rows' ? base : undefined;

@@ -521,3 +521,47 @@ describe.skipIf(typeof document === 'undefined')('the notices of a QueryConsole'
         expect(byText('button', 'Dismiss')).toBeDefined();
     });
 });
+
+describe.skipIf(typeof document === 'undefined')('paging a QueryConsole result the byte limit cut short', () => {
+    let recorded: RecordedTransport;
+    let client: ReturnType<typeof clientOver>;
+    let mounted: Mounted;
+    const pageOf = (offset: number, count: number) => ({
+        columns: [{ name: 'id', type: 'INTEGER', kind: 'integer' as const }],
+        rows: Array.from({ length: count }, (_, index) => [offset + index + 1]),
+        hasMore: true,
+        elapsedMs: 0
+    });
+    const offsets = (): number[] => recorded.of('page').map((request) => request.params.offset);
+
+    beforeEach(async () => {
+        recorded = recordTransport(fakeDatabaseTransport({ databases: { [SHOP_PATH]: shopDatabase } }));
+        recorded.onExecute((sql) => [{ kind: 'rows', sql, ...pageOf(0, 3) }]);
+        recorded.respond('page', ({ offset }) => pageOf(offset, 2));
+        client = clientOver(recorded.transport);
+        mounted = await mount(<QueryConsole connection={connection} defaultValue="SELECT * FROM orders" />, { client });
+    });
+
+    afterEach(async () => {
+        await mounted.unmount();
+        await client.dispose();
+    });
+
+    test('starts the next page after the rows that came, and goes back to where the page before started', async () => {
+        await click(byText('button', 'Run'));
+        await waitFor(() => expect(findAll('[role=gridcell]')).toHaveLength(3));
+
+        await click(byLabel('Next page'));
+        await waitFor(() => expect(document.body.textContent).toContain('Page 2'));
+        await click(byLabel('Next page'));
+        await waitFor(() => expect(document.body.textContent).toContain('Page 3'));
+        expect(offsets()).toEqual([3, 5]);
+        expect(findAll('[role=rowheader]').map((header) => header.textContent)).toEqual(['6', '7']);
+
+        await click(byLabel('Previous page'));
+        await waitFor(() => expect(document.body.textContent).toContain('Page 2'));
+        await click(byLabel('Previous page'));
+        await waitFor(() => expect(document.body.textContent).toContain('Page 1'));
+        expect(offsets()).toEqual([3, 5, 3, 0]);
+    });
+});

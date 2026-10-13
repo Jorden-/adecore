@@ -45,24 +45,24 @@ const tables = await session.tables('main');
 const page = await session.rows('main', 'customers', { offset: 0, limit: 100, where: "country = 'NL'", orderBy: 'name' });
 ```
 
-| Method                                       | Resolves with                                                                     |
-| -------------------------------------------- | --------------------------------------------------------------------------------- |
-| `server(options?)`                           | The `ServerInfo`. Opens the connection if it is not open.                         |
-| `schemas(options?)`                          | `readonly SchemaInfo[]`                                                           |
-| `tables(schema, options?)`                   | `readonly TableInfo[]`                                                            |
-| `structure(schema, table, options?)`         | `TableStructure`                                                                  |
-| `rows(schema, table, query, options?)`       | `RowsResult` for a `RowsQuery`: `{ offset, limit, where?, orderBy?, cellLimit? }` |
-| `count(schema, table, where?, options?)`     | The number of rows                                                                |
-| `cell(schema, table, key, column, options?)` | The whole `Value` of one cell                                                     |
-| `apply(schema, table, changes, options?)`    | The number of rows affected                                                       |
-| `execute(sql, options?)`                     | `ExecuteResult`: `results`, one per statement, and `inTransaction`                |
-| `page(sql, query, options?)`                 | `RowsResult` for a `PageQuery`: `{ offset, limit, schema?, cellLimit? }`          |
-| `transaction(action, options?)`              | Whether a transaction is open after `'begin'`, `'commit'` or `'rollback'`         |
-| `export(request, options?)`                  | `ExportResult`: `rows`, `bytes` and `elapsedMs`                                   |
-| `import(schema, table, request, options?)`   | The number of rows inserted                                                       |
-| `close()`                                    | Nothing. Closes the session.                                                      |
+| Method                                       | Resolves with                                                                                |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `server(options?)`                           | The `ServerInfo`. Opens the connection if it is not open.                                    |
+| `schemas(options?)`                          | `readonly SchemaInfo[]`                                                                      |
+| `tables(schema, options?)`                   | `readonly TableInfo[]`                                                                       |
+| `structure(schema, table, options?)`         | `TableStructure`                                                                             |
+| `rows(schema, table, query, options?)`       | `RowsResult` for a `RowsQuery`: `{ offset, limit, where?, orderBy?, cellLimit?, maxBytes? }` |
+| `count(schema, table, where?, options?)`     | The number of rows                                                                           |
+| `cell(schema, table, key, column, options?)` | The whole `Value` of one cell                                                                |
+| `apply(schema, table, changes, options?)`    | The number of rows affected                                                                  |
+| `execute(sql, options?)`                     | `ExecuteResult`: `results`, one per statement, and `inTransaction`                           |
+| `page(sql, query, options?)`                 | `RowsResult` for a `PageQuery`: `{ offset, limit, schema?, cellLimit?, maxBytes? }`          |
+| `transaction(action, options?)`              | Whether a transaction is open after `'begin'`, `'commit'` or `'rollback'`                    |
+| `export(request, options?)`                  | `ExportResult`: `rows`, `bytes` and `elapsedMs`                                              |
+| `import(schema, table, request, options?)`   | The number of rows inserted                                                                  |
+| `close()`                                    | Nothing. Closes the session.                                                                 |
 
-Every method but `close` takes `RequestOptions` last, which is `{ signal? }`; `ExecuteOptions` adds `schema`, `limit` and `cellLimit`. What each method does on the server is under [Methods](/database/guide/protocol#methods). An `ExportRequest` is `{ source, format, path, header?, tableName? }` and an `ImportRequest` is `{ path, format, header, columns }`; see [Files](/database/guide/files). A `TableRef` names a table by `connectionId`, `schema` and `table`, for code that passes tables around.
+Every method but `close` takes `RequestOptions` last, which is `{ signal? }`; `ExecuteOptions` adds `schema`, `limit`, `cellLimit` and `maxBytes`. What each method does on the server is under [Methods](/database/guide/protocol#methods). An `ExportRequest` is `{ source, format, path, header?, tableName? }` and an `ImportRequest` is `{ path, format, header, columns }`; see [Files](/database/guide/files). A `TableRef` names a table by `connectionId`, `schema` and `table`, for code that passes tables around.
 
 ## Retry rules
 

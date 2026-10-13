@@ -22,7 +22,7 @@ fn speaks_the_protocol_over_stdio() {
     stdout.read_line(&mut ready).unwrap();
     assert_eq!(
         ready.trim_end(),
-        format!(r#"{{"event":"ready","protocol":4,"version":"{}"}}"#, env!("CARGO_PKG_VERSION"))
+        format!(r#"{{"event":"ready","protocol":5,"version":"{}"}}"#, env!("CARGO_PKG_VERSION"))
     );
 
     let open = json!({ "id": "a", "method": "open", "params": { "connection": { "engine": "sqlite", "path": path.to_str().unwrap(), "create": true } } });

@@ -6,7 +6,6 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
 use serde::Serialize;
-use serde_json::Value as Json;
 use tokio::sync::{OwnedRwLockReadGuard, RwLock, mpsc, oneshot};
 
 use crate::engine::{self, Canceller, Engine};
@@ -25,8 +24,9 @@ fn locked<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-fn to_json<T: Serialize>(value: T) -> Result<Json> {
-    serde_json::to_value(value).map_err(|e| DatabaseError::internal(format!("Could not serialize the result: {e}.")))
+/// A result as the JSON text of its response, written straight from the value.
+fn to_json<T: Serialize>(value: T) -> Result<String> {
+    serde_json::to_string(&value).map_err(|e| DatabaseError::internal(format!("Could not serialize the result: {e}.")))
 }
 
 /// The id of the request a session is executing right now, if any.
@@ -49,7 +49,7 @@ struct Command {
     id: String,
     state: Arc<RequestState>,
     call: Call,
-    reply: oneshot::Sender<Result<Json>>,
+    reply: oneshot::Sender<Result<String>>,
 }
 
 struct SessionHandle {
@@ -184,7 +184,7 @@ impl Dispatcher {
         })
     }
 
-    async fn open(self: Arc<Self>, params: OpenParams) -> Result<Json> {
+    async fn open(self: Arc<Self>, params: OpenParams) -> Result<String> {
         let (engine, server, canceller) = engine::connect(&params.connection).await?;
         let session = format!("s{}", self.counter.fetch_add(1, Ordering::SeqCst) + 1);
         let (queue, commands) = mpsc::unbounded_channel();
@@ -215,7 +215,7 @@ impl Dispatcher {
         to_json(OpenResult { session, server })
     }
 
-    async fn cancel(self: Arc<Self>, params: CancelParams) -> Result<Json> {
+    async fn cancel(self: Arc<Self>, params: CancelParams) -> Result<String> {
         let state = locked(&self.running).get(&params.request).cloned();
 
         let Some(state) = state else {
@@ -342,14 +342,14 @@ fn finish(state: &RequestState, running: &Running) -> bool {
     state.cancelled.load(Ordering::SeqCst)
 }
 
-async fn test(params: OpenParams) -> Result<Json> {
+async fn test(params: OpenParams) -> Result<String> {
     let (engine, server, _) = engine::connect(&params.connection).await?;
     engine.close().await;
 
     to_json(TestResult { server })
 }
 
-async fn sample(params: SampleParams) -> Result<Json> {
+async fn sample(params: SampleParams) -> Result<String> {
     let sampled = tokio::task::spawn_blocking(move || import::sample(&params))
         .await
         .map_err(|e| DatabaseError::internal(format!("The file reader failed: {e}.")))??;
@@ -357,14 +357,14 @@ async fn sample(params: SampleParams) -> Result<Json> {
     to_json(sampled)
 }
 
-async fn discover(params: DiscoverParams) -> Result<Json> {
+async fn discover(params: DiscoverParams) -> Result<String> {
     to_json(discover::discover(params).await?)
 }
 
 /// Runs a request in a task of its own, so a panic answers `internal` instead of ending the helper.
 fn isolated<F>(id: String, work: F) -> ResponseFuture
 where
-    F: Future<Output = Result<Json>> + Send + 'static,
+    F: Future<Output = Result<String>> + Send + 'static,
 {
     Box::pin(async move {
         let outcome = match tokio::spawn(work).await {
@@ -419,7 +419,7 @@ async fn session_worker(worker: Worker, mut engine: Engine, mut commands: mpsc::
         if matches!(call, Call::Close(_)) {
             engine.close().await;
             finish(&state, &running);
-            let _ = reply.send(Ok(Json::Null));
+            let _ = reply.send(Ok("null".to_string()));
 
             return;
         }
@@ -489,7 +489,7 @@ fn fail_queued(commands: &mut mpsc::UnboundedReceiver<Command>, running: &Runnin
     }
 }
 
-async fn run_call(engine: &mut Engine, call: Call, cancelled: Arc<AtomicBool>) -> Result<Json> {
+async fn run_call(engine: &mut Engine, call: Call, cancelled: Arc<AtomicBool>) -> Result<String> {
     match call {
         Call::Schemas(_) => to_json(engine.schemas().await?),
         Call::Tables(params) => to_json(engine.tables(params).await?),
@@ -513,7 +513,7 @@ async fn run_call(engine: &mut Engine, call: Call, cancelled: Arc<AtomicBool>) -
 mod tests {
     use super::*;
 
-    async fn answer(dispatcher: &Arc<Dispatcher>, line: serde_json::Value) -> Json {
+    async fn answer(dispatcher: &Arc<Dispatcher>, line: serde_json::Value) -> serde_json::Value {
         serde_json::from_str(&dispatcher.submit(&line.to_string()).await).unwrap()
     }
 
@@ -538,7 +538,7 @@ mod tests {
         assert!(!next.is_finished(), "the next request waits for the kill");
 
         drop(held);
-        let line: Json = serde_json::from_str(&tokio::time::timeout(Duration::from_secs(5), next).await.unwrap().unwrap()).unwrap();
+        let line: serde_json::Value = serde_json::from_str(&tokio::time::timeout(Duration::from_secs(5), next).await.unwrap().unwrap()).unwrap();
         assert_eq!(line["result"]["results"][0]["rows"], serde_json::json!([[1]]));
         assert!(gate.try_read_owned().is_ok(), "the gate is free again for the next kill");
     }

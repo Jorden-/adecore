@@ -2,7 +2,7 @@
   "request": {
     "id": "r4",
     "method": "rows",
-    "params": { "session": "s1", "schema": "main", "table": "users", "where": "id > 1", "orderBy": "email DESC", "offset": 0, "limit": 2, "cellLimit": 16 }
+    "params": { "session": "s1", "schema": "main", "table": "users", "where": "id > 1", "orderBy": "email DESC", "offset": 0, "limit": 2, "cellLimit": 16, "maxBytes": 1048576 }
   },
   "response": {
     "id": "r4",

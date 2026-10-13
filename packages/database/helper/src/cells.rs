@@ -100,6 +100,64 @@ pub fn cell_to_value(cell: Cell) -> Value {
     }
 }
 
+/// The longest a number takes as JSON, `-1.7976931348623157e308`, with room to spare.
+const NUMBER_BYTES: usize = 24;
+/// What a preview adds around its text: the braces, the keys, the kind and the length.
+const PREVIEW_BYTES: usize = 64;
+
+/// How much of a response the rows of its results may take, so the line a host reads and parses stays a bounded size.
+pub struct ByteBudget {
+    left: usize,
+}
+
+impl ByteBudget {
+    pub fn new(max_bytes: usize) -> Self {
+        ByteBudget { left: max_bytes }
+    }
+
+    /// Takes the row out of the budget when it fits. The first row of a result always does, so paging moves on
+    /// however wide one row is; a response is therefore at most the budget plus one row per result.
+    pub fn admit(&mut self, row: &[Cell], first: bool) -> bool {
+        let size = row_bytes(row);
+
+        if !first && size > self.left {
+            return false;
+        }
+
+        self.left = self.left.saturating_sub(size);
+
+        true
+    }
+}
+
+/// The length of a row written as JSON, exact for text and an upper bound for a number.
+pub fn row_bytes(row: &[Cell]) -> usize {
+    2 + row.iter().map(|cell| cell_bytes(cell) + 1).sum::<usize>()
+}
+
+fn cell_bytes(cell: &Cell) -> usize {
+    match cell {
+        Cell::Null => 4,
+        Cell::Bool(_) => 5,
+        Cell::Number(_) => NUMBER_BYTES,
+        Cell::Text(text) => string_bytes(text),
+        Cell::Object(CellObject::Binary { hex, .. }) => hex.len() + 2 + PREVIEW_BYTES,
+        Cell::Object(CellObject::LongText { preview, .. }) => string_bytes(preview) + PREVIEW_BYTES,
+    }
+}
+
+/// A string as serde_json writes it: quoted, with a quote, a backslash and a control character escaped.
+fn string_bytes(text: &str) -> usize {
+    2 + text
+        .bytes()
+        .map(|byte| match byte {
+            b'"' | b'\\' | b'\n' | b'\r' | b'\t' | 0x08 | 0x0c => 2,
+            0x00..=0x1f => 6,
+            _ => 1,
+        })
+        .sum::<usize>()
+}
+
 /// Milliseconds with one decimal.
 pub fn elapsed_ms(elapsed: Duration) -> f64 {
     (elapsed.as_secs_f64() * 10_000.0).round() / 10.0
@@ -182,6 +240,45 @@ mod tests {
         assert_eq!(from_hex("0001ABff"), Some(vec![0, 1, 171, 255]));
         assert_eq!(from_hex("abc"), None);
         assert_eq!(from_hex("zz"), None);
+    }
+
+    #[test]
+    fn rows_measure_as_serde_json_writes_them() {
+        let rows = [
+            vec![
+                Cell::Text("plain".to_string()),
+                Cell::Text("a \"quote\", a \\, a\nline and \u{1}".to_string()),
+                Cell::Null,
+            ],
+            vec![Cell::Bool(true), Cell::Text("héllo".to_string())],
+            vec![binary_cell(&[1, 2, 3], 2), text_cell("abcdef", 3)],
+        ];
+
+        for row in rows {
+            let written = serde_json::to_string(&row).unwrap().len();
+
+            assert!(row_bytes(&row) >= written, "{row:?}");
+            assert!(row_bytes(&row) <= written + 2 * PREVIEW_BYTES, "{row:?}");
+        }
+
+        assert_eq!(
+            row_bytes(&[Cell::Text("a\"\u{1}".to_string())]),
+            serde_json::to_string(&[Cell::Text("a\"\u{1}".to_string())]).unwrap().len() + 1
+        );
+        assert!(row_bytes(&[float_cell(-f64::MAX)]) >= serde_json::to_string(&[float_cell(-f64::MAX)]).unwrap().len());
+    }
+
+    #[test]
+    fn a_budget_admits_rows_until_it_runs_out_and_always_the_first() {
+        let row = vec![Cell::Text("x".repeat(98))];
+        let size = row_bytes(&row);
+        let mut budget = ByteBudget::new(size * 2);
+
+        assert!(budget.admit(&row, true));
+        assert!(budget.admit(&row, false));
+        assert!(!budget.admit(&row, false));
+        assert!(budget.admit(&row, true), "the first row of the next result");
+        assert!(!budget.admit(&[Cell::Null], false));
     }
 
     #[test]

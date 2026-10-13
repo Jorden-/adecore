@@ -52,7 +52,7 @@ The check reads the SQL only: a `WHERE` that matches every row runs without aski
 
 ## Paging a result
 
-A result of a statement that starts with `SELECT` or `WITH` and has more than 500 rows shows Previous page and Next page in its footer. Each page is a [`page`](/database/guide/protocol#reading-a-result-in-pages) request of 500 rows, so a result larger than memory can be read page by page. Other statements, such as `SHOW` and `PRAGMA`, show their first 500 rows only.
+A result of a statement that starts with `SELECT` or `WITH` and has more than 500 rows shows Previous page and Next page in its footer. Each page is a [`page`](/database/guide/protocol#reading-a-result-in-pages) request of up to 500 rows, so a result larger than memory can be read page by page. A page of wide rows stops early at the byte limit of a response, and the next one starts after it. Other statements, such as `SHOW` and `PRAGMA`, show their first 500 rows only.
 
 ## Transactions
 

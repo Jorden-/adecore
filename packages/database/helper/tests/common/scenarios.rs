@@ -178,6 +178,95 @@ pub async fn pages_statements(db: &mut Db<'_>) {
     assert_eq!(cut["rows"][0][0], json!({ "kind": "longText", "preview": "", "length": 1 }));
 }
 
+/// The size of the line a request is answered with, and its result.
+async fn measured(db: &mut Db<'_>, method: &str, params: Value) -> (usize, Value) {
+    let params = db.with_target(params);
+    let id = db.client.next_id();
+    let line = db
+        .client
+        .dispatcher
+        .submit(&json!({ "id": id, "method": method, "params": params }).to_string())
+        .await;
+    let response: Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(response["ok"], json!(true), "{method} failed: {}", response["error"]);
+
+    (line.len(), response["result"].clone())
+}
+
+pub async fn bounds_responses_by_bytes(db: &mut Db<'_>) {
+    const BOUND: usize = 16 * 1024 * 1024;
+    let wide = if db.mysql {
+        "REPEAT('x', 65536)"
+    } else {
+        "replace(hex(zeroblob(32768)), '0', 'x')"
+    };
+    db.script(&format!(
+        "DROP TABLE IF EXISTS digits; DROP TABLE IF EXISTS numbers; DROP TABLE IF EXISTS wide; \
+         CREATE TABLE digits (d INTEGER); INSERT INTO digits VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9); \
+         CREATE TABLE numbers (i INTEGER PRIMARY KEY, label VARCHAR(100)); \
+         INSERT INTO numbers SELECT a.d * 100 + b.d * 10 + c.d, 'a label of about forty characters, once' FROM digits a, digits b, digits c WHERE a.d < 5; \
+         CREATE TABLE wide (t MEDIUMTEXT); INSERT INTO wide VALUES ({wide})"
+    ))
+    .await;
+    let cells: Vec<String> = (1..=20).map(|column| format!("w.t AS c{column}")).collect();
+    let sql = format!("SELECT n.i, {} FROM numbers n CROSS JOIN wide w ORDER BY n.i", cells.join(", "));
+
+    // 500 rows of 20 cells of 64 KB would be 655 MB.
+    let (size, executed) = measured(db, "execute", json!({ "sql": sql, "limit": 500 })).await;
+    let result = &executed["results"][0];
+    let read = result["rows"].as_array().unwrap().len();
+    assert!(size < BOUND, "{size} bytes");
+    assert!(read > 1 && read < 500, "{read} rows");
+    assert_eq!(result["hasMore"], true);
+    assert_eq!(result["rows"][0][1].as_str().unwrap().len(), 65_536, "a cell stays whole");
+
+    let (size, next) = measured(db, "page", json!({ "sql": sql, "offset": read, "limit": 500 })).await;
+    assert!(size < BOUND, "{size} bytes");
+    assert_eq!(next["rows"][0][0], json!(read), "the next page starts after the rows that fit");
+    assert_eq!(next["hasMore"], true);
+
+    let single = db.ok("page", json!({ "sql": sql, "offset": 0, "limit": 500, "maxBytes": 1 })).await;
+    assert_eq!(single["rows"].as_array().unwrap().len(), 1, "the first row always fits");
+    assert_eq!(single["hasMore"], true);
+
+    // Every result of a script takes from one budget, and still gets its first row.
+    let script = db
+        .ok(
+            "execute",
+            json!({ "sql": format!("{sql}; SELECT i FROM numbers ORDER BY i"), "maxBytes": 100_000 }),
+        )
+        .await;
+    assert_eq!(script["results"][0]["rows"].as_array().unwrap().len(), 1);
+    assert_eq!(script["results"][1]["rows"], json!([[0]]));
+    assert_eq!(script["results"][1]["hasMore"], true);
+
+    let rows = db
+        .ok(
+            "rows",
+            json!({ "table": "numbers", "orderBy": "i", "offset": 0, "limit": 500, "maxBytes": 1000 }),
+        )
+        .await;
+    let fitted = rows["rows"].as_array().unwrap().len();
+    assert!(fitted > 1 && fitted < 30, "{fitted} rows");
+    assert_eq!(rows["hasMore"], true);
+    let all = db.ok("rows", json!({ "table": "numbers", "offset": 0, "limit": 500 })).await;
+    assert_eq!(all["rows"].as_array().unwrap().len(), 500);
+    assert_eq!(all["hasMore"], false);
+
+    for (method, params) in [
+        ("rows", json!({ "table": "numbers", "offset": 0, "limit": 1, "maxBytes": 0 })),
+        (
+            "page",
+            json!({ "sql": "SELECT i FROM numbers", "offset": 0, "limit": 1, "maxBytes": 67_108_865 }),
+        ),
+        ("execute", json!({ "sql": "SELECT 1", "maxBytes": -1 })),
+    ] {
+        assert_eq!(db.error(method, params).await["code"], "invalid-request", "{method}");
+    }
+
+    db.script("DROP TABLE digits; DROP TABLE numbers; DROP TABLE wide").await;
+}
+
 pub async fn drives_transactions(db: &mut Db<'_>) {
     db.seed_items().await;
 

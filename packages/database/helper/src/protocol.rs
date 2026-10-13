@@ -5,7 +5,7 @@ use serde_json::{Number, json};
 
 use crate::error::DatabaseError;
 
-pub const PROTOCOL_VERSION: u32 = 4;
+pub const PROTOCOL_VERSION: u32 = 5;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "engine", rename_all = "lowercase")]
@@ -389,6 +389,7 @@ pub struct RowsParams {
     pub offset: i64,
     pub limit: i64,
     pub cell_limit: Option<i64>,
+    pub max_bytes: Option<i64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -424,6 +425,7 @@ pub struct ExecuteParams {
     pub schema: Option<String>,
     pub limit: Option<i64>,
     pub cell_limit: Option<i64>,
+    pub max_bytes: Option<i64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -435,6 +437,7 @@ pub struct PageParams {
     pub offset: i64,
     pub limit: i64,
     pub cell_limit: Option<i64>,
+    pub max_bytes: Option<i64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -753,14 +756,27 @@ impl Request {
     }
 }
 
-/// The line that answers a request, without its trailing newline.
-pub fn response_line(id: &str, outcome: Result<serde_json::Value, DatabaseError>) -> String {
-    let value = match outcome {
-        Ok(result) => json!({ "id": id, "ok": true, "result": result }),
-        Err(error) => json!({ "id": id, "ok": false, "error": error }),
-    };
+/// The line that answers a request, without its trailing newline. The result arrives as JSON text, so a large one is
+/// written once and never held a second time as a tree of values.
+pub fn response_line(id: &str, outcome: Result<String, DatabaseError>) -> String {
+    let id = serde_json::to_string(id).expect("a string serializes");
 
-    value.to_string()
+    match outcome {
+        Ok(result) => {
+            let mut line = String::with_capacity(result.len() + id.len() + 26);
+            line.push_str(r#"{"id":"#);
+            line.push_str(&id);
+            line.push_str(r#","ok":true,"result":"#);
+            line.push_str(&result);
+            line.push('}');
+
+            line
+        }
+        Err(error) => format!(
+            r#"{{"id":{id},"ok":false,"error":{}}}"#,
+            serde_json::to_string(&error).expect("an error serializes")
+        ),
+    }
 }
 
 pub fn ready_line(version: &str) -> String {

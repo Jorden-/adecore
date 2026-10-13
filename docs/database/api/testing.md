@@ -62,7 +62,7 @@ const shop: FakeDatabase = {
 ## What it answers
 
 - `open`, `test`, `close`, `schemas`, `tables` and `structure` answer from the data. The schemas `information_schema`, `mysql`, `performance_schema` and `sys` are `system`.
-- `rows` pages with `offset` and `limit`, reports `hasMore` and cuts text and bytes past `cellLimit` into previews. `cell` returns the whole value.
+- `rows` pages with `offset` and `limit`, reports `hasMore` and cuts text and bytes past `cellLimit` into previews. It stops at `maxBytes` as the helper does, counting characters rather than bytes, and so do `execute` and `page`. `cell` returns the whole value.
 - `apply` keeps all changes or none. It fails with `read-only` on a read only connection, `unsupported` on a view, `no-row-key` without a row key, `conflict` (with `change`) when a key matches no row or more than one, and `query-failed` for a duplicate primary key. A value left out takes its default, with numbering for an auto increment column and the current time for `CURRENT_TIMESTAMP`.
 - `execute` and `page` run `SELECT * FROM <table>` on the selected schema, which is the first until a call names another. Every other statement fails with `unsupported`, and as in the protocol the first failed statement ends the list.
 - `transaction` raises and lowers a flag that `execute` reports as `inTransaction`. A rollback does not undo a change.

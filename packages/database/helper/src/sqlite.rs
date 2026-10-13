@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use rusqlite::types::{Value as SqlValue, ValueRef};
 use rusqlite::{Connection, InterruptHandle, OpenFlags, OptionalExtension, Row, Statement, params_from_iter};
 
-use crate::cells::{binary_cell, cell_to_value, elapsed_ms, float_cell, insert_id, int_cell, text_cell};
+use crate::cells::{ByteBudget, binary_cell, cell_to_value, elapsed_ms, float_cell, insert_id, int_cell, text_cell};
 use crate::error::{DatabaseError, ErrorCode, Result};
 use crate::export::{Exporter, PartialFile};
 use crate::import::{ImportPlan, ImportReader, ImportRow, at_line, at_lines, insert_sql};
@@ -17,7 +17,7 @@ use crate::quoting::Dialect;
 use crate::splitter::{first_keyword, split_statements, top_level_words};
 use crate::sql::{
     DEFAULT_EXECUTE_CELL_LIMIT, DEFAULT_EXECUTE_LIMIT, MAX_LIMIT, Param, cell_sql, conflict, count_sql, export_query, fragment, page_sql, paging, paging_with,
-    pick_row_key, plan_apply, resolve_cell_limit, rows_sql, single_statement,
+    pick_row_key, plan_apply, resolve_cell_limit, resolve_max_bytes, rows_sql, single_statement,
 };
 
 const DIALECT: Dialect = Dialect::Sqlite;
@@ -153,7 +153,7 @@ impl SqliteEngine {
     }
 
     pub async fn page(&self, params: PageParams) -> Result<RowsResult> {
-        let paging = paging_with(params.limit, params.offset, params.cell_limit, DEFAULT_EXECUTE_CELL_LIMIT)?;
+        let paging = paging_with(params.limit, params.offset, params.cell_limit, params.max_bytes, DEFAULT_EXECUTE_CELL_LIMIT)?;
         let statement = single_statement(&params.sql, DIALECT, &["SELECT", "WITH"], "A page")?;
 
         self.run(move |connection| read_page(connection, &statement, &paging)).await
@@ -552,8 +552,14 @@ fn read_row(row: &Row<'_>, count: usize, cell_limit: usize) -> Result<Vec<Cell>>
     Ok(cells)
 }
 
-/// Reads at most `limit` rows and reports whether another one waited behind them.
-fn read_result_rows(statement: &mut Statement<'_>, params: &[Param], limit: usize, cell_limit: usize) -> Result<(Vec<ResultColumn>, Vec<Vec<Cell>>, bool)> {
+/// Reads at most `limit` rows, and no more than the budget holds, and reports whether another one waited behind them.
+fn read_result_rows(
+    statement: &mut Statement<'_>,
+    params: &[Param],
+    limit: usize,
+    cell_limit: usize,
+    budget: &mut ByteBudget,
+) -> Result<(Vec<ResultColumn>, Vec<Vec<Cell>>, bool)> {
     let columns = result_columns(statement);
     let count = columns.len();
     let mut rows = statement.query(params_from_iter(sql_values(params)))?;
@@ -566,7 +572,14 @@ fn read_result_rows(statement: &mut Statement<'_>, params: &[Param], limit: usiz
             break;
         }
 
-        cells.push(read_row(row, count, cell_limit)?);
+        let row = read_row(row, count, cell_limit)?;
+
+        if !budget.admit(&row, cells.is_empty()) {
+            has_more = true;
+            break;
+        }
+
+        cells.push(row);
     }
 
     Ok((with_value_kinds(columns, &cells), cells, has_more))
@@ -600,12 +613,12 @@ fn kind_of_cell(cell: &Cell) -> Option<ValueKind> {
 }
 
 fn read_rows(connection: &Connection, params: &RowsParams) -> Result<RowsResult> {
-    let page = paging(params.limit, params.offset, params.cell_limit)?;
+    let page = paging(params.limit, params.offset, params.cell_limit, params.max_bytes)?;
     let started = Instant::now();
     let sql = rows_sql(DIALECT, &params.schema, &params.table, fragment(&params.r#where), fragment(&params.order_by));
     let mut statement = connection.prepare(&sql)?;
     let bound = [Param::Int(page.limit as i64 + 1), Param::Int(page.offset as i64)];
-    let (columns, rows, has_more) = read_result_rows(&mut statement, &bound, page.limit, page.cell_limit)?;
+    let (columns, rows, has_more) = read_result_rows(&mut statement, &bound, page.limit, page.cell_limit, &mut ByteBudget::new(page.max_bytes))?;
 
     Ok(RowsResult {
         columns,
@@ -682,6 +695,8 @@ fn execute_script(connection: &Connection, params: &ExecuteParams, cancelled: &A
         Some(_) => return Err(DatabaseError::invalid_request(format!("The limit must be between 1 and {MAX_LIMIT}."))),
     };
     let cell_limit = resolve_cell_limit(params.cell_limit, DEFAULT_EXECUTE_CELL_LIMIT)?;
+    // One budget for the whole script, since all of its results travel in one response.
+    let mut budget = ByteBudget::new(resolve_max_bytes(params.max_bytes)?);
     let mut results = Vec::new();
 
     for statement in split_statements(&params.sql, DIALECT) {
@@ -692,7 +707,7 @@ fn execute_script(connection: &Connection, params: &ExecuteParams, cancelled: &A
             break;
         }
 
-        match run_statement(connection, &statement, limit, cell_limit, started) {
+        match run_statement(connection, &statement, limit, cell_limit, &mut budget, started) {
             Ok(result) => results.push(result),
             Err(error) if error.code == ErrorCode::Cancelled => {
                 results.push(StatementResult::cancelled(statement, elapsed_ms(started.elapsed())));
@@ -715,11 +730,11 @@ fn execute_script(connection: &Connection, params: &ExecuteParams, cancelled: &A
     })
 }
 
-fn run_statement(connection: &Connection, sql: &str, limit: usize, cell_limit: usize, started: Instant) -> Result<StatementResult> {
+fn run_statement(connection: &Connection, sql: &str, limit: usize, cell_limit: usize, budget: &mut ByteBudget, started: Instant) -> Result<StatementResult> {
     let mut statement = connection.prepare(sql)?;
 
     if statement.column_count() > 0 {
-        let (columns, rows, has_more) = read_result_rows(&mut statement, &[], limit, cell_limit)?;
+        let (columns, rows, has_more) = read_result_rows(&mut statement, &[], limit, cell_limit, budget)?;
 
         return Ok(StatementResult::Rows {
             sql: sql.to_string(),
@@ -748,7 +763,7 @@ fn read_page(connection: &Connection, statement: &str, page: &crate::sql::Paging
     let started = Instant::now();
     let mut prepared = connection.prepare(&page_sql(DIALECT, statement))?;
     let bound = [Param::Int(page.limit as i64 + 1), Param::Int(page.offset as i64)];
-    let (columns, rows, has_more) = read_result_rows(&mut prepared, &bound, page.limit, page.cell_limit)?;
+    let (columns, rows, has_more) = read_result_rows(&mut prepared, &bound, page.limit, page.cell_limit, &mut ByteBudget::new(page.max_bytes))?;
 
     Ok(RowsResult {
         columns,

@@ -46,12 +46,14 @@ export interface RowsQuery {
     readonly offset: number;
     readonly limit: number;
     readonly cellLimit?: number;
+    readonly maxBytes?: number;
 }
 
 export interface ExecuteOptions extends RequestOptions {
     readonly schema?: string;
     readonly limit?: number;
     readonly cellLimit?: number;
+    readonly maxBytes?: number;
 }
 
 /*
@@ -93,6 +95,7 @@ export interface PageQuery {
     readonly offset: number;
     readonly limit: number;
     readonly cellLimit?: number;
+    readonly maxBytes?: number;
 }
 
 export interface ExportRequest {

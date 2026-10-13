@@ -6,7 +6,8 @@
       "session": "s2",
       "sql": "UPDATE users SET name = 'x' WHERE id = 1; SELECT id, COUNT(*) AS n FROM users GROUP BY id; SELECT nope",
       "schema": "shop",
-      "limit": 500
+      "limit": 500,
+      "maxBytes": 8388608
     }
   },
   "response": {

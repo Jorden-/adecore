@@ -8,7 +8,7 @@ use mysql_async::consts::{ColumnFlags, ColumnType, StatusFlags};
 use mysql_async::prelude::{Protocol, Queryable};
 use mysql_async::{Column, Conn, Opts, OptsBuilder, Params, QueryResult, Row, SslOpts, Value as MyValue};
 
-use crate::cells::{binary_cell, cell_to_value, elapsed_ms, float_cell, insert_id, int_cell, text_cell, uint_cell};
+use crate::cells::{ByteBudget, binary_cell, cell_to_value, elapsed_ms, float_cell, insert_id, int_cell, text_cell, uint_cell};
 use crate::error::{DatabaseError, ErrorCode, Result};
 use crate::export::{Exporter, PartialFile};
 use crate::import::{ImportPlan, ImportReader, ImportRow, at_line, at_lines, insert_sql};
@@ -18,7 +18,7 @@ use crate::quoting::{Dialect, mysql_string_literal};
 use crate::splitter::{escapes_read_only, split_statements};
 use crate::sql::{
     DEFAULT_EXECUTE_CELL_LIMIT, DEFAULT_EXECUTE_LIMIT, MAX_LIMIT, Param, bare_condition, cell_sql, conflict, count_sql, export_query, fragment, page_sql,
-    paging, paging_with, pick_row_key, plan_apply, resolve_cell_limit, rows_sql, single_statement,
+    paging, paging_with, pick_row_key, plan_apply, resolve_cell_limit, resolve_max_bytes, rows_sql, single_statement,
 };
 use crate::tunnel::Tunnel as LocalTunnel;
 
@@ -405,8 +405,9 @@ fn result_columns(columns: &[Column]) -> Vec<ResultColumn> {
 
 type ResultSet = (Vec<ResultColumn>, Vec<Vec<Cell>>, bool);
 
-/// Reads at most `limit` rows of the current result set and notes whether another one waited behind them.
-async fn read_set<P: Protocol>(result: &mut QueryResult<'_, '_, P>, limit: usize, cell_limit: usize) -> Result<ResultSet> {
+/// Reads at most `limit` rows of the current result set, and no more than the budget holds, and notes whether another
+/// one waited behind them.
+async fn read_set<P: Protocol>(result: &mut QueryResult<'_, '_, P>, limit: usize, cell_limit: usize, budget: &mut ByteBudget) -> Result<ResultSet> {
     let columns: Vec<Column> = result.columns_ref().to_vec();
     let columns_arc = result.columns();
     let mut rows = Vec::new();
@@ -423,13 +424,19 @@ async fn read_set<P: Protocol>(result: &mut QueryResult<'_, '_, P>, limit: usize
             break;
         }
 
-        rows.push(
-            row.unwrap()
-                .into_iter()
-                .enumerate()
-                .map(|(index, value)| cell_of(value, &columns[index], cell_limit))
-                .collect(),
-        );
+        let cells: Vec<Cell> = row
+            .unwrap()
+            .into_iter()
+            .enumerate()
+            .map(|(index, value)| cell_of(value, &columns[index], cell_limit))
+            .collect();
+
+        if !budget.admit(&cells, rows.is_empty()) {
+            has_more = true;
+            break;
+        }
+
+        rows.push(cells);
     }
 
     Ok((result_columns(&columns), rows, has_more))
@@ -970,12 +977,12 @@ impl MysqlEngine {
     }
 
     pub async fn rows(&mut self, params: RowsParams) -> Result<RowsResult> {
-        let page = paging(params.limit, params.offset, params.cell_limit)?;
+        let page = paging(params.limit, params.offset, params.cell_limit, params.max_bytes)?;
         let started = Instant::now();
         let sql = rows_sql(DIALECT, &params.schema, &params.table, fragment(&params.r#where), fragment(&params.order_by));
         let bound = Params::Positional(vec![MyValue::UInt(page.limit as u64 + 1), MyValue::UInt(page.offset)]);
         let mut result = self.connection.exec_iter(sql, bound).await?;
-        let (columns, rows, has_more) = read_set(&mut result, page.limit, page.cell_limit).await?;
+        let (columns, rows, has_more) = read_set(&mut result, page.limit, page.cell_limit, &mut ByteBudget::new(page.max_bytes)).await?;
         result.drop_result().await?;
 
         Ok(RowsResult {
@@ -999,7 +1006,7 @@ impl MysqlEngine {
     pub async fn cell(&mut self, params: CellParams) -> Result<CellResult> {
         let (sql, bound) = cell_sql(DIALECT, &params.schema, &params.table, &params.column, &params.key)?;
         let mut result = self.connection.exec_iter(sql, my_params(&bound)).await?;
-        let (_, mut rows, _) = read_set(&mut result, 2, usize::MAX).await?;
+        let (_, mut rows, _) = read_set(&mut result, 2, usize::MAX, &mut ByteBudget::new(usize::MAX)).await?;
         result.drop_result().await?;
 
         match rows.len() {
@@ -1050,14 +1057,18 @@ impl MysqlEngine {
             Some(_) => return Err(DatabaseError::invalid_request(format!("The limit must be between 1 and {MAX_LIMIT}."))),
         };
         let cell_limit = resolve_cell_limit(params.cell_limit, DEFAULT_EXECUTE_CELL_LIMIT)?;
+        // One budget for the whole script, since all of its results travel in one response.
+        let mut budget = ByteBudget::new(resolve_max_bytes(params.max_bytes)?);
+        // The server stops after limit + 1 rows, so a huge SELECT is never drained. Sent with the `USE` in one round trip,
+        // which the server ends at the first statement that fails.
+        let limit_sql = format!("SET SESSION sql_select_limit = {}", limit + 1);
+        let prelude = match &params.schema {
+            Some(schema) => format!("USE {}; {limit_sql}", DIALECT.quote_ident(schema)),
+            None => limit_sql,
+        };
 
-        if let Some(schema) = &params.schema {
-            self.connection.query_drop(format!("USE {}", DIALECT.quote_ident(schema))).await?;
-        }
-
-        // The server stops after limit + 1 rows, so a huge SELECT is never drained.
-        self.connection.query_drop(format!("SET SESSION sql_select_limit = {}", limit + 1)).await?;
-        let outcome = self.run_script(&params.sql, limit, cell_limit, &cancelled).await;
+        self.connection.query_drop(prelude).await?;
+        let outcome = self.run_script(&params.sql, limit, cell_limit, &mut budget, &cancelled).await;
         let _ = self.connection.query_drop("SET SESSION sql_select_limit = DEFAULT").await;
         let results = outcome?;
 
@@ -1067,7 +1078,14 @@ impl MysqlEngine {
         })
     }
 
-    async fn run_script(&mut self, script: &str, limit: usize, cell_limit: usize, cancelled: &AtomicBool) -> Result<Vec<StatementResult>> {
+    async fn run_script(
+        &mut self,
+        script: &str,
+        limit: usize,
+        cell_limit: usize,
+        budget: &mut ByteBudget,
+        cancelled: &AtomicBool,
+    ) -> Result<Vec<StatementResult>> {
         let mut results = Vec::new();
 
         for statement in split_statements(script, DIALECT) {
@@ -1087,7 +1105,7 @@ impl MysqlEngine {
                 break;
             }
 
-            match self.run_statement(&statement, limit, cell_limit, started).await {
+            match self.run_statement(&statement, limit, cell_limit, budget, started).await {
                 // The server may end an interrupted read without an error (`SLEEP` does), with only some of its rows.
                 Ok(StatementResult::Rows { .. }) if cancelled.load(Ordering::SeqCst) => {
                     results.push(StatementResult::cancelled(statement, elapsed_ms(started.elapsed())));
@@ -1114,7 +1132,7 @@ impl MysqlEngine {
     }
 
     pub async fn page(&mut self, params: PageParams) -> Result<RowsResult> {
-        let page = paging_with(params.limit, params.offset, params.cell_limit, DEFAULT_EXECUTE_CELL_LIMIT)?;
+        let page = paging_with(params.limit, params.offset, params.cell_limit, params.max_bytes, DEFAULT_EXECUTE_CELL_LIMIT)?;
         let statement = single_statement(&params.sql, DIALECT, &["SELECT", "WITH"], "A page")?;
 
         if let Some(schema) = &params.schema {
@@ -1124,7 +1142,7 @@ impl MysqlEngine {
         let started = Instant::now();
         let bound = Params::Positional(vec![MyValue::UInt(page.limit as u64 + 1), MyValue::UInt(page.offset)]);
         let mut result = self.connection.exec_iter(page_sql(DIALECT, &statement), bound).await?;
-        let (columns, rows, has_more) = read_set(&mut result, page.limit, page.cell_limit).await?;
+        let (columns, rows, has_more) = read_set(&mut result, page.limit, page.cell_limit, &mut ByteBudget::new(page.max_bytes)).await?;
         result.drop_result().await?;
 
         Ok(RowsResult {
@@ -1249,7 +1267,7 @@ impl MysqlEngine {
         at_lines(error, batch)
     }
 
-    async fn run_statement(&mut self, sql: &str, limit: usize, cell_limit: usize, started: Instant) -> Result<StatementResult> {
+    async fn run_statement(&mut self, sql: &str, limit: usize, cell_limit: usize, budget: &mut ByteBudget, started: Instant) -> Result<StatementResult> {
         let mut result = self.connection.query_iter(sql).await?;
 
         if result.columns_ref().is_empty() {
@@ -1265,7 +1283,7 @@ impl MysqlEngine {
             });
         }
 
-        let (columns, rows, has_more) = read_set(&mut result, limit, cell_limit).await?;
+        let (columns, rows, has_more) = read_set(&mut result, limit, cell_limit, budget).await?;
         result.drop_result().await?;
 
         Ok(StatementResult::Rows {

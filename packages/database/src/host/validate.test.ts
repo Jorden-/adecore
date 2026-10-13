@@ -149,6 +149,10 @@ describe('rows, count and cell', () => {
         expect(rejection(rows({ offset: 1.5 }))).toContain('offset');
         expect(rejection(rows({ cellLimit: 0 }))).toContain('cellLimit');
         expect(rejection(rows({ cellLimit: 1048577 }))).toContain('cellLimit');
+        expect(parseRequest(rows({ maxBytes: 1 })).ok).toBe(true);
+        expect(parseRequest(rows({ maxBytes: 67108864 })).ok).toBe(true);
+        expect(rejection(rows({ maxBytes: 0 }))).toContain('maxBytes');
+        expect(rejection(rows({ maxBytes: 67108865 }))).toContain('maxBytes');
         expect(rejection(rows({ where: 5 }))).toContain('where');
     });
 
@@ -207,6 +211,8 @@ describe('execute, cancel and the session methods', () => {
         expect(parseRequest(request('execute', { session: 's', sql: 'SELECT 1', schema: 'main', limit: 10000, cellLimit: 1 })).ok).toBe(true);
         expect(rejection(request('execute', { session: 's', sql: '' }))).toContain('sql');
         expect(rejection(request('execute', { session: 's', sql: 'x', limit: 10001 }))).toContain('limit');
+        expect(parseRequest(request('execute', { session: 's', sql: 'x', maxBytes: 1048576 })).ok).toBe(true);
+        expect(rejection(request('execute', { session: 's', sql: 'x', maxBytes: 1.5 }))).toContain('maxBytes');
         expect(rejection(request('execute', { session: 's', sql: 'x', extra: true }))).toContain('"extra"');
     });
 
@@ -236,6 +242,8 @@ describe('page and transaction', () => {
         expect(rejection(page({ sql: '' }))).toContain('sql');
         expect(rejection(page({ schema: '' }))).toContain('schema');
         expect(rejection(page({ cellLimit: 0 }))).toContain('cellLimit');
+        expect(parseRequest(page({ maxBytes: 4096 })).ok).toBe(true);
+        expect(rejection(page({ maxBytes: 67108865 }))).toContain('maxBytes');
         expect(rejection(page({ where: 'id > 1' }))).toContain('"where"');
         expect(rejection(request('page', { session: 's', sql: 'x', limit: 1 }))).toContain('"offset"');
     });

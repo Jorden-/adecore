@@ -130,6 +130,19 @@ describe('reading', () => {
         expect((await session.rows('main', 'users', { offset: 3, limit: 2 })).rows).toEqual([]);
     });
 
+    test('stops at maxBytes, but always gives the first row', async () => {
+        const { session } = setup();
+        const first = await session.rows('main', 'users', { offset: 0, limit: 3, maxBytes: 1 });
+        expect(first.rows.map((row) => row[0])).toEqual([1]);
+        expect(first.hasMore).toBe(true);
+
+        const executed = await session.execute('SELECT * FROM users; SELECT * FROM users', { maxBytes: 1 });
+        expect(executed.results.map((result) => (result.kind === 'rows' ? [result.rows.length, result.hasMore] : null))).toEqual([
+            [1, true],
+            [1, true]
+        ]);
+    });
+
     test('cuts text and binary at the cell limit', async () => {
         const { session } = setup();
         const result = await session.rows('main', 'users', { offset: 1, limit: 1, cellLimit: 8 });

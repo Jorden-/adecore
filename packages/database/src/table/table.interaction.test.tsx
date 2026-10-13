@@ -96,6 +96,35 @@ describe.skipIf(typeof document === 'undefined')('the views of a table in a DOM,
     });
 });
 
+describe.skipIf(typeof document === 'undefined')('a page of a table the byte limit cut short', () => {
+    let recorded: RecordedTransport;
+    let client: ReturnType<typeof clientOver>;
+    let mounted: Mounted;
+
+    beforeEach(async () => {
+        recorded = recordTransport(fakeDatabaseTransport({ databases: { [SHOP_PATH]: shopDatabase } }));
+        recorded.respond('rows', ({ offset }) => ({
+            columns: [{ name: 'id', type: 'INTEGER', kind: 'integer' }],
+            rows: [[offset + 1], [offset + 2]],
+            hasMore: true,
+            elapsedMs: 0
+        }));
+        client = clientOver(recorded.transport);
+        mounted = await mount(<TableView connection={connection} schema="main" table="customers" />, { client });
+        await waitFor(() => expect(findAll('[role=gridcell]').length).toBeGreaterThan(0));
+    });
+
+    afterEach(async () => {
+        await mounted.unmount();
+        await client.dispose();
+    });
+
+    test('goes on after the rows that came, not a whole page further', async () => {
+        await click(byLabel('Next page'));
+        await waitFor(() => expect(recorded.of('rows').map((request) => request.params.offset)).toEqual([0, 2]));
+    });
+});
+
 describe.skipIf(typeof document === 'undefined')('the record view beside a table', () => {
     let client: ReturnType<typeof clientOver>;
     let mounted: Mounted;

@@ -98,7 +98,7 @@ fn requests_parse_and_responses_round_trip() {
 }
 
 fn response_line_value(id: &str, outcome: Result<Value, DatabaseError>) -> Value {
-    serde_json::from_str(&response_line(id, outcome)).unwrap()
+    serde_json::from_str(&response_line(id, outcome.map(|result| result.to_string()))).unwrap()
 }
 
 #[test]
@@ -133,10 +133,32 @@ fn requests_pick_the_right_call() {
 }
 
 #[test]
+fn the_byte_limit_parses_from_the_fixtures() {
+    let all = fixtures();
+    let request = |name: &str| {
+        let (_, fixture) = all.iter().find(|(candidate, _)| candidate == name).unwrap();
+
+        Request::parse(&fixture["request"].to_string()).unwrap().call
+    };
+
+    let Call::Rows(rows) = request("rows") else {
+        panic!("rows is not a rows call");
+    };
+    let Call::Execute(execute) = request("execute") else {
+        panic!("execute is not an execute call");
+    };
+    let Call::Page(page) = request("page") else {
+        panic!("page is not a page call");
+    };
+
+    assert_eq!((rows.max_bytes, execute.max_bytes, page.max_bytes), (Some(1_048_576), Some(8_388_608), None));
+}
+
+#[test]
 fn the_ready_line_has_the_agreed_shape() {
     let line = ready_line("1.2.3");
 
-    assert_eq!(line, r#"{"event":"ready","protocol":4,"version":"1.2.3"}"#);
+    assert_eq!(line, r#"{"event":"ready","protocol":5,"version":"1.2.3"}"#);
 }
 
 #[test]
