@@ -125,6 +125,19 @@ export class CodexBackend implements ChatBackend {
             onExit: (exitCode, stderr) => this.handleExit(transport, exitCode, stderr)
         });
         this.transport = transport;
+        try {
+            await this.handshake(transport);
+        } catch (error) {
+            // A chat that failed to start drops this backend, so nothing else would end an app-server stuck in its handshake.
+            if (this.transport === transport) {
+                this.transport = null;
+                void transport.dispose();
+            }
+            throw error;
+        }
+    }
+
+    private async handshake(transport: CodexTransport): Promise<void> {
         await transport.request('initialize', { clientInfo: this.client, capabilities: { experimentalApi: true, requestAttestation: false } });
         transport.notify('initialized', {});
         const tier = codexServiceTier(this.launch.selection);
@@ -141,7 +154,10 @@ export class CodexBackend implements ChatBackend {
                 result = await transport.request('thread/resume', { threadId: this.launch.resume, excludeTurns: true, ...params });
                 this.contextPending = this.launch.resumeNote;
             } catch (error) {
-                // The thread is gone from Codex's store; a fresh one keeps the chat usable.
+                // A refusal means the thread is gone from Codex's store and a fresh one keeps the chat usable; a silence or an exit says nothing about the thread.
+                if (!(error instanceof Error) || error.name !== 'CodexRpcError') {
+                    throw error;
+                }
                 this.emit({ type: 'note', level: 'warning', text: `Codex could not resume its thread (${errorText(error)}). Started a new one.` });
                 result = await transport.request('thread/start', { ...params, ...instructions });
             }

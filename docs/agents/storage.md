@@ -58,7 +58,7 @@ The count ends at 2. `Serializer.run` runs work one at a time, even after one fa
 
 ## Other helpers
 
-- `runProcess(command, options)` runs a short command and answers its output and `exitCode` (`null` after a signal). A nonzero exit is an answer, not an error; `timeoutMs` sends SIGTERM and rejects. It keeps all output and cleans up no process group, so keep it to commands you trust to end.
+- `runProcess(command, options)` runs a short command and answers its output and `exitCode` (`null` after a signal). A nonzero exit is an answer, not an error; The command runs in a process group of its own. `timeoutMs` rejects and sends the group a SIGTERM, then a SIGKILL two seconds later. Past 16 MB of stdout and stderr together, the run ends the same way and rejects, so keep it to commands that print little.
 - `withTimeout(promise, ms, message)` rejects at a deadline without stopping what it waited for, and `wait(ms, signal?)` resolves early on an abort.
 - `WatchSeams` is file watching you can swap: `SYSTEM_WATCH` uses `fs.watch`, recursive only where the platform supports it (`supportsRecursive`). `settled(seams, ms, run)` runs once after a burst of changes, and `PerClientWatches` keeps a watch per client and path.
 - `cleanTitle` and `readLines` read titles from a transcript; `readLines` stops at the last whole line, so a line still being written is read later.

@@ -35,7 +35,10 @@ class CodexRpcError extends Error {
     }
 }
 
-type Settle = { resolve(value: unknown): void; reject(reason: Error): void; method: string };
+type Settle = { resolve(value: unknown): void; reject(reason: Error): void; method: string; timer: ReturnType<typeof setTimeout> };
+
+// The app-server answers every request it takes at once and does the work in notifications, so a silent one is stuck.
+const REQUEST_TIMEOUT_MS = 60_000;
 
 /*
  * One `codex app-server` process and the JSON-RPC framing on its stdio: newline-delimited JSON,
@@ -48,6 +51,8 @@ export class CodexTransport {
     private readonly pending = new Map<number, Settle>();
     private nextId = 1;
     private closed = false;
+    // Set once stdin ended or broke; a write after an EPIPE only raises the next one.
+    private inputClosed = false;
 
     constructor(options: CodexTransportOptions) {
         this.options = options;
@@ -56,7 +61,7 @@ export class CodexTransport {
             cwd: options.cwd,
             env: options.env,
             ...(options.spawn ? { spawn: options.spawn } : {}),
-            onError: (error) => this.failed(error),
+            onError: (error) => this.broken(error),
             onExit: (exitCode, stderr) => this.handleExit(exitCode, stderr)
         });
         void this.readLines();
@@ -77,10 +82,16 @@ export class CodexTransport {
                 return;
             }
             const id = this.nextId++;
-            this.pending.set(id, { resolve, reject, method });
+            const timer = setTimeout(() => {
+                this.pending.delete(id);
+                reject(new Error(`${method} failed: Codex did not answer in ${REQUEST_TIMEOUT_MS / 1000} seconds`));
+            }, REQUEST_TIMEOUT_MS);
+            timer.unref?.();
+            this.pending.set(id, { resolve, reject, method, timer });
             try {
                 this.write({ id, method, params });
             } catch (error) {
+                clearTimeout(timer);
                 this.pending.delete(id);
                 reject(error);
             }
@@ -101,6 +112,7 @@ export class CodexTransport {
 
     /* Closes stdin; the app-server ends on its own once it has nothing more to say. */
     end(): void {
+        this.inputClosed = true;
         try {
             this.child.process.stdin.end();
         } catch {
@@ -122,19 +134,27 @@ export class CodexTransport {
     }
 
     private write(frame: CodexFrame): void {
-        if (this.closed) {
+        if (this.closed || this.inputClosed) {
             throw new Error('Codex stdin is closed');
         }
-        this.child.process.stdin.write(`${JSON.stringify(frame)}\n`);
-        this.child.process.stdin.flush();
+        try {
+            this.child.process.stdin.write(`${JSON.stringify(frame)}\n`);
+            this.child.process.stdin.flush();
+        } catch (error) {
+            this.inputClosed = true;
+            throw error;
+        }
+    }
+
+    /* A pipe that failed takes no more writes; a frame a consumer choked on leaves it as it was. */
+    private broken(error: unknown): void {
+        this.inputClosed = true;
+        this.failed(error);
     }
 
     private failed(error: unknown): void {
         const failure = new Error(`Codex transport failed: ${errorText(error)}`);
-        for (const settle of this.pending.values()) {
-            settle.reject(failure);
-        }
-        this.pending.clear();
+        this.rejectPending(() => failure);
         try {
             this.options.onError?.(failure);
         } catch (reportError) {
@@ -173,7 +193,7 @@ export class CodexTransport {
             }
         } catch (error) {
             if (!this.closed) {
-                this.failed(error);
+                this.broken(error);
             }
         } finally {
             reader.releaseLock();
@@ -203,6 +223,7 @@ export class CodexTransport {
             return;
         }
         this.pending.delete(message.id as number);
+        clearTimeout(settle.timer);
         if (message.error !== undefined) {
             settle.reject(new CodexRpcError(settle.method, message.error));
         } else {
@@ -215,10 +236,15 @@ export class CodexTransport {
             return;
         }
         this.closed = true;
+        this.rejectPending((method) => new Error(`${method} failed: Codex exited`));
+        this.options.onExit(exitCode, stderr);
+    }
+
+    private rejectPending(reason: (method: string) => Error): void {
         for (const settle of this.pending.values()) {
-            settle.reject(new Error(`${settle.method} failed: Codex exited`));
+            clearTimeout(settle.timer);
+            settle.reject(reason(settle.method));
         }
         this.pending.clear();
-        this.options.onExit(exitCode, stderr);
     }
 }

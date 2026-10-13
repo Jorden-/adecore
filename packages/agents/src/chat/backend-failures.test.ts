@@ -1,10 +1,12 @@
-import { expect, test } from 'bun:test';
+import { afterEach, expect, jest, test } from 'bun:test';
 import { CodexBackend } from './codex-backend.ts';
 import { codexProvider } from '../providers/codex-provider.ts';
 import { fakeCodexWith } from './fake-codex.ts';
 import { claudeProvider } from '../providers/claude-provider.ts';
 import type { BackendEvent, BackendLaunch } from './backend.ts';
 import type { ChatProcess, ChatSpawnOptions } from './chat-process.ts';
+import { ChatSession } from './chat-session.ts';
+import { info } from './chat-session.fixture.test.ts';
 import { ClaudeBackend } from './claude-backend.ts';
 import { CodexTransport } from './codex-transport.ts';
 import { inProcess, type FakeIo, type FakeCli } from './fake-cli.ts';
@@ -27,10 +29,16 @@ const launch: BackendLaunch = {
     resumeNote: null
 };
 
+afterEach(() => {
+    jest.useRealTimers();
+});
+
 function pipe(program?: FakeCli) {
     let io: FakeIo;
     let options: ChatSpawnOptions;
     let broken = false;
+    // Every chunk that reached the pipe, a refused one included.
+    const writes: string[] = [];
     const fake = inProcess((madeIo) => {
         io = madeIo;
         return program?.(madeIo) ?? { onLine: () => undefined };
@@ -44,6 +52,7 @@ function pipe(program?: FakeCli) {
                 stdin: {
                     ...process.stdin,
                     write: (chunk) => {
+                        writes.push(chunk);
                         if (broken) {
                             throw new Error('broken pipe');
                         }
@@ -52,6 +61,7 @@ function pipe(program?: FakeCli) {
                 }
             };
         },
+        writes,
         out: (frame: unknown) => io.out(frame),
         break: () => {
             broken = true;
@@ -104,8 +114,10 @@ test('Claude rejects a failed answer write, withdraws it, and never answers that
     expect(backend.respondApproval('approval', 'allow')).toBe(false);
     expect(events).toContainEqual({ type: 'request.withdrawn', requestId: 'approval' });
     expect(events).toContainEqual({ type: 'failed', message: 'Claude transport failed: broken pipe', processAlive: true });
+    const written = fake.writes.length;
     expect(backend.respondApproval('approval', 'allow')).toBe(false);
-    expect(() => backend.sendTurn({ text: 'no', preamble: null, attachments: [], mentions: [], skills: [] })).toThrow('broken pipe');
+    expect(() => backend.sendTurn({ text: 'no', preamble: null, attachments: [], mentions: [], skills: [] })).toThrow('Claude stdin is closed');
+    expect(fake.writes.length).toBe(written);
     await fake.exit();
 });
 
@@ -153,10 +165,23 @@ test('Codex write and asynchronous pipe failures settle requests immediately wit
     fake.error();
     expect(await pending).toBeInstanceOf(Error);
     expect(failures[0]?.message).toContain('asynchronous pipe failure');
-    fake.break();
-    await expect(transport.request('turn/start', {})).rejects.toThrow('broken pipe');
-    expect(() => transport.respond('approval', {})).toThrow('broken pipe');
+    const written = fake.writes.length;
+    await expect(transport.request('turn/start', {})).rejects.toThrow('Codex stdin is closed');
+    expect(() => transport.respond('approval', {})).toThrow('Codex stdin is closed');
+    expect(() => transport.notify('initialized', {})).toThrow('Codex stdin is closed');
+    expect(fake.writes.length).toBe(written);
     expect(transport.alive).toBe(true);
+    await fake.exit();
+});
+
+test('a Codex write that fails is the last one that reaches the pipe', async () => {
+    const fake = pipe();
+    const transport = new CodexTransport({ ...launch, spawn: fake.spawn, onFrame: () => undefined, onExit: () => undefined });
+    fake.break();
+    await expect(transport.request('initialize', {})).rejects.toThrow('broken pipe');
+    await expect(transport.request('initialize', {})).rejects.toThrow('Codex stdin is closed');
+    expect(() => transport.respondError(1, -32601, 'no')).toThrow('Codex stdin is closed');
+    expect(fake.writes).toHaveLength(1);
     await fake.exit();
 });
 
@@ -264,4 +289,87 @@ test('Codex sends native steering with the exact active turn id', async () => {
     backend.interrupt();
     await flush();
     await backend.dispose();
+});
+
+test('Codex gives up on an app-server that never answers its handshake, and ends it', async () => {
+    jest.useFakeTimers();
+    const fake = inProcess(() => ({ onLine: () => undefined }));
+    const backend = new CodexBackend({ ...launch, selection: codexProvider.catalog.normalize(undefined), spawn: fake.spawn }, { onEvent: () => undefined });
+    const started = backend.start().catch((error: Error) => error);
+    jest.advanceTimersByTime(59_999);
+    expect(backend.running).toBe(true);
+    jest.advanceTimersByTime(1);
+    expect((await started) as Error).toMatchObject({ message: 'initialize failed: Codex did not answer in 60 seconds' });
+    expect(backend.running).toBe(false);
+    expect(await fake.started[0]!.exited).toBeNull();
+});
+
+test('a Codex chat whose app-server never answers fails its turn within a minute', async () => {
+    jest.useFakeTimers();
+    const fake = inProcess(() => ({ onLine: () => undefined }));
+    const session = new ChatSession({
+        info: { ...info(), provider: 'codex', selection: codexProvider.catalog.normalize(undefined) },
+        provider: codexProvider,
+        command: ['codex'],
+        env: () => ({}),
+        spawn: fake.spawn,
+        emit: () => undefined,
+        persist: () => undefined,
+        persistSoon: () => undefined
+    });
+    const { turnId } = session.send('hello');
+    await flush();
+    jest.advanceTimersByTime(60_000);
+    await flush();
+    expect(session.thread.get(turnId)).toMatchObject({ kind: 'turn', state: 'error' });
+    expect(session.thread.list().at(-1)).toMatchObject({ kind: 'note', level: 'error', text: 'initialize failed: Codex did not answer in 60 seconds' });
+    expect(session.running).toBe(false);
+    expect(await fake.started[0]!.exited).toBeNull();
+    await session.dispose();
+});
+
+test('Codex keeps a thread it could not resume in time instead of starting another', async () => {
+    jest.useFakeTimers();
+    const methods: string[] = [];
+    const fake = inProcess((io) => ({
+        onLine: (line) => {
+            const frame = JSON.parse(line);
+            methods.push(frame.method);
+            if (frame.method === 'initialize') {
+                io.out({ id: frame.id, result: {} });
+            }
+        }
+    }));
+    const events: BackendEvent[] = [];
+    const backend = new CodexBackend(
+        { ...launch, resume: 'thread-1', selection: codexProvider.catalog.normalize(undefined), spawn: fake.spawn },
+        { onEvent: (event) => events.push(event) }
+    );
+    const started = backend.start().catch((error: Error) => error);
+    await flush();
+    jest.advanceTimersByTime(60_000);
+    expect((await started) as Error).toMatchObject({ message: 'thread/resume failed: Codex did not answer in 60 seconds' });
+    expect(methods).toEqual(['initialize', 'initialized', 'thread/resume']);
+    expect(events).toEqual([]);
+});
+
+test('Claude waits for a steer through the whole turn, and rejects one it never echoed a grace after the turn ended', async () => {
+    jest.useFakeTimers();
+    const fake = pipe();
+    const backend = new ClaudeBackend({ ...launch, spawn: fake.spawn }, { onEvent: () => undefined });
+    await backend.start();
+    backend.sendTurn({ promptId: 'original', text: 'start', preamble: null, attachments: [], mentions: [], skills: [] });
+    const late = backend.steerTurn({ promptId: 'late', text: 'next', preamble: null, attachments: [], mentions: [], skills: [] });
+    const lost = backend
+        .steerTurn({ promptId: 'lost', text: 'gone', preamble: null, attachments: [], mentions: [], skills: [] })
+        .catch((error: Error) => error);
+    jest.advanceTimersByTime(60 * 60_000);
+    fake.out({ type: 'result', subtype: 'success', user_message_uuids: ['original'], total_cost_usd: 0 });
+    await flush();
+    jest.advanceTimersByTime(29_999);
+    fake.out({ type: 'user', uuid: 'late', parent_tool_use_id: null, message: { role: 'user', content: [] } });
+    expect(await late).toBe(true);
+    jest.advanceTimersByTime(1);
+    expect((await lost) as Error).toMatchObject({ message: 'Claude ended its turn without taking your message' });
+    await fake.exit();
 });

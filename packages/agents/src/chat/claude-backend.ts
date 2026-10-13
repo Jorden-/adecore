@@ -6,6 +6,10 @@ import { ChatChild } from './chat-process.ts';
 import { ClaudeProtocol } from './claude-protocol.ts';
 import { buildUserMessage } from './input.ts';
 
+// Claude may echo a steer only once a slow tool returns, so a running turn sets no deadline; after the turn ended, a message
+// it still holds opens the next turn at once or never arrives.
+const STEER_GRACE_MS = 30_000;
+
 export interface ClaudeBackendOptions {
     // Tools the CLI runs without asking, in every mode, as `--allowedTools` patterns (`Bash(git status)`).
     allowedTools?: readonly string[];
@@ -28,6 +32,7 @@ export class ClaudeBackend implements ChatBackend {
     // The person asked to stop; the result frame that follows closes the turn as aborted.
     private interrupted = false;
     private readonly steers = new Map<string, { resolve(accepted: boolean): void; reject(reason: Error): void }>();
+    private steerTimer: ReturnType<typeof setTimeout> | null = null;
     private active = false;
 
     constructor(launch: BackendLaunch, host: BackendHost, options: ClaudeBackendOptions = {}) {
@@ -63,7 +68,7 @@ export class ClaudeBackend implements ChatBackend {
             cwd: this.launch.cwd,
             env: { ...this.launch.env, ...claudeEnv(selection) },
             ...(this.launch.spawn ? { spawn: this.launch.spawn } : {}),
-            onError: (error) => this.failed(error),
+            onError: (error) => this.broken(error),
             onExit: (exitCode, stderr) => this.handleExit(child, exitCode, stderr)
         });
         this.child = child;
@@ -175,7 +180,7 @@ export class ClaudeBackend implements ChatBackend {
             }
         } catch (error) {
             if (this.child === child) {
-                this.failed(error);
+                this.broken(error);
             }
         } finally {
             reader.releaseLock();
@@ -196,10 +201,14 @@ export class ClaudeBackend implements ChatBackend {
         if (echoed?.type === 'user' && typeof echoed.uuid === 'string' && echoed.parent_tool_use_id == null) {
             this.steers.get(echoed.uuid)?.resolve(true);
             this.steers.delete(echoed.uuid);
+            if (this.steers.size === 0) {
+                this.clearSteerTimer();
+            }
         }
         for (const event of this.protocol.handle(frame)) {
             if (event.type === 'turn.done') {
                 this.active = false;
+                this.awaitSteers();
             }
             if (event.type === 'turn.done' && this.interrupted) {
                 this.interrupted = false;
@@ -218,12 +227,40 @@ export class ClaudeBackend implements ChatBackend {
         }
     }
 
+    private awaitSteers(): void {
+        if (this.steers.size === 0 || this.steerTimer !== null) {
+            return;
+        }
+        this.steerTimer = setTimeout(() => {
+            this.steerTimer = null;
+            for (const pending of this.steers.values()) {
+                pending.reject(new Error('Claude ended its turn without taking your message'));
+            }
+            this.steers.clear();
+        }, STEER_GRACE_MS);
+        this.steerTimer.unref?.();
+    }
+
+    private clearSteerTimer(): void {
+        if (this.steerTimer !== null) {
+            clearTimeout(this.steerTimer);
+            this.steerTimer = null;
+        }
+    }
+
     private rejectSteers(reason: string): void {
         this.active = false;
+        this.clearSteerTimer();
         for (const pending of this.steers.values()) {
             pending.reject(new Error(reason));
         }
         this.steers.clear();
+    }
+
+    /* A pipe that failed takes no more writes; a frame a consumer choked on leaves it as it was. */
+    private broken(error: unknown): void {
+        this.stdinClosed = true;
+        this.failed(error);
     }
 
     private failed(error: unknown): void {
@@ -252,8 +289,13 @@ export class ClaudeBackend implements ChatBackend {
         if (!child || this.stdinClosed) {
             throw new Error('Claude stdin is closed');
         }
-        child.process.stdin.write(`${JSON.stringify(frame)}\n`);
-        child.process.stdin.flush();
+        try {
+            child.process.stdin.write(`${JSON.stringify(frame)}\n`);
+            child.process.stdin.flush();
+        } catch (error) {
+            this.stdinClosed = true;
+            throw error;
+        }
     }
 
     private closeStdin(): void {
