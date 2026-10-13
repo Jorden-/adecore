@@ -15,7 +15,7 @@ document.positionAt(9); // { line: 1, column: 2 }
 document.offsetAt({ line: 1, column: 99 }); // 13, the end of the line
 ```
 
-The model keeps the line endings it was given. A line ends at `\n`, and a `\r\n` counts as one break whose `\r` is not part of the line's `text`. A lone `\r` does not end a line. An empty document has one line, and a trailing break adds an empty last line.
+The model keeps the line endings it was given. A line ends at `\n`, `\r\n` or a lone `\r`, the way the language server protocol counts lines, so a position means the same line to the model and to a server. A `\r\n` counts as one break, and neither of its characters is part of the line's `text`. An empty document has one line, and a trailing break adds an empty last line.
 
 `getLine` clamps a line number out of range. `positionAt` and `offsetAt` clamp to the document and to the line. `slice` is a plain substring and can cut a surrogate pair in half.
 

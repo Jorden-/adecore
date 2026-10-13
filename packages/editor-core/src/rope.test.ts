@@ -5,7 +5,7 @@ import { TextRope } from './rope.ts';
 function referenceLines(text: string): { start: number; end: number; next: number; text: string }[] {
     const lines: { start: number; end: number; next: number; text: string }[] = [];
     let start = 0;
-    for (const match of text.matchAll(/\r?\n/g)) {
+    for (const match of text.matchAll(/\r\n|\r|\n/g)) {
         lines.push({ start, end: match.index, next: match.index + match[0].length, text: text.slice(start, match.index) });
         start = match.index + match[0].length;
     }
@@ -43,7 +43,7 @@ describe('persistent text and line index', () => {
             expect(rope.getLine(line)).toEqual(lines[line]);
             expect(rope.lineAt(lines[line]!.start)).toBe(line);
             const offset = Math.floor(rand() * (text.length + 1));
-            expect(rope.lineAt(offset)).toBe(text.slice(0, offset).split('\n').length - 1);
+            expect(rope.lineAt(offset)).toBe(lines.filter((candidate) => candidate.start <= offset).length - 1);
             expect(rope.slice(from - 10, from + 30)).toBe(text.slice(Math.max(0, from - 10), from + 30));
         }
         for (const version of versions) {
@@ -64,6 +64,39 @@ describe('persistent text and line index', () => {
         expect(model.getLine(0).next).toBe(2049);
         expect(model.getLine(999)).toEqual({ start: model.getLength(), end: model.getLength(), next: model.getLength(), text: '' });
         expect(model.getLine(-2)).toEqual(model.getLine(0));
+    });
+
+    it('counts a lone CR as a line break, as the language server protocol does', () => {
+        const rope = TextRope.from('a\rb\nc\r\nd\r');
+        expect(rope.lineCount).toBe(5);
+        expect([0, 1, 2, 3, 4].map((line) => rope.getLine(line))).toEqual(referenceLines('a\rb\nc\r\nd\r'));
+        expect(rope.lineAt(2)).toBe(1);
+        expect(rope.lineAt(6)).toBe(2);
+        expect(rope.lineAt(7)).toBe(3);
+        const replaced = rope.replace(3, 4, '\r');
+        expect(replaced.lineCount).toBe(5);
+        expect(replaced.getLine(2)).toEqual({ start: 4, end: 5, next: 7, text: 'c' });
+        const joined = rope.replace(2, 2, '\n');
+        expect(joined.lineCount).toBe(5);
+        expect(joined.getLine(0)).toEqual({ start: 0, end: 1, next: 3, text: 'a' });
+    });
+
+    it('joins a CR and an LF that end up in neighboring leaves into one break', () => {
+        const text = 'x'.repeat(2047) + '\r\n' + 'y'.repeat(2047) + '\r';
+        const rope = TextRope.from(text);
+        expect(rope.lineCount).toBe(3);
+        expect(rope.getLine(0)).toEqual({ start: 0, end: 2047, next: 2049, text: 'x'.repeat(2047) });
+        expect(rope.lineAt(2048)).toBe(0);
+        expect(rope.lineAt(2049)).toBe(1);
+        const split = rope.replace(2048, 2048, 'z');
+        expect(split.lineCount).toBe(4);
+        expect(split.getLine(1)).toEqual({ start: 2048, end: 2049, next: 2050, text: 'z' });
+        const rejoined = split.replace(2048, 2049, '');
+        expect(rejoined.lineCount).toBe(3);
+        expect(rejoined.getLine(1).start).toBe(2049);
+        const appended = rope.replace(rope.length, rope.length, '\n');
+        expect(appended.lineCount).toBe(3);
+        expect(appended.getLine(1)).toEqual({ start: 2049, end: 4096, next: 4098, text: 'y'.repeat(2047) });
     });
 
     it('supports empty lines, inserted/deleted breaks and raw UTF-16 slices', () => {

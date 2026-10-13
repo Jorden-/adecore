@@ -8,27 +8,56 @@ export interface DocumentLine {
 
 /*
  * A persistent AVL tree of text chunks of at most `ROPE_CHUNK_SIZE` UTF-16 code units. Every node knows
- * its length and its LF count, a leaf also where its LFs are, so offsets and line numbers resolve
- * without scanning.
+ * its length and its line break count, a leaf also where its breaks are, so offsets and line numbers
+ * resolve without scanning. A line ends at `\n`, `\r\n` or a lone `\r`, as the language server protocol
+ * counts lines, and a break sits at the last code unit of its line ending.
  */
-type Leaf = { readonly text: string; readonly breaks: readonly number[]; readonly length: number; readonly lines: number; readonly height: number };
-type Branch = { readonly left: Node; readonly right: Node; readonly length: number; readonly lines: number; readonly height: number };
+type Edges = { readonly startsWithLf: boolean; readonly endsWithCr: boolean };
+type Leaf = Edges & { readonly text: string; readonly breaks: readonly number[]; readonly length: number; readonly lines: number; readonly height: number };
+type Branch = Edges & { readonly left: Node; readonly right: Node; readonly length: number; readonly lines: number; readonly height: number };
 type Node = Leaf | Branch;
 export const ROPE_CHUNK_SIZE = 2048;
+
+const CR = 13;
+const LF = 10;
+
+/* A node counts a `\r` it ends with as a break; when the next node starts with `\n`, the two are one CRLF and only the `\n` is. */
+function sharedBreak(left: Node, right: Node): number {
+    return left.endsWithCr && right.startsWithLf ? 1 : 0;
+}
 
 function leaf(text: string): Leaf | null {
     if (!text.length) {
         return null;
     }
     const breaks: number[] = [];
-    for (let index = text.indexOf('\n'); index !== -1; index = text.indexOf('\n', index + 1)) {
-        breaks.push(index);
+    for (let index = 0; index < text.length; index++) {
+        const code = text.charCodeAt(index);
+        if (code === LF || (code === CR && text.charCodeAt(index + 1) !== LF)) {
+            breaks.push(index);
+        }
     }
-    return { text, breaks, length: text.length, lines: breaks.length, height: 1 };
+    return {
+        text,
+        breaks,
+        length: text.length,
+        lines: breaks.length,
+        height: 1,
+        startsWithLf: text.charCodeAt(0) === LF,
+        endsWithCr: text.charCodeAt(text.length - 1) === CR
+    };
 }
 
 function branch(left: Node, right: Node): Branch {
-    return { left, right, length: left.length + right.length, lines: left.lines + right.lines, height: Math.max(left.height, right.height) + 1 };
+    return {
+        left,
+        right,
+        length: left.length + right.length,
+        lines: left.lines + right.lines - sharedBreak(left, right),
+        height: Math.max(left.height, right.height) + 1,
+        startsWithLf: left.startsWithLf,
+        endsWithCr: right.endsWithCr
+    };
 }
 
 function balance(left: Node, right: Node): Node {
@@ -259,7 +288,7 @@ export class TextRope {
                 node = node.left;
             } else {
                 offset -= node.left.length;
-                count += node.left.lines;
+                count += node.left.lines - sharedBreak(node.left, node.right);
                 node = node.right;
             }
         }
@@ -283,7 +312,8 @@ export class TextRope {
             return { start, end: this.length, next: this.length };
         }
         const newline = this.breakAt(index);
-        return { start, end: newline - (this.charAt(newline - 1) === '\r' ? 1 : 0), next: newline + 1 };
+        const crlf = this.charAt(newline) === '\n' && this.charAt(newline - 1) === '\r';
+        return { start, end: newline - (crlf ? 1 : 0), next: newline + 1 };
     }
 
     getLine(index: number): DocumentLine {
@@ -295,10 +325,11 @@ export class TextRope {
         let node = this.root!;
         let offset = 0;
         while ('left' in node) {
-            if (index < node.left.lines) {
+            const leftLines = node.left.lines - sharedBreak(node.left, node.right);
+            if (index < leftLines) {
                 node = node.left;
             } else {
-                index -= node.left.lines;
+                index -= leftLines;
                 offset += node.left.length;
                 node = node.right;
             }
