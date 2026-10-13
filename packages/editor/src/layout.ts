@@ -4,6 +4,7 @@ import { offsetOfStop, rowOfStop, stopAtOffset, stopCount, xOfStop } from './geo
 import { BIDI_COLUMNS, bidiControl, visibleBidi } from './bidi.ts';
 import { uniformGeometry } from './uniform-geometry.ts';
 import { lineChangeMapper } from './layout-changes.ts';
+import { offsetMapper } from './offsets.ts';
 
 export type Affinity = 'before' | 'after';
 
@@ -393,6 +394,74 @@ export interface LayoutConfig {
     replacements?: readonly BlockReplacement[];
 }
 
+/* Lines `first` through `last`, both included. */
+interface LineRange {
+    first: number;
+    last: number;
+}
+
+/* The lines an edit replaced: `first` through `oldLast` before it, `first` through `newLast` after it. */
+interface LineEdit {
+    first: number;
+    oldLast: number;
+    newLast: number;
+}
+
+/* What the rows stand on besides the text, by the line it is at. */
+interface RowStructure {
+    above: Map<number, BlockWidget[]>;
+    below: Map<number, BlockWidget[]>;
+    folds: Map<number, FoldState>;
+    replaced: Map<number, { replacement: BlockReplacement; endLine: number }>;
+    /* The lines whose rows are more than a plain line: with a widget, a collapsed fold, a replacement or an inlay. */
+    special: LineRange[];
+}
+
+/* A text row whose key follows its line, so an edit above it moves the row without a new key. */
+class LineRow implements TextRow {
+    readonly kind = 'text';
+    index: number;
+    line: number;
+    lastLine: number;
+    tail: number | null;
+    head: number | null;
+    subRows: number;
+    top = 0;
+    height: number;
+
+    constructor(index: number, line: number, lastLine: number, tail: number | null, head: number | null, subRows: number, height: number) {
+        this.index = index;
+        this.line = line;
+        this.lastLine = lastLine;
+        this.tail = tail;
+        this.head = head;
+        this.subRows = subRows;
+        this.height = height;
+    }
+
+    get key(): string {
+        return `line:${this.line}`;
+    }
+}
+
+/* Sorted, with the ranges that overlap or touch joined. */
+function mergeRanges(ranges: LineRange[]): LineRange[] {
+    ranges.sort((left, right) => left.first - right.first);
+    const merged: LineRange[] = [];
+    for (const range of ranges) {
+        const previous = merged.at(-1);
+        if (previous !== undefined && range.first <= previous.last + 1) {
+            previous.last = Math.max(previous.last, range.last);
+        } else {
+            merged.push({ ...range });
+        }
+    }
+    return merged;
+}
+
+/* Past this many lines to lay out again, building every row costs about as much, and it keeps the arguments of a splice few. */
+const PATCH_LIMIT = 20000;
+
 /*
  * The rows of the document as they are drawn: one per line, taller for a wrapped line, one for a
  * widget, none for a line a fold hides. Only the rows that are on screen are ever measured; the
@@ -405,6 +474,9 @@ export class EditorLayout {
     /* The widest line measured since the text last changed, and the room past it; what a horizontal scroll bar needs. */
     width = 0;
     private lineRows: number[] = [];
+    /* The rows of widgets and replacements by key, which their measured heights come in by. */
+    private keyed = new Map<string, LayoutRow>();
+    private special: LineRange[] = [];
     private geometryCache = new Map<number, LineGeometry>();
     private measuredRows = new Map<number, { start: number; end: number; next: number; subRows: number }>();
     private measuredHeights = new Map<string, number>();
@@ -453,6 +525,7 @@ export class EditorLayout {
             this.replacements = config.replacements;
             this.lineHeightsVersion++;
         }
+        let edit: LineEdit | undefined;
         if (measureAgain || (config.textChanged && !config.changes?.length)) {
             this.lineHeightsVersion++;
             this.geometryCache.clear();
@@ -460,6 +533,7 @@ export class EditorLayout {
             this.width = 0;
         } else {
             if (config.changes?.length) {
+                edit = this.lineEdit(config.changes);
                 this.retainGeometry(config.changes);
                 this.lineHeightsVersion++;
             }
@@ -484,7 +558,32 @@ export class EditorLayout {
                 }
             }
         }
-        this.rebuild();
+        this.rebuild(edit);
+    }
+
+    /* The lines the transactions changed, in the coordinates of the text before and after them. */
+    private lineEdit(batches: readonly (readonly DocumentChange[])[]): LineEdit | undefined {
+        let from = Number.POSITIVE_INFINITY;
+        let to = Number.NEGATIVE_INFINITY;
+        for (const changes of batches) {
+            if (Number.isFinite(to)) {
+                to = offsetMapper(changes)(to);
+            }
+            let delta = 0;
+            for (const change of changes) {
+                from = Math.min(from, change.from);
+                to = Math.max(to, change.from + delta + change.insertedLength);
+                delta += change.insertedLength - (change.to - change.from);
+            }
+        }
+        if (!Number.isFinite(from)) {
+            return undefined;
+        }
+        // The line above too, since an edit at the start of a line can turn the `\r` that ends it into a `\r\n`.
+        const first = Math.max(0, this.document.positionAt(from).line - 1);
+        const newLast = this.document.positionAt(to).line;
+        const oldLast = newLast - (this.document.getLineCount() - this.lineRows.length);
+        return oldLast < first ? undefined : { first, oldLast, newLast };
     }
 
     private retainGeometry(batches: readonly (readonly DocumentChange[])[]): void {
@@ -527,7 +626,19 @@ export class EditorLayout {
         return Math.max(1, Math.ceil((length * this.metrics.charWidth) / Math.max(limit, this.metrics.charWidth)));
     }
 
-    private rebuild(): void {
+    private rebuild(edit?: LineEdit): void {
+        const structure = this.structure();
+        if (edit === undefined || !this.patch(edit, structure)) {
+            this.keyed.clear();
+            const built = this.buildRows(structure, 0, this.document.getLineCount() - 1, 0);
+            this.rows = built.rows;
+            this.lineRows = built.lineRows;
+            this.reflow(0);
+        }
+        this.special = structure.special;
+    }
+
+    private structure(): RowStructure {
         this.inlaysByLine.clear();
         for (const inlay of this.inlays) {
             const line = this.document.positionAt(inlay.at).line;
@@ -560,15 +671,119 @@ export class EditorLayout {
                 replaced.set(startLine, { replacement, endLine });
             }
         }
+        const special: LineRange[] = [];
+        for (const line of [...this.inlaysByLine.keys(), ...above.keys(), ...below.keys()]) {
+            special.push({ first: line, last: line });
+        }
+        for (const fold of folds.values()) {
+            special.push({ first: fold.startLine, last: Math.max(fold.startLine, fold.endLine) });
+        }
+        for (const [startLine, entry] of replaced) {
+            special.push({ first: startLine, last: entry.endLine });
+        }
+        return { above, below, folds, replaced, special: mergeRanges(special) };
+    }
+
+    /*
+     * Lays out again only the lines an edit changed and the rows that stand on more than their line, and moves the
+     * rest. False when that would cost no less than building every row.
+     */
+    private patch(edit: LineEdit, structure: RowStructure): boolean {
         const count = this.document.getLineCount();
-        this.rows = [];
-        this.lineRows = new Array<number>(count);
+        const delta = edit.newLast - edit.oldLast;
+        if (this.rows.length === 0 || this.lineRows.length + delta !== count) {
+            return false;
+        }
+        const moved = (range: LineRange): LineRange => {
+            if (range.last < edit.first) {
+                return range;
+            }
+            if (range.first > edit.oldLast) {
+                return { first: range.first + delta, last: range.last + delta };
+            }
+            return { first: Math.min(range.first, edit.first), last: range.last > edit.oldLast ? range.last + delta : edit.newLast };
+        };
+        const ranges = mergeRanges([{ first: edit.first, last: edit.newLast }, ...structure.special, ...this.special.map(moved)]).filter(
+            (range) => range.first < count
+        );
+        let lines = 0;
+        for (const range of ranges) {
+            range.last = Math.min(range.last, count - 1);
+            lines += range.last - range.first + 1;
+        }
+        if (lines > Math.min(PATCH_LIMIT, count / 2)) {
+            return false;
+        }
+        const rows = this.rows;
+        const built = new Set<LayoutRow>();
+        let first = rows.length;
+        let resized = delta !== 0;
+        // From the bottom up, so the rows and lines of the ranges above keep their indices. Rows not built again keep their old lines until the end.
+        for (let index = ranges.length - 1; index >= 0; index--) {
+            const range = ranges[index]!;
+            const oldFirst = range.first > edit.newLast ? range.first - delta : range.first;
+            const oldLast = range.last >= edit.newLast ? range.last - delta : range.last;
+            let start = this.lineRows[oldFirst]!;
+            while (start > 0 && rows[start - 1]!.kind === 'block' && rows[start - 1]!.line >= oldFirst) {
+                start--;
+            }
+            let end = this.lineRows[oldLast]!;
+            while (end + 1 < rows.length && rows[end + 1]!.kind === 'block' && rows[end + 1]!.line <= oldLast) {
+                end++;
+            }
+            const fresh = this.buildRows(structure, range.first, range.last, start);
+            const removed = rows.splice(start, end - start + 1, ...fresh.rows);
+            this.lineRows.splice(oldFirst, oldLast - oldFirst + 1, ...fresh.lineRows);
+            let height = 0;
+            for (const row of removed) {
+                height -= row.height;
+                if (this.keyed.get(row.key) === row) {
+                    this.keyed.delete(row.key);
+                }
+            }
+            let top = start > 0 ? rows[start - 1]!.top + rows[start - 1]!.height : 0;
+            for (const row of fresh.rows) {
+                built.add(row);
+                height += row.height;
+                row.top = top;
+                top += row.height;
+            }
+            resized ||= height !== 0 || removed.length !== fresh.rows.length;
+            first = start;
+        }
+        if (resized) {
+            for (let index = first; index < rows.length; index++) {
+                const row = rows[index]!;
+                row.index = index;
+                if (!built.has(row) && row.line > edit.oldLast) {
+                    row.line += delta;
+                    if (row.kind === 'text') {
+                        row.lastLine += delta;
+                    }
+                }
+                if (row.kind === 'text') {
+                    for (let covered = row.line; covered <= row.lastLine; covered++) {
+                        this.lineRows[covered] = index;
+                    }
+                }
+            }
+            this.reflow(first);
+        }
+        return true;
+    }
+
+    /* The rows of lines `from` through `to`, the first of them at `index`, and the row each of the lines is in. */
+    private buildRows(structure: RowStructure, from: number, to: number, index: number): { rows: LayoutRow[]; lineRows: number[] } {
+        const { above, below, folds, replaced } = structure;
+        const count = this.document.getLineCount();
+        const rows: LayoutRow[] = [];
+        const lineRows = new Array<number>(to - from + 1);
         const addBlock = (widget: BlockWidget, line: number): void => {
             const key = `block:${widget.id}`;
-            this.rows.push({
+            const row: BlockRow = {
                 key,
                 kind: 'block',
-                index: this.rows.length,
+                index: index + rows.length,
                 line,
                 widget,
                 top: 0,
@@ -577,9 +792,11 @@ export class EditorLayout {
                     : widget.fixed
                       ? Math.max(1, widget.height ?? DEFAULT_BLOCK_HEIGHT)
                       : (this.measuredHeights.get(key) ?? widget.height ?? DEFAULT_BLOCK_HEIGHT)
-            });
+            };
+            rows.push(row);
+            this.keyed.set(key, row);
         };
-        for (let line = 0; line < count; line++) {
+        for (let line = from; line <= to; line++) {
             for (const block of above.get(line) ?? []) {
                 addBlock(block, line);
             }
@@ -587,11 +804,11 @@ export class EditorLayout {
             if (standIn !== undefined) {
                 const last = Math.min(count - 1, standIn.endLine);
                 const key = `replaced:${standIn.replacement.id}`;
-                const index = this.rows.length;
-                this.rows.push({
+                const rowIndex = index + rows.length;
+                const row: TextRow = {
                     key,
                     kind: 'text',
-                    index,
+                    index: rowIndex,
                     line,
                     lastLine: last,
                     tail: null,
@@ -600,9 +817,11 @@ export class EditorLayout {
                     top: 0,
                     height: this.measuredHeights.get(key) ?? standIn.replacement.height ?? DEFAULT_BLOCK_HEIGHT,
                     replacement: standIn.replacement
-                });
+                };
+                rows.push(row);
+                this.keyed.set(key, row);
                 for (let covered = line; covered <= last; covered++) {
-                    this.lineRows[covered] = index;
+                    lineRows[covered - from] = rowIndex;
                 }
                 for (const block of below.get(last) ?? []) {
                     addBlock(block, last);
@@ -614,30 +833,19 @@ export class EditorLayout {
             const last = Math.max(line, Math.min(count - 1, fold?.endLine ?? line));
             const tail = fold?.closer !== undefined && last > line ? this.clampToLine(fold.closer, last) : null;
             const head = fold?.head !== undefined && last > line ? this.clampToLine(fold.head, line) : null;
-            const index = this.rows.length;
+            const rowIndex = index + rows.length;
             const bounds = this.wrapWidth === null ? null : this.document.getLine(line);
             const subRows = this.rowCountOf(line, bounds === null ? 0 : bounds.end - bounds.start);
-            this.rows.push({
-                key: `line:${line}`,
-                kind: 'text',
-                index,
-                line,
-                lastLine: last,
-                tail,
-                head,
-                subRows,
-                top: 0,
-                height: subRows * this.metrics.lineHeight
-            });
+            rows.push(new LineRow(rowIndex, line, last, tail, head, subRows, subRows * this.metrics.lineHeight));
             for (let covered = line; covered <= last; covered++) {
-                this.lineRows[covered] = index;
+                lineRows[covered - from] = rowIndex;
             }
             for (const block of below.get(line) ?? []) {
                 addBlock(block, line);
             }
             line = last;
         }
-        this.reflow();
+        return { rows, lineRows };
     }
 
     /* An offset of a fold clamped to its line, since the fold may be a moment older than an edit. */
@@ -646,31 +854,43 @@ export class EditorLayout {
         return Math.min(bounds.end, Math.max(bounds.start, offset));
     }
 
-    private reflow(): void {
-        let top = 0;
-        for (const row of this.rows) {
+    /* The tops of the rows from `from` on. */
+    private reflow(from: number): void {
+        const previous = this.rows[from - 1];
+        let top = previous === undefined ? 0 : previous.top + previous.height;
+        for (let index = from; index < this.rows.length; index++) {
+            const row = this.rows[index]!;
             row.top = top;
             top += row.height;
         }
         this.height = top + BOTTOM_PADDING;
     }
 
+    /* The row of a widget, a replacement or a line by its key. */
+    rowByKey(key: string): LayoutRow | undefined {
+        if (key.startsWith('line:')) {
+            const row = this.rowForLine(Number(key.slice(5)));
+            return row.key === key ? row : undefined;
+        }
+        return this.keyed.get(key);
+    }
+
     /* A widget's measured height. Returns whether it moved anything. */
     setMeasuredHeight(key: string, height: number): boolean {
-        const row = this.rows.find((candidate) => candidate.key === key);
+        const row = this.rowByKey(key);
         const next = Math.max(1, Math.round(height));
         if (!row || (row.kind === 'block' && row.widget.fixed) || !Number.isFinite(next) || row.height === next) {
             return false;
         }
         this.measuredHeights.set(key, next);
         row.height = next;
-        this.reflow();
+        this.reflow(row.index);
         return true;
     }
 
     /* The visual lines a drawn row really has, which its estimate may have missed. Returns whether any row changed. */
     syncRows(rows: readonly LayoutRow[]): boolean {
-        let changed = false;
+        let first = this.rows.length;
         for (const row of rows) {
             if (row.kind !== 'text' || row.replacement !== undefined) {
                 continue;
@@ -688,14 +908,15 @@ export class EditorLayout {
             if (subRows !== row.subRows) {
                 row.subRows = subRows;
                 row.height = subRows * this.metrics.lineHeight;
-                changed = true;
+                first = Math.min(first, row.index);
             }
         }
-        if (changed) {
+        if (first < this.rows.length) {
             this.lineHeightsVersion++;
-            this.reflow();
+            this.reflow(first);
+            return true;
         }
-        return changed;
+        return false;
     }
 
     rowAt(y: number): LayoutRow {

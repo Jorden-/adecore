@@ -1,6 +1,6 @@
 import { describe, expect, test, spyOn } from 'bun:test';
 import { DocumentModel } from '@adecore/editor-core';
-import { EditorLayout, type LayoutMetrics, type TextRow, scanLine, wrapIndent, wrapStops } from './layout.ts';
+import { EditorLayout, type LayoutConfig, type LayoutMetrics, type TextRow, scanLine, wrapIndent, wrapStops } from './layout.ts';
 
 /* Every character is 10px wide, a line 20px tall, so the numbers in an assertion can be read off the text. */
 const METRICS: LayoutMetrics = {
@@ -442,8 +442,131 @@ for (const wrap of [false, true]) {
         const positions = spyOn(model, 'positionAt');
         const subscription = model.subscribe((snapshot) => layout.configure({ textChanged: true, changes: snapshot.changes }));
         model.applyEdits([{ from: 0, to: 1, text: 'Z' }]);
-        expect(positions.mock.calls.length).toBeLessThanOrEqual(wrap ? 800 : 400);
+        // One per remembered line, and the two ends of the edit.
+        expect(positions.mock.calls.length).toBeLessThanOrEqual((wrap ? 800 : 400) + 2);
         positions.mockRestore();
         subscription.dispose();
     });
 }
+
+/* Sorted by where they start, without the ones that overlap one before them. */
+function apart<Edit extends { from: number; to: number }>(edits: Edit[]): Edit[] {
+    const kept: Edit[] = [];
+    for (const edit of edits.sort((left, right) => left.from - right.from)) {
+        if (kept.length === 0 || edit.from >= kept.at(-1)!.to) {
+            kept.push(edit);
+        }
+    }
+    return kept;
+}
+
+describe('an edit', () => {
+    function random(seed: number): () => number {
+        let state = seed;
+        return () => {
+            state = (state + 0x6d2b79f5) | 0;
+            let value = Math.imul(state ^ (state >>> 15), 1 | state);
+            value = (value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value;
+            return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    const PIECES = ['a', 'word ', 'longer words that wrap ', '\n', '\r\n', '\r', '\t'];
+
+    function piece(next: () => number, length: number): string {
+        return Array.from({ length }, () => PIECES[Math.floor(next() * PIECES.length)]).join('');
+    }
+
+    /* What a row is, apart from the object it is. */
+    function described(layout: EditorLayout): unknown[] {
+        const rows = layout.rows.map((row) => [
+            row.key,
+            row.index,
+            row.line,
+            row.top,
+            row.height,
+            row.kind === 'text' ? [row.lastLine, row.tail, row.head, row.subRows, row.replacement?.id] : row.widget.id
+        ]);
+        const lines = Array.from({ length: layout.document.getLineCount() }, (_, line) => layout.rowForLine(line).index);
+        return [layout.height, rows, lines];
+    }
+
+    for (const wrapWidth of [null, 100]) {
+        test(`lays out the rows a full build would, wrap=${wrapWidth !== null}`, () => {
+            const next = random(wrapWidth ?? 7);
+            const model = new DocumentModel(piece(next, 300));
+            const layout = new EditorLayout(model, METRICS);
+            layout.configure({ wrapWidth });
+            let structure: LayoutConfig = {};
+            const structureOf = (): LayoutConfig => {
+                const length = model.getLength();
+                const lines = model.getLineCount();
+                const at = (): number => Math.floor(next() * (length + 1));
+                const line = (): number => Math.floor(next() * lines);
+                return {
+                    inlays: Array.from({ length: Math.floor(next() * 4) }, (_, index) => ({ id: `inlay${index}`, at: at(), text: 'hint' })),
+                    blocks: Array.from({ length: Math.floor(next() * 4) }, (_, index) => ({
+                        id: `block${index}`,
+                        at: at(),
+                        placement: next() < 0.5 ? ('above' as const) : ('below' as const),
+                        height: 10 + index
+                    })),
+                    folds: Array.from({ length: Math.floor(next() * 4) }, () => {
+                        const startLine = line();
+                        const endLine = startLine + Math.floor(next() * 6);
+                        return { startLine, endLine, collapsed: next() < 0.7, closer: at(), ...(next() < 0.3 ? { head: at() } : {}) };
+                    }),
+                    replacements: Array.from({ length: Math.floor(next() * 3) }, (_, index) => {
+                        const from = at();
+                        return { id: `replaced${index}`, from, to: Math.min(length, from + Math.floor(next() * 40)), render: () => {} };
+                    })
+                };
+            };
+            const subscription = model.subscribe((snapshot) => layout.configure({ textChanged: true, changes: snapshot.changes, ...structure }));
+            for (let step = 0; step < 150; step++) {
+                if (step % 3 === 0) {
+                    structure = structureOf();
+                }
+                const length = model.getLength();
+                const edits = apart(
+                    Array.from({ length: 1 + Math.floor(next() * 3) }, () => {
+                        const from = Math.floor(next() * (length + 1));
+                        return { from, to: Math.min(length, from + Math.floor(next() * 12)), text: piece(next, Math.floor(next() * 4)) };
+                    })
+                );
+                if (!model.applyEdits(edits, { historyGroup: 'typing' })) {
+                    layout.configure(structure);
+                }
+                if (step % 13 === 6) {
+                    model.undo();
+                }
+                const reference = new EditorLayout(model, METRICS);
+                reference.configure({ wrapWidth, ...structure });
+                expect(described(layout)).toEqual(described(reference));
+            }
+            subscription.dispose();
+        });
+    }
+
+    test('lays out only the lines it touched, of a large wrapped document', () => {
+        const { model, layout } = layoutOf(Array.from({ length: 100_000 }, (_, line) => `const value${line} = compute(alpha, beta);`).join('\n'), 300);
+        const subscription = model.subscribe((snapshot) =>
+            layout.configure({ textChanged: true, changes: snapshot.changes, inlays: [], blocks: [], folds: [] })
+        );
+        const first = layout.rows[0];
+        const last = layout.rows.at(-1);
+        const lines = spyOn(model, 'getLine');
+        const caret = model.getLine(50_000).start + 10;
+        model.applyEdits([{ from: caret, to: caret, text: 'x' }]);
+        expect(lines.mock.calls.length).toBeLessThan(10);
+        expect(layout.rows[0]).toBe(first!);
+        expect(layout.rows.at(-1)).toBe(last!);
+        lines.mockClear();
+        model.applyEdits([{ from: caret, to: caret, text: '\n' }]);
+        expect(lines.mock.calls.length).toBeLessThan(10);
+        expect(layout.rows.at(-1)).toBe(last!);
+        expect(last!.key).toBe('line:100000');
+        lines.mockRestore();
+        subscription.dispose();
+    });
+});
