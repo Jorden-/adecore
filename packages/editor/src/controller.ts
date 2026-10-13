@@ -202,7 +202,9 @@ export class InputController {
         });
         this.listen(input, 'keyup', (event) => this.gesture.keyup(event));
         this.listen(root, 'focusout', (event) => {
-            if (!(event.relatedTarget instanceof Node) || !root.contains(event.relatedTarget)) {
+            // A node by its type, as `instanceof Node` fails for one of another window, such as a window the opener mounted the editor in.
+            const related = event.relatedTarget as Node | null;
+            if (typeof related?.nodeType !== 'number' || !root.contains(related)) {
                 this.options.blur();
             }
         });
