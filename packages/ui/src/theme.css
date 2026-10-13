@@ -848,6 +848,15 @@
         scrollbar-width: none;
     }
     .ade-tab-strip::-webkit-scrollbar { display: none; }
+    /* Tabs that scroll sideways instead of handing the rest to a menu. The pixel at the bottom holds a
+       line tab's underline, which the scroll box would clip otherwise. */
+    .tabs-scroll {
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 1px;
+        scrollbar-width: none;
+    }
+    .tabs-scroll::-webkit-scrollbar { display: none; }
     .ade-document-tab {
         position: relative;
         display: inline-flex;

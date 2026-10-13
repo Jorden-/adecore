@@ -31,6 +31,17 @@ Each `ProjectSwitcherItem` has an `id`, unique within its list, and a `name`. Th
 
 The menu draws three groups: the projects, then the items in `before`, then Recent projects with the items in `children`. Put the ways to open a project in `children`, such as opening a folder or creating a project, so they share a group with Recent projects. Put what is neither in `before`. A group with nothing in it draws no separator.
 
+The same groups are `ProjectSwitcherGroups`, for a menu that opens from a trigger of its own, such as a plus at the end of a row of open projects. It takes `projects`, `recentProjects`, `before`, `children` and `onSelect` as above and goes inside a `Menu.Popup`.
+
+```tsx
+<Menu.Root>
+    <IconButton render={<Menu.Trigger />} icon={Plus} label="Open project" />
+    <Menu.Popup className="min-w-60">
+        <ProjectSwitcherGroups projects={projects} onSelect={open} />
+    </Menu.Popup>
+</Menu.Root>
+```
+
 Keyboard, typeahead and submenus come from [Menu](/ui/overlays/menu). Typeahead matches the project name, not its hint.
 
 ## Props
