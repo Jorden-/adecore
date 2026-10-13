@@ -4,6 +4,7 @@ import type {
     ChatAssistantItem,
     ChatCheckpointDiff,
     ChatEvent,
+    ChatGoalAction,
     ChatInfo,
     ChatItem,
     ChatQueuedMessage,
@@ -267,7 +268,37 @@ export class ChatSession {
     get busy(): boolean {
         const turnId = this.thread.info.activeTurnId;
         const turn = turnId ? this.thread.get(turnId) : undefined;
-        return turnId !== null && (turn?.kind !== 'turn' || turn.origin !== 'agent');
+        // A turn the CLI opened toward a goal is the goal's own: a message waits for it like for any turn of the person's.
+        return turnId !== null && (turn?.kind !== 'turn' || turn.origin !== 'agent' || this.goalWorks());
+    }
+
+    /* Whether the CLI works toward a goal, which goes on in turns of its own until the goal is met, paused or cleared. */
+    private goalWorks(): boolean {
+        return this.thread.info.goal?.status === 'active';
+    }
+
+    /*
+     * Pauses, resumes or clears the chat's goal. A CLI with calls for it takes them at once, even while a goal
+     * turn runs; resuming an idle goal and clearing a goal of a CLI without them go out as `/goal` in a turn of
+     * their own, which a goal turn still running is in the way of.
+     */
+    async goal(action: ChatGoalAction): Promise<void> {
+        const supported = this.options.provider.capabilities.goals;
+        if (supported === undefined || (supported === 'command' && action !== 'clear')) {
+            throw new ChatError('chat-unsupported', `${this.options.provider.name} cannot ${action} a goal`);
+        }
+        if (this.thread.info.goal === undefined) {
+            throw new ChatError('goal-not-found', 'This chat has no goal');
+        }
+        const backend = this.backend;
+        if (supported === 'native' && backend?.goal && backend.running && (action !== 'resume' || this.busy)) {
+            await backend.goal(action);
+            return;
+        }
+        if (this.busy) {
+            throw new ChatError('chat-busy', 'Stop the turn that works toward the goal first');
+        }
+        this.send(`/goal ${action}`);
     }
 
     /* The next process uses these settings; live work keeps the process it started in. */
@@ -456,6 +487,8 @@ export class ChatSession {
             extras.delivery !== 'steer' ||
             this.info.queuePaused ||
             text.startsWith('/') ||
+            // A goal runs as turns of its own; a message waits for the one running instead of joining it.
+            this.goalWorks() ||
             !this.busy ||
             !turnId ||
             !backend?.steerTurn ||
@@ -599,6 +632,10 @@ export class ChatSession {
     private dispatch(text: string, extras: ChatSendExtras, requestedTurnId?: string): void {
         this.pauseQueue(false);
         this.settleAgentTurn();
+        // A goal that was met has said what it had to; the next message of the person leaves it behind.
+        if (this.thread.info.goal?.status === 'complete') {
+            this.emit([this.thread.patchInfo({ goal: undefined })]);
+        }
         const { preamble, note } = this.contextNote(text);
         // A slash command must stay the first thing the CLI reads, as `contextNote` keeps it.
         const references = text.startsWith('/') || !this.options.references ? { ids: [], note: null } : this.options.references(extras.chats);
@@ -759,6 +796,7 @@ export class ChatSession {
                 queuePaused: false,
                 background: [],
                 delegating: undefined,
+                goal: undefined,
                 effectiveRuntimeMode: undefined,
                 permissionMode: undefined,
                 slashCommands: [],
@@ -1671,7 +1709,7 @@ export class ChatSession {
     }
 
     private processInUse(): boolean {
-        return this.hasNativeWork() || this.thread.pending().length > 0 || this.awaitingBackgroundReport;
+        return this.hasNativeWork() || this.thread.pending().length > 0 || this.awaitingBackgroundReport || this.goalWorks();
     }
 
     private replacementWaits(): boolean {
@@ -1717,6 +1755,7 @@ export class ChatSession {
             saveGeneratedImage: this.options.saveGeneratedImage,
             instructions: this.options.instructions?.() ?? null,
             resumeNote: this.options.resumeNote?.() ?? null,
+            ...(info.goal === undefined ? {} : { goal: info.goal }),
             ...(folders.length > 0 ? { folders } : {}),
             ...(this.options.spawn ? { spawn: this.options.spawn } : {})
         };

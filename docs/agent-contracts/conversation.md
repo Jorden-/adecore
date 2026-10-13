@@ -24,6 +24,7 @@ The fields a client reads most:
 | `requests`                              | The approvals and questions that wait on a person, oldest first, at most `CHAT_REQUEST_LIMITS.perChat`.  |
 | `usage`                                 | `ChatUsage`: context tokens, context window, cost, turns and an estimated `breakdown` of the context.    |
 | `limit`, `resumeAt`, `resumeAtReset`    | The limit the last turn stopped on, when the host takes the chat up again, and the chat's own switch for that. |
+| `goal`                                  | `ChatGoal`: the objective the CLI works toward on its own, its status and how far it got; absent while there is none. |
 | `forkOf`, `hidden`, `suggestedTitle`    | Where a fork came from, a chat no list should show, and the title the CLI gave the session.              |
 
 Optional arrays such as `queue`, `background`, `skills` and `requests` are absent on records from before they existed; read absent as empty.
@@ -98,6 +99,10 @@ A turn's `checkpointDiff` lists the files the working tree changed against the t
 `chat.fork` starts a new chat after a turn, with the history up to it. It can take a `title` (at most `CHAT_FORK_TITLE_MAX`, 120), a worktree on a new branch, another provider, model or account. `chat.forkInfo` answers what a fork dialog needs to offer: whether the folder is a repository, the branches taken, a free one to suggest. `chat.continueOn` moves a chat that stopped on a limit to another account of its CLI. Where a fork lands is the app's business; see [Protocol](/agent-contracts/protocol#requests).
 
 ## Limits
+
+## Goals
+
+`/goal` gives a CLI an objective it works toward turn after turn until it is met. `ChatInfo.goal` is a `ChatGoal` (`ChatGoalSchema`): the `objective`, its `status` (`ChatGoalStatusSchema`, `ChatGoalStatus`: `active`, `paused`, `blocked`, `usage-limited`, `budget-limited` or `complete`), and what the CLI counts of it: `checks` and `lastCheck` where its check of the goal sends the agent on, `tokensUsed`, `tokenBudget` and `secondsUsed` where it counts what the goal spent. The statuses are the goal's own enum, so a client that validates a chat payload whole never meets a new value inside one it knew. `chat.goal` (`ChatGoalPayloadSchema`, `ChatGoalPayload`, with a `ChatGoalAction` of `pause`, `resume` or `clear`, `ChatGoalActionSchema`) acts on the goal without a turn; which actions a CLI takes is its `goals` capability.
 
 A usage limit or an overloaded model is not a turn state: it is an `error` turn with `limit: { kind: 'usage' | 'overload', resetsAt? }`. `resetsAt` is absent when the CLI named no time. `ChatInfo.limit` repeats it for the header until the next turn opens.
 

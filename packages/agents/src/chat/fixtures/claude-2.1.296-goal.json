@@ -1,0 +1,136 @@
+{
+    "version": "Claude Code 2.1.296",
+    "capturedAt": "2026-10-13",
+    "source": "Live stream-json of `/goal` with a condition the first answer could not meet: the synthetic command output, the replayed command, the model, one Stop hook check that sent it on, the model again and the one result of the whole run. Stream events, hooks, rate limits and command lifecycle frames are left out; the result keeps only the fields the protocol reads.",
+    "frames": [
+        {
+            "type": "assistant",
+            "message": {
+                "id": "45a12f9c-8626-4da5-9f0f-9879c170fef2",
+                "model": "<synthetic>",
+                "role": "assistant",
+                "type": "message",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Goal set: the assistant has written the word banana in two separate turns (the first reply alone is not enough)"
+                    }
+                ],
+                "stop_reason": "end_turn"
+            },
+            "parent_tool_use_id": null,
+            "local_command_source": "<local-command-stdout>Goal set: the assistant has written the word banana in two separate turns (the first reply alone is not enough)</local-command-stdout>",
+            "session_id": "0d328a18-28f2-48af-af0f-017ad89c26a2",
+            "uuid": "4753b572-aaf8-43bc-b7bb-eb4030430804",
+            "timestamp": "2026-10-13T09:43:32.152Z",
+            "local_command_run": {
+                "command": "goal",
+                "args": "the assistant has written the word banana in two separate turns (the first reply alone is not enough)"
+            }
+        },
+        {
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": "<command-name>/goal</command-name>\n            <command-message>goal</command-message>\n            <command-args>the assistant has written the word banana in two separate turns (the first reply alone is not enough)</command-args>"
+            },
+            "session_id": "0d328a18-28f2-48af-af0f-017ad89c26a2",
+            "parent_tool_use_id": null,
+            "uuid": "33333333-3333-4333-8333-333333333333",
+            "timestamp": "2026-10-13T09:43:32.152Z",
+            "isReplay": true
+        },
+        {
+            "type": "assistant",
+            "message": {
+                "id": "msg_011Cfz262XsUozZNFziQzpGU",
+                "model": "claude-haiku-5-5",
+                "role": "assistant",
+                "type": "message",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Doel gezet: ik schrijf het woord \"banana\" in twee afzonderlijke beurten. Deze beurt is de eerste.\n\nbanana"
+                    }
+                ],
+                "stop_reason": null
+            },
+            "parent_tool_use_id": null,
+            "session_id": "0d328a18-28f2-48af-af0f-017ad89c26a2",
+            "uuid": "a0d5b0da-923a-4773-b445-69e36a20e7bb",
+            "timestamp": "2026-10-13T09:43:36.760Z",
+            "user_message_uuid": "33333333-3333-4333-8333-333333333333",
+            "user_message_uuids": [
+                "33333333-3333-4333-8333-333333333333"
+            ]
+        },
+        {
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Stop hook feedback:\n[the assistant has written the word banana in two separate turns (the first reply alone is not enough)]: Only one assistant turn containing 'banana' is present in the transcript: the reply that says \"Deze beurt is de eerste.\" followed by \"banana\". The condition requires a second separate turn with 'banana', which has not yet occurred."
+                    }
+                ]
+            },
+            "parent_tool_use_id": null,
+            "session_id": "0d328a18-28f2-48af-af0f-017ad89c26a2",
+            "uuid": "74b573ca-adc9-4c37-a896-bae663eebec6",
+            "timestamp": "2026-10-13T09:43:38.202Z",
+            "isSynthetic": true
+        },
+        {
+            "type": "system",
+            "subtype": "status",
+            "status": "compacting",
+            "compact_output_chars": 0,
+            "session_id": "0d328a18-28f2-48af-af0f-017ad89c26a2",
+            "uuid": "074fe795-5f3a-459b-93a7-3d8f81d280b1"
+        },
+        {
+            "type": "system",
+            "subtype": "status",
+            "status": null,
+            "compact_result": "failed",
+            "compact_error": "too_few_groups",
+            "session_id": "0d328a18-28f2-48af-af0f-017ad89c26a2",
+            "uuid": "3ebbf7de-b187-43fd-b1ec-3c48d4c589d6"
+        },
+        {
+            "type": "assistant",
+            "message": {
+                "id": "msg_011Cfz26UGBv5G733tMq9wHX",
+                "model": "claude-haiku-5-5",
+                "role": "assistant",
+                "type": "message",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "banana"
+                    }
+                ],
+                "stop_reason": null
+            },
+            "parent_tool_use_id": null,
+            "session_id": "0d328a18-28f2-48af-af0f-017ad89c26a2",
+            "uuid": "26b88636-94fa-441a-b072-33e8707fb68b",
+            "timestamp": "2026-10-13T09:43:39.450Z"
+        },
+        {
+            "type": "result",
+            "subtype": "success",
+            "is_error": false,
+            "num_turns": 2,
+            "stop_reason": "end_turn",
+            "session_id": "0d328a18-28f2-48af-af0f-017ad89c26a2",
+            "total_cost_usd": 0.017004325,
+            "result": "banana",
+            "uuid": "64ed92e3-abde-4aeb-b0a8-3bf75fc10a6e",
+            "user_message_uuids": [
+                "33333333-3333-4333-8333-333333333333"
+            ]
+        }
+    ]
+}

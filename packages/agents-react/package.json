@@ -164,6 +164,11 @@
             "types": "./dist/chat/logic/json.d.ts",
             "default": "./dist/chat/logic/json.js"
         },
+        "./chat/logic/goal": {
+            "source": "./src/chat/logic/goal.ts",
+            "types": "./dist/chat/logic/goal.d.ts",
+            "default": "./dist/chat/logic/goal.js"
+        },
         "./chat/logic/limit": {
             "source": "./src/chat/logic/limit.ts",
             "types": "./dist/chat/logic/limit.d.ts",
@@ -393,6 +398,11 @@
             "source": "./src/chat/ui/ImageView.tsx",
             "types": "./dist/chat/ui/ImageView.d.ts",
             "default": "./dist/chat/ui/ImageView.js"
+        },
+        "./chat/ui/GoalDock": {
+            "source": "./src/chat/ui/GoalDock.tsx",
+            "types": "./dist/chat/ui/GoalDock.d.ts",
+            "default": "./dist/chat/ui/GoalDock.js"
         },
         "./chat/ui/LimitState": {
             "source": "./src/chat/ui/LimitState.tsx",

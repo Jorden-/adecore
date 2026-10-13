@@ -38,6 +38,9 @@ export function transportActions(transport: ChatTransport): ChatActions {
         stopTask: async (chatId, taskId) => {
             await transport.request('chat.stopTask', { chatId, taskId });
         },
+        goal: async (chatId, action) => {
+            await transport.request('chat.goal', { chatId, action });
+        },
         approve: async (chatId, requestId, decision, message) => {
             await transport.request('chat.approve', { chatId, requestId, decision, ...(message === undefined ? {} : { message }) });
         },

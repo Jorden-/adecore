@@ -64,6 +64,7 @@ import { ComposerInput, type ComposerInputHandle } from './ComposerInput';
 import { holdLiftsIn, type HoldRelease } from '../prompt-hold';
 import { PromptComposer, type PromptHold } from './PromptComposer';
 import { QuoteTakerContext } from './quote-selection';
+import { GoalDock } from './GoalDock';
 import { LimitDock } from './LimitState';
 import { ResumeCompactionDock } from './ResumeCompactionDock';
 import { StashPicker } from './Pickers';
@@ -285,6 +286,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
     // Absent until the host answered `provider.list`, so only an explicit false hides anything.
     const capabilities = provider?.capabilities;
     const compaction = capabilities?.compaction;
+    const goals = capabilities?.goals;
     const dismissedTurnId = useResumeCompactionDismissal(chatId);
     // The cheap half of the offer, so a chat that can never make one keeps no timer.
     const couldOfferCompaction = compaction !== undefined && compaction !== 'none' && info.usage.contextTokens >= RESUME_COMPACTION_TOKENS;
@@ -424,16 +426,18 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
         }
         const known = new Set(skills.map((skill) => skill.name));
         const own = LOCAL_COMMANDS.map((name) => ({ name, hint: t(`composer.commands.${name}`), local: true, skill: false }));
+        // Every CLI with goals reads `/goal`, also one that lists no commands of its own.
+        const goal = goals === undefined ? [] : [{ name: 'goal', hint: t('composer.commands.goal'), local: false, skill: false }];
         const cli = usableSlashCommands(info.slashCommands)
-            .filter((name) => !LOCAL_COMMANDS.includes(name))
+            .filter((name) => !LOCAL_COMMANDS.includes(name) && (goals === undefined || name !== 'goal'))
             .map((name) => ({
                 name,
                 hint: known.has(name) ? t('composer.commands.skill') : t('composer.commands.cli', { cli: provider?.name ?? t('composer.commands.anyCli') }),
                 local: false,
                 skill: known.has(name)
             }));
-        return [...own, ...cli].filter((command) => command.name.startsWith(commandQuery)).slice(0, 8);
-    }, [commandQuery, info.slashCommands, provider?.name, skills, t]);
+        return [...own, ...goal, ...cli].filter((command) => command.name.startsWith(commandQuery)).slice(0, 8);
+    }, [commandQuery, goals, info.slashCommands, provider?.name, skills, t]);
 
     const skillMatches = useMemo(() => {
         if (skillQuery === null) {
@@ -1135,6 +1139,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                     hold={hold}
                 >
                     <LimitDock chatId={chatId} info={info} />
+                    <GoalDock chatId={chatId} info={info} goals={goals} />
                     {compactionOffer && (
                         <ResumeCompactionDock
                             tokens={compactionOffer.tokens}

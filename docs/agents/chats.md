@@ -24,6 +24,12 @@ Stopping a turn settles the requests it left open, so no approval stays pending 
 
 `chat.subagent` reads the conversation of an agent the chat delegated to, from the CLI's own transcript, a page at a time, and with `watch: true` sends `chat.subagentChanged` while it grows. `chat.stopSubagent` stops a subagent a task of your app opened; a Claude subagent that the running process announced is ended with `stop_task` while its parent and siblings go on. A process that did not start it refuses with `subagent-stale` while a turn runs, and with no turn running, like a subagent without a task id, the row is only marked stopped. `chat.stopTask` stops one background shell or monitor, on a CLI that can.
 
+## Goals
+
+`/goal <objective>` sets a goal, `/goal` alone says where it stands, and `/goal pause`, `/goal resume` and `/goal clear` act on it; the goal itself is `info.goal`. Claude Code takes the command as it is and works toward the goal inside the one turn it opens, behind a check that sends it on until the goal is met; the host reads the goal from the command's own answer and from each check, and counts a turn that ends normally after the model answered as the goal met. Codex has calls for goals: the backend sets the objective, starts the first goal turn with the chat's settings and only then makes the goal active, after which Codex opens every next turn itself, as a turn of the agent's. Stopping a Codex turn pauses its goal first, so no goal turn opens after it.
+
+A goal runs as turns of its own. While one is active, a message waits in the queue for the turn that runs, `delivery: "steer"` included. `chat.goal` pauses, resumes or clears without a turn on a CLI with goal calls; resuming an idle goal, and clearing on a CLI that only reads the command, sends `/goal` as a turn and is refused with `chat-busy` while a turn is in the way. A met goal leaves `info.goal` with the next message of the person.
+
 ## Searching and resuming
 
 `searchThreadItems(items, query, { limit })` from `@adecore/agents/chat/thread-search` returns `ThreadHit` records for the user and assistant messages of a thread that contain the query, with a snippet around the match (`ThreadSearchOptions` holds the limit). `spokenText` from `@adecore/agents/chat/claude-transcript` is the text of a Claude transcript line as the person saw it.

@@ -60,11 +60,11 @@ The two backends and their protocols.
 | Module | Exports |
 | --- | --- |
 | [`chat/claude-backend`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/claude-backend.ts) | `ClaudeBackendOptions`, `ClaudeBackend` |
-| [`chat/claude-protocol`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/claude-protocol.ts) | `ClaudeProtocol` |
+| [`chat/claude-protocol`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/claude-protocol.ts) | `claudeGoalFromCommand`, `claudeGoalCheck`, `ClaudeProtocol` |
 | [`chat/claude-title`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/claude-title.ts) | `ClaudeTitleReader` |
 | [`chat/claude-transcript`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/claude-transcript.ts) | `SubagentMeta`, `claudeProjectSlug`, `findSubagentsDir`, `readSubagentMetas`, `findWorkflowAgent`, `TranscriptProjection` |
-| [`chat/codex-backend`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/codex-backend.ts) | `parseSkillsList`, `CodexBackendOptions`, `CodexBackend` |
-| [`chat/codex-protocol`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/codex-protocol.ts) | `unwrapCommand`, `CodexProtocol` |
+| [`chat/codex-backend`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/codex-backend.ts) | `GoalCommand`, `parseGoalCommand`, `parseSkillsList`, `CodexBackendOptions`, `CodexBackend` |
+| [`chat/codex-protocol`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/codex-protocol.ts) | `codexGoal`, `unwrapCommand`, `CodexProtocol` |
 | [`chat/codex-thread`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/codex-thread.ts) | `ThreadItemsParams`, `parseThreadItemsPage`, `projectCodexItems`, `CodexProcessSpec`, `listThreadItemsOnce`, `ThreadForkParams`, `forkThreadOnce` |
 | [`chat/codex-transport`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/codex-transport.ts) | `CodexFrame`, `CodexClientInfo`, `DEFAULT_CODEX_CLIENT`, `CodexTransport` |
 | [`providers/claude`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/providers/claude.ts) | `claudeRuntimeMode`, `claudeArgs`, `claudeEnv`, `CLAUDE_CAPABILITIES`, `CLAUDE_RESUME_COMMAND`, `promptPrefix` |

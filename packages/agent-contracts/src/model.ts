@@ -115,7 +115,10 @@ export const ProviderCapabilitiesSchema = z.object({
     reportsContextWindow: z.boolean(),
     // Whether the CLI hands over what the model thought before it answered.
     reportsThinking: z.boolean(),
-    slashCommands: z.boolean()
+    slashCommands: z.boolean(),
+    // How `/goal` reaches the CLI: through a protocol of its own that pauses, resumes and clears (`native`),
+    // or as the slash command alone (`command`); absent where the CLI has no goals.
+    goals: z.enum(['native', 'command']).optional()
 });
 export type ProviderCapabilities = z.infer<typeof ProviderCapabilitiesSchema>;
 

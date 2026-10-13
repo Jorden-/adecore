@@ -55,6 +55,10 @@ export function chatHandlers(chats: ChatCore, providers: ProviderRegistry): { [T
             await chats.stopTask(payload.chatId, payload.taskId);
             return {};
         },
+        'chat.goal': async (payload) => {
+            await chats.goal(payload.chatId, payload.action);
+            return {};
+        },
         'chat.detach': (payload, clientId) => {
             chats.detach(payload.chatId, clientId);
             return {};

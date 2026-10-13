@@ -27,6 +27,11 @@ export interface TaskCoordinatorDeps {
      * it (`reports`), nothing (`silent`), or nothing ever again, since its process went (`gone`).
      */
     afterBackgroundWork(chatId: string): 'reports' | 'silent' | 'gone';
+    /*
+     * The goal a chat's CLI works toward, while one is active: `running` while its process is there to open the
+     * next turn toward it; null once the goal is met, paused or cleared, or when there never was one.
+     */
+    activeGoal?(chatId: string): { objective: string; running: boolean } | null;
     /* The commands and monitors a chat's CLI runs in the background right now. */
     commandsOf(chatId: string): readonly ChatBackgroundTask[];
     /* The `background-limit` outbox entry of a task, which settles it once its commands ran too long. */
@@ -73,6 +78,10 @@ function restartedNote(commands: readonly string[]): string {
     return `The machine restarted while this still ran in the background: ${commandList(commands)}.`;
 }
 
+function goalLostNote(objective: string): string {
+    return `The agent stopped before its goal was met: ${objective}`;
+}
+
 /* What a settled turn of a child makes of its task. */
 export function resultOfTurn(turn: ChatTurnItem, items: readonly ChatItem[], at: number): { status: 'done' | 'failed'; result: TaskResult } {
     if (turn.state === 'done') {
@@ -90,8 +99,9 @@ export function resultOfTurn(turn: ChatTurnItem, items: readonly ChatItem[], at:
 /*
  * Settles tasks from what children do and does nothing else: it writes the task store and owes wakes
  * in the outbox, never starts a turn, since it runs inside the broadcast of the child it heard. A chat
- * child settles when a turn ends with none of its own tasks still open or waiting to wake it and no work
- * of its CLI's still running in the background, or once the commands it runs there outlast their limit;
+ * child settles when a turn ends with none of its own tasks still open or waiting to wake it, no goal
+ * still active and no work of its CLI's still running in the background, or once the commands it runs
+ * there outlast their limit;
  * an agent that is not a chat, which the host tells it about, settles only on `done`, or fails when it
  * ends without one.
  */
@@ -234,6 +244,16 @@ export class TaskCoordinator {
         const paused = this.pauseFor(chatId, turn, items);
         if (paused !== null) {
             this.hold(task, paused);
+            return;
+        }
+        // A goal holds the task with no limit, and the parent sleeps on through the turns its CLI opens toward it.
+        const goal = turn.state === 'done' ? (this.deps.activeGoal?.(chatId) ?? null) : null;
+        if (goal?.running === true) {
+            return;
+        }
+        if (goal !== null) {
+            const { result } = resultOfTurn(turn, items, this.deps.now());
+            this.settle(task, 'failed', { ...result, text: `${result.text}\n\n${goalLostNote(goal.objective)}`, source: 'exit' });
             return;
         }
         // A turn a person stopped or that failed ends the task as it always did, whatever still runs beside it.

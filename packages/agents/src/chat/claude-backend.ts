@@ -22,7 +22,7 @@ export class ClaudeBackend implements ChatBackend {
     private readonly launch: BackendLaunch;
     private readonly host: BackendHost;
     private readonly allowedTools: readonly string[];
-    private readonly protocol = new ClaudeProtocol();
+    private readonly protocol: ClaudeProtocol;
     private child: ChatChild | null = null;
     private stdinClosed = false;
     // The person asked to stop; the result frame that follows closes the turn as aborted.
@@ -34,6 +34,7 @@ export class ClaudeBackend implements ChatBackend {
         this.launch = launch;
         this.host = host;
         this.allowedTools = options.allowedTools ?? [];
+        this.protocol = new ClaudeProtocol(launch.goal ?? null);
     }
 
     get running(): boolean {
@@ -101,6 +102,7 @@ export class ClaudeBackend implements ChatBackend {
 
     interrupt(): void {
         this.interrupted = true;
+        this.protocol.noteInterrupt();
         this.write({ type: 'control_request', request_id: `interrupt-${Date.now()}`, request: { subtype: 'interrupt' } });
     }
 

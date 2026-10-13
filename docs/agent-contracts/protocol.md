@@ -49,7 +49,7 @@ A frame arrives as `unknown` because the receiving end checks it. `onFrame` answ
 | Answer                 | `chat.approve`, `chat.answer`, `chat.dismiss`                                                         |
 | Configure              | `chat.configure`, `chat.setPreferences`, `skills.list`, `provider.list`                               |
 | Turns and forks        | `chat.turnDiff`, `chat.fork`, `chat.forkInfo`, `chat.summarize`, `chat.continueOn`                    |
-| Delegated work         | `chat.subagent`, `chat.stopSubagent`, `chat.stopTask`                                                 |
+| Delegated work         | `chat.subagent`, `chat.stopSubagent`, `chat.stopTask`, `chat.goal`                                    |
 | Bookmarks              | `chat.addBookmark`, `chat.renameBookmark`, `chat.removeBookmark`                                      |
 | Visuals                | `chat.removeVisual`                                                                                   |
 | Accounts               | `accounts.list`, `accounts.save`, `accounts.refresh`, `accounts.create`, `accounts.watchLogin`        |

@@ -1,6 +1,6 @@
 /*
  * Network-free `codex app-server` fake. Prompt commands exercise approvals, edits, questions,
- * interrupts, failures, names, subagents, pagination and forks through the real JSON-RPC shapes.
+ * interrupts, failures, names, subagents, pagination, forks and goals through the real JSON-RPC shapes.
  */
 import { runOverStdio, type FakeCli } from './fake-cli.ts';
 
@@ -119,6 +119,37 @@ export function fakeCodexWith(options: FakeCodexOptions): FakeCli {
             turnId = '';
         };
 
+        /*
+         * The thread's goal (Codex 0.162.1). An objective `steps:N` takes N turns: the first is the one the client
+         * starts, which ends when the test says later is, and Codex opens every next one itself while the goal
+         * is active, also later, and marks the goal complete in the last.
+         */
+        let goal: Frame | null = null;
+        let goalSteps = 0;
+
+        const goalChanged = (): void => {
+            notify('thread/goal/updated', { threadId, turnId: turnId === '' ? null : turnId, goal });
+        };
+
+        const goalStep = (): void => {
+            goalSteps += 1;
+            agentMessage(`goal step ${goalSteps}`);
+            const needed = Number(/steps:(\d+)/.exec(String(goal?.objective ?? ''))?.[1] ?? '1');
+            if (goal !== null) {
+                goal = { ...goal, tokensUsed: Number(goal.tokensUsed) + 100, status: goalSteps >= needed ? 'complete' : goal.status };
+                goalChanged();
+            }
+            turnCompleted('completed');
+            if (goal?.status === 'active') {
+                io.later(() => {
+                    if (goal?.status === 'active') {
+                        turnStarted();
+                        goalStep();
+                    }
+                });
+            }
+        };
+
         let pendingApproval: PendingApproval | null = null;
         let pendingQuestion: { rpcId: number; questionId: string } | null = null;
         let pendingSteer = false;
@@ -160,6 +191,10 @@ export function fakeCodexWith(options: FakeCodexOptions): FakeCli {
             const user = item('userMessage', { clientId: null, content: [{ type: 'text', text, text_elements: [] }] });
             started(user);
             completed(user);
+            if (goal !== null && (text === goal.objective || text === '')) {
+                io.later(goalStep);
+                return;
+            }
             if (text === 'crash') {
                 io.exit(1);
                 return;
@@ -525,6 +560,44 @@ export function fakeCodexWith(options: FakeCodexOptions): FakeCli {
                         turnCompleted('interrupted');
                     }
                     return;
+                case 'thread/goal/get':
+                    out({ id, result: { goal } });
+                    return;
+                case 'thread/goal/set': {
+                    const at = Math.floor(Date.now() / 1000);
+                    if (typeof params.objective === 'string') {
+                        goal = {
+                            threadId,
+                            objective: params.objective,
+                            status: 'active',
+                            tokenBudget: null,
+                            tokensUsed: 0,
+                            timeUsedSeconds: 0,
+                            createdAt: at,
+                            updatedAt: at
+                        };
+                        goalSteps = 0;
+                    }
+                    if (goal === null) {
+                        out({ id, error: { code: -32600, message: 'no goal to update' } });
+                        return;
+                    }
+                    if (typeof params.status === 'string') {
+                        goal = { ...goal, status: params.status, updatedAt: at };
+                    }
+                    out({ id, result: { goal } });
+                    goalChanged();
+                    return;
+                }
+                case 'thread/goal/clear': {
+                    const cleared = goal !== null;
+                    goal = null;
+                    out({ id, result: { cleared } });
+                    if (cleared) {
+                        notify('thread/goal/cleared', { threadId });
+                    }
+                    return;
+                }
                 case 'thread/compact/start':
                     out({ id, result: {} });
                     turnStarted();

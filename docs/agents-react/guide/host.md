@@ -54,7 +54,7 @@ A default leaves a part out; it is not a policy. A view's `disabled` stops nothi
 
 ## Actions
 
-The views run every action on a chat through a `ChatActions`: clear, stop, unqueue, send now, compact, configure, continue on another account, read a turn's diff, stop a subagent or a task, approve, answer and dismiss. With `actions: null` each one is the request of the same name on the transport of the scope it runs in (`transportActions(transport)`). `useChatActions()` and `actionsOf(scope)` answer the set in use.
+The views run every action on a chat through a `ChatActions`: clear, stop, unqueue, send now, compact, configure, continue on another account, read a turn's diff, stop a subagent or a task, approve, answer and dismiss, and act on a goal. `goal` is optional: without it the goal row shows the goal and offers no buttons. With `actions: null` each one is the request of the same name on the transport of the scope it runs in (`transportActions(transport)`). `useChatActions()` and `actionsOf(scope)` answer the set in use.
 
 A set of your own is one for the page and gets only chat ids, so it has to know which host each chat is on. Wrap the requests rather than replace them, and keep the `code` of a refusal:
 

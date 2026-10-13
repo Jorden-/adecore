@@ -167,6 +167,28 @@ export const ChatTurnLimitSchema = z.object({
 });
 export type ChatTurnLimit = z.infer<typeof ChatTurnLimitSchema>;
 
+/*
+ * A goal the chat's CLI works toward on its own, turn after turn, until it is met: Claude Code's and Codex's
+ * `/goal`. The statuses are this schema's own, so a client that validates a chat payload whole never meets
+ * a new value inside one it already knew. `usage-limited` and `budget-limited` are Codex's: the plan's limit,
+ * or the token budget the goal was given.
+ */
+export const ChatGoalStatusSchema = z.enum(['active', 'paused', 'blocked', 'usage-limited', 'budget-limited', 'complete']);
+export type ChatGoalStatus = z.infer<typeof ChatGoalStatusSchema>;
+
+export const ChatGoalSchema = z.object({
+    objective: z.string(),
+    status: ChatGoalStatusSchema,
+    // How often the CLI's own check found the goal not met yet and sent the agent on; absent from a CLI that counts tokens instead.
+    checks: z.number().int().nonnegative().optional(),
+    // What that check last said was still missing.
+    lastCheck: z.string().optional(),
+    tokensUsed: z.number().int().nonnegative().optional(),
+    tokenBudget: z.number().int().positive().optional(),
+    secondsUsed: z.number().int().nonnegative().optional()
+});
+export type ChatGoal = z.infer<typeof ChatGoalSchema>;
+
 export const ChatQuestionSchema = z.object({
     id: z.string(),
     header: z.string(),
@@ -274,6 +296,8 @@ export const ChatInfoSchema = z.object({
     resumeAt: z.number().optional(),
     // What the chat waits on a person for, oldest first and at most `CHAT_REQUEST_LIMITS.perChat`; absent while nothing waits.
     requests: z.array(ChatRequestSummarySchema).optional(),
+    // The goal the CLI works toward, from the moment one is set until it is cleared; absent while there is none.
+    goal: ChatGoalSchema.optional(),
     createdAt: z.number()
 });
 export type ChatInfo = z.infer<typeof ChatInfoSchema>;
@@ -764,6 +788,13 @@ export const ChatStopSubagentPayloadSchema = ChatTargetPayloadSchema.extend({
     toolUseId: z.string().min(1).max(256)
 });
 export type ChatStopSubagentPayload = z.infer<typeof ChatStopSubagentPayloadSchema>;
+
+// What a person does to a chat's goal without a turn of its own; `pause` and `resume` only where the CLI's protocol has them.
+export const ChatGoalActionSchema = z.enum(['pause', 'resume', 'clear']);
+export type ChatGoalAction = z.infer<typeof ChatGoalActionSchema>;
+
+export const ChatGoalPayloadSchema = ChatTargetPayloadSchema.extend({ action: ChatGoalActionSchema });
+export type ChatGoalPayload = z.infer<typeof ChatGoalPayloadSchema>;
 
 export const ChatStopTaskPayloadSchema = ChatTargetPayloadSchema.extend({ taskId: z.string().min(1).max(256) });
 export type ChatStopTaskPayload = z.infer<typeof ChatStopTaskPayloadSchema>;

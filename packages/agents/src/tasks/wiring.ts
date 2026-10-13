@@ -106,6 +106,11 @@ export function wireTasks(deps: TaskWiringDeps): TaskWiring {
             return reportsOnBackgroundWork(chat.info.provider) ? 'reports' : 'silent';
         },
         commandsOf: (chatId) => chats.get(chatId)?.info.background ?? [],
+        activeGoal: (chatId) => {
+            const chat = chats.get(chatId);
+            const goal = chat?.info.goal;
+            return chat && goal?.status === 'active' ? { objective: goal.objective, running: chat.running } : null;
+        },
         limit
     });
 
@@ -142,7 +147,8 @@ export function wireTasks(deps: TaskWiringDeps): TaskWiring {
         }
         const stored = await chats.storedBackground(task.childId);
         const storedWork = stored.items.length > 0 || stored.commands.length > 0;
-        if (!deps.placed(task.childId) || (task.background === undefined && task.requiresTaskTurn !== true && !storedWork)) {
+        // A goal still active went down with the CLI, which its child's last turn settles on.
+        if (!deps.placed(task.childId) || (task.background === undefined && task.requiresTaskTurn !== true && !storedWork && !stored.goal)) {
             return;
         }
         if (task.background === undefined && stored.turnId !== null && storedWork) {

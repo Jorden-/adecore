@@ -62,7 +62,8 @@ export const CODEX_CAPABILITIES: ProviderCapabilities = {
     reportsCost: false,
     reportsContextWindow: true,
     reportsThinking: true,
-    slashCommands: false
+    slashCommands: false,
+    goals: 'native'
 };
 
 // `codex resume` is a subcommand that reads `[OPTIONS] [SESSION_ID]`, so the flags go after it.

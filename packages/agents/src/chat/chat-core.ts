@@ -13,6 +13,7 @@ import {
     type ChatCreatePayload,
     type ChatEvent,
     type ChatHistoryResult,
+    type ChatGoalAction,
     type ChatInfo,
     type ChatItem,
     type ChatQueuedMessage,
@@ -446,7 +447,7 @@ export class ChatCore {
         return session.info;
     }
 
-    async storedBackground(chatId: string): Promise<{ turnId: string | null; items: BackgroundWork[]; commands: string[] }> {
+    async storedBackground(chatId: string): Promise<{ turnId: string | null; items: BackgroundWork[]; commands: string[]; goal: boolean }> {
         const record = await this.store?.read(chatId);
         const items = record?.items ?? [];
         const background = items.filter(
@@ -454,7 +455,12 @@ export class ChatCore {
                 isBackgroundWork(item) && (runsInBackground(item) || items.some((note) => note.id === `lost-background-${item.id}`))
         );
         const last = items.findLast((item) => item.kind === 'turn');
-        return { turnId: background.at(-1)?.turnId ?? last?.id ?? null, items: background, commands: (record?.info.background ?? []).map(commandLabel) };
+        return {
+            turnId: background.at(-1)?.turnId ?? last?.id ?? null,
+            items: background,
+            commands: (record?.info.background ?? []).map(commandLabel),
+            goal: record?.info.goal?.status === 'active'
+        };
     }
 
     save(chatId: string): Promise<void> {
@@ -664,6 +670,11 @@ export class ChatCore {
     async stopTask(chatId: string, taskId: string): Promise<void> {
         await this.loaded(chatId);
         this.require(chatId).stopTask(taskId);
+    }
+
+    async goal(chatId: string, action: ChatGoalAction): Promise<void> {
+        await this.loaded(chatId);
+        await this.require(chatId).goal(action);
     }
 
     /* The whole conversation of a subagent of the CLI's own, for an agent that reads it as text. */
@@ -1281,14 +1292,15 @@ export class ChatCore {
      */
     private announceStatus(chatId: string, info: ChatInfo): void {
         // A limit, the resume owed after it and subagents still at work are what a header shows of an idle chat, so they count as a change too,
-        // and so does a request opening or settling while the chat already waits on another.
+        // and so does a request opening or settling while the chat already waits on another, and a goal set, moving on or gone.
         const said = JSON.stringify([
             info.status,
             info.limit ?? null,
             info.resumeAt ?? null,
             info.resumeAtReset ?? null,
             info.delegating ?? false,
-            info.requests?.map((request) => request.requestId) ?? []
+            info.requests?.map((request) => request.requestId) ?? [],
+            info.goal === undefined ? null : [info.goal.status, info.goal.objective]
         ]);
         if (this.announced.get(chatId) === said) {
             return;

@@ -1,5 +1,6 @@
 import { describe, expect, jest, test } from 'bun:test';
-import { ClaudeProtocol } from './claude-protocol.ts';
+import { claudeGoalCheck, claudeGoalFromCommand, ClaudeProtocol } from './claude-protocol.ts';
+import goalCapture from './fixtures/claude-2.1.296-goal.json';
 import autoFallbackCapture from './fixtures/claude-2.1.285-auto-fallback.json';
 import resumedTaskCapture from './fixtures/claude-2.1.285-resume-task-notification.json';
 import compactCapture from './fixtures/claude-2.1.285-resume-direct-compact.json';
@@ -874,5 +875,71 @@ describe('ClaudeProtocol', () => {
                 ]
             }
         });
+    });
+});
+
+describe('goals', () => {
+    const objective = 'the assistant has written the word banana in two separate turns (the first reply alone is not enough)';
+
+    test('a goal run of Claude Code 2.1.296 is set, checked once and met within the one turn it runs in', () => {
+        const protocol = new ClaudeProtocol();
+        protocol.beginPrompt('33333333-3333-4333-8333-333333333333');
+        const events = goalCapture.frames.flatMap((frame) => protocol.handle(frame));
+        const goals = events.filter((event) => event.type === 'goal');
+        expect(goals.map((event) => event.goal)).toEqual([
+            { objective, status: 'active', checks: 0 },
+            expect.objectContaining({ objective, status: 'active', checks: 1 }),
+            expect.objectContaining({ objective, status: 'complete', checks: 1 })
+        ]);
+        expect(goals[1]?.goal?.lastCheck).toStartWith("Only one assistant turn containing 'banana'");
+        expect(events.some((event) => event.type === 'note' && event.text.startsWith('Goal not met yet: Only one assistant turn'))).toBe(true);
+        // The goal is complete before the turn ends, so whatever settles on that end reads it so.
+        const types = events.map((event) => event.type);
+        expect(types.lastIndexOf('goal')).toBeLessThan(types.indexOf('turn.done'));
+        expect(events.filter((event) => event.type === 'turn.done')).toHaveLength(1);
+    });
+
+    test('a stopped goal turn leaves the goal set, and the next answer takes it up again', () => {
+        const protocol = new ClaudeProtocol({ objective: 'tests pass', status: 'active', checks: 2 });
+        protocol.beginPrompt('prompt');
+        protocol.handle({ type: 'assistant', message: { id: 'm1', model: 'claude', content: [{ type: 'text', text: 'working' }] } });
+        protocol.noteInterrupt();
+        const stopped = protocol.handle({ type: 'result', subtype: 'success', is_error: false, user_message_uuids: ['prompt'] });
+        expect(stopped.find((event) => event.type === 'goal')).toEqual({ type: 'goal', goal: { objective: 'tests pass', status: 'paused', checks: 2 } });
+
+        protocol.beginPrompt('next');
+        const again = protocol.handle({ type: 'assistant', message: { id: 'm2', model: 'claude', content: [{ type: 'text', text: 'on it' }] } });
+        expect(again.find((event) => event.type === 'goal')).toEqual({ type: 'goal', goal: { objective: 'tests pass', status: 'active', checks: 2 } });
+    });
+
+    test('a turn that ends while a background agent still runs leaves the goal active, since the check waits for it', () => {
+        const protocol = new ClaudeProtocol({ objective: 'docs written', status: 'active', checks: 0 });
+        protocol.beginPrompt('prompt');
+        protocol.handle({
+            type: 'system',
+            subtype: 'task_started',
+            task_id: 'agent-1',
+            tool_use_id: 'toolu_1',
+            task_type: 'local_agent',
+            is_backgrounded: true
+        });
+        protocol.handle({ type: 'assistant', message: { id: 'm1', model: 'claude', content: [{ type: 'text', text: 'started a helper' }] } });
+        const ended = protocol.handle({ type: 'result', subtype: 'success', is_error: false, user_message_uuids: ['prompt'] });
+        expect(ended.some((event) => event.type === 'goal')).toBe(false);
+    });
+
+    test('the command answers of Claude Code read as the goal they leave', () => {
+        expect(claudeGoalFromCommand('Goal set: ship it', null)).toEqual({ objective: 'ship it', status: 'active', checks: 0 });
+        expect(claudeGoalFromCommand('Goal cleared: ship it', null)).toBeNull();
+        expect(claudeGoalFromCommand('No goal set. Usage: `/goal <condition>`', null)).toBeNull();
+        expect(claudeGoalFromCommand('Goal active: ship it (3 turns)\nLast check: the build fails', null)).toEqual({
+            objective: 'ship it',
+            status: 'active',
+            checks: 3,
+            lastCheck: 'the build fails'
+        });
+        expect(claudeGoalFromCommand('Goal active: ship it (not yet evaluated)', null)).toEqual({ objective: 'ship it', status: 'active', checks: 0 });
+        expect(claudeGoalFromCommand('Compacted the conversation', null)).toBeUndefined();
+        expect(claudeGoalCheck('Stop hook feedback:\n[other]: nope', { objective: 'ship it', status: 'active' })).toBeUndefined();
     });
 });

@@ -49,6 +49,26 @@
     "keep": "Keep full history",
     "compact": "Compact"
   },
+  "goal": {
+    "status": {
+      "active": "Working toward a goal",
+      "paused": "Goal paused",
+      "blocked": "Goal blocked",
+      "usage-limited": "Goal stopped on a usage limit",
+      "budget-limited": "Goal used up its token budget",
+      "complete": "Goal met"
+    },
+    "pill": "Goal",
+    "checks_one": "{{count}} check not met yet",
+    "checks_other": "{{count}} checks not met yet",
+    "tokens": "{{tokens}} tokens",
+    "budget": "{{tokens}} of {{budget}} tokens",
+    "lastCheck": "Last check: {{check}}",
+    "pause": "Pause",
+    "resume": "Resume",
+    "clear": "Clear",
+    "failed": "The goal could not be changed"
+  },
   "limit": {
     "usage": {
       "pill": "Limited",
@@ -274,6 +294,7 @@
       "model": "Switch the model",
       "compact": "Compact the context",
       "clear": "Start a new context",
+      "goal": "Work toward an objective until it is met",
       "skill": "Skill",
       "cli": "{{cli}} command",
       "anyCli": "CLI"

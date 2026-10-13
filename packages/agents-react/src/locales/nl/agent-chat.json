@@ -49,6 +49,26 @@
     "keep": "Hele geschiedenis houden",
     "compact": "Comprimeren"
   },
+  "goal": {
+    "status": {
+      "active": "Werkt aan een doel",
+      "paused": "Doel gepauzeerd",
+      "blocked": "Doel geblokkeerd",
+      "usage-limited": "Doel gestopt op een gebruikslimiet",
+      "budget-limited": "Doel heeft zijn tokenbudget op",
+      "complete": "Doel bereikt"
+    },
+    "pill": "Doel",
+    "checks_one": "{{count}} controle nog niet gehaald",
+    "checks_other": "{{count}} controles nog niet gehaald",
+    "tokens": "{{tokens}} tokens",
+    "budget": "{{tokens}} van {{budget}} tokens",
+    "lastCheck": "Laatste controle: {{check}}",
+    "pause": "Pauzeren",
+    "resume": "Hervatten",
+    "clear": "Wissen",
+    "failed": "Het doel kon niet worden gewijzigd"
+  },
   "limit": {
     "usage": {
       "pill": "Limiet bereikt",
@@ -274,6 +294,7 @@
       "model": "Wissel van model",
       "compact": "Comprimeer de context",
       "clear": "Begin een nieuwe context",
+      "goal": "Werk aan een doel tot het bereikt is",
       "skill": "Skill",
       "cli": "{{cli}}-commando",
       "anyCli": "CLI"

@@ -68,6 +68,7 @@ Many props and options are not exported types. Derive them where you need one, a
 | [`chat/logic/fork`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/fork.ts) | `FORKABLE_PROVIDERS`, `ForkPoint`, `forkRefusal`, `summaryRefusal`, `forkIdsAfter`, `forkedTurnIds`, `lastSettledTurn`, `forkPointOf`, `forkPointLabel`, `turnIdOfRow`, `ForkShape`, `forkShapes`, `ForkWorktreeChoice`, `ForkCliChoice`, `forkPayload`, `branchRefusal` |
 | [`chat/logic/handback`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/handback.ts) | `handbackReportOf` |
 | [`chat/logic/json`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/json.ts) | `isRecord` |
+| [`chat/logic/goal`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/goal.ts) | `GoalView`, `goalView` |
 | [`chat/logic/limit`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/limit.ts) | `LimitView`, `limitView` |
 | [`chat/logic/resume-compaction`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/resume-compaction.ts) | `RESUME_COMPACTION_TOKENS`, `RESUME_COMPACTION_IDLE_MS`, `ResumeCompactionOffer`, `resumeCompactionOffer` |
 | [`chat/logic/scrubber`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/scrubber.ts) | `TickKind`, `ScrubberTick`, `SCRUBBER_MIN_TICKS`, `TICK_HEIGHT_PX`, `STRIP_WIDTH_PX`, `STRIP_INSET_PX`, `ticksOf`, `TickSlot`, `ScrubberLayout`, `layoutTicks`, `tickOfRow`, `ticksWithHits`, `messageAt`, `slotOf`, `tickWidth`, `ReadingPosition`, `MessageRange`, `messagesInView`, `slotInView`, `stepMessage`, `threadPaddingLeft` |
@@ -100,6 +101,7 @@ Many props and options are not exported types. Derive them where you need one, a
 | [`chat/ui/EditDiff`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/EditDiff.tsx) | `EditDiff` (default) |
 | [`chat/ui/FadingWords`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/FadingWords.tsx) | `FadingWords` |
 | [`chat/ui/ImageView`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/ImageView.tsx) | `ImageThumbProps`, `ImageThumb` |
+| [`chat/ui/GoalDock`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/GoalDock.tsx) | `GoalDock`, `GoalPill` |
 | [`chat/ui/LimitState`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/LimitState.tsx) | `LimitDock`, `LimitPill` |
 | [`chat/ui/Markdown`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/Markdown.tsx) | `ReplyMarkdown`, `MessageMarkdown`, `Markdown` |
 | [`chat/ui/MermaidBlock`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/MermaidBlock.tsx) | `MermaidBlock` |

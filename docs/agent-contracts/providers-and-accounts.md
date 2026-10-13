@@ -41,6 +41,7 @@ A catalog is the models of one provider, as a host ships it and as a newer copy 
 | `compaction`           | Folding the context: `native`, as a prompt (`prompt`), or `none`.                    |
 | `reportsCost`, `reportsContextWindow`, `reportsThinking` | What the CLI tells about a turn.                   |
 | `slashCommands`        | Whether the CLI takes slash commands.                                                |
+| `goals`                | How `/goal` reaches the CLI: through calls that pause, resume and clear (`native`), as the slash command alone (`command`), or absent where the CLI has no goals. |
 
 `resumeCommandFor(template, sessionId, flags = [])` fills a `resumeCommand`. It quotes the session id for a shell and puts the flags where the template has a `{flags}` word. The flags go in as they are: quote any that come from outside.
 

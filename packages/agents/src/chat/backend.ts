@@ -2,6 +2,8 @@ import type {
     ChatAttachment,
     ChatAttachmentUpload,
     ChatFileChange,
+    ChatGoal,
+    ChatGoalAction,
     ChatQuestion,
     ChatSkill,
     ChatSubagentUsage,
@@ -38,6 +40,8 @@ export interface BackendLaunch {
     // The part of it a resumed thread has to hear again in front of its next prompt, for a CLI that ignores new
     // instructions on a resume; null when there is nothing to repeat.
     resumeNote: string | null;
+    // The goal the chat last knew of, which a CLI that takes it up again from its own transcript on a resume still works toward.
+    goal?: ChatGoal;
     // Folders outside `cwd` the agent may reach without asking. Claude Code takes them as `--add-dir`; Codex's
     // sandbox reads the whole disk already and keeps writes to the workspace, so it needs nothing.
     folders?: readonly string[];
@@ -158,6 +162,8 @@ export type BackendEvent =
     // What the CLI said in passing about the plan it runs on; it belongs to the machine, not the chat.
     | { type: 'limits'; update: LimitsUpdate }
     | { type: 'compaction'; preTokens: number | null }
+    // The goal the CLI works toward as it stands now, whole; null once there is none.
+    | { type: 'goal'; goal: ChatGoal | null }
     | { type: 'model'; model: string }
     | { type: 'note'; level: 'info' | 'warning' | 'error'; text: string }
     // The CLI answered a `stopTask` with an error, so the task still runs.
@@ -196,6 +202,8 @@ export interface ChatBackend {
     // False when nothing waits under that id, so the caller can answer the client with an error.
     respondApproval(requestId: string, decision: ApprovalDecision, message?: string): boolean;
     respondQuestion(requestId: string, answers: Record<string, string>): boolean;
+    // Pauses, resumes or clears the goal without a turn, for a protocol that has calls for it; what changed arrives as a `goal` event.
+    goal?(action: ChatGoalAction): Promise<void>;
     // Ends one command or monitor the CLI runs beside its turns, for a protocol that can name one.
     stopTask?(taskId: string): void;
     // Turns down a request the CLI still holds after a person stopped the turn, for a protocol that leaves one open past it.

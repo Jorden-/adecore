@@ -1,9 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { accessSync, constants } from 'node:fs';
-import { attachmentImageMime, type ChatSkill } from '@adecore/agent-contracts';
+import { attachmentImageMime, type ChatGoal, type ChatGoalAction, type ChatSkill } from '@adecore/agent-contracts';
 import { errorText } from '../error-text.ts';
 import { codexServiceTier, codexThreadOptions } from '../providers/codex.ts';
 import type { ApprovalDecision, BackendEvent, BackendHost, BackendLaunch, ChatBackend, TurnInput } from './backend.ts';
-import { CodexProtocol } from './codex-protocol.ts';
+import { codexGoal, CodexProtocol } from './codex-protocol.ts';
 import { CodexTransport, DEFAULT_CODEX_CLIENT, type CodexClientInfo, type CodexFrame } from './codex-transport.ts';
 import { attachmentNote } from './input.ts';
 
@@ -34,6 +35,35 @@ export function parseSkillsList(result: unknown): ChatSkill[] {
     return [...skills.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+export type GoalCommand = { kind: 'show' } | { kind: 'clear' } | { kind: 'pause' } | { kind: 'resume' } | { kind: 'set'; objective: string };
+
+// The words Claude Code 2.1.296 takes for clearing a goal; Codex reads the same, so `/goal` means one thing in every chat.
+const CLEAR_WORDS = new Set(['clear', 'stop', 'off', 'reset', 'none', 'cancel']);
+
+/* A `/goal` message the way the CLIs read one: a bare `/goal` shows the goal, a control word acts on it, and anything else is a new objective. Null for any other message. */
+export function parseGoalCommand(text: string): GoalCommand | null {
+    const match = /^\/goal(?:\s+([\s\S]*))?$/.exec(text.trim());
+    if (!match) {
+        return null;
+    }
+    const argument = (match[1] ?? '').trim();
+    const word = argument.toLowerCase();
+    if (word === '') {
+        return { kind: 'show' };
+    }
+    if (CLEAR_WORDS.has(word)) {
+        return { kind: 'clear' };
+    }
+    if (word === 'pause' || word === 'resume') {
+        return { kind: word };
+    }
+    return { kind: 'set', objective: argument };
+}
+
+function goalLine(goal: ChatGoal): string {
+    return `Goal ${goal.status.replace('-', ' ')}: ${goal.objective}`;
+}
+
 export interface CodexBackendOptions {
     client?: CodexClientInfo;
 }
@@ -62,6 +92,8 @@ export class CodexBackend implements ChatBackend {
     private turnUnnamed = false;
     /* A stop that came in while the turn was unnamed, sent once `turn/started` names it. */
     private interruptOwed = false;
+    // The thread's goal as Codex last reported it, which a stop pauses first so Codex opens no turn after it.
+    private goalNow: ChatGoal | null = null;
 
     constructor(launch: BackendLaunch, host: BackendHost, options: CodexBackendOptions = {}) {
         this.launch = launch;
@@ -123,6 +155,18 @@ export class CodexBackend implements ChatBackend {
             }
             this.emit(event);
         }
+        await this.readGoal(transport).catch(() => {
+            // An app-server without goals, or with the feature turned off, has none to report.
+        });
+    }
+
+    private async readGoal(transport: CodexTransport): Promise<ChatGoal | null> {
+        const result = await transport.request('thread/goal/get', { threadId: this.threadId });
+        const goal = codexGoal(isRecord(result) ? result.goal : null);
+        if (this.transport === transport) {
+            this.emit({ type: 'goal', goal });
+        }
+        return goal;
     }
 
     private turnInput(input: TurnInput): unknown[] {
@@ -154,22 +198,121 @@ export class CodexBackend implements ChatBackend {
     }
 
     sendTurn(input: TurnInput): void {
+        const command = input.attachments.length === 0 ? parseGoalCommand(input.text) : null;
+        if (command !== null) {
+            void this.runGoalCommand(command, input);
+            return;
+        }
         const nativeInput = this.turnInput(input);
-        const effort = this.launch.selection.options.effort;
-        const tier = codexServiceTier(this.launch.selection);
         this.turnUnnamed = true;
         this.promptId = input.promptId ?? null;
-        this.request(
-            'turn/start',
-            {
-                threadId: this.threadId,
-                input: nativeInput,
-                model: this.launch.selection.model,
-                ...(typeof effort === 'string' ? { effort } : {}),
-                ...(tier === null ? {} : { serviceTier: tier })
-            },
-            () => this.acceptPrompt(input.promptId)
-        );
+        this.request('turn/start', this.turnStartParams(nativeInput), () => this.acceptPrompt(input.promptId));
+    }
+
+    private turnStartParams(nativeInput: unknown[]): Record<string, unknown> {
+        const effort = this.launch.selection.options.effort;
+        const tier = codexServiceTier(this.launch.selection);
+        return {
+            threadId: this.threadId,
+            input: nativeInput,
+            model: this.launch.selection.model,
+            ...(typeof effort === 'string' ? { effort } : {}),
+            ...(tier === null ? {} : { serviceTier: tier })
+        };
+    }
+
+    /*
+     * `/goal` through the app-server's goal calls, as Codex's own TUI does. A new objective or a resume
+     * starts the first goal turn itself, with this chat's settings, and only then makes the goal active:
+     * Codex opens every later turn on its own, and one it opened before this turn would take the old
+     * settings. Every other form settles at once with a reply, no turn of the model's.
+     */
+    private async runGoalCommand(command: GoalCommand, input: TurnInput): Promise<void> {
+        const transport = this.transport;
+        if (!transport) {
+            this.emit({ type: 'failed', message: 'thread/goal failed: Codex is not running' });
+            return;
+        }
+        const threadId = this.threadId;
+        const setGoal = async (params: Record<string, unknown>): Promise<void> => {
+            const result = await transport.request('thread/goal/set', { threadId, origin: 'user', ...params });
+            if (this.transport === transport) {
+                this.emit({ type: 'goal', goal: codexGoal(isRecord(result) ? result.goal : null) });
+            }
+        };
+        try {
+            const current = await this.readGoal(transport);
+            if (command.kind === 'show') {
+                this.reply(input.promptId, current === null ? 'No goal is set.' : goalLine(current));
+                return;
+            }
+            if (command.kind === 'clear') {
+                const result = await transport.request('thread/goal/clear', { threadId, origin: 'user' });
+                this.emit({ type: 'goal', goal: null });
+                this.reply(input.promptId, isRecord(result) && result.cleared === true ? 'Goal cleared.' : 'No goal to clear.');
+                return;
+            }
+            if (current === null && command.kind !== 'set') {
+                this.reply(input.promptId, 'No goal is set. Set one with /goal and the objective.');
+                return;
+            }
+            if (command.kind === 'pause') {
+                await setGoal({ status: 'paused' });
+                this.reply(input.promptId, 'Goal paused. /goal resume takes it up again.');
+                return;
+            }
+            if (command.kind === 'set') {
+                // A new objective starts over, its tokens and time included.
+                if (current !== null) {
+                    await transport.request('thread/goal/clear', { threadId, origin: 'user' });
+                }
+                await setGoal({ objective: command.objective, status: 'paused' });
+            }
+            const nativeInput = command.kind === 'set' ? this.turnInput({ ...input, text: command.objective }) : [];
+            this.turnUnnamed = true;
+            this.promptId = input.promptId ?? null;
+            await transport.request('turn/start', this.turnStartParams(nativeInput));
+            if (this.transport !== transport) {
+                return;
+            }
+            this.acceptPrompt(input.promptId);
+            await setGoal({ status: 'active' });
+        } catch (error) {
+            if (this.transport === transport) {
+                this.emit({ type: 'failed', message: errorText(error) });
+            }
+        }
+    }
+
+    /* A turn that ends with what the host said, for a command no model answers. */
+    private reply(promptId: string | undefined, text: string): void {
+        if (promptId !== undefined) {
+            this.emit({ type: 'turn.accepted', promptId });
+        }
+        this.emit({ type: 'text.done', ref: `goal-${randomUUID()}`, text });
+        this.emit({ type: 'turn.done', ...(promptId === undefined ? {} : { promptId }), state: 'done', costUsd: 0 });
+    }
+
+    async goal(action: ChatGoalAction): Promise<void> {
+        const transport = this.transport;
+        if (!transport) {
+            throw new Error('thread/goal failed: Codex is not running');
+        }
+        if (action === 'clear') {
+            await transport.request('thread/goal/clear', { threadId: this.threadId, origin: 'user' });
+            if (this.transport === transport) {
+                this.emit({ type: 'goal', goal: null });
+            }
+            return;
+        }
+        const result = await transport.request('thread/goal/set', {
+            threadId: this.threadId,
+            status: action === 'pause' ? 'paused' : 'active',
+            origin: 'user'
+        });
+        if (this.transport === transport) {
+            this.emit({ type: 'goal', goal: codexGoal(isRecord(result) ? result.goal : null) });
+        }
     }
 
     async steerTurn(input: TurnInput): Promise<boolean> {
@@ -276,6 +419,10 @@ export class CodexBackend implements ChatBackend {
         const turnId = this.protocol.turnId;
         if (!this.transport) {
             return;
+        }
+        // As Codex's own TUI does: paused first, so no goal turn opens after the one this stops.
+        if (this.goalNow?.status === 'active') {
+            void this.transport.request('thread/goal/set', { threadId: this.threadId, status: 'paused', origin: 'user' }).catch(() => undefined);
         }
         if (!turnId) {
             this.interruptOwed = this.turnUnnamed;
@@ -418,6 +565,9 @@ export class CodexBackend implements ChatBackend {
     }
 
     private emit(event: BackendEvent): void {
+        if (event.type === 'goal') {
+            this.goalNow = event.goal;
+        }
         // An older autonomous turn can finish while the next prompt still waits for its own turn/started.
         if ((event.type === 'turn.done' && (!this.turnUnnamed || event.promptId !== undefined)) || event.type === 'failed' || event.type === 'exit') {
             this.turnUnnamed = false;

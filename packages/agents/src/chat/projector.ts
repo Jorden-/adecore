@@ -381,6 +381,13 @@ export class ThreadProjector {
             case 'model':
                 events.push(this.thread.patchInfo({ model: event.model }));
                 break;
+            case 'goal': {
+                const goal = event.goal ?? undefined;
+                if (JSON.stringify(goal) !== JSON.stringify(info.goal)) {
+                    events.push(this.thread.patchInfo({ goal }));
+                }
+                break;
+            }
             case 'note':
                 events.push(this.note(event.level, event.text));
                 break;

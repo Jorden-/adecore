@@ -54,7 +54,15 @@ Which key sends is the person's `sendKey` in the [chat preferences](/agents-reac
 | Mod+S                       | Stashes the draft; in an empty box, brings back the newest stashed prompt.   |
 | Mod+Shift+V                 | Pastes a long text inline instead of as a file.                              |
 
-`/model`, `/compact` and `/clear` are handled by the composer; the CLI's own commands go to it as text, except those that only make sense in its terminal (`usableSlashCommands`).
+`/model`, `/compact` and `/clear` are handled by the composer; the CLI's own commands go to it as text, except those that only make sense in its terminal (`usableSlashCommands`). `/goal` is listed for every CLI with the `goals` capability, also one that lists no commands of its own.
+
+## Goals
+
+While the chat has a goal, `GoalDock({ chatId, info, goals })` stands at the top of the composer, which draws it itself: where the goal stands, the objective, how far it got in what the CLI counts, and the actions the CLI takes. The whole objective and what the last check said are in its tooltip. `goalView(info, goals, canAct)` answers which actions those are: pause, resume and clear on a CLI with `goals: 'native'`, clear between turns on one with `goals: 'command'`, and none where the host's actions have no `goal`. `GoalPill({ chatId })` says a goal works in a header that shows the chat without its thread, from the status every client gets.
+
+```tsx
+import { GoalDock, GoalPill } from '@adecore/agents-react/chat/ui/GoalDock';
+```
 
 ## Pickers and pasting
 

@@ -7,6 +7,7 @@ import type {
     AgentKind,
     ChatCheckpointDiff,
     ChatConfigurePayload,
+    ChatGoalAction,
     ChatItem,
     ChatSubagentItem,
     ChatUiChoicePayload,
@@ -58,6 +59,8 @@ export interface ChatActions {
     turnDiff(chatId: string, turnId: string): Promise<ChatCheckpointDiff | null>;
     stopSubagent(chatId: string, toolUseId: string): Promise<void>;
     stopTask(chatId: string, taskId: string): Promise<void>;
+    /* Pauses, resumes or clears the chat's goal; absent where the host offers none of it, which leaves the goal row without its buttons. */
+    goal?(chatId: string, action: ChatGoalAction): Promise<void>;
     approve(chatId: string, requestId: string, decision: 'allow' | 'allow-always' | 'deny', message?: string): Promise<void>;
     answer(chatId: string, requestId: string, answers: Record<string, string>): Promise<void>;
     dismiss(chatId: string, itemId: string): Promise<void>;

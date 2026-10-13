@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { BackendEvent } from './backend.ts';
-import { CodexProtocol, unwrapCommand } from './codex-protocol.ts';
+import { parseGoalCommand } from './codex-backend.ts';
+import { codexGoal, CodexProtocol, unwrapCommand } from './codex-protocol.ts';
 import nativeApprovalCapture from './fixtures/codex-0.159.2-native-approval.json';
 import nativeFileApprovalCapture from './fixtures/codex-0.159.2-native-file-approval.json';
 import nativeInteractedCapture from './fixtures/codex-0.159.2-native-interacted.json';
@@ -977,5 +978,52 @@ describe('Codex generated images', () => {
     test('assistant phases survive projection', () => {
         const events = new CodexProtocol(1).handle({ method: 'item/completed', params: { ...ids, item: message('answer', 'Hello', { phase: 'commentary' }) } });
         expect(events).toContainEqual({ type: 'text.done', ref: 'answer', text: 'Hello', phase: 'commentary' });
+    });
+});
+
+describe('goals', () => {
+    test('a `/goal` message reads the way the CLIs read it', () => {
+        expect(parseGoalCommand('/goal')).toEqual({ kind: 'show' });
+        expect(parseGoalCommand('  /goal pause ')).toEqual({ kind: 'pause' });
+        expect(parseGoalCommand('/goal Resume')).toEqual({ kind: 'resume' });
+        expect(parseGoalCommand('/goal off')).toEqual({ kind: 'clear' });
+        expect(parseGoalCommand('/goal make the build green\nand keep it so')).toEqual({ kind: 'set', objective: 'make the build green\nand keep it so' });
+        expect(parseGoalCommand('/goals')).toBeNull();
+        expect(parseGoalCommand('set a /goal')).toBeNull();
+    });
+
+    test('a goal of the app-server reads as the chat says it, and the notifications of the chat thread carry it', () => {
+        expect(
+            codexGoal({
+                threadId: 't',
+                objective: ' ship it ',
+                status: 'budgetLimited',
+                tokenBudget: 5000,
+                tokensUsed: 5100,
+                timeUsedSeconds: 42,
+                createdAt: 1,
+                updatedAt: 2
+            })
+        ).toEqual({ objective: 'ship it', status: 'budget-limited', tokenBudget: 5000, tokensUsed: 5100, secondsUsed: 42 });
+        expect(codexGoal({ objective: 'ship it', status: 'someday' })).toBeNull();
+        expect(codexGoal(null)).toBeNull();
+
+        const protocol = new CodexProtocol(1);
+        protocol.threadReady({ thread: { id: 'own' } });
+        const goal = {
+            threadId: 'own',
+            objective: 'ship it',
+            status: 'active',
+            tokenBudget: null,
+            tokensUsed: 0,
+            timeUsedSeconds: 0,
+            createdAt: 1,
+            updatedAt: 1
+        };
+        expect(protocol.handle({ method: 'thread/goal/updated', params: { threadId: 'own', turnId: null, goal } })).toEqual([
+            { type: 'goal', goal: { objective: 'ship it', status: 'active', tokensUsed: 0, secondsUsed: 0 } }
+        ]);
+        expect(protocol.handle({ method: 'thread/goal/updated', params: { threadId: 'child', turnId: null, goal } })).toEqual([]);
+        expect(protocol.handle({ method: 'thread/goal/cleared', params: { threadId: 'own' } })).toEqual([{ type: 'goal', goal: null }]);
     });
 });

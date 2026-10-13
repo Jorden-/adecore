@@ -1,4 +1,5 @@
 import type {
+    ChatGoal,
     ChatQuestion,
     ChatSubagentStatus,
     ChatSubagentUsage,
@@ -119,6 +120,56 @@ type Pending =
     | { type: 'question'; toolUseId: string | null; input: unknown };
 
 /*
+ * What Claude Code 2.1.296 answers a `/goal` with, as a `<synthetic>` assistant message of its own: the goal
+ * it set, the one it cleared, or the one that is active with how many turns its check sent back. Undefined
+ * for any other text, null where no goal is left.
+ */
+const GOAL_SET = 'Goal set: ';
+const GOAL_ACTIVE = /^Goal active: ([\s\S]+?) \(([^)]*)\)(?:\nLast check: ([\s\S]*))?$/;
+const GOAL_GONE = ['Goal cleared: ', 'Goal cleared after ', 'No goal set'];
+
+export function claudeGoalFromCommand(text: string, current: ChatGoal | null): ChatGoal | null | undefined {
+    const said = text.trim();
+    if (said.startsWith(GOAL_SET)) {
+        const objective = said.slice(GOAL_SET.length).trim();
+        return objective === '' ? undefined : { objective, status: 'active', checks: 0 };
+    }
+    if (GOAL_GONE.some((prefix) => said.startsWith(prefix))) {
+        return null;
+    }
+    const active = GOAL_ACTIVE.exec(said);
+    if (!active) {
+        return undefined;
+    }
+    const objective = active[1]!;
+    const checks = /\d+/.exec(active[2]!)?.[0];
+    const lastCheck = active[3]?.trim();
+    return {
+        ...(current?.objective === objective ? current : {}),
+        objective,
+        status: 'active',
+        checks: checks === undefined ? 0 : Number(checks),
+        ...(lastCheck ? { lastCheck } : {})
+    };
+}
+
+/*
+ * One check of the goal's Stop hook that found it not met yet: a synthetic user message the CLI feeds the
+ * agent before it goes on, which names the objective in brackets. Undefined for any other message.
+ */
+export function claudeGoalCheck(text: string, current: ChatGoal | null): ChatGoal | undefined {
+    if (current === null) {
+        return undefined;
+    }
+    const prefix = `Stop hook feedback:\n[${current.objective}]: `;
+    if (!text.startsWith(prefix)) {
+        return undefined;
+    }
+    const lastCheck = text.slice(prefix.length).trim();
+    return { ...current, status: 'active', checks: (current.checks ?? 0) + 1, ...(lastCheck === '' ? {} : { lastCheck }) };
+}
+
+/*
  * Claude Code's stream-json frames, in and out. Text is keyed by message id plus the ordinal of the
  * text block inside that message, because the streaming events and the final `assistant` frames
  * number their blocks differently (the final frames arrive one block at a time). One instance
@@ -151,6 +202,28 @@ export class ClaudeProtocol {
     private readonly stopRequests = new Map<string, string>();
 
     private readonly steerIds = new Set<string>();
+    // The goal this process works toward, which `--resume` takes up from the transcript; a model answer since it was
+    // set or last checked is what lets a turn that ends normally count as its check passing.
+    private goal: ChatGoal | null;
+    private goalAnswered = false;
+    private interrupting = false;
+    // Background subagents still at work; Claude Code holds a goal's check until they report.
+    private readonly backgroundAgents = new Set<string>();
+
+    constructor(goal: ChatGoal | null = null) {
+        this.goal = goal;
+    }
+
+    /* A stop is on its way; the turn it ends leaves the goal set but nobody working on it. */
+    noteInterrupt(): void {
+        this.interrupting = true;
+    }
+
+    private setGoal(goal: ChatGoal | null, events: BackendEvent[]): void {
+        this.goal = goal;
+        this.goalAnswered = false;
+        events.push({ type: 'goal', goal });
+    }
 
     beginSteer(promptId: string): void {
         this.steerIds.add(promptId);
@@ -347,6 +420,7 @@ export class ClaudeProtocol {
             if (taskId) {
                 this.endBackground(taskId, events);
                 this.workflows.delete(taskId);
+                this.backgroundAgents.delete(taskId);
             }
             // The CLI wakes the main agent itself when a background task settles; this frame is the only
             // thing that says what it was about, and it arrives before the turn nobody asked for.
@@ -369,6 +443,10 @@ export class ClaudeProtocol {
     private handleTaskStarted(frame: Frame, events: BackendEvent[]): void {
         const ref = str(frame.tool_use_id);
         if (frame.task_type === 'local_agent') {
+            const agentTask = str(frame.task_id);
+            if (agentTask && frame.is_backgrounded === true) {
+                this.backgroundAgents.add(agentTask);
+            }
             if (ref) {
                 events.push({
                     type: 'task.started',
@@ -417,6 +495,7 @@ export class ClaudeProtocol {
         const status = str(patch.status);
         if (status !== null && ENDED_TASK_STATUSES.has(status)) {
             this.foregroundShells.delete(taskId);
+            this.backgroundAgents.delete(taskId);
             this.endBackground(taskId, events);
             this.endWorkflow(taskId, null, status === 'completed', events);
         }
@@ -525,6 +604,9 @@ export class ClaudeProtocol {
             this.apiError = frame.error;
         }
         const model = str(message.model);
+        if (!parentRef) {
+            this.trackGoal(model, content, events);
+        }
         // The CLI answers some frames itself and names them `<synthetic>`; no model wrote those.
         if (parentRef && model && model !== '<synthetic>' && this.subagentModels.get(parentRef) !== model) {
             this.subagentModels.set(parentRef, model);
@@ -563,6 +645,45 @@ export class ClaudeProtocol {
         }
     }
 
+    private trackGoal(model: string | null, content: unknown[], events: BackendEvent[]): void {
+        if (model === '<synthetic>') {
+            const next = claudeGoalFromCommand(resultText(content), this.goal);
+            if (next !== undefined) {
+                this.setGoal(next, events);
+            }
+            return;
+        }
+        if (this.goal === null) {
+            return;
+        }
+        this.goalAnswered = true;
+        // A message after a stop takes the goal up again; its hook never went away.
+        if (this.goal.status === 'paused') {
+            this.goal = { ...this.goal, status: 'active' };
+            events.push({ type: 'goal', goal: this.goal });
+        }
+    }
+
+    /*
+     * Where a turn leaves the goal. Claude Code ends a turn on its own only once the goal's check passed, so
+     * a turn that ends normally after the model answered met it; Claude Code 2.1.296 says nothing more
+     * about it in stream-json. A check it defers while background work runs leaves the goal active, and a
+     * stopped or failed turn leaves it set with nobody working on it.
+     */
+    private settleGoal(failed: boolean, events: BackendEvent[]): void {
+        const goal = this.goal;
+        const interrupted = this.interrupting;
+        this.interrupting = false;
+        if (goal?.status !== 'active') {
+            return;
+        }
+        if (failed || interrupted) {
+            this.setGoal({ ...goal, status: 'paused' }, events);
+        } else if (this.goalAnswered && this.backgroundTasks.size === 0 && this.workflows.size === 0 && this.backgroundAgents.size === 0) {
+            this.setGoal({ ...goal, status: 'complete' }, events);
+        }
+    }
+
     /*
      * `tool_progress` carries how long the call has run (once per 30 s for a Bash under the CLI's
      * remote gate, or a heartbeat for a slow MCP tool); the start is kept so the client can count on.
@@ -583,6 +704,13 @@ export class ClaudeProtocol {
         }
         const message = isRecord(frame.message) ? frame.message : {};
         const content = Array.isArray(message.content) ? message.content : [];
+        if (frame.isSynthetic === true && !str(frame.parent_tool_use_id)) {
+            const checked = claudeGoalCheck(resultText(message.content), this.goal);
+            if (checked !== undefined) {
+                this.setGoal(checked, events);
+                events.push({ type: 'note', level: 'info', text: `Goal not met yet: ${checked.lastCheck ?? checked.objective}` });
+            }
+        }
         for (const block of content) {
             if (!isRecord(block) || block.type !== 'tool_result') {
                 continue;
@@ -630,6 +758,8 @@ export class ClaudeProtocol {
         const limit = failed ? this.limit() : null;
         this.apiError = null;
         this.refusedWindows.clear();
+        // Before the turn ends, so whoever settles work on that end already reads where the goal stands.
+        this.settleGoal(failed, events);
         events.push({
             type: 'turn.done',
             ...(promptId === null ? {} : { promptId }),

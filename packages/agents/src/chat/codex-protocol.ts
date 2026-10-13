@@ -1,5 +1,5 @@
 import { generatedImage } from './generated-image.ts';
-import type { ChatFileChange, ChatQuestion, ChatTurnLimit, UsageWindow } from '@adecore/agent-contracts';
+import type { ChatFileChange, ChatGoal, ChatGoalStatus, ChatQuestion, ChatTurnLimit, UsageWindow } from '@adecore/agent-contracts';
 import { readCodexLimits } from '../usage/limits/normalize.ts';
 import { codexRuntimeMode } from '../providers/codex.ts';
 import type { ApprovalDecision, BackendEvent } from './backend.ts';
@@ -23,6 +23,38 @@ function str(value: unknown): string | null {
 
 function num(value: unknown): number {
     return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+const GOAL_STATUSES: Record<string, ChatGoalStatus> = {
+    active: 'active',
+    paused: 'paused',
+    blocked: 'blocked',
+    usageLimited: 'usage-limited',
+    budgetLimited: 'budget-limited',
+    complete: 'complete'
+};
+
+/* A `ThreadGoal` of the app-server (Codex 0.162.1) as a chat says it; null for a goal it cannot read, or none. */
+export function codexGoal(raw: unknown): ChatGoal | null {
+    if (!isRecord(raw)) {
+        return null;
+    }
+    const objective = str(raw.objective)?.trim() ?? '';
+    const status = GOAL_STATUSES[str(raw.status) ?? ''];
+    if (objective === '' || status === undefined) {
+        return null;
+    }
+    const count = (value: unknown): number | undefined => (typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : undefined);
+    const tokensUsed = count(raw.tokensUsed);
+    const tokenBudget = count(raw.tokenBudget);
+    const secondsUsed = count(raw.timeUsedSeconds);
+    return {
+        objective,
+        status,
+        ...(tokensUsed === undefined ? {} : { tokensUsed }),
+        ...(tokenBudget === undefined || tokenBudget === 0 ? {} : { tokenBudget }),
+        ...(secondsUsed === undefined ? {} : { secondsUsed })
+    };
 }
 
 // Codex wraps every command in a login shell; the person wants to read the command, not the wrapper.
@@ -279,6 +311,12 @@ export class CodexProtocol {
                 break;
             case 'turn/completed':
                 this.handleTurnCompleted(params, events);
+                break;
+            case 'thread/goal/updated':
+                events.push({ type: 'goal', goal: codexGoal(params.goal) });
+                break;
+            case 'thread/goal/cleared':
+                events.push({ type: 'goal', goal: null });
                 break;
             case 'thread/closed':
                 this.withdrawOwner(threadId ?? this.ownThreadId, null, events);
