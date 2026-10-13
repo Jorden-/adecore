@@ -1,5 +1,5 @@
 export { EditorLanguage, type EditorLanguageOptions } from './editor-language.ts';
-export type { Timers } from './timers.ts';
+export { realTimers, type Timers } from './timers.ts';
 export { DEFAULT_RANGE_LINES, DEFAULT_RANGE_CHARACTERS, type SemanticTokensOptions } from './semantic-tokens.ts';
 export { ProjectLanguage, type FileOperationTarget } from './project-language.ts';
 export type { LanguageDocumentHandle } from './project-language.ts';
@@ -38,8 +38,8 @@ export type { EditorRendering } from './rendering-context.ts';
 export { FindReplace } from './FindReplace.tsx';
 export { ChangeReview } from './ChangeReview.tsx';
 export type { ChangeReviewProps } from './ChangeReview.tsx';
-export { ProjectProblems, countsOf, compareRows } from './project-problems.ts';
-export type { ProblemFile, ProblemRow } from './project-problems.ts';
+export { ProjectProblems, serviceProblems, countsOf, compareRows } from './project-problems.ts';
+export type { ProblemFile, ProblemRow, ProblemReport, ProblemSource } from './project-problems.ts';
 export { applyWorkspaceEdit, supportedResourceOperations } from './workspace-edit.ts';
 export type { ProjectFiles, StagedFile, WorkspaceEditHost } from './workspace-edit.ts';
 export { useProblemCounts } from './use-problem-counts.ts';

@@ -24,6 +24,24 @@ export function compareRows(left: ProblemRow, right: ProblemRow): number {
     );
 }
 
+/* One report of a file's problems; `path` is a stored path, as `ProblemFile.path` is. */
+export interface ProblemReport {
+    readonly path: string;
+    readonly server: string;
+    readonly diagnostics: readonly Diagnostic[];
+}
+
+/* Hands every report to `listener` until the function it returns runs. */
+export type ProblemSource = (listener: (report: ProblemReport) => void) => () => void;
+
+/* The diagnostics a service reports, by the stored path `pathOf` gives each URI. */
+export function serviceProblems(service: LanguageService, pathOf: (uri: string) => string = (uri) => uri): ProblemSource {
+    return (listener) => {
+        const subscription = service.onDiagnostics((report) => listener({ path: pathOf(report.uri), server: report.source, diagnostics: report.diagnostics }));
+        return () => subscription.dispose();
+    };
+}
+
 /*
  * Each report replaces the previous diagnostics from that source for the file. Files with no
  * remaining problems drop out. Hints remain editor annotations rather than listed problems.
@@ -38,9 +56,10 @@ export class ProjectProblems {
     /* Made on first read after a report, so a project nobody lists does no sorting. */
     private snapshot: readonly ProblemFile[] | null = [];
 
-    constructor(service: LanguageService, pathOf: (uri: string) => string = (uri) => uri) {
-        const subscription = service.onDiagnostics((report) => this.report(pathOf(report.uri), report.source, report.diagnostics));
-        this.stop = () => subscription.dispose();
+    /* A service stands for `serviceProblems(service, pathOf)`. */
+    constructor(source: ProblemSource | LanguageService, pathOf?: (uri: string) => string) {
+        const listen = typeof source === 'function' ? source : serviceProblems(source, pathOf);
+        this.stop = listen((report) => this.report(report.path, report.server, report.diagnostics));
     }
 
     report(path: string, server: string, diagnostics: readonly Diagnostic[]): void {

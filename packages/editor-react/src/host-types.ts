@@ -4,6 +4,7 @@ import type { i18n } from 'i18next';
 import type { Keymap } from '@adecore/editor/keymap';
 import type { ProjectFiles } from './workspace-edit.ts';
 import type { Place } from './navigation-history.ts';
+import type { ProblemSource } from './project-problems.ts';
 
 export interface DiskText {
     text: string;
@@ -65,6 +66,8 @@ export interface LanguageHost {
     readonly panelBodyHeight?: number;
     /* A person finished resizing a peek or call hierarchy panel; the height is already within what the editor allows. */
     onPanelResize?(height: number): void;
+    /* Where `project.problems` reads its reports, such as a machine that also reports files no editor here holds; the service's diagnostics without one. */
+    readonly problemSource?: ProblemSource;
     openPlace?(place: Place): void;
     pathOfUri?(uri: string): string | null;
     serverNames?(uri: string): readonly string[];

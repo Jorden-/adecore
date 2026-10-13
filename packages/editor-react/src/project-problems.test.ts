@@ -4,7 +4,7 @@ import type { Diagnostic } from '@adecore/lsp';
 import { FakeEditorEngine } from '@adecore/editor/fake';
 import { EditorLanguage } from './editor-language.ts';
 import { ProjectLanguage } from './project-language.ts';
-import { ProjectProblems } from './project-problems.ts';
+import { ProjectProblems, type ProblemReport, type ProblemSource } from './project-problems.ts';
 import { FakeLanguageService, ManualTimers } from './testing.ts';
 
 const at = (line: number, message = 'Problem', severity: Diagnostic['severity'] = 1): Diagnostic => ({
@@ -53,5 +53,30 @@ test('an edit moves the problems of a file without telling the listeners or copy
     expect(language.diagnostics.problems[1]!.diagnostic.range.start.line).toBe(3);
     expect(language.diagnostics.counts()).toEqual({ error: 2, warning: 0, info: 0 });
     language.dispose();
+    project.dispose();
+});
+
+test('a project lists the reports of the source its host hands it, and lets go of it when disposed', () => {
+    const service = new FakeLanguageService();
+    const listeners = new Set<(report: ProblemReport) => void>();
+    const source: ProblemSource = (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+    };
+    const project = new ProjectLanguage(service, { problemSource: source });
+    for (const listener of listeners) {
+        listener({ path: 'src/held-elsewhere.ts', server: 'ts', diagnostics: [at(1)] });
+    }
+    service.report({ uri: 'file:///work/src/a.ts', source: 'ts', diagnostics: [at(0)] });
+    expect(project.problems.getSnapshot().map((file) => [file.path, file.rows[0]!.server])).toEqual([['src/held-elsewhere.ts', 'ts']]);
+    project.dispose();
+    expect(listeners.size).toBe(0);
+});
+
+test('without a source of its own a project lists what the service reports, by the path in its folder', () => {
+    const service = new FakeLanguageService();
+    const project = new ProjectLanguage(service, { folder: '/work' });
+    service.report({ uri: 'file:///work/src/a.ts', source: 'ts', diagnostics: [at(0)] });
+    expect(project.problems.getSnapshot().map((file) => file.path)).toEqual(['src/a.ts']);
     project.dispose();
 });

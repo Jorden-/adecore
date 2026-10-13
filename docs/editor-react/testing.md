@@ -46,4 +46,4 @@ An answer for a document whose text changed while it was pending rejects with `S
 
 ## ManualTimers
 
-The features wait before they ask: 80 milliseconds before suggestions, 300 before a hover card. `ManualTimers` replaces the clock, passed as the last argument of `EditorLanguage`. `advance(ms)` runs what is due, and the test awaits the promises of the requests that started.
+The features wait before they ask: 80 milliseconds before suggestions, 300 before a hover card. `ManualTimers` replaces the clock, passed as the last argument of `EditorLanguage`; `realTimers` is the default one, on `setTimeout`, and a subclass of `EditorLanguage` that takes a `Timers` of its own defaults to it too. `advance(ms)` runs what is due, and the test awaits the promises of the requests that started.

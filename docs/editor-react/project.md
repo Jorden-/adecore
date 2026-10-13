@@ -16,6 +16,7 @@ The `host` is what the app allows the features to do. Every field is optional.
 | `openPlace(place)`                      | Opens another file at a zero-based position; the features call it to go to a definition elsewhere                                                                                 |
 | `pathOfUri(uri)`                        | The path to show for a URI, or `null`; without it, `file:` URIs under `folder` are made relative                                                                                  |
 | `serverNames(uri)`                      | The names of the servers of a document, for the cards                                                                                                                             |
+| `problemSource`                         | Where [`project.problems`](#problems) reads its reports; the service's diagnostics without one |
 | `notify(notification)`                  | Shows a short `success` or `error` message with an `id` and a `title`, such as a toast                                                                                            |
 | `resolveSnippetVariable(name, context)` | Synchronous snippet overrides; `undefined` delegates to built-ins or an editable unknown-variable placeholder. The `SnippetVariableContext` describes one caret before insertion. |
 | `suggestNames(request, signal)`         | Suggests new names during a rename, from any source the app picks                                                                                                                 |
@@ -80,6 +81,15 @@ Without `exists`, what `read` has no text for is of unknown existence. A move or
 ```tsx
 const files = useSyncExternalStore(project.problems.subscribe, project.problems.getSnapshot);
 const counts = countsOf(files); // { error, warning, info }
+```
+
+The reports come from the service's diagnostics unless the host hands a `problemSource`: a function that passes every `ProblemReport` (`path`, `server`, `diagnostics`) to its listener and returns the function that stops it. That fits a machine that also reports files no editor of this page holds. The `path` is a stored path, as in a `ProblemFile`, and a report replaces the earlier one of the same server for that file. The project stops the source when it is disposed. `serviceProblems(service, pathOf)` is the default source, and `new ProjectProblems(source)` builds a store outside a project.
+
+```ts
+const project = new ProjectLanguage(service, {
+    folder,
+    problemSource: (listener) => machine.onDiagnostics((event) => listener({ path: event.path, server: event.server, diagnostics: event.diagnostics }))
+});
 ```
 
 `compareRows` is the order of the rows. For the counts of one file, see [`useProblemCounts`](/editor-react/hover#problems).

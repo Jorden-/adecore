@@ -3,7 +3,7 @@ import i18next, { type i18n } from 'i18next';
 import { fileUriToPath, pathToFileUri, type ApplyWorkspaceEditResult, type ContentChange, type LanguageService, type WorkspaceEdit } from '@adecore/lsp';
 import type { Editor, EditorPosition } from '@adecore/editor';
 import { NavigationHistory, type Place } from './navigation-history.ts';
-import { ProjectProblems } from './project-problems.ts';
+import { ProjectProblems, serviceProblems } from './project-problems.ts';
 import { applyWorkspaceEdit, type ProjectFiles } from './workspace-edit.ts';
 import type { LanguageHost } from './host-types.ts';
 import { relativeTo } from './paths.ts';
@@ -113,7 +113,7 @@ export class ProjectLanguage {
         this.folder = host.folder ?? '';
         this.files = host.files ?? null;
         this.panelBodyHeight = host.panelBodyHeight ?? PANEL_BODY_HEIGHT;
-        this.problems = new ProjectProblems(service, (uri) => this.pathOfLocation(uri) ?? uri);
+        this.problems = new ProjectProblems(host.problemSource ?? serviceProblems(service, (uri) => this.pathOfLocation(uri) ?? uri));
     }
 
     /* Open panels of other editors of the project follow a resize. */
