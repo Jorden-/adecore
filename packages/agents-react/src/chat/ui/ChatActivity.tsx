@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 import clsx from 'clsx';
+import { useShallow } from 'zustand/shallow';
 import { useTranslation } from 'react-i18next';
 import { Activity, MessageCircleQuestionMark, Square, SquareTerminal } from 'lucide-react';
 import type { ChatBackgroundTask, ChatSubagentItem } from '@adecore/agent-contracts';
@@ -31,17 +32,17 @@ export function ChatActivity({ chatId }: { chatId: string }) {
     const subagents = useMemo(() => (structure === undefined ? [] : flyoutSubagents(order, structure)), [order, structure]);
     const { id, keyOf } = useChatScope();
     const tasks = host.tasks.useTasks(id);
-    const statuses = useChats((s) => s.statusByKey);
+    // The infos of these sub-agents' own chats, so the info of any other chat changing does not draw this again.
+    const children = useChats(useShallow((s) => subagents.map((item) => (item.childId === undefined ? undefined : s.statusByKey[keyOf(item.childId)]?.info))));
     const progress = useMemo(
         () =>
             progressOf(
-                subagents.map((item) => {
+                subagents.map((item, index) => {
                     const taskId = taskIdOf(item);
-                    const child = item.childId === undefined ? undefined : statuses[keyOf(item.childId)]?.info;
-                    return taskRowStateOf(item, taskId === null ? null : (tasks?.[taskId] ?? null), child);
+                    return taskRowStateOf(item, taskId === null ? null : (tasks?.[taskId] ?? null), children[index]);
                 })
             ),
-        [subagents, tasks, statuses, keyOf]
+        [subagents, tasks, children]
     );
     const words = useMemo(
         () =>
