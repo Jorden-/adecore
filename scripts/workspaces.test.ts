@@ -1,5 +1,14 @@
 import { describe, expect, test } from 'bun:test';
-import { dependencyOrder, publicationOrder, releaseVersion, versionManifest, type PackageManifest, type WorkspacePackage } from './workspaces.ts';
+import {
+    assertPrereleaseFlag,
+    dependencyOrder,
+    isPrerelease,
+    publicationOrder,
+    releaseVersion,
+    versionManifest,
+    type PackageManifest,
+    type WorkspacePackage
+} from './workspaces.ts';
 
 const pkg = (name: string, options: Partial<PackageManifest> = {}): WorkspacePackage => ({
     directory: name,
@@ -78,5 +87,19 @@ describe('release version normalization', () => {
         for (const value of ['', '../1.2.3', '1.2', '01.2.3', '1.2.3-01', '1.2.3-beta..1', '1.2.3\n']) {
             expect(() => releaseVersion(value)).toThrow('Invalid release version');
         }
+    });
+    test('reads a prerelease from the version, not from build metadata', () => {
+        for (const value of ['1.0.0-beta.1', 'v0.16.0-rc.0', '1.0.0-0+build']) {
+            expect(isPrerelease(value)).toBe(true);
+        }
+        for (const value of ['1.0.0', 'v0.16.0', '1.0.0+build-7']) {
+            expect(isPrerelease(value)).toBe(false);
+        }
+    });
+    test('rejects a prerelease flag that disagrees with the version', () => {
+        expect(() => assertPrereleaseFlag('1.0.0-beta.1', true)).not.toThrow();
+        expect(() => assertPrereleaseFlag('1.0.0', false)).not.toThrow();
+        expect(() => assertPrereleaseFlag('1.0.0-beta.1', false)).toThrow('must be marked');
+        expect(() => assertPrereleaseFlag('1.0.0', true)).toThrow('must not be marked');
     });
 });

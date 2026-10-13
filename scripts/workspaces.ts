@@ -104,6 +104,23 @@ export function releaseVersion(value: string): string {
     return version;
 }
 
+/* Whether a release version carries prerelease identifiers, which publish under `next` so `latest` stays on the last stable version. */
+export function isPrerelease(value: string): boolean {
+    return releaseVersion(value).split('+')[0]!.includes('-');
+}
+
+/* Fails when the GitHub prerelease flag of a release disagrees with its version, as either one alone would pick the wrong npm tag. */
+export function assertPrereleaseFlag(value: string, flagged: boolean): void {
+    const prerelease = isPrerelease(value);
+    if (prerelease !== flagged) {
+        throw new Error(
+            prerelease
+                ? `Version ${value} is a prerelease, so its GitHub release must be marked as one.`
+                : `Version ${value} is stable, so its GitHub release must not be marked as a prerelease.`
+        );
+    }
+}
+
 export function versionManifest(manifest: PackageManifest, value: string): PackageManifest {
     const version = releaseVersion(value);
     const updated = { ...manifest, version };
