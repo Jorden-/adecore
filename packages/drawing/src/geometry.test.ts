@@ -1,6 +1,18 @@
 import { describe, expect, test } from 'bun:test';
 import type { DrawingElement } from './protocol.ts';
-import { arrowHead, boundsOfElements, elementAt, elementsIn, hitsElement, rectFromPoints, resizeRect, rotatePoint, scaleElement } from './geometry.ts';
+import {
+    arrowHead,
+    boundsOfElements,
+    drawnBoundsOf,
+    drawnBoundsOfElements,
+    elementAt,
+    elementsIn,
+    hitsElement,
+    rectFromPoints,
+    resizeRect,
+    rotatePoint,
+    scaleElement
+} from './geometry.ts';
 
 const base = { stroke: 'ink', strokeWidth: 2, seed: 1 } as const;
 
@@ -65,6 +77,12 @@ describe('hit tests', () => {
         const elements = [rect('a'), rect('b', 400), { ...rect('c', 10), locked: true }];
         expect(elementsIn(elements, { x: -10, y: -10, w: 200, h: 200 }).map((element) => element.id)).toEqual(['a']);
     });
+
+    test('a marquee takes a turned element where it is drawn', () => {
+        const turned: DrawingElement = { ...rect('a', 0, 0, 400, 20), angle: Math.PI / 2 };
+        expect(elementsIn([turned], { x: 195, y: 100, w: 10, h: 10 }).map((element) => element.id)).toEqual(['a']);
+        expect(elementsIn([turned], { x: 0, y: 0, w: 10, h: 10 })).toEqual([]);
+    });
 });
 
 describe('boxes', () => {
@@ -75,6 +93,18 @@ describe('boxes', () => {
     test('the bounds of a drawing hold everything in it', () => {
         expect(boundsOfElements([rect('a'), rect('b', 200, 100)])).toEqual({ x: 0, y: 0, w: 300, h: 160 });
         expect(boundsOfElements([])).toBeNull();
+    });
+
+    test('the drawn bounds of a turned element hold it as it is drawn, and the stored box stays as it is', () => {
+        const turned: DrawingElement = { ...rect('a', 0, 0, 400, 20), angle: Math.PI / 2 };
+        const drawn = drawnBoundsOf(turned);
+        expect(drawn.x).toBeCloseTo(190);
+        expect(drawn.y).toBeCloseTo(-190);
+        expect(drawn.w).toBeCloseTo(20);
+        expect(drawn.h).toBeCloseTo(400);
+        expect(drawnBoundsOf(rect('b'))).toEqual({ x: 0, y: 0, w: 100, h: 60 });
+        expect(boundsOfElements([turned])).toEqual({ x: 0, y: 0, w: 400, h: 20 });
+        expect(drawnBoundsOfElements([])).toBeNull();
     });
 
     test('a resize moves the handle and leaves the opposite side where it was', () => {

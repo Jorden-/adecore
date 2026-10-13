@@ -65,6 +65,31 @@ export function boundsOfElements(elements: readonly DrawingElement[]): Rect | nu
     return unionOf(elements.map(boundsOf));
 }
 
+/* The box around an element as it is drawn: the stored box, turned by its angle. */
+export function drawnBoundsOf(element: DrawingElement): Rect {
+    const rect = boundsOf(element);
+    const angle = element.angle ?? 0;
+    if (angle === 0) {
+        return rect;
+    }
+    const center = centerOf(rect);
+    const corners = [
+        { x: rect.x, y: rect.y },
+        { x: rect.x + rect.w, y: rect.y },
+        { x: rect.x + rect.w, y: rect.y + rect.h },
+        { x: rect.x, y: rect.y + rect.h }
+    ].map((corner) => rotatePoint(corner, center, angle));
+    const xs = corners.map((corner) => corner.x);
+    const ys = corners.map((corner) => corner.y);
+    const left = Math.min(...xs);
+    const top = Math.min(...ys);
+    return { x: left, y: top, w: Math.max(...xs) - left, h: Math.max(...ys) - top };
+}
+
+export function drawnBoundsOfElements(elements: readonly DrawingElement[]): Rect | null {
+    return unionOf(elements.map(drawnBoundsOf));
+}
+
 export function intersects(a: Rect, b: Rect): boolean {
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
@@ -189,7 +214,7 @@ export function elementAt(elements: readonly DrawingElement[], point: Point, tol
 }
 
 export function elementsIn(elements: readonly DrawingElement[], rect: Rect): DrawingElement[] {
-    return elements.filter((element) => !element.locked && intersects(boundsOf(element), rect));
+    return elements.filter((element) => !element.locked && intersects(drawnBoundsOf(element), rect));
 }
 
 export function handlePoint(rect: Rect, handle: ResizeHandle): Point {

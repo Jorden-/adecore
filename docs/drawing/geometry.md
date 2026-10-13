@@ -8,14 +8,15 @@ The demo maps the pointer onto the viewBox of the exported SVG, asks `elementAt`
 
 ## Bounds
 
-- `boundsOf(element)` is the stored box of one element. `boundsOfElements(elements)` is the box around all of them, or `null` for none.
+- `boundsOf(element)` is the stored box of one element. `boundsOfElements(elements)` is the box around all of them, or `null` for none. A resize works in this box.
+- `drawnBoundsOf(element)` is the stored box turned by the element's angle, so it holds a turned element as it is drawn. `drawnBoundsOfElements(elements)` is the box around all of them, or `null` for none. `toSvg` and `elementsIn` use these.
 - `unionOf(rects)` is the box around any rects, also when one has a negative width or height, or `null` for an empty list.
 - `centerOf(rect)` is its middle. `roundPoint(point)` rounds both coordinates to whole units.
 - `rectFromPoints(from, to)` is the box of a drag in either direction, always with a positive size.
 - `intersects(a, b)` is true when two boxes overlap. Boxes that only touch do not.
 - `distanceToSegment(point, a, b)` is the distance from a point to the segment between `a` and `b`.
 
-A box is the stored `x`, `y`, `w` and `h`. It leaves out the rotation, the wobble of a rough shape, the stroke width, arrow heads and text that runs past a note. Add room for those yourself when you fit a view to its content.
+A box is the stored `x`, `y`, `w` and `h`, and a drawn box adds only the rotation. Both leave out the wobble of a rough shape, the stroke width, arrow heads and text that runs past a note. Add room for those yourself when you fit a view to its content.
 
 ## Rotation
 
@@ -40,7 +41,7 @@ const picked = elementsIn(elements, rectFromPoints(dragStart, pointer));
 
 "Near" is within `tolerance` or the stroke width, whichever is larger. The test uses the ideal outline: the corner radius of a rect and the wobble of a rough path do not change it.
 
-`elementAt(elements, point, tolerance)` returns the topmost element that is hit, or `undefined`. `elementsIn(elements, rect)` returns every element whose box overlaps the rect, in stacking order. Both skip `locked` elements; `hitsElement` does not. A lock only keeps an element out of selection, so check it again where the app writes.
+`elementAt(elements, point, tolerance)` returns the topmost element that is hit, or `undefined`. `elementsIn(elements, rect)` returns every element whose drawn box overlaps the rect, in stacking order. Both skip `locked` elements; `hitsElement` does not. A lock only keeps an element out of selection, so check it again where the app writes.
 
 ## Resizing
 

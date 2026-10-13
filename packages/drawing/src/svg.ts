@@ -1,5 +1,5 @@
 import type { DrawingColor, DrawingElement, DrawingFont } from './protocol.ts';
-import { boundsOfElements, type Rect } from './geometry.ts';
+import { drawnBoundsOfElements, type Rect } from './geometry.ts';
 import { pathsOfElement, type ElementPath } from './paths.ts';
 import { DEFAULT_FONT_STACKS, LINE_HEIGHT, approximateMeasure, fontOf, linesOf, writingFrameOf, type MeasureLine, type WrittenElement } from './text.ts';
 
@@ -127,7 +127,7 @@ function elementSvg(element: DrawingElement, options: SvgOptions): string {
  */
 export function toSvg(elements: readonly DrawingElement[], options: SvgOptions): string {
     const margin = options.margin ?? DEFAULT_SVG_MARGIN;
-    const bounds: Rect = boundsOfElements(elements) ?? { x: 0, y: 0, w: 1, h: 1 };
+    const bounds: Rect = drawnBoundsOfElements(elements) ?? { x: 0, y: 0, w: 1, h: 1 };
     const x = round(bounds.x - margin);
     const y = round(bounds.y - margin);
     const w = round(bounds.w + margin * 2);

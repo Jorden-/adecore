@@ -10,6 +10,8 @@ export {
     toLocal,
     unionOf,
     boundsOfElements,
+    drawnBoundsOf,
+    drawnBoundsOfElements,
     intersects,
     rectFromPoints,
     distanceToSegment,

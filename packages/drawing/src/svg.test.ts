@@ -145,6 +145,11 @@ describe('toSvg', () => {
         expect(svg).toContain('viewBox="-32 -32 164 124"');
     });
 
+    test('a turned element fits inside the document as it is drawn', () => {
+        const turned = toSvg([{ ...rect('a'), w: 400, h: 20, angle: Math.PI / 2 }], { palette });
+        expect(turned).toContain('viewBox="158 -222 84 464"');
+    });
+
     test('the text is escaped and named by its font', () => {
         expect(svg).toContain('hello &amp; &lt;you&gt;');
         expect(svg).toContain('Kalam');
