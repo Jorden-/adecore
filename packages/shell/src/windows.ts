@@ -14,8 +14,11 @@ export interface WindowsOptions {
     state: WindowState;
     /* Which windows were open when the app last quit, so a cold start opens them again. */
     session: WindowStateStorage;
-    /* Builds the app's window for a key and loads it. The bounds go into the constructor. */
-    create: (key: string | null, bounds: Partial<Rectangle> & WindowSize, origin: WindowOrigin) => BrowserWindow;
+    /*
+     * Builds the app's window for a key and loads it. The bounds go into the constructor. `state` is
+     * what the window's page last handed `setState` before a quit, on a window the session opens again.
+     */
+    create: (key: string | null, bounds: Partial<Rectangle> & WindowSize, origin: WindowOrigin, state: string | null) => BrowserWindow;
     /* A window came to the front, after `focused()` already answers it, such as to draw its own menu. */
     onFront?: (window: BrowserWindow) => void;
     /* The key an app kept its one window under before it had several, where a first window without bounds of its own opens. */
@@ -26,22 +29,47 @@ export interface WindowsOptions {
 interface Entry {
     window: BrowserWindow;
     key: string | null;
+    state: string | null;
+    /* The keys the window keeps besides the one it shows, such as its tabs, which no other window may show. */
+    held: string[];
+}
+
+/* Where a new window's top left corner goes on the screen, such as under the pointer that dragged something out. */
+export interface WindowPoint {
+    x: number;
+    y: number;
+}
+
+interface SessionWindow {
+    key: string | null;
+    state: string | null;
 }
 
 const SESSION_VERSION = 1;
 
-const parseSession = (text: string | null): (string | null)[] => {
+/*
+ * The states sit in a list of their own beside the keys, at the same places, so a shell from before
+ * them still reads the keys and opens the windows without what their pages kept.
+ */
+const parseSession = (text: string | null): SessionWindow[] => {
     if (text === null) {
         return [];
     }
     try {
-        const file = JSON.parse(text) as { version?: unknown; windows?: unknown };
+        const file = JSON.parse(text) as { version?: unknown; windows?: unknown; states?: unknown };
         if (file.version !== SESSION_VERSION || !Array.isArray(file.windows)) {
             return [];
         }
-        const keys = file.windows.filter((key): key is string | null => key === null || (typeof key === 'string' && key !== ''));
+        const states: unknown[] = Array.isArray(file.states) ? file.states : [];
+        const windows = file.windows.flatMap((key: unknown, index): SessionWindow[] => {
+            if (key !== null && (typeof key !== 'string' || key === '')) {
+                return [];
+            }
+            const state = states[index];
+            return [{ key, state: typeof state === 'string' ? state : null }];
+        });
         // A key belongs to one window, so a file that lists one twice keeps the last.
-        return keys.filter((key, index) => key === null || keys.lastIndexOf(key) === index);
+        return windows.filter(({ key }, index) => key === null || windows.findLastIndex((other) => other.key === key) === index);
     } catch {
         return [];
     }
@@ -70,8 +98,11 @@ export const createWindows = (options: WindowsOptions) => {
         if (quitting) {
             return;
         }
-        const keys = order.map((id) => entries.get(id)?.key ?? null);
-        options.session.write(`${JSON.stringify({ version: SESSION_VERSION, windows: keys }, null, 2)}\n`);
+        const shown = order.map((id) => entries.get(id));
+        const keys = shown.map((entry) => entry?.key ?? null);
+        const states = shown.map((entry) => entry?.state ?? null);
+        const file = states.some((state) => state !== null) ? { version: SESSION_VERSION, windows: keys, states } : { version: SESSION_VERSION, windows: keys };
+        options.session.write(`${JSON.stringify(file, null, 2)}\n`);
     };
 
     const toFront = (id: number): void => {
@@ -88,7 +119,15 @@ export const createWindows = (options: WindowsOptions) => {
         return null;
     };
 
-    const holderOf = (key: string): Entry | null => alive().find((entry) => entry.key === key) ?? null;
+    const holderOf = (key: string): Entry | null => alive().find((entry) => entry.key === key || entry.held.includes(key)) ?? null;
+
+    /* Takes a key out of the window that has it, shown or kept. */
+    const release = (entry: Entry, key: string): void => {
+        if (entry.key === key) {
+            entry.key = null;
+        }
+        entry.held = entry.held.filter((other) => other !== key);
+    };
 
     const pageWindow = (contents: WebContents): BrowserWindow | null => alive().find((entry) => entry.window.webContents === contents)?.window ?? null;
 
@@ -113,9 +152,10 @@ export const createWindows = (options: WindowsOptions) => {
         return options.state.bounds(stateKey, { ...beside, x: beside.x + CASCADE, y: beside.y + CASCADE });
     };
 
-    const create = (key: string | null, origin: WindowOrigin): BrowserWindow => {
-        const window = options.create(key, boundsFor(key), origin);
-        const entry: Entry = { window, key };
+    const create = (key: string | null, origin: WindowOrigin, state: string | null = null, at?: WindowPoint): BrowserWindow => {
+        const bounds = boundsFor(key);
+        const window = options.create(key, at === undefined ? bounds : { ...bounds, x: Math.round(at.x), y: Math.round(at.y) }, origin, state);
+        const entry: Entry = { window, key, state, held: [] };
         const id = window.id;
         entries.set(id, entry);
         toFront(id);
@@ -154,26 +194,26 @@ export const createWindows = (options: WindowsOptions) => {
     };
 
     const restore = (): void => {
-        const keys = parseSession(options.session.read());
+        const windows = parseSession(options.session.read());
         started = true;
-        if (keys.length === 0) {
+        if (windows.length === 0) {
             create(null, 'first');
             return;
         }
-        for (const key of keys) {
-            create(key, 'session');
+        for (const { key, state } of windows) {
+            create(key, 'session', state);
         }
     };
 
     return {
-        /* Raises the window that has the key, or opens one for it. Null always opens a new window. */
-        open: (key: string | null): BrowserWindow => {
+        /* Raises the window that has the key, or opens one for it, at `at` when given. Null always opens a new window. */
+        open: (key: string | null, at?: WindowPoint): BrowserWindow => {
             const holder = key === null ? null : holderOf(key);
             if (holder) {
                 raise(holder.window);
                 return holder.window;
             }
-            return create(key, 'opened');
+            return create(key, 'opened', null, at);
         },
 
         /* Opens the windows that were open when the app last quit, or one without a key. */
@@ -181,7 +221,7 @@ export const createWindows = (options: WindowsOptions) => {
 
         /*
          * Makes a window the one that shows a key, as when its page opens a project. False when another
-         * window already has it; that window comes to the front instead. Null lets the key go.
+         * window already shows or keeps it; that window comes to the front instead. Null lets the key go.
          */
         claim: (window: BrowserWindow, key: string | null): boolean => {
             const entry = entries.get(window.id);
@@ -208,14 +248,95 @@ export const createWindows = (options: WindowsOptions) => {
          * Moves what a window shows into a new window, which comes to the front, and leaves the old one
          * without a key. The key is never without a window in between. Null for a window that shows nothing.
          */
-        move: (window: BrowserWindow): BrowserWindow | null => {
+        move: (window: BrowserWindow, at?: WindowPoint): BrowserWindow | null => {
             const entry = entries.get(window.id);
             if (!entry || entry.key === null) {
                 return null;
             }
             const key = entry.key;
-            entry.key = null;
-            return create(key, 'opened');
+            release(entry, key);
+            return create(key, 'opened', null, at);
+        },
+
+        /*
+         * The keys a window keeps besides the one it shows, such as its tabs. A key another window shows
+         * or keeps stays that window's, so the answer is the keys this window has now.
+         */
+        hold: (window: BrowserWindow, keys: readonly string[]): string[] => {
+            const entry = entries.get(window.id);
+            if (!entry) {
+                return [];
+            }
+            entry.held = [...new Set(keys)].filter((key) => {
+                const holder = holderOf(key);
+                return holder === null || holder === entry;
+            });
+            return entry.held;
+        },
+
+        /*
+         * Takes a key a window shows or keeps into a new window of its own, at `at` when given, as when
+         * a tab is dragged out. Null when the window does not have the key.
+         */
+        detach: (window: BrowserWindow, key: string, at?: WindowPoint): BrowserWindow | null => {
+            const entry = entries.get(window.id);
+            if (!entry || (entry.key !== key && !entry.held.includes(key))) {
+                return null;
+            }
+            release(entry, key);
+            writeSession();
+            return create(key, 'opened', null, at);
+        },
+
+        /*
+         * Hands a key to another window to keep, out of whichever window had it, as when a tab is dropped
+         * on another window. That window's page then shows it with `claim`.
+         */
+        transfer: (key: string, window: BrowserWindow): boolean => {
+            const target = entries.get(window.id);
+            if (!target) {
+                return false;
+            }
+            const holder = holderOf(key);
+            if (holder !== null && holder !== target) {
+                release(holder, key);
+            }
+            if (!target.held.includes(key)) {
+                target.held = [...target.held, key];
+            }
+            writeSession();
+            return true;
+        },
+
+        /* The window that shows or keeps a key, if any. */
+        holderOf: (key: string): BrowserWindow | null => holderOf(key)?.window ?? null,
+
+        /* The app window under a point on the screen, the one last in front first, leaving out `except`. */
+        windowAt: (point: WindowPoint, except?: BrowserWindow): BrowserWindow | null => {
+            for (let i = order.length - 1; i >= 0; i--) {
+                const entry = entries.get(order[i]!);
+                if (!entry || entry.window.isDestroyed() || entry.window === except || entry.window.isMinimized() || !entry.window.isVisible()) {
+                    continue;
+                }
+                const bounds = entry.window.getBounds();
+                if (point.x >= bounds.x && point.x < bounds.x + bounds.width && point.y >= bounds.y && point.y < bounds.y + bounds.height) {
+                    return entry.window;
+                }
+            }
+            return null;
+        },
+
+        /*
+         * What a window's page keeps of itself across a quit, opaque to the shell, such as the tabs it
+         * had. The session hands it back to `create` for that window; null keeps nothing.
+         */
+        setState: (window: BrowserWindow, state: string | null): void => {
+            const entry = entries.get(window.id);
+            if (!entry || entry.state === state) {
+                return;
+            }
+            entry.state = state;
+            writeSession();
         },
 
         /* The window a page or a `<webview>` inside it belongs to, such as whose menu a guest opens. Not a check of who may speak for the app: that is `fromPage`. */

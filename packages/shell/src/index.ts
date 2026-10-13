@@ -13,4 +13,4 @@ export type { SavedWindow, StateWindow, WindowDisplay, WindowSize, WindowState, 
 export { createTheme } from './theme.ts';
 export type { Theme, ThemeOptions, TitleBarOverlay } from './theme.ts';
 export { CASCADE, createWindows, UNKEYED_STATE } from './windows.ts';
-export type { WindowOrigin, Windows, WindowsOptions } from './windows.ts';
+export type { WindowOrigin, WindowPoint, Windows, WindowsOptions } from './windows.ts';

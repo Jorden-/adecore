@@ -53,6 +53,18 @@ handleFromApp('window:claim', (event, key: unknown) => {
 
 `move(window)` puts what a window shows into a new window and leaves the old one without a key, with no moment in between where nobody has it. The old page then shows its empty state.
 
+Both take a `WindowPoint` as a second argument, `{ x, y }` on the screen, where the new window's top left corner goes, such as under the pointer that dragged something out of another window. A window that is raised instead stays where it is.
+
+## Keys a window keeps
+
+A window can keep keys besides the one it shows, such as the projects of its tabs. `hold(window, keys)` sets them and answers the keys the window has now: a key another window shows or keeps stays with that window. A kept key is the window's like the one it shows, so `claim` and `open` for it raise this window; `holderOf(key)` names the window, so the app can tell its page to show the key.
+
+`detach(window, key, at)` takes a key the window shows or keeps into a new window, as when a tab is dragged out. `transfer(key, window)` hands a key to another window to keep, out of the one that had it, as when the tab is dropped on that window; its page then shows the key with `claim`. `windowAt(point, except)` is the window under a point on the screen, the one last in front first, for where such a drop lands.
+
+## What a page keeps
+
+`setState(window, state)` keeps a string for the window across a quit, such as the tabs its page had open. The shell never reads it. At the next start the session hands it back as the fourth argument of `create`, `state`, for that window only; a window opened any other way gets `null`. Put it in the address the window loads, so a reload finds it there too. A session file keeps the states in a list beside the keys, so a shell from before states still opens the windows, without them.
+
 ## Who asked
 
 Every IPC handler resolves its window from the sender instead of assuming one: `fromPage(event.sender)` answers only for the page of an app window, so it is also the check of who may speak for the app. `fromContents` also knows the window of a `<webview>` inside a page, which Electron gives no window of its own, so a guest's context menu opens over the right window; it never decides who may call a handler. What has no sender, such as a second instance, a notification or a menu command, goes to `focused()`, the window last in front. `send(channel, ...args)` reaches every window, for what the whole app shares. `keyOf(window)` is the key a window shows, and `all()` lists the open windows.

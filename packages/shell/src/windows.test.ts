@@ -57,6 +57,8 @@ const fakeWindow = (bounds: Rectangle) => {
         maximize: () => {},
         setFullScreen: () => {},
         getNormalBounds: () => state.bounds,
+        getBounds: () => state.bounds,
+        isVisible: () => true,
         restore: () => {
             calls.push('restore');
             state.minimized = false;
@@ -82,15 +84,15 @@ const setup = (sessionText: string | null = null, stateText: string | null = nul
         defaults: { width: 1440, height: 900 },
         setTimeout: () => null
     });
-    const created: { key: string | null; bounds: Partial<Rectangle>; origin: WindowOrigin; fake: Fake }[] = [];
+    const created: { key: string | null; bounds: Partial<Rectangle>; origin: WindowOrigin; state: string | null; fake: Fake }[] = [];
     const fronts: BrowserWindow[] = [];
     const windows = createWindows({
         state,
         session: session.storage,
         platform,
-        create: (key, bounds, origin) => {
+        create: (key, bounds, origin, state) => {
             const fake = fakeWindow({ x: bounds.x ?? 100, y: bounds.y ?? 100, width: bounds.width, height: bounds.height });
-            created.push({ key, bounds, origin, fake });
+            created.push({ key, bounds, origin, state, fake });
             return fake.window;
         },
         onFront: (window) => {
@@ -131,6 +133,63 @@ describe('createWindows', () => {
         const twice = setup(JSON.stringify({ version: 1, windows: ['a', 'b', 'a', 3, ''] }));
         twice.windows.restore();
         expect(twice.created.map(({ key }) => key)).toEqual(['b', 'a']);
+    });
+
+    test('a page keeps a state of its own through a quit, beside a key the session can still read without it', () => {
+        const { windows, created, session } = setup();
+        const first = windows.open('a');
+        windows.open('b');
+        windows.setState(first, '["a","c"]');
+        expect(session.keys()).toEqual(['a', 'b']);
+        const again = setup(session.storage.read());
+        again.windows.restore();
+        expect(again.created.map(({ key, state }) => [key, state])).toEqual([
+            ['a', '["a","c"]'],
+            ['b', null]
+        ]);
+        expect(created[1]!.state).toBeNull();
+    });
+
+    test('a window opened or moved at a point has its top left corner there', () => {
+        const { windows, created } = setup();
+        const first = windows.open('a', { x: 640.4, y: 300 });
+        expect(created[0]!.bounds).toMatchObject({ x: 640, y: 300 });
+        windows.move(first, { x: 10, y: 20 });
+        expect(created[1]!.bounds).toMatchObject({ x: 10, y: 20 });
+    });
+
+    test("a key a window keeps is that window's: another can neither claim nor keep it", () => {
+        const { windows, created } = setup();
+        const first = windows.open('a');
+        const second = windows.open('b');
+        expect(windows.hold(first, ['a', 'c', 'b'])).toEqual(['a', 'c']);
+        expect(windows.claim(second, 'c')).toBe(false);
+        expect(created[0]!.fake.calls).toContain('focus');
+        expect(windows.holderOf('c')).toBe(first);
+        expect(windows.open('c')).toBe(first);
+    });
+
+    test('a kept key dragged out takes a new window, and dropped on another goes to that one', () => {
+        const { windows, created } = setup();
+        const first = windows.open('a');
+        windows.hold(first, ['a', 'b']);
+        const torn = windows.detach(first, 'b', { x: 10, y: 20 })!;
+        expect(created[1]!.key).toBe('b');
+        expect(created[1]!.bounds).toMatchObject({ x: 10, y: 20 });
+        expect(windows.holderOf('b')).toBe(torn);
+        expect(windows.transfer('b', first)).toBe(true);
+        expect(windows.holderOf('b')).toBe(first);
+        expect(windows.keyOf(torn)).toBeNull();
+        expect(windows.detach(torn, 'b')).toBeNull();
+    });
+
+    test('the window under a point is the one last in front, leaving out the one asked to', () => {
+        const { windows } = setup();
+        const back = windows.open('a', { x: 0, y: 0 });
+        const front = windows.open('b', { x: 50, y: 50 });
+        expect(windows.windowAt({ x: 60, y: 60 })).toBe(front);
+        expect(windows.windowAt({ x: 60, y: 60 }, front)).toBe(back);
+        expect(windows.windowAt({ x: 5000, y: 5000 })).toBeNull();
     });
 
     test('opening a key another window has raises that window', () => {
