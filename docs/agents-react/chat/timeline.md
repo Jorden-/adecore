@@ -55,11 +55,11 @@ A file link in Markdown writes its place, scope and cwd down for `readTimelineTa
 
 ## Streaming
 
-`useStreaming()` on the host picks how a reply appears: a word at a time with a fade (`words`), a Markdown block at a time (`blocks`), or all at once when it is done (`whole`). A code fence that is still open is highlighted line by line as it grows. Only the row of the growing reply redraws for a word; see [reading the stores](/agents-react/guide/chat-client#reading-the-stores).
+`useStreaming()` on the host picks how a reply appears: a word at a time with a fade (`words`), a Markdown block at a time (`blocks`), or all at once when it is done (`whole`). A code fence that is still open is highlighted line by line as it grows, with the host's `code.highlighter` when it lends one. Only the row of the growing reply redraws for a word, not the thread or its other rows; a word that adds a line moves the end through the new height of that row. See [reading the stores](/agents-react/guide/chat-client#reading-the-stores).
 
 ## Find
 
-The thread has no find of its own. The host's `useTimelineFind(options)` gets the rows, the refs of the frame, the thread and the scroller, and callbacks to open a fold and scroll to a row, and answers a `TimelineFind`: the bar to draw over the thread, the rows of the hits and the current one. `FindReveal` and `useOpenForFind` let a fold open for a hit inside it.
+The thread has no find of its own. The host's `useTimelineFind(options)` gets the rows, the refs of the frame, the thread and the scroller, and callbacks to open a fold and scroll to a row, and answers a `TimelineFind`: the bar to draw over the thread, the rows of the hits and the current one. The options stay one object until the rows, the structure or the order change, and their callbacks read the scroll position when called, so an effect may depend on them. `FindReveal` and `useOpenForFind` let a fold open for a hit inside it.
 
 ## Rows
 
