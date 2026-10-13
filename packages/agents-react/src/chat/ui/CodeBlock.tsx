@@ -8,7 +8,7 @@ import { CodeStreamingContext } from './code-streaming';
 import { WHOLE_FADE_CLASS } from './rehype-fade';
 import { useChatHost } from '../../host';
 import { useCodeTheme } from './code-theme';
-import { loadLanguage, loadTheme, tokenizerFor, tokenStyle } from './highlighter';
+import { tokenStyle, useCodeHighlighter } from './highlighter';
 
 const COPIED_MS = 1500;
 
@@ -35,12 +35,13 @@ export function CodeBlock({ code, lang, actions, view }: { code: string; lang: s
     const { t } = useTranslation('agent-chat');
     const theme = useCodeTheme();
     const { custom } = useChatHost().code;
+    const highlighter = useCodeHighlighter();
     const streaming = useContext(CodeStreamingContext);
     const [copyState, setCopyState] = useState<'idle' | 'copying' | 'copied' | 'failed'>('idle');
     const copying = useRef(false);
     // What loaded last, so a block whose theme changes draws again once the new one is in.
     const [loaded, setLoaded] = useState<string | null>(null);
-    const tokenizer = tokenizerFor(lang, theme);
+    const tokenizer = highlighter.tokenizer(lang, theme);
     // Only a block that had to wait fades in; one drawn highlighted from its first frame just stands there.
     const [waited] = useState(tokenizer === null);
     const lines = useMemo(() => (tokenizer ? new IncrementalLines(tokenizer.tokenize) : null), [tokenizer]);
@@ -76,13 +77,13 @@ export function CodeBlock({ code, lang, actions, view }: { code: string; lang: s
             return;
         }
         let cancelled = false;
-        Promise.all([loadLanguage(lang), loadTheme(theme, custom)])
+        Promise.all([highlighter.loadLanguage(lang), highlighter.loadTheme(theme, custom)])
             .then(() => !cancelled && setLoaded(`${lang}:${theme}`))
             .catch(() => !cancelled && setLoaded('failed'));
         return () => {
             cancelled = true;
         };
-    }, [lang, theme, custom, tokenizer]);
+    }, [highlighter, lang, theme, custom, tokenizer]);
 
     const pending = (tokenizer === null || tokens === null) && loaded !== 'failed';
     return (

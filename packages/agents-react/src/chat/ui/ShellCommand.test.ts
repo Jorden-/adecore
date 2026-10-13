@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { parseHTML } from 'linkedom';
-import { loadLanguage, loadTheme } from './highlighter';
+import { codeHighlighter } from './highlighter';
 import { ShellCommand } from './ShellCommand';
 
 function render(command: string): HTMLElement {
@@ -15,7 +15,8 @@ describe('ShellCommand', () => {
         const plain = render(command);
         expect(plain.textContent).toBe(command);
         expect(plain.querySelector('span')).toBeNull();
-        await Promise.all([loadTheme('github-light', []), loadLanguage('shellscript'), loadLanguage('python')]);
+        const highlighter = codeHighlighter();
+        await Promise.all([highlighter.loadTheme('github-light', []), highlighter.loadLanguage('shellscript'), highlighter.loadLanguage('python')]);
         const drawn = render(command);
         expect(drawn.textContent).toBe(command);
         const colored = [...drawn.querySelectorAll('span')].filter((span) => span.getAttribute('style')?.includes('color'));

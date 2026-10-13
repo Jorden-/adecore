@@ -133,7 +133,7 @@ Many props and options are not exported types. Derive them where you need one, a
 | [`chat/ui/file-links`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/file-links.ts) | `FileLinkContext`, `useFileLinkCwd`, `useFileLinkTarget`, `useOpenFileLink` |
 | [`chat/ui/find-reveal`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/find-reveal.ts) | `ChatFindField`, `FindReveal`, `FindRevealContext`, `useOpenForFind` |
 | [`chat/ui/full-diff`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/full-diff.ts) | `DiffContents`, `fullFileDiff` |
-| [`chat/ui/highlighter`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/highlighter.ts) | `Highlighter`, `GrammarState`, `loadLanguage`, `loadTheme`, `readyHighlighter`, `loadedLanguage`, `tokenizerFor`, `tokenStyle` |
+| [`chat/ui/highlighter`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/highlighter.ts) | `Highlighter`, `GrammarState`, `CodeHighlighter`, `codeHighlighter`, `useCodeHighlighter`, `loadLanguage`, `loadTheme`, `readyHighlighter`, `loadedLanguage`, `tokenizerFor`, `tokenStyle` |
 | [`chat/ui/icons`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/icons.tsx) | `DOCK_ICON_SIZE`, `ROW_GUTTER`, `toolIcon` |
 | [`chat/ui/markdown-blocks`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/markdown-blocks.ts) | `MarkdownBlock`, `splitMarkdownBlocks`, `settledBlocksText` |
 | [`chat/ui/mermaid`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/mermaid.ts) | `MermaidColors`, `MERMAID_TOKENS`, `mermaidConfig`, `SizedSvg`, `sizedSvg`, `svgDataUrl` |

@@ -249,7 +249,7 @@ export interface ChatHost {
         syntaxWorker?: () => Worker;
         /* Starts legacy highlighting with its first diff; an enclosing DiffPool takes precedence. */
         legacyDiffWorker?: () => Worker;
-        /* Borrow the page highlighter for fallback; the host retains ownership. */
+        /* Borrow the page highlighter for code blocks and the diff fallback; the host retains ownership. */
         highlighter?: () => Promise<Highlighter>;
         /* Opt in to bounded editor reviews; failures show a status, omitted keeps the legacy renderer. */
         editor?: () => Promise<EditorEngine>;

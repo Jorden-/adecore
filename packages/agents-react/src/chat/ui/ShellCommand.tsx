@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import type { BundledLanguage } from 'shiki/bundle/web';
+import type { BundledLanguage } from 'shiki';
 import { EMBEDDED_CODE_LIMIT, SHELL_LANGUAGE, embeddedCode } from '../logic/embedded-code';
 import type { CodeToken } from './code-lines';
 import { useChatHost } from '../../host';
 import { useCodeTheme } from './code-theme';
-import { loadLanguage, loadTheme, loadedLanguage, readyHighlighter, tokenStyle, type Highlighter } from './highlighter';
+import { tokenStyle, useCodeHighlighter, type CodeHighlighter, type Highlighter } from './highlighter';
 
 /* One colored run of a command, as offsets into it. */
 interface Run extends CodeToken {
@@ -19,7 +19,7 @@ const cache = new Map<string, Run[]>();
 /* The runs of `code` in one language, placed at `offset`; a run in the theme's own foreground takes the color around it. */
 function runsOf(highlighter: Highlighter, code: string, language: string, theme: string, offset: number): Run[] {
     const fg = highlighter.getTheme(theme).fg.toLowerCase();
-    const { tokens } = highlighter.codeToTokens(code, { lang: loadedLanguage(language) as BundledLanguage, theme });
+    const { tokens } = highlighter.codeToTokens(code, { lang: language as BundledLanguage, theme });
     return tokens.flat().map((token) => ({
         start: offset + token.offset,
         end: offset + token.offset + token.content.length,
@@ -52,7 +52,7 @@ function languagesOf(command: string): Set<string> {
 }
 
 /* The colored runs of a command, or null while a grammar or the theme is still on its way. */
-function highlight(command: string, theme: string): Run[] | null {
+function highlight(command: string, theme: string, code: CodeHighlighter): Run[] | null {
     const key = `${theme}\n${command}`;
     const known = cache.get(key);
     if (known !== undefined) {
@@ -62,13 +62,13 @@ function highlight(command: string, theme: string): Run[] | null {
         return known;
     }
     const embedded = embeddedCode(command);
-    const highlighter = readyHighlighter([SHELL_LANGUAGE, ...embedded.map(({ language }) => language)], theme);
+    const highlighter = code.ready([SHELL_LANGUAGE, ...embedded.map(({ language }) => language)], theme);
     if (highlighter === null) {
         return null;
     }
-    let runs = runsOf(highlighter, command, SHELL_LANGUAGE, theme, 0);
-    for (const code of embedded) {
-        runs = overlay(runs, code.start, code.end, runsOf(highlighter, command.slice(code.start, code.end), code.language, theme, code.start));
+    let runs = runsOf(highlighter, command, code.language(SHELL_LANGUAGE), theme, 0);
+    for (const part of embedded) {
+        runs = overlay(runs, part.start, part.end, runsOf(highlighter, command.slice(part.start, part.end), code.language(part.language), theme, part.start));
     }
     cache.set(key, runs);
     if (cache.size > CACHE_LIMIT) {
@@ -111,23 +111,24 @@ function draw(command: string, runs: readonly Run[]): ReactNode[] {
 export function ShellCommand({ command }: { command: string }) {
     const theme = useCodeTheme();
     const { custom } = useChatHost().code;
+    const highlighter = useCodeHighlighter();
     // Bumped when a load settles, so the cache is asked again.
     const [, setLoads] = useState(0);
     const tooLong = command.length > EMBEDDED_CODE_LIMIT;
-    const runs = tooLong ? null : highlight(command, theme);
+    const runs = tooLong ? null : highlight(command, theme, highlighter);
 
     useEffect(() => {
         if (runs !== null || tooLong) {
             return;
         }
         let cancelled = false;
-        Promise.all([loadTheme(theme, custom), ...[...languagesOf(command)].map(loadLanguage)])
+        Promise.all([highlighter.loadTheme(theme, custom), ...[...languagesOf(command)].map((lang) => highlighter.loadLanguage(lang))])
             .then(() => !cancelled && setLoads((count) => count + 1))
             .catch(() => undefined);
         return () => {
             cancelled = true;
         };
-    }, [command, theme, custom, runs, tooLong]);
+    }, [highlighter, command, theme, custom, runs, tooLong]);
 
     return <>{runs === null ? command : draw(command, runs)}</>;
 }
