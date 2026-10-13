@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
-import { Popover as BasePopover } from '@base-ui-components/react/popover';
-import { PreviewCard as BasePreviewCard } from '@base-ui-components/react/preview-card';
+import { Popover as BasePopover } from '@base-ui/react/popover';
+import { PreviewCard as BasePreviewCard } from '@base-ui/react/preview-card';
 import { withClass } from '../class-name.ts';
 import { splitPlacement, type PlacementKey } from '../placement.ts';
 import { renderPositioner } from '../popup-layer.ts';

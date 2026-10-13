@@ -1,5 +1,5 @@
 import { useCallback, type ComponentProps, type ReactElement, type ReactNode } from 'react';
-import { Tooltip as BaseTooltip } from '@base-ui-components/react/tooltip';
+import { Tooltip as BaseTooltip } from '@base-ui/react/tooltip';
 import { Kbd } from './Kbd.tsx';
 import type { Shortcut } from './shortcut.ts';
 import { registerShortcutHint } from './shortcut-hints.ts';

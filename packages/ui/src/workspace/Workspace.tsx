@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import clsx from 'clsx';
-import { useRender } from '@base-ui-components/react/use-render';
+import { useRender } from '@base-ui/react/use-render';
 import { WorkspaceContext, type WorkspaceLayout } from './context.ts';
 
 export interface WorkspaceProps extends useRender.ComponentProps<'div'> {

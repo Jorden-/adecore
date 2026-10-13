@@ -1,10 +1,10 @@
 import { createContext, useContext, type ComponentProps, type ReactNode, type Ref } from 'react';
 import clsx from 'clsx';
 import { Check, ChevronRight, type LucideIcon } from 'lucide-react';
-import { ContextMenu as BaseContextMenu } from '@base-ui-components/react/context-menu';
-import { Menu as BaseMenu } from '@base-ui-components/react/menu';
-import { Separator as BaseSeparator } from '@base-ui-components/react/separator';
-import { useRender } from '@base-ui-components/react/use-render';
+import { ContextMenu as BaseContextMenu } from '@base-ui/react/context-menu';
+import { Menu as BaseMenu } from '@base-ui/react/menu';
+import { Separator as BaseSeparator } from '@base-ui/react/separator';
+import { useRender } from '@base-ui/react/use-render';
 import { withClass } from '../class-name.ts';
 import { Icon } from '../Icon.tsx';
 import { Tooltip } from '../Tooltip.tsx';

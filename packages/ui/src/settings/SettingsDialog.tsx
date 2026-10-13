@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type Ref } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
-import { Tabs } from '@base-ui-components/react/tabs';
+import { Tabs } from '@base-ui/react/tabs';
 import { Search, X, type LucideIcon } from 'lucide-react';
 import { CloseButton } from '../CloseButton.tsx';
 import { DialogDescription, DialogPopup, DialogRoot, DialogTitle } from '../dialog/parts.tsx';

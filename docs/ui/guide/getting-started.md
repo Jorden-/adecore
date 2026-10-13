@@ -113,11 +113,11 @@ export default defineConfig({
     resolve: {
         conditions: ['source', ...defaultClientConditions],
         // The checkout has its own node_modules; a second React or i18next breaks every hook and every word.
-        dedupe: ['react', 'react-dom', 'i18next', 'react-i18next', '@base-ui-components/react']
+        dedupe: ['react', 'react-dom', 'i18next', 'react-i18next', '@base-ui/react']
     },
     optimizeDeps: {
         exclude: ['@adecore/ui'],
-        include: ['@base-ui-components/react/menu', '@base-ui-components/react/dialog', 'lucide-react', 'clsx']
+        include: ['@base-ui/react/menu', '@base-ui/react/dialog', 'lucide-react', 'clsx']
     }
 });
 ```

@@ -1,7 +1,7 @@
 import type { Ref } from 'react';
 import clsx from 'clsx';
 import { Check, Minus } from 'lucide-react';
-import { Checkbox as BaseCheckbox } from '@base-ui-components/react/checkbox';
+import { Checkbox as BaseCheckbox } from '@base-ui/react/checkbox';
 import { Icon } from './Icon.tsx';
 
 export interface CheckboxProps {

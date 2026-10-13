@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Combobox } from '@base-ui-components/react/combobox';
+import { Combobox } from '@base-ui/react/combobox';
 import clsx from 'clsx';
 import { ChevronDown, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';

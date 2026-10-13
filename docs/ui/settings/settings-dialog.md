@@ -26,7 +26,7 @@ Escape in the search field clears the query first; only an empty field lets Esca
 
 ## An account at the foot
 
-`account` puts one more section under the footer, past a hairline, whose tab you draw yourself, such as an avatar and a name. The tab is a Base UI `Tabs.Tab` (from `@base-ui-components/react/tabs`) with the section's id as its value.
+`account` puts one more section under the footer, past a hairline, whose tab you draw yourself, such as an avatar and a name. The tab is a Base UI `Tabs.Tab` (from `@base-ui/react/tabs`) with the section's id as its value.
 
 ## Narrow windows
 

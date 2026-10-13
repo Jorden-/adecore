@@ -45,7 +45,7 @@ An app that links a checkout of the library (see [Getting started](/ui/guide/get
 preload = ["@adecore/ui/testing/dedupe", "./test-preload.ts"]
 ```
 
-It loads every file of `react`, `react-dom`, `i18next`, `react-i18next` and `@base-ui-components/react` inside the checkout as a stand-in for the same file in the app's copy. The app's copy is the one the folder `bun test` runs in resolves to, or else the one of the first workspace that depends on the library. A package the checkout has no copy of is left alone, so the preload does nothing once the library comes from the registry.
+It loads every file of `react`, `react-dom`, `i18next`, `react-i18next` and `@base-ui/react` inside the checkout as a stand-in for the same file in the app's copy. The app's copy is the one the folder `bun test` runs in resolves to, or else the one of the first workspace that depends on the library. A package the checkout has no copy of is left alone, so the preload does nothing once the library comes from the registry.
 
 A bunfig at the root of a monorepo with an isolated install may not resolve the package itself, since only the workspace depends on it. Point at the file through the workspace instead:
 

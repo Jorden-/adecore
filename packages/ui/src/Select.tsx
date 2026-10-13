@@ -1,5 +1,5 @@
 import type { Ref } from 'react';
-import { Select as BaseSelect } from '@base-ui-components/react/select';
+import { Select as BaseSelect } from '@base-ui/react/select';
 import clsx from 'clsx';
 import { ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';

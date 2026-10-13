@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactElement, ReactNode } from 'react';
 import clsx from 'clsx';
 import type { LucideIcon } from 'lucide-react';
-import { useRender } from '@base-ui-components/react/use-render';
+import { useRender } from '@base-ui/react/use-render';
 import { Icon } from './Icon.tsx';
 import type { Shortcut } from './shortcut.ts';
 import { Spinner } from './Spinner.tsx';

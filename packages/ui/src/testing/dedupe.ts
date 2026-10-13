@@ -10,7 +10,7 @@ import { Glob, plugin } from 'bun';
  * same file in the app's copy. Does nothing for a package the checkout has no copy of, which is every
  * package once the library is installed from the registry.
  */
-const SHARED = ['react', 'react-dom', 'i18next', 'react-i18next', '@base-ui-components/react'];
+const SHARED = ['react', 'react-dom', 'i18next', 'react-i18next', '@base-ui/react'];
 
 const NAME = '@adecore/ui';
 

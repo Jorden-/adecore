@@ -1,8 +1,8 @@
 import { Fragment, useId, type ReactNode, type Ref } from 'react';
 import clsx from 'clsx';
 import type { LucideIcon } from 'lucide-react';
-import { Radio } from '@base-ui-components/react/radio';
-import { RadioGroup } from '@base-ui-components/react/radio-group';
+import { Radio } from '@base-ui/react/radio';
+import { RadioGroup } from '@base-ui/react/radio-group';
 import { Icon } from './Icon.tsx';
 
 export interface Choice<Value extends string | number> {

@@ -12,7 +12,7 @@ import {
     type UIEvent,
     type WheelEvent
 } from 'react';
-import { useRender } from '@base-ui-components/react/use-render';
+import { useRender } from '@base-ui/react/use-render';
 import { Pin, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';

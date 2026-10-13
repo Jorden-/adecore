@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { useRender } from '@base-ui-components/react/use-render';
+import { useRender } from '@base-ui/react/use-render';
 
 export type KeyValueListRootProps = useRender.ComponentProps<'dl'> & {
     /* A hairline between rows, for a long list such as the headers of a message. Without it the rows sit close, for a few facts in a card. */

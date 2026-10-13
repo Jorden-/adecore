@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { useRender } from '@base-ui-components/react/use-render';
+import { useRender } from '@base-ui/react/use-render';
 
 /* A label takes the line height of the row it sits in, which is why the size carries `/[inherit]`. */
 const SECTION_LABEL = 'text-xs/[inherit] font-medium text-text-faint';

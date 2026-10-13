@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { useRender } from '@base-ui-components/react/use-render';
+import { useRender } from '@base-ui/react/use-render';
 import { FileTree as PierreFileTree, type FileTreeProps as PierreProps } from '@pierre/trees/react';
 import type { FileTree, FileTreeVisibleRow } from '@pierre/trees';
 import { useTranslation } from 'react-i18next';

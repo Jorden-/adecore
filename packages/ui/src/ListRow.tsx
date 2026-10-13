@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { useRender } from '@base-ui-components/react/use-render';
+import { useRender } from '@base-ui/react/use-render';
 
 const VARIANT = {
     /* A row of a list that reads as a table and fills the width of its panel: commits, processes,

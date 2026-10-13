@@ -12,7 +12,7 @@ import {
     type KeyboardEvent,
     type ReactNode
 } from 'react';
-import { useRender } from '@base-ui-components/react/use-render';
+import { useRender } from '@base-ui/react/use-render';
 import { GripVertical, Maximize2, Minimize2 } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';

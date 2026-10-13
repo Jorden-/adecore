@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react';
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
-import { useRender } from '@base-ui-components/react/use-render';
+import { useRender } from '@base-ui/react/use-render';
 import { Icon } from './Icon.tsx';
 
 /* `focus-ring` for the swatch that is a menu item rather than a button, which the keyboard reaches all the same. */

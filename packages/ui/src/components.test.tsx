@@ -354,7 +354,7 @@ describe('a menu item', () => {
         );
         expect(bare).not.toContain('menu-item');
         expect(bare).not.toContain('<svg');
-        expect(bare).toContain('role="menuitem" tabindex="-1"');
+        expect(bare).toMatch(/<div role="menuitem"[^>]* tabindex="-1"/);
     });
 
     test('puts its indicator at the end of the row when it asks for it there', () => {

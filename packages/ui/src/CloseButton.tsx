@@ -1,6 +1,6 @@
 import type { Ref } from 'react';
 import { X } from 'lucide-react';
-import { Dialog } from '@base-ui-components/react/dialog';
+import { Dialog } from '@base-ui/react/dialog';
 import { IconButton, type IconButtonSize } from './IconButton.tsx';
 import type { Shortcut } from './shortcut.ts';
 

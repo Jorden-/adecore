@@ -1,6 +1,6 @@
 import { useId, type Ref } from 'react';
 import clsx from 'clsx';
-import { Slider as BaseSlider } from '@base-ui-components/react/slider';
+import { Slider as BaseSlider } from '@base-ui/react/slider';
 import { formatFixed } from './format/number.ts';
 import { placesOf } from './step-places.ts';
 
