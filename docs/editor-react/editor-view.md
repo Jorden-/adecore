@@ -28,6 +28,7 @@
 | `languageOptions`  | `EditorLanguageOptions`                      | What the app tunes about the features, as the last argument of `EditorLanguage`                                                  |
 | `onMount`          | `(editor, language) => void \| (() => void)` | Called after mounting with the `Editor` and the `EditorLanguage`, or `null`; the function it returns runs before the editor goes |
 | `contextMenuItems` | `(language) => ReactNode`                    | Rows of the app in the [context menu](/editor-react/rename#context-menu)                                                         |
+| `hoverFooter`      | `(view, language) => ReactNode`              | Sections of the app at the foot of the [hover card](#languagepopups)                                                             |
 | `className`, `ref` |                                              | On the outer element, which needs a height                                                                                       |
 
 A change of `engine`, `project`, `uri` or `languageId` mounts the editor again, with a fresh undo history and document. The rest is read when it mounts, so an inline `options` object or `onMount` function costs nothing on a render. A later change of `theme`, `readOnly`, `readOnlyReason`, `wrap`, `indentation`, `smartKeys`, `guides`, `stickyScroll`, `whitespace`, `rightMargin`, `foldOutline`, `label` or `messages` reaches the editor in place; the other options only count when it mounts. On unmount it runs the cleanup of `onMount`, disposes the `EditorLanguage` and then the editor. It never disposes the project.
@@ -51,7 +52,37 @@ Attach one `EditorLanguage` per editor. `EditorView` already makes one, so do no
 
 ## LanguagePopups
 
-`<LanguagePopups language={language} contextMenuItems={...} />` draws every card a feature opens over the editor: hover, suggestions, signature help, the pick list, rename, peek, the call hierarchy, the symbol picker, the context menu and the authors card. `EditorView` renders it; an app that mounts by hand renders it next to the editor. Each card is placed from the screen position of its character and placed again when the editor scrolls or resizes.
+`<LanguagePopups language={language} />` draws every card a feature opens over the editor: hover, suggestions, signature help, the pick list, rename, peek, the call hierarchy, the symbol picker, the context menu and the authors card. `EditorView` renders it; an app that mounts by hand renders it next to the editor. Each card is placed from the screen position of its character and placed again when the editor scrolls or resizes.
+
+An app adds its own parts through `LanguagePopupsProps`, so it never needs a copy of the component:
+
+| Prop               | Type                            | Meaning                                                                                                                                                                                                       |
+| ------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `language`         | `EditorLanguage` or a subclass  | The editor's features; the callbacks below get the same type back                                                                                                                                             |
+| `contextMenuItems` | `(language) => ReactNode`       | Rows of the app in the [context menu](/editor-react/rename#context-menu)                                                                                                                                      |
+| `hoverFooter`      | `(view, language) => ReactNode` | Sections at the foot of the hover card, below its problems, such as actions on them. `view` is the `HoverView` the card shows; each element at the top level gets a divider above it, and `null` adds nothing |
+| `children`         | `ReactNode`                     | A layer of the app over the editor, drawn after the cards and before the rename field, such as an inline prompt                                                                                               |
+
+```tsx
+<EditorRenderingProvider value={rendering}>
+    <LanguagePopups
+        language={language}
+        hoverFooter={(view, language) =>
+            view.problems.length === 0 ? null : (
+                <div className="flex gap-1 px-3 py-2">
+                    <Button size="xs" variant="secondary" onClick={() => explain(language, view.problems)}>
+                        Explain
+                    </Button>
+                </div>
+            )
+        }
+    >
+        <InlinePrompt language={language} />
+    </LanguagePopups>
+</EditorRenderingProvider>
+```
+
+The cards render into the page through portals, so a provider around `LanguagePopups`, such as `EditorRenderingProvider`, reaches all of them.
 
 `createHolder<T>()` is the small store `EditorView` uses to hand the `EditorLanguage` it created to React: `get`, `set` and `subscribe`, for `useSyncExternalStore`.
 

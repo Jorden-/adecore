@@ -14,6 +14,7 @@ import {
 import { EditorLanguage, type EditorLanguageOptions } from './editor-language.ts';
 import { LanguagePopups } from './LanguagePopups.tsx';
 import type { ProjectLanguage } from './project-language.ts';
+import type { HoverView } from './popups.ts';
 import type { Timers } from './timers.ts';
 
 export interface EditorViewProps {
@@ -33,6 +34,8 @@ export interface EditorViewProps {
     onMount?(editor: Editor, language: EditorLanguage | null): void | (() => void);
     /* Rows of the app in the context menu, between the refactorings and the clipboard rows. */
     contextMenuItems?(language: EditorLanguage): ReactNode;
+    /* Sections of the app at the foot of the hover card, such as actions on its problems. */
+    hoverFooter?(view: HoverView, language: EditorLanguage): ReactNode;
 }
 
 interface MountInputs {
@@ -99,7 +102,20 @@ function applyChangedOptions(editor: Editor, before: EditorOptions, after: Edito
     }
 }
 
-export function EditorView({ engine, options, project, uri, languageId, timers, languageOptions, className, ref, onMount, contextMenuItems }: EditorViewProps) {
+export function EditorView({
+    engine,
+    options,
+    project,
+    uri,
+    languageId,
+    timers,
+    languageOptions,
+    className,
+    ref,
+    onMount,
+    contextMenuItems,
+    hoverFooter
+}: EditorViewProps) {
     const { t } = useTranslation('editor');
     const element = useRef<HTMLDivElement>(null);
     const mounted = useRef<Editor | null>(null);
@@ -155,7 +171,7 @@ export function EditorView({ engine, options, project, uri, languageId, timers, 
     return (
         <div className={className} ref={ref} style={{ position: 'relative', minHeight: 0 }}>
             <div ref={element} style={{ position: 'absolute', inset: 0 }} />
-            {language !== null && <LanguagePopups language={language} contextMenuItems={contextMenuItems} />}
+            {language !== null && <LanguagePopups language={language} contextMenuItems={contextMenuItems} hoverFooter={hoverFooter} />}
         </div>
     );
 }

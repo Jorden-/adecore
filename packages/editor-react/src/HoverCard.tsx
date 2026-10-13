@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CircleX, Info, TriangleAlert } from 'lucide-react';
 import { fileUriToPath, type Location } from '@adecore/lsp';
@@ -88,13 +89,16 @@ export function HoverCard({
     problems,
     info,
     anchor,
-    position
+    position,
+    footer
 }: {
     language: EditorLanguage;
     problems: readonly Problem[];
     info: HoverInfo | null;
     anchor: EditorPosition;
     position: EditorPosition;
+    /* Sections of the app below the problems, each with a divider above it. */
+    footer?: ReactNode;
 }) {
     const { t } = useTranslation('editor');
     return (
@@ -137,6 +141,7 @@ export function HoverCard({
             {problems.map((problem, index) => (
                 <ProblemSection key={index} problem={problem} language={language} />
             ))}
+            {footer}
         </div>
     );
 }

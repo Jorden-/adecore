@@ -16,6 +16,7 @@ export { EditorView } from './EditorView.tsx';
 export { createHolder } from './holder.ts';
 export type { EditorViewProps } from './EditorView.tsx';
 export { LanguagePopups } from './LanguagePopups.tsx';
+export type { LanguagePopupsProps } from './LanguagePopups.tsx';
 export { AnchoredPopup } from './AnchoredPopup.tsx';
 export { HoverCard } from './HoverCard.tsx';
 export { CompletionPopup } from './CompletionPopup.tsx';
