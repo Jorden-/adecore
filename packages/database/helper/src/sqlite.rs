@@ -821,17 +821,15 @@ fn import_file(connection: &Connection, read_only: bool, params: &ImportParams, 
 
     connection.execute_batch("SAVEPOINT adecore_import")?;
 
-    let outcome = insert_batches(connection, params, &names, &mut reader, cancelled);
+    // Releasing the outermost savepoint commits, which is where a deferred constraint fails; that failure is undone like any other.
+    let outcome = insert_batches(connection, params, &names, &mut reader, cancelled)
+        .and_then(|rows| connection.execute_batch("RELEASE adecore_import").map(|_| rows).map_err(DatabaseError::from));
 
     match outcome {
-        Ok(rows) => {
-            connection.execute_batch("RELEASE adecore_import")?;
-
-            Ok(ImportResult {
-                rows,
-                elapsed_ms: elapsed_ms(started.elapsed()),
-            })
-        }
+        Ok(rows) => Ok(ImportResult {
+            rows,
+            elapsed_ms: elapsed_ms(started.elapsed()),
+        }),
         Err(error) => {
             let _ = connection.execute_batch("ROLLBACK TO adecore_import; RELEASE adecore_import");
 

@@ -878,3 +878,27 @@ async fn sqlite_rolls_back_an_open_transaction_when_the_helper_closes() {
     let count = fresh.ok("execute", json!({ "session": session, "sql": "SELECT COUNT(*) FROM t" })).await;
     assert_eq!(count["results"][0]["rows"], json!([[0]]));
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sqlite_an_import_that_fails_on_its_release_leaves_nothing_to_commit() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut client = Client::new();
+    let mut db = scenario_db(&mut client, &directory).await;
+    db.script("PRAGMA foreign_keys = ON; CREATE TABLE parent (id INTEGER PRIMARY KEY); CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES parent (id) DEFERRABLE INITIALLY DEFERRED)")
+        .await;
+    let path = directory.path().join("children.csv");
+    std::fs::write(&path, "id,parent_id\n1,999\n").unwrap();
+
+    // The deferred key is checked only when the import's savepoint is released, which is where it fails.
+    db.error(
+        "import",
+        json!({ "table": "child", "path": path.to_str().unwrap(), "format": "csv", "header": true, "columns": ["id", "parent_id"] }),
+    )
+    .await;
+
+    let state = db.ok("execute", json!({ "sql": "SELECT COUNT(*) FROM child" })).await;
+    assert_eq!(state["results"][0]["rows"], json!([[0]]));
+    assert_eq!(state["inTransaction"], false);
+    db.script("INSERT INTO parent VALUES (999)").await;
+    assert_eq!(db.count("child").await, 0);
+}
