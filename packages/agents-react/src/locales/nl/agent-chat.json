@@ -506,7 +506,14 @@
   },
   "code": {
     "actions": "Codeacties",
-    "copyFailed": "De code kon niet worden gekopieerd. Probeer het opnieuw."
+    "copyFailed": "De code kon niet worden gekopieerd. Probeer het opnieuw.",
+    "mermaid": {
+      "diagram": "Diagram",
+      "showSource": "Bron tonen",
+      "showDiagram": "Diagram tonen",
+      "failed": "Dit diagram kon niet worden getekend, dit is de bron.",
+      "crashed": "Dit diagram kon niet worden weergegeven"
+    }
   },
   "blocks": {
     "label": "Interactief blok",

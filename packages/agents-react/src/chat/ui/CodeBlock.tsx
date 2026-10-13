@@ -27,9 +27,10 @@ const CodeLine = memo(function CodeLine({ tokens }: { tokens: CodeToken[] }) {
 /*
  * A fenced block, highlighted a line at a time. Until shiki and the grammar are there it holds its
  * place invisibly, so bare code never turns colored. An open fence is tokenized as it grows, and
- * closing it does not draw it again.
+ * closing it does not draw it again. `view` takes the place of the code, such as what the code draws,
+ * and Copy still copies the code.
  */
-export function CodeBlock({ code, lang, actions }: { code: string; lang: string; actions?: ReactNode }) {
+export function CodeBlock({ code, lang, actions, view }: { code: string; lang: string; actions?: ReactNode; view?: ReactNode }) {
     const { t } = useTranslation('agent-chat');
     const theme = useCodeTheme();
     const streaming = useContext(CodeStreamingContext);
@@ -84,23 +85,25 @@ export function CodeBlock({ code, lang, actions }: { code: string; lang: string;
     const pending = (tokenizer === null || tokens === null) && loaded !== 'failed';
     return (
         <div className="chat-code" data-copy-state={copyState}>
-            <pre
-                className={clsx(pending && 'invisible', !pending && tokens !== null && waited && WHOLE_FADE_CLASS)}
-                aria-hidden={pending || undefined}
-                style={{ color: tokenizer?.fg }}
-            >
-                <code>
-                    {tokens === null
-                        ? code
-                        : tokens.map((line, index) => (
-                              // Lines only ever grow at the end, so the place of a line is a stable key.
-                              <Fragment key={index}>
-                                  <CodeLine tokens={line} />
-                                  {index < tokens.length - 1 && '\n'}
-                              </Fragment>
-                          ))}
-                </code>
-            </pre>
+            {view ?? (
+                <pre
+                    className={clsx(pending && 'invisible', !pending && tokens !== null && waited && WHOLE_FADE_CLASS)}
+                    aria-hidden={pending || undefined}
+                    style={{ color: tokenizer?.fg }}
+                >
+                    <code>
+                        {tokens === null
+                            ? code
+                            : tokens.map((line, index) => (
+                                  // Lines only ever grow at the end, so the place of a line is a stable key.
+                                  <Fragment key={index}>
+                                      <CodeLine tokens={line} />
+                                      {index < tokens.length - 1 && '\n'}
+                                  </Fragment>
+                              ))}
+                    </code>
+                </pre>
+            )}
             <ButtonGroup className="chat-code-actions" role="group" aria-label={t('code.actions')}>
                 <IconButton
                     icon={copyState === 'copied' ? Check : Copy}

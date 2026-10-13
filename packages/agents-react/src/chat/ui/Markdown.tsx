@@ -6,6 +6,7 @@ import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import { CHIP_IN_MESSAGE, MENTION_TONE, SKILL_TONE } from './chips';
 import { CodeBlock } from './CodeBlock';
+import { MermaidBlock } from './MermaidBlock';
 import { CodeStreamingContext } from './code-streaming';
 import { splitMarkdownBlocks } from './markdown-blocks';
 import { rehypeChips, type ChipOptions } from './rehype-chips';
@@ -13,7 +14,8 @@ import { rehypeFadeWords } from './rehype-fade';
 import { remarkHtmlAsText } from './remark-html-as-text';
 import { chatHost, type FileRef, type ShellCodeBlockContext } from '../../host';
 import { openFileLink, useFileLinkCwd, useFileLinkScopeId, useFileLinkTarget } from './file-links';
-import { FileIcon, Icon } from '@adecore/ui';
+import { ErrorBoundary, FileIcon, Icon } from '@adecore/ui';
+import { useTranslation } from 'react-i18next';
 
 type ShellCodeBlockReply = Pick<ShellCodeBlockContext, 'scopeId' | 'chatId' | 'itemId'> & { streaming: boolean };
 
@@ -139,11 +141,23 @@ function ExternalLink({ href, children }: { href?: string; children?: ReactNode 
     );
 }
 
+/* A ```mermaid fence, which draws what it says. */
+function Diagram({ code }: { code: string }) {
+    const { t } = useTranslation('agent-chat');
+    return (
+        <ErrorBoundary label={t('code.mermaid.crashed')} resetKeys={[code]} compact className="rounded-lg border border-border">
+            <MermaidBlock code={code} />
+        </ErrorBoundary>
+    );
+}
+
 function MarkdownCode({ className, children, plain = false }: { className?: string; children?: ReactNode; plain?: boolean }) {
     const block = useContext(BlockCodeContext);
     const text = String(children ?? '');
     if (block) {
-        return <CodeBlock code={text.replace(/\n$/, '')} lang={languageOf(className)} />;
+        const lang = languageOf(className);
+        const code = text.replace(/\n$/, '');
+        return lang === 'mermaid' ? <Diagram code={code} /> : <CodeBlock code={code} lang={lang} />;
     }
     return plain ? <code className={INLINE_CODE}>{text}</code> : <InlineCode text={text} />;
 }
@@ -219,6 +233,9 @@ function ReplyCode({ className, children, node }: { className?: string; children
               }
             : null;
     const text = String(children ?? '');
+    if (block && languageOf(className) === 'mermaid') {
+        return <Diagram code={text.replace(/\n$/, '')} />;
+    }
     if (block) {
         return (
             <CodeBlock

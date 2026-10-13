@@ -506,7 +506,14 @@
   },
   "code": {
     "actions": "Code actions",
-    "copyFailed": "Could not copy the code. Try again."
+    "copyFailed": "Could not copy the code. Try again.",
+    "mermaid": {
+      "diagram": "Diagram",
+      "showSource": "Show source",
+      "showDiagram": "Show diagram",
+      "failed": "Could not draw this diagram, so this is its source.",
+      "crashed": "This diagram failed to render"
+    }
   },
   "blocks": {
     "label": "Interactive block",

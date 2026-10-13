@@ -389,6 +389,11 @@
             "types": "./dist/chat/ui/Markdown.d.ts",
             "default": "./dist/chat/ui/Markdown.js"
         },
+        "./chat/ui/MermaidBlock": {
+            "source": "./src/chat/ui/MermaidBlock.tsx",
+            "types": "./dist/chat/ui/MermaidBlock.d.ts",
+            "default": "./dist/chat/ui/MermaidBlock.js"
+        },
         "./chat/ui/MessageActions": {
             "source": "./src/chat/ui/MessageActions.tsx",
             "types": "./dist/chat/ui/MessageActions.d.ts",
@@ -693,6 +698,11 @@
             "source": "./src/chat/ui/timestamp-format.ts",
             "types": "./dist/chat/ui/timestamp-format.d.ts",
             "default": "./dist/chat/ui/timestamp-format.js"
+        },
+        "./chat/ui/mermaid": {
+            "source": "./src/chat/ui/mermaid.ts",
+            "types": "./dist/chat/ui/mermaid.d.ts",
+            "default": "./dist/chat/ui/mermaid.js"
         },
         "./chat/ui/quote-selection": {
             "source": "./src/chat/ui/quote-selection.ts",
@@ -1077,8 +1087,9 @@
     },
     "dependencies": {
         "@adecore/agent-contracts": "workspace:*",
-        "@adecore/intelligent-ui": "workspace:*",
         "@adecore/editor": "workspace:*",
+        "@adecore/editor-react": "workspace:*",
+        "@adecore/intelligent-ui": "workspace:*",
         "@adecore/merge": "workspace:*",
         "@codemirror/commands": "^6.11.1",
         "@codemirror/language": "^6.12.4",
@@ -1091,14 +1102,14 @@
         "@tanstack/react-virtual": "^3.14.13",
         "clsx": "^2.1.1",
         "lucide-react": "^1.47.0",
+        "mermaid": "^12.2.0",
         "react-markdown": "^10.1.0",
         "remark-breaks": "^4.0.0",
         "remark-gfm": "^4.0.1",
         "shiki": "^4.4.3",
         "simple-icons": "^16.32.0",
         "zod": "^4.6.5",
-        "zustand": "^5.0.15",
-        "@adecore/editor-react": "workspace:*"
+        "zustand": "^5.0.15"
     },
     "peerDependencies": {
         "@adecore/ui": "^0.15.0",

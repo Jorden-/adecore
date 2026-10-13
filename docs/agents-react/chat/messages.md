@@ -30,7 +30,19 @@ A fenced block, highlighted with Shiki in the theme the host's `code` names for 
 
 `useCodeTheme()` answers the theme id in use. `CodeStreamingContext` tells a block that its fence is still open, which `ReplyMarkdown` sets.
 
+`view` takes the place of the code inside the same frame, such as what the code draws, while Copy still copies `code`.
+
 Every block has a Copy icon that copies its `code` text, including whitespace and line endings. The controls show on hover or keyboard focus, and always on a device without hover. A failed clipboard write shows an error, never a copied state. The optional `actions` node adds controls of your own beside Copy, in the same block. The code scrolls apart from the controls. A reply of the chat itself puts the host's [shell action](/agents-react/guide/host#slots-and-cards) there.
+
+## Mermaid diagrams
+
+A ```` ```mermaid ```` fence in any of the three is drawn as its diagram, by `MermaidBlock({ code })`. [Mermaid](https://mermaid.js.org) (MIT) is large, so it loads only when the first closed diagram fence appears on the page, never with the thread. While the fence is still open the block is its highlighted source, and once it closes the diagram takes its place. A text Mermaid cannot parse or draw stays its source, with a short muted note under it.
+
+The diagram stands in the frame of a code block and scrolls sideways when it is wider than the reply. A button beside Copy switches between the diagram and its source, and Copy copies the source either way. The colors are the theme's tokens, resolved when the diagram is drawn, so it is drawn again when the mode changes between light and dark.
+
+Mermaid draws with its strict security level and without HTML labels, so a label is text, a click directive does nothing and a link cannot run script; a directive inside the diagram cannot change those settings or the theme. The drawing is shown as an image (a `data:` URL of the SVG), which never runs script and loads nothing. A page with a Content Security Policy needs `data:` in `img-src` and `'unsafe-inline'` in `style-src` (Mermaid measures labels with a style element of its own while it draws), and no `'unsafe-eval'`.
+
+`mermaidConfig`, `sizedSvg` and `svgDataUrl` in `chat/ui/mermaid` are the configuration and the steps from Mermaid's SVG to the image.
 
 ## AnsiOutput and FadingWords
 

@@ -59,3 +59,5 @@ Every module has its own subpath, `@adecore/agents-react/<path>`; there is no ro
 ## License
 
 FSL-1.1-MIT. See [LICENSE](./LICENSE).
+
+Diagrams in a reply are drawn by [Mermaid](https://github.com/mermaid-js/mermaid), a dependency under the MIT license, loaded only when a reply holds one.

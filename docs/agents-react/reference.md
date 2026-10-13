@@ -99,6 +99,7 @@ Many props and options are not exported types. Derive them where you need one, a
 | [`chat/ui/ImageView`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/ImageView.tsx) | `ImageThumbProps`, `ImageThumb` |
 | [`chat/ui/LimitState`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/LimitState.tsx) | `LimitDock`, `LimitPill` |
 | [`chat/ui/Markdown`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/Markdown.tsx) | `ReplyMarkdown`, `MessageMarkdown`, `Markdown` |
+| [`chat/ui/MermaidBlock`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/MermaidBlock.tsx) | `MermaidBlock` |
 | [`chat/ui/MessageActions`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/MessageActions.tsx) | `MessageActions` |
 | [`chat/ui/Pickers`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/Pickers.tsx) | `ModelPicker`, `StashPicker` |
 | [`chat/ui/PromptComposer`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/PromptComposer.tsx) | `PromptComposer` |
@@ -130,6 +131,7 @@ Many props and options are not exported types. Derive them where you need one, a
 | [`chat/ui/highlighter`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/highlighter.ts) | `Highlighter`, `GrammarState`, `loadLanguage`, `loadTheme`, `readyHighlighter`, `loadedLanguage`, `tokenizerFor`, `tokenStyle` |
 | [`chat/ui/icons`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/icons.tsx) | `DOCK_ICON_SIZE`, `ROW_GUTTER`, `toolIcon` |
 | [`chat/ui/markdown-blocks`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/markdown-blocks.ts) | `MarkdownBlock`, `splitMarkdownBlocks`, `settledBlocksText` |
+| [`chat/ui/mermaid`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/mermaid.ts) | `MermaidColors`, `MERMAID_TOKENS`, `mermaidConfig`, `SizedSvg`, `sizedSvg`, `svgDataUrl` |
 | [`chat/ui/quote-selection`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/quote-selection.ts) | `QuoteTaker`, `QuoteTakerContext`, `selectedAnswerQuote` |
 | [`chat/ui/rehype-chips`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/rehype-chips.ts) | `ChipOptions`, `rehypeChips` |
 | [`chat/ui/rehype-fade`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/rehype-fade.ts) | `FADE_CLASS`, `WHOLE_FADE_CLASS`, `wordSegments`, `isWhitespace`, `rehypeFadeWords` |

@@ -18,7 +18,7 @@ pnpm add @adecore/agents-react @adecore/agent-contracts
 
 :::
 
-`@adecore/ui`, React 19, `react-dom`, `i18next` and `react-i18next` are peer dependencies. CodeMirror, Shiki, `@pierre/diffs`, Zustand and the Markdown renderer come along. Set up [`@adecore/ui`](/ui/guide/getting-started) first: the views are made of its components and read its theme.
+`@adecore/ui`, React 19, `react-dom`, `i18next` and `react-i18next` are peer dependencies. CodeMirror, Shiki, `@pierre/diffs`, Zustand, the Markdown renderer and Mermaid (MIT, loaded only for a diagram) come along. Set up [`@adecore/ui`](/ui/guide/getting-started) first: the views are made of its components and read its theme.
 
 The backend stays out of the page. Import `@adecore/agents` in the process that runs the chats, never here.
 
