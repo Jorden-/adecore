@@ -1,0 +1,61 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`the public API . exports these names 1`] = `
+[
+  "DEFAULT_DIAGRAM_MARGIN",
+  "DEFAULT_EDGE_TONE",
+  "DEFAULT_GROUP_TONE",
+  "DEFAULT_NODE_TONE",
+  "GROUP_LABEL_BAND",
+  "LABEL_SIZE",
+  "SUB_SIZE",
+  "arrowHeadPath",
+  "dashOf",
+  "edgeLabelLinesOf",
+  "edgePath",
+  "layoutOf",
+  "readingOrder",
+  "shapePaths",
+  "textLinesOf",
+  "toSvg",
+  "type DiagramLayout",
+  "type DiagramSvgOptions",
+  "type EdgeLabelBox",
+  "type EdgeRoute",
+  "type GroupBox",
+  "type NodeBox",
+  "type Point",
+  "type Rect",
+  "type ShapePaths",
+  "type TextLine",
+]
+`;
+
+exports[`the public API ./protocol exports these names 1`] = `
+[
+  "DIAGRAM_LIMITS",
+  "DIAGRAM_SHAPES",
+  "DIAGRAM_VERSION",
+  "DiagramContentSchema",
+  "DiagramDirectionSchema",
+  "DiagramDocumentSchema",
+  "DiagramEdgeSchema",
+  "DiagramEdgeStyleSchema",
+  "DiagramGroupSchema",
+  "DiagramMetaSchema",
+  "DiagramNodeSchema",
+  "DiagramShapeSchema",
+  "EMPTY_DIAGRAM",
+  "diagramProblemIn",
+  "migrateDiagram",
+  "type DiagramContent",
+  "type DiagramDirection",
+  "type DiagramDocument",
+  "type DiagramEdge",
+  "type DiagramEdgeStyle",
+  "type DiagramGroup",
+  "type DiagramMeta",
+  "type DiagramNode",
+  "type DiagramShape",
+]
+`;

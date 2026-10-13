@@ -16,7 +16,7 @@ const layout = layoutOf(diagram);
 
 ## Layers
 
-A diagram runs in columns along its direction. `layersOf(nodes, edges)` gives the column of every node: the longest path to it from a node that nothing points at, counting from 0. A node without edges is in column 0.
+A diagram runs in columns along its direction. The column of a node, its `layer`, is the longest path to it from a node that nothing points at, counting from 0. A node without edges is in column 0.
 
 A cycle has no longest path, so it is broken first. A walk through the graph in file order leaves out every edge that points back at a node it is still inside of, and ranks what is left. Those edges are still drawn, against the flow. Which edge of a cycle is left out depends on the order of the file, so moving a node in the file can change the layout.
 
@@ -30,20 +30,20 @@ A `down` diagram is laid out as a `right` one and mirrored across the diagonal. 
 
 ## Sizes
 
-`sizeOfNode(node)` returns a `NodeSize`, the box and the wrapped lines of a node:
+A node's box follows from its wrapped text and its shape:
 
-- The label is `LABEL_SIZE` (14) and bold, on lines `LABEL_LINE` (18) apart. `sub` is `SUB_SIZE` (12), on lines `SUB_LINE` (16) apart.
-- Text wraps to `NODE_MAX_WIDTH` (280) minus the padding. A box is at least 120 wide.
-- A `diamond` wraps narrower and is twice the size of its text, so the text fits between its corners. It can end up wider than `NODE_MAX_WIDTH`.
-- A `pill` widens its padding for its round ends, and a `cylinder` is `CYLINDER_LID` (10) taller for its lid.
+- The label is `LABEL_SIZE` (14) and bold, on lines 18 apart. `sub` is `SUB_SIZE` (12), on lines 16 apart.
+- Text wraps to 280 minus the padding. A box is at least 120 wide.
+- A `diamond` wraps narrower and is twice the size of its text, so the text fits between its corners. It can end up wider than 280.
+- A `pill` widens its padding for its round ends, and a `cylinder` is 10 taller for its lid.
 
-`sizeOfEdgeLabel(text)` does the same for an edge label: `SUB_SIZE`, wrapped to `EDGE_LABEL_MAX_WIDTH` (160), with `EDGE_LABEL_PADDING` (`{ x: 4, y: 2 }`) around it.
+An edge label is `SUB_SIZE`, wrapped to 160, with 4 units of padding on the sides and 2 above and below.
 
-There is no font engine in the package, so text is estimated, never measured. `estimateTextWidth(text, size, bold)` adds up a width per kind of character, measured once for common system fonts and leaning towards too wide. `wrapText(text, size, bold, maxWidth)` wraps at spaces and reads a line break as a space. A font the estimate does not fit can run past its box, because exporting in another font does not change the layout.
+There is no font engine in the package, so text is estimated, never measured: a width per kind of character, measured once for common system fonts and leaning towards too wide. Text wraps at spaces, and a line break reads as a space. A font the estimate does not fit can run past its box, because exporting in another font does not change the layout. A view that draws the text itself sets it in `LABEL_SIZE` and `SUB_SIZE` and takes the lines from the layout, so it wraps where the boxes were sized for.
 
 ## Groups
 
-A group is a box around its members, `GROUP_PADDING` (20) away from them, with its label in a band of `GROUP_LABEL_BAND` (24) along the top, `GROUP_LABEL_INSET` (12) in from the side. Groups do not nest. Nodes outside a group stay on the same side of it from column to column, so an edge between two of them does not have to cross it.
+A group is a box around its members, 20 away from them, with its label in a band of `GROUP_LABEL_BAND` (24) along the top, at `labelBox`. Groups do not nest. Nodes outside a group stay on the same side of it from column to column, so an edge between two of them does not have to cross it.
 
 ## Edges
 

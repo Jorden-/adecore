@@ -47,7 +47,7 @@ Ids are lowercase letters, digits and hyphens, unique across the whole plan. Tex
 | `items`        | 300   | Every item in the plan, sections and text included                            |
 | `plansPerChat` | 20    | Not checked here; a limit for the app's own list of plans in one conversation |
 
-`PlanSchema` checks fields and limits that one item can see. `validatePlan(value)` also checks what needs the whole tree (unique ids, depth, the item count, where sections and text may stand, no state on a parent) and returns `{ ok: true, plan }` or a [refusal](/plan/operations#refusals). Run it on every plan you load. `structureProblem(plan)` is only the tree half.
+`PlanSchema` checks fields and limits that one item can see. `validatePlan(value)` also checks what needs the whole tree (unique ids, depth, the item count, where sections and text may stand, no state on a parent) and returns `{ ok: true, plan }` or a [refusal](/plan/operations#refusals). Run it on every plan you load.
 
 ## State
 
@@ -64,7 +64,7 @@ A step without sub-steps carries its own `state`, and an absent state is `open`:
 | `warning` | `[w]`  | Finished, with something to read |
 | `info`    | `[i]`  | Finished, with a remark          |
 
-A step with sub-steps has no state of its own. `stepState(step)` derives it with `deriveState(states)`, from the first row that matches:
+A step with sub-steps has no state of its own. `stepState(step)` derives it from its children, by the first row that matches:
 
 | Children                           | Parent                                      |
 | ---------------------------------- | ------------------------------------------- |
@@ -93,16 +93,14 @@ In a `steps` plan a warning or info counts as done. In a `test` plan only `done`
 
 ## Walking the tree
 
-| Function                 | Returns                                                                                |
-| ------------------------ | -------------------------------------------------------------------------------------- |
-| `findItem(plan, id)`     | The item, or `null`                                                                    |
-| `locateItem(plan, id)`   | A `PlanLocation`: the item, the array it is in and its index, its parent and its depth |
-| `allItems(items)`        | Every item, parents before their children                                              |
-| `allSteps(items)`        | Every step                                                                             |
-| `leafSteps(items)`       | Every step without sub-steps, the ones that carry a state                              |
-| `isParentStep(step)`     | Whether it has sub-steps                                                               |
-| `activeStepIds(plan)`    | The ids of the leaf steps set to `active`                                              |
-| `holdsPersonState(item)` | Whether it, or a step under it, has a state a person set                               |
+| Function              | Returns                                                   |
+| --------------------- | --------------------------------------------------------- |
+| `findItem(plan, id)`  | The item, or `null`                                       |
+| `allItems(items)`     | Every item, parents before their children                 |
+| `allSteps(items)`     | Every step                                                |
+| `leafSteps(items)`    | Every step without sub-steps, the ones that carry a state |
+| `isParentStep(step)`  | Whether it has sub-steps                                  |
+| `activeStepIds(plan)` | The ids of the leaf steps set to `active`                 |
 
 ## Creating a plan
 

@@ -6,8 +6,6 @@ import { orderLayers } from './order.ts';
 import { routeChannel, type ChannelHop, type ChannelLabel } from './route.ts';
 import { LABEL_LINE, LABEL_SIZE, SUB_LINE, SUB_SIZE, estimateTextWidth, widestLine, wrapText } from './text.ts';
 
-export { LABEL_LINE, LABEL_SIZE, SUB_LINE, SUB_SIZE, estimateTextWidth, wrapText } from './text.ts';
-
 export type { Point, Rect } from '@adecore/drawing';
 
 export interface NodeBox extends Rect {
@@ -56,19 +54,19 @@ export interface DiagramLayout {
 const NODE_PADDING_X = 16;
 const NODE_PADDING_Y = 13;
 const NODE_MIN_WIDTH = 120;
-export const NODE_MAX_WIDTH = 280;
+const NODE_MAX_WIDTH = 280;
 const TEXT_MAX_WIDTH = NODE_MAX_WIDTH - NODE_PADDING_X * 2;
 /* A diamond holds its text in the middle of its box, so its lines are shorter and the box is twice their size. */
 const DIAMOND_TEXT_MAX_WIDTH = 160;
 const DIAMOND_MIN = { w: 168, h: 72 };
 /* The extra height of a cylinder, for the lid its text stays under. */
 export const CYLINDER_LID = 10;
-export const EDGE_LABEL_MAX_WIDTH = 160;
+const EDGE_LABEL_MAX_WIDTH = 160;
 export const EDGE_LABEL_PADDING = { x: 4, y: 2 };
-export const GROUP_PADDING = 20;
+const GROUP_PADDING = 20;
 /* The band on top of a group where its label sits. */
 export const GROUP_LABEL_BAND = 24;
-export const GROUP_LABEL_INSET = 12;
+const GROUP_LABEL_INSET = 12;
 /* Room between a layer's widest box and the first thing in the channel after it. */
 const EDGE_CLEAR = 20;
 /* How far a loop on one node reaches out of its box. */
@@ -112,7 +110,7 @@ export function sizeOfNode(node: Pick<DiagramNode, 'label' | 'sub' | 'shape'>): 
 }
 
 /* The box of an edge's label before it is placed: wrapped narrower than a node, on a padding of its own. */
-export function sizeOfEdgeLabel(text: string): { w: number; h: number; lines: string[] } {
+function sizeOfEdgeLabel(text: string): { w: number; h: number; lines: string[] } {
     const lines = wrapText(text, SUB_SIZE, false, EDGE_LABEL_MAX_WIDTH);
     return {
         w: even(widestLine(lines, SUB_SIZE, false) + EDGE_LABEL_PADDING.x * 2),

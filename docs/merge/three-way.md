@@ -3,7 +3,7 @@
 A three-way merge compares two versions with the base they both started from. Where only one side changed a stretch, that change wins. Where both changed it differently, a person decides.
 
 ```ts
-import { autoLines, bothLines, draftOf, fingerprint, openBlocks, sideLines, splitBlocks, wandLines } from '@adecore/merge';
+import { bothLines, draftOf, fingerprint, sideLines, splitBlocks, wandLines } from '@adecore/merge';
 import type { MergeBlock, MergeBlockKind, MergeDraft, MergeSide, MergeSpan } from '@adecore/merge';
 ```
 
@@ -21,18 +21,15 @@ import type { MergeBlock, MergeBlockKind, MergeDraft, MergeSide, MergeSpan } fro
 
 Changes of the two sides become one block where they overlap in the base, or where both insert at the same line. A change of ours that ends where one of theirs begins stays a block of its own. Overlaps chain, so one block can grow over several changes of each side.
 
-`openBlocks(blocks)` counts the `conflict` blocks. It looks at the kinds only, so it stays the same after you answer them.
-
 ## Answers
 
 An answer is the lines a block becomes, kept in a `Map<number, readonly string[]>` by the index of the block. `[]` is a valid answer that deletes the stretch.
 
 | Function | Returns |
 | --- | --- |
-| `autoLines(block)` | The lines the block merges to by itself, or `null` for a conflict. Test for `null`: a deletion is `[]`. |
 | `sideLines(block, side)` | A copy of one side. `MergeSide` is `'ours' \| 'theirs'`. |
 | `bothLines(block, first)` | Both sides, `first` before the other, for two additions that both belong. It removes no duplicate lines. |
-| `wandLines(block)` | `autoLines` for a block that is no conflict. For a conflict, an answer only in the two cases below, else `null`. |
+| `wandLines(block)` | For a block that is no conflict, the lines it merges to by itself. For a conflict, an answer only in the two cases below, else `null`. Test for `null`: a deletion is `[]`. |
 
 The wand answers a conflict when:
 
@@ -43,7 +40,7 @@ It compares text and knows no language, so whitespace differences need a choice.
 
 ## Drafts
 
-`draftOf(blocks, answers?)` builds the merged file as a `MergeDraft`, `{ lines, spans }`. Each block takes its answer, then its `autoLines`, and a conflict without an answer takes our side. It writes no conflict markers, so the draft is a file a person can edit as it is. An answer may replace a block of any kind; a key with no block is ignored.
+`draftOf(blocks, answers?)` builds the merged file as a `MergeDraft`, `{ lines, spans }`. Each block takes its answer, then the lines it merges to by itself, and a conflict without an answer takes our side. It writes no conflict markers, so the draft is a file a person can edit as it is. An answer may replace a block of any kind; a key with no block is ignored.
 
 A `MergeSpan` is `{ block, kind, from, to }`: the index and kind of a block and the lines it covers in this draft, `to` exclusive. A deleted block still has a span, with `from` equal to `to`. Spans describe the draft as it was built: an edit in an editor does not move them, and an answered conflict keeps `kind: 'conflict'`. Build a new draft after a new answer, or track the ranges in the editor.
 

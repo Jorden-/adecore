@@ -29,7 +29,7 @@ const drawing = DrawingDocumentSchema.parse({ version: 1, rev: 0, elements: [
 ] });
 assert.match(packedDrawing.toSvg(drawing.elements, { palette: packedDrawing.DEFAULT_PALETTE }), /<svg/);
 assert.ok(packedDrawing.pathsOfElement(drawing.elements[0]).length > 0);
-assert.ok(packedDrawing.freehandOutline(drawing.elements[1]).length > 0);`,
+assert.ok(packedDrawing.pathsOfElement(drawing.elements[1]).length > 0);`,
     '@adecore/diagram': `const packedDiagram = await import('@adecore/diagram');
 const { DiagramDocumentSchema } = await import('@adecore/diagram/protocol');
 const diagram = DiagramDocumentSchema.parse({ version: 1, rev: 0, meta: { title: 'Packed graph', direction: 'right' }, nodes: [{ id: 'one', label: 'First' }, { id: 'two', label: 'Second' }], edges: [{ from: 'one', to: 'two' }], groups: [] });

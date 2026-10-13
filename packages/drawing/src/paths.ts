@@ -70,7 +70,7 @@ function roundedRectPath(w: number, h: number, radius: number): string {
     return `M ${corner} 0 L ${w - corner} 0 Q ${w} 0 ${w} ${corner} L ${w} ${h - corner} Q ${w} ${h} ${w - corner} ${h} L ${corner} ${h} Q 0 ${h} 0 ${h - corner} L 0 ${corner} Q 0 0 ${corner} 0 Z`;
 }
 
-export function outlineToPath(outline: readonly (readonly number[])[]): string {
+function outlineToPath(outline: readonly (readonly number[])[]): string {
     if (outline.length === 0) {
         return '';
     }
@@ -78,7 +78,7 @@ export function outlineToPath(outline: readonly (readonly number[])[]): string {
     return `M ${first![0]} ${first![1]} ${rest.map((point) => `L ${point[0]} ${point[1]}`).join(' ')} Z`;
 }
 
-export function freehandOutline(element: DrawingElement & { kind: 'freehand' }): string {
+function freehandOutline(element: DrawingElement & { kind: 'freehand' }): string {
     const points = element.points.map(([x, y, pressure]) => [x, y, pressure ?? 0.5] as [number, number, number]);
     const outline = getStroke(points, {
         size: element.strokeWidth * 4 + 2,

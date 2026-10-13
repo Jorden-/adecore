@@ -1,6 +1,6 @@
 export { diffLines, type Change } from './diff.ts';
-export { openBlocks, splitBlocks, type MergeBlock, type MergeBlockKind } from './blocks.ts';
-export { autoLines, bothLines, draftOf, fingerprint, sideLines, wandLines, type MergeDraft, type MergeSide, type MergeSpan } from './resolve.ts';
+export { splitBlocks, type MergeBlock, type MergeBlockKind } from './blocks.ts';
+export { bothLines, draftOf, fingerprint, sideLines, wandLines, type MergeDraft, type MergeSide, type MergeSpan } from './resolve.ts';
 export { joinLines, shapeOf, splitLines, type TextShape } from './text.ts';
 export { missingSides, patchFits } from './patch.ts';
 export { parsePatch, parseHunkHeader, type HunkHeader, type Hunk, type ParsedPatch, type PatchLine } from './patch-parser.ts';

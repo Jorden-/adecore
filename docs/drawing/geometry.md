@@ -14,13 +14,12 @@ The demo maps the pointer onto the viewBox of the exported SVG, asks `elementAt`
 - `centerOf(rect)` is its middle. `roundPoint(point)` rounds both coordinates to whole units.
 - `rectFromPoints(from, to)` is the box of a drag in either direction, always with a positive size.
 - `intersects(a, b)` is true when two boxes overlap. Boxes that only touch do not.
-- `distanceToSegment(point, a, b)` is the distance from a point to the segment between `a` and `b`.
 
 A box is the stored `x`, `y`, `w` and `h`, and a drawn box adds only the rotation. Both leave out the wobble of a rough shape, the stroke width, arrow heads and text that runs past a note. Add room for those yourself when you fit a view to its content.
 
 ## Rotation
 
-`angle` turns an element around the center of its box, in radians. `rotatePoint(point, around, angle)` turns a point. `toLocal(element, point)` turns a point back by the element's angle, so a test can treat the element as unturned; the result is still in world units. `absolutePoints(element)` is the points of a line or freehand stroke in world units, without the rotation, and `[]` for any other kind.
+`angle` turns an element around the center of its box, in radians. `rotatePoint(point, around, angle)` turns a point; turned back by the element's angle around `centerOf(boundsOf(element))`, a point lands in the element's own frame, still in world units. `absolutePoints(element)` is the points of a line or freehand stroke in world units, without the rotation, and `[]` for any other kind.
 
 ## Hit tests
 
@@ -31,7 +30,7 @@ const hit = elementAt(elements, pointer, 6 / zoom);
 const picked = elementsIn(elements, rectFromPoints(dragStart, pointer));
 ```
 
-`hitsElement(element, point, tolerance)` decides one element, after undoing its rotation:
+`elementAt` decides each element after undoing its rotation:
 
 | Kind                         | A hit                                                                    |
 | ---------------------------- | ------------------------------------------------------------------------ |
@@ -41,7 +40,7 @@ const picked = elementsIn(elements, rectFromPoints(dragStart, pointer));
 
 "Near" is within `tolerance` or the stroke width, whichever is larger. The test uses the ideal outline: the corner radius of a rect and the wobble of a rough path do not change it.
 
-`elementAt(elements, point, tolerance)` returns the topmost element that is hit, or `undefined`. `elementsIn(elements, rect)` returns every element whose drawn box overlaps the rect, in stacking order. Both skip `locked` elements; `hitsElement` does not. A lock only keeps an element out of selection, so check it again where the app writes.
+`elementAt(elements, point, tolerance)` returns the topmost element that is hit, or `undefined`. `elementsIn(elements, rect)` returns every element whose drawn box overlaps the rect, in stacking order. Both skip `locked` elements. A lock only keeps an element out of selection, so check it again where the app writes.
 
 ## Resizing
 
@@ -57,8 +56,4 @@ const to = resizeRect(from, 'se', pointer, event.shiftKey);
 const resized = scaleElement(element, from, to);
 ```
 
-`scaleElement(element, from, to)` moves and scales an element from one box to another; for a selection of several, pass the box around all of them as `from`. It scales the points of a line or stroke and keeps the pressure of a stroke. A text gets `sized: true`, so from then on it wraps to its box instead of growing with its text. The angle, seed, stroke width, font size and corner radius stay as they were. A box with no width or height scales by 1 along that axis. Both functions work on the unturned box; turn the pointer into the element's frame first for a rotated element.
-
-## Arrow heads
-
-`arrowHead(tip, from, size)` returns the two strokes of an arrow head at `tip`, pointing away from `from`. `arrowHeadSize(strokeWidth)` is the size the package draws for a stroke width: `12 + strokeWidth * 4`.
+`scaleElement(element, from, to)` moves and scales an element from one box to another; for a selection of several, pass the box around all of them as `from`. It scales the points of a line or stroke and keeps the pressure of a stroke. A text gets `sized: true`, so from then on it wraps to its box instead of growing with its text. The angle, seed, stroke width, font size and corner radius stay as they were. A box with no width or height scales by 1 along that axis. Both functions work on the unturned box; turn the pointer into the element's frame with `rotatePoint` first for a rotated element.

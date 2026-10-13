@@ -40,7 +40,7 @@ export function rotatePoint(point: Point, around: Point, angle: number): Point {
 }
 
 /* A point in the element's own frame, so every hit test can pretend nothing is turned. */
-export function toLocal(element: DrawingElement, point: Point): Point {
+function toLocal(element: DrawingElement, point: Point): Point {
     return rotatePoint(point, centerOf(boundsOf(element)), -(element.angle ?? 0));
 }
 
@@ -103,7 +103,7 @@ export function rectFromPoints(from: Point, to: Point): Rect {
     };
 }
 
-export function distanceToSegment(point: Point, a: Point, b: Point): number {
+function distanceToSegment(point: Point, a: Point, b: Point): number {
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const length = dx * dx + dy * dy;

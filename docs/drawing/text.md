@@ -12,7 +12,7 @@ A `text` and a `note` are both a `WrittenElement`: they carry `text`, a `size` a
 | `text` with `sized`    | Wrapped to `w`.                                                          |
 | `note`                 | Wrapped to the box minus `NOTE_PADDING` (16) on each side.               |
 
-`writingFrameOf(element)` is where those lines start inside the element and how wide they may be. `textLines(text)` splits at line breaks; `wrapLines(text, maxWidth, measure)` also wraps at spaces, and breaks a word that does not fit on a line of its own between its characters. Wrapping only sets the width: a note with more text than room runs past the bottom of its sheet, and the app makes it taller.
+`writingFrameOf(element)` is where those lines start inside the element and how wide they may be. Wrapping breaks at spaces, and breaks a word that does not fit on a line of its own between its characters. Wrapping only sets the width: a note with more text than room runs past the bottom of its sheet, and the app makes it taller.
 
 `fontOf(font)` reads an absent font as `hand`. `DEFAULT_FONT_STACKS` names a stack per font for outside the app: Kalam for `hand`, the system font for `sans` and the system monospace for `mono`. The package ships no font files.
 

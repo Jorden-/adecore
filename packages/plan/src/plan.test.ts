@@ -5,7 +5,6 @@ import {
     canApply,
     canDeletePlan,
     createPlan,
-    deriveState,
     findItem,
     parsePlanDraft,
     parsePlanMarkdown,
@@ -23,6 +22,7 @@ import {
     type PlanDraftText,
     type PlanRefusal
 } from './index.ts';
+import { deriveState } from './tree.ts';
 
 const NOW = '2026-09-16T14:30:00Z';
 

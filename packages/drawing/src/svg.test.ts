@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { DrawingColor, DrawingElement } from './protocol.ts';
 import { pathsOfElement } from './paths.ts';
-import { toSvg } from './svg.ts';
+import { DEFAULT_PALETTE, escapeXml, toSvg } from './svg.ts';
 import { rotatePoint } from './geometry.ts';
 import { readingOrder } from './reading-order.ts';
 
@@ -163,6 +163,11 @@ describe('toSvg', () => {
         expect(toSvg([rect('a')], { palette })).not.toContain('<rect');
     });
 
+    test('without a palette it draws in the light theme', () => {
+        expect(toSvg([rect('a')])).toBe(toSvg([rect('a')], { palette: DEFAULT_PALETTE }));
+        expect(toSvg([rect('a')])).toContain(`stroke="${DEFAULT_PALETTE.ink}"`);
+    });
+
     test('a rotated element away from the origin lands where the canvas draws it', () => {
         const turned: DrawingElement = { ...rect('a', 200, 120), angle: Math.PI / 3 };
         const [, tx, ty, degrees, cx, cy] = toSvg([turned], { palette })
@@ -178,6 +183,10 @@ describe('toSvg', () => {
         const written = toSvg([text('t', 'bell\u0007 and\u0000 form\u000c feed\u001f', 0, 0), note('n', 'tab\tstays\u0008')], { palette });
         expect(written).not.toMatch(/[^\t\n\r\u0020-\uFFFD]/);
         expect(written).toContain('bell and form feed');
+    });
+
+    test('escapeXml escapes markup and quotes and drops what XML cannot hold', () => {
+        expect(escapeXml(`<a href="x">'&'</a>\u0007`)).toBe('&lt;a href=&quot;x&quot;&gt;&apos;&amp;&apos;&lt;/a&gt;');
     });
 });
 

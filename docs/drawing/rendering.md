@@ -13,11 +13,11 @@ const svg = toSvg(drawing.elements, {
 });
 ```
 
-The SVG is sized to the bounds of the elements plus a margin, and keeps their stacking order. Only `palette` is required:
+The SVG is sized to the bounds of the elements plus a margin, and keeps their stacking order. Every option has a default:
 
 | `SvgOptions` | Default                  |                                                                                |
 | ------------ | ------------------------ | ------------------------------------------------------------------------------ |
-| `palette`    | Required                 | The color of every palette name: strokes, fills and text.                      |
+| `palette`    | `DEFAULT_PALETTE`        | The color of every palette name: strokes, fills and text.                      |
 | `paper`      | `DEFAULT_PAPER`          | The sheet of a note, by its `fillColor`.                                       |
 | `edge`       | `DEFAULT_EDGE`           | The outline of a note's sheet.                                                 |
 | `background` | None                     | A rect behind everything. Leave it out, or pass `null`, for a transparent SVG. |
@@ -27,7 +27,7 @@ The SVG is sized to the bounds of the elements plus a margin, and keeps their st
 
 `DEFAULT_PALETTE`, `DEFAULT_PAPER` and `DEFAULT_EDGE` are the colors of a light theme, for a backend that has no theme to ask. To export in the theme a person sees, resolve its colors to plain values first. A CSS variable works while the SVG sits inside the page, as in the demos on these pages, and is lost when the file is opened anywhere else.
 
-Fonts are named, not embedded, so a file opened on another machine falls back to a font it has. Text and font names are escaped, and characters XML cannot hold are dropped. The colors are written into attributes as they are: they come from the app, never from the document, which can only name a palette color.
+Fonts are named, not embedded, so a file opened on another machine falls back to a font it has. Text and font names are escaped, and characters XML cannot hold are dropped. `escapeXml(value)` does both, for an app that writes SVG of its own around a drawing. The colors are written into attributes as they are: they come from the app, never from the document, which can only name a palette color.
 
 ## pathsOfElement
 
@@ -57,8 +57,8 @@ A `fill` path with a `strokeWidth` above 0 is a hachure: stroke it in the fill c
 How each kind is drawn:
 
 - `rect`, `diamond`, `ellipse` and `line` go through [Rough.js](https://roughjs.com) with the element's `seed`, so the wobble is the same on every render and on every machine. Roughness `0` draws one straight stroke; `2` wobbles and bows more than the default.
-- `freehand` goes through [perfect-freehand](https://github.com/steveruizok/perfect-freehand) as one filled outline. Points without a pressure get a taper from the speed of the stroke. `freehandOutline` returns that outline as a path, and `outlineToPath` closes any list of points into one.
-- `note` is a smooth rounded rect, `NOTE_RADIUS` in the corners, as a `fill` and a `stroke` path. A painter fills it in the note's paper color and draws its text on top.
+- `freehand` goes through [perfect-freehand](https://github.com/steveruizok/perfect-freehand) as one filled outline. Points without a pressure get a taper from the speed of the stroke.
+- `note` is a smooth rounded rect with a radius of 8, as a `fill` and a `stroke` path. A painter fills it in the note's paper color and draws its text on top.
 - `text` has no paths. Draw it with the lines from [`linesOf`](/drawing/text).
 
 The paths come from those two libraries, so the exact path data can change when either is upgraded. The seed keeps a render stable between upgrades, not across them.

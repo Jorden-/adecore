@@ -4,8 +4,8 @@ import { pathsOfElement, type ElementPath } from './paths.ts';
 import { DEFAULT_FONT_STACKS, LINE_HEIGHT, approximateMeasure, fontOf, linesOf, writingFrameOf, type MeasureLine, type WrittenElement } from './text.ts';
 
 export interface SvgOptions {
-    /* What every palette name is in the theme this export is made in. */
-    palette: Record<DrawingColor, string>;
+    /* What every palette name is in the theme this export is made in; without it the light theme's colors are used. */
+    palette?: Record<DrawingColor, string>;
     /* The paper behind the drawing, or null for a transparent one. */
     background?: string | null;
     /* World units around the drawing, so nothing touches the edge. */
@@ -67,9 +67,11 @@ export const DEFAULT_EDGE: Record<DrawingColor, string> = {
 // oxlint-disable-next-line no-control-regex
 const NOT_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g;
 
-function escapeXml(value: string): string {
+export function escapeXml(value: string): string {
     return value.replace(NOT_XML, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
+
+type PaintOptions = SvgOptions & Required<Pick<SvgOptions, 'palette'>>;
 
 function round(value: number): number {
     return Math.round(value * 100) / 100;
@@ -81,7 +83,7 @@ function transformOf(element: DrawingElement): string {
     return `translate(${round(element.x)} ${round(element.y)})${turn}`;
 }
 
-function textSvg(element: WrittenElement, options: SvgOptions): string {
+function textSvg(element: WrittenElement, options: PaintOptions): string {
     const family = options.fonts?.[fontOf(element.font)] ?? DEFAULT_FONT_STACKS[fontOf(element.font)];
     const anchor = element.align === 'center' ? 'middle' : element.align === 'right' ? 'end' : 'start';
     const frame = writingFrameOf(element);
@@ -93,7 +95,7 @@ function textSvg(element: WrittenElement, options: SvgOptions): string {
     return `<text font-family="${escapeXml(family)}" font-size="${element.size}" fill="${options.palette[element.stroke]}" text-anchor="${anchor}">${lines}</text>`;
 }
 
-function pathSvg(path: ElementPath, element: DrawingElement, options: SvgOptions): string {
+function pathSvg(path: ElementPath, element: DrawingElement, options: PaintOptions): string {
     const note = element.kind === 'note';
     if (path.role === 'stroke') {
         const dash = path.dash ? ` stroke-dasharray="${path.dash.join(' ')}"` : '';
@@ -109,7 +111,7 @@ function pathSvg(path: ElementPath, element: DrawingElement, options: SvgOptions
         : `<path d="${path.d}" fill="${color}" stroke="none"/>`;
 }
 
-function elementSvg(element: DrawingElement, options: SvgOptions): string {
+function elementSvg(element: DrawingElement, options: PaintOptions): string {
     const body =
         element.kind === 'text'
             ? textSvg(element, options)
@@ -125,7 +127,8 @@ function elementSvg(element: DrawingElement, options: SvgOptions): string {
  * The whole drawing as one SVG, in the colors of the theme it is exported from. Fonts are named,
  * never embedded: a file that opens outside the app falls back to a system face.
  */
-export function toSvg(elements: readonly DrawingElement[], options: SvgOptions): string {
+export function toSvg(elements: readonly DrawingElement[], options: SvgOptions = {}): string {
+    const paint: PaintOptions = { ...options, palette: options.palette ?? DEFAULT_PALETTE };
     const margin = options.margin ?? DEFAULT_SVG_MARGIN;
     const bounds: Rect = drawnBoundsOfElements(elements) ?? { x: 0, y: 0, w: 1, h: 1 };
     const x = round(bounds.x - margin);
@@ -133,6 +136,6 @@ export function toSvg(elements: readonly DrawingElement[], options: SvgOptions):
     const w = round(bounds.w + margin * 2);
     const h = round(bounds.h + margin * 2);
     const paper = options.background ? `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${options.background}"/>` : '';
-    const body = elements.map((element) => elementSvg(element, options)).join('');
+    const body = elements.map((element) => elementSvg(element, paint)).join('');
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${x} ${y} ${w} ${h}">${paper}${body}</svg>`;
 }

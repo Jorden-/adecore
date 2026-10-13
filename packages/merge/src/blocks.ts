@@ -97,8 +97,3 @@ export function splitBlocks(base: readonly string[], ours: readonly string[], th
     push(base.length, ours.length, theirs.length);
     return blocks;
 }
-
-/* The stretches a person still has to decide on. */
-export function openBlocks(blocks: readonly MergeBlock[]): number {
-    return blocks.filter((block) => block.kind === 'conflict').length;
-}

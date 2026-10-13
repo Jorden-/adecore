@@ -12,7 +12,7 @@ export function bothLines(block: MergeBlock, first: MergeSide): string[] {
 }
 
 /* What a block is worth without anyone choosing: the side that changed, or the change both made. */
-export function autoLines(block: MergeBlock): string[] | null {
+function autoLines(block: MergeBlock): string[] | null {
     switch (block.kind) {
         case 'stable':
         case 'ours':

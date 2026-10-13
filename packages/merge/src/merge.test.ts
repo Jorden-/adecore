@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { diffLines } from './diff.ts';
-import { openBlocks, splitBlocks } from './blocks.ts';
+import { splitBlocks } from './blocks.ts';
 import { draftOf, wandLines } from './resolve.ts';
 import { joinLines, shapeOf, splitLines } from './text.ts';
 
@@ -98,7 +98,6 @@ describe('splitBlocks', () => {
     test('a change on one side alone is that side', () => {
         const blocks = splitBlocks(['a', 'b', 'c'], ['a', 'ours', 'c'], ['a', 'b', 'c']);
         expect(blocks.map((block) => block.kind)).toEqual(['stable', 'ours', 'stable']);
-        expect(openBlocks(blocks)).toBe(0);
     });
 
     test('the same change on both sides is neither side', () => {

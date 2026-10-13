@@ -27,20 +27,15 @@ export {
     type PlanRefusalCode,
     type PlanRefusal,
     refuse,
-    type PlanLocation,
-    locateItem,
     findItem,
     allItems,
     allSteps,
     isParentStep,
     effectiveChecks,
     isFinishedOutcome,
-    deriveState,
     stepState,
     type PlanProgress,
     planProgress,
     leafSteps,
-    activeStepIds,
-    holdsPersonState,
-    structureProblem
+    activeStepIds
 } from './tree.ts';

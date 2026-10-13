@@ -1,6 +1,6 @@
 import type { DrawingColor } from '@adecore/drawing/protocol';
 import type { DiagramDocument } from './protocol.ts';
-import { DEFAULT_FONT_STACKS, DEFAULT_PALETTE, DEFAULT_PAPER } from '@adecore/drawing';
+import { DEFAULT_FONT_STACKS, DEFAULT_PALETTE, DEFAULT_PAPER, escapeXml } from '@adecore/drawing';
 import { GROUP_LABEL_BAND, layoutOf, type DiagramLayout } from './layout.ts';
 import { arrowHeadPath, dashOf, edgeLabelLinesOf, edgePath, shapePaths, textLinesOf } from './shapes.ts';
 import { SUB_SIZE } from './text.ts';
@@ -25,14 +25,6 @@ export const DEFAULT_DIAGRAM_MARGIN = 32;
 export const DEFAULT_NODE_TONE: DrawingColor = 'ink';
 export const DEFAULT_GROUP_TONE: DrawingColor = 'muted';
 export const DEFAULT_EDGE_TONE: DrawingColor = 'muted';
-
-// XML has no way to write a control character other than tab and the line breaks, not even escaped.
-// oxlint-disable-next-line no-control-regex
-const NOT_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g;
-
-function escapeXml(value: string): string {
-    return value.replace(NOT_XML, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-}
 
 /* The whole diagram as one SVG string, from the same layout and paths a view draws with its own elements. */
 export function toSvg(document: Pick<DiagramDocument, 'meta' | 'nodes' | 'groups' | 'edges'>, options: DiagramSvgOptions = {}): string {
