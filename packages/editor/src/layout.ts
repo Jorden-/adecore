@@ -194,7 +194,7 @@ const WRAP_INDENT_STEP = 2;
 const GEOMETRY_CACHE_SIZE = 400;
 const PLAIN = /^[\x20-\x7e\t]*$/;
 const GRAPHEME_LIMIT = 20000;
-const SEGMENTER = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+let segmenter: Intl.Segmenter | undefined;
 
 /* Where each character starts, with the length last. A very long line is cut by code unit, since splitting it by grapheme would cost more than it shows. */
 function characterOffsets(text: string): number[] {
@@ -204,7 +204,8 @@ function characterOffsets(text: string): number[] {
             offsets.push(i);
         }
     } else {
-        for (const part of SEGMENTER.segment(text)) {
+        segmenter ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+        for (const part of segmenter.segment(text)) {
             offsets.push(part.index);
         }
     }

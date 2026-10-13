@@ -156,7 +156,7 @@ const identifier = /[\p{L}\p{N}\p{M}\p{Pc}$]/u;
 /* What can follow `->`: the first letter of a member name, or the `{` of a dynamic one. */
 const arrowContinues = /^[\p{L}_{]/u;
 const wordCommand = /^(select|delete)?(word|camel)(Left|Right)$/i;
-const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+let graphemes: Intl.Segmenter | undefined;
 
 function sameSelections(left: readonly Selection[], right: readonly Selection[]): boolean {
     return left.length === right.length && left.every((selection, index) => selection.anchor === right[index]!.anchor && selection.head === right[index]!.head);
@@ -238,6 +238,7 @@ function deletionStep(rope: TextRope, offset: number, direction: -1 | 1): number
     }
     const line = rope.getLine(rope.lineAt(offset));
     let previous = line.start;
+    graphemes ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' });
     for (const segment of graphemes.segment(line.text)) {
         const at = line.start + segment.index;
         if (direction < 0 && at >= offset) {
