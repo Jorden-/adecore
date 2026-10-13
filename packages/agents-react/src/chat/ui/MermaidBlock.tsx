@@ -2,7 +2,7 @@ import { useContext, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Code, Workflow } from 'lucide-react';
 import { IconButton } from '@adecore/ui';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { CodeBlock } from './CodeBlock';
 import { CodeStreamingContext } from './code-streaming';
 import { MERMAID_TOKENS, mermaidConfig, sizedSvg, svgDataUrl, type MermaidColors, type SizedSvg } from './mermaid';
@@ -52,9 +52,10 @@ async function drawDiagram(id: string, source: string, element: HTMLElement, dar
  * draw, it is the code block it would otherwise be.
  */
 export function MermaidBlock({ code }: { code: string }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     const streaming = useContext(CodeStreamingContext);
-    const dark = chatHost().code.useMode() === 'dark';
+    const dark = host.code.useMode() === 'dark';
     const id = `mermaid-${useId().replace(/[^\w-]/g, '')}`;
     const frame = useRef<HTMLDivElement>(null);
     const [source, setSource] = useState(false);

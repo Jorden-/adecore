@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import type { ChatApprovalItem } from '@adecore/agent-contracts';
 import { approvalChanges, fileChanges } from '../../chat/logic/tools';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { ApprovalReview } from '../../chat/ui/diff/ApprovalReview';
 import { reviewEntries } from '../../chat/ui/diff/review-plan';
 import { isPrimaryKey } from '../logic/keys';
@@ -21,12 +21,13 @@ export function CommandBox({ command, cwd }: { command: string; cwd?: string }) 
 }
 
 function ApprovalDetails({ item }: { item: ChatApprovalItem }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-prompts');
     const [expanded, setExpanded] = useState(false);
     const patches = approvalChanges(item.input);
     const edits = patches.length ? [] : fileChanges(item.toolName, item.input);
     const entries = reviewEntries(patches, edits);
-    const editorPreview = chatHost().code.editor !== undefined;
+    const editorPreview = host.code.editor !== undefined;
     const maxHeight = expanded ? 480 : 176;
     const input = typeof item.input === 'object' && item.input !== null ? (item.input as Record<string, unknown>) : {};
     return (
@@ -76,8 +77,9 @@ export function ApprovalBody({
     denyReason: boolean;
     locked: boolean;
 }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-prompts');
-    const AnswerField = chatHost().dictation.Textarea;
+    const AnswerField = host.dictation.Textarea;
     return (
         <>
             <ApprovalDetails item={item} />
@@ -92,7 +94,7 @@ export function ApprovalBody({
                     onChange={(e) => onDraft({ ...draft, reason: e.target.value })}
                     onKeyDown={(e) => {
                         // Mod+Enter presses Allow everywhere else in the card, which is the opposite of what a reason for declining is typed for.
-                        if (isPrimaryKey(e.nativeEvent, chatHost().isApplePlatform())) {
+                        if (isPrimaryKey(e.nativeEvent, host.isApplePlatform())) {
                             e.preventDefault();
                         }
                     }}

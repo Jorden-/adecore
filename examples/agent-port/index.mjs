@@ -9,15 +9,15 @@ import { fakeClaude } from '@adecore/agents/chat/fake-claude';
 import { inProcess } from '@adecore/agents/chat/fake-cli';
 import { memoryPortPair } from '@adecore/agents/host/memory-port';
 import { ChatClient } from '@adecore/agents-react/chat/chat-client';
-import { setChatHost } from '@adecore/agents-react/host';
 import { AGENTS_LOCALES } from '@adecore/agents-react/locales';
 import { portTransport } from '@adecore/agents-react/port-transport';
 import { ChatScopeContext, useChatScope } from '@adecore/agents-react/scope';
 import { chatSink, useChats } from '@adecore/agents-react/state/chats';
+import { configureChatStorage } from '@adecore/agents-react/storage';
 
 const dataDir = await mkdtemp(join(tmpdir(), 'adecore-agent-port-'));
 const fake = inProcess(fakeClaude);
-setChatHost({ storage: { namespace: 'agent-port-example', storage: null } });
+configureChatStorage({ namespace: 'agent-port-example', storage: null });
 const host = await AgentHost.open({
     dataDir,
     background: false,

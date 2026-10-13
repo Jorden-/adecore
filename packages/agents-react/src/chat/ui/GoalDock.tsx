@@ -6,7 +6,7 @@ import { Target } from 'lucide-react';
 import type { ChatGoal, ChatGoalAction, ChatInfo, ProviderCapabilities } from '@adecore/agent-contracts';
 import { Button, Icon, Pill, Tooltip } from '@adecore/ui';
 import { formatTokens, useFormatLocale } from '@adecore/ui/format';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { useChatScope } from '../../scope';
 import { useChats } from '../../state/chats';
 import { useChatActions } from '../actions';
@@ -33,6 +33,7 @@ function progressOf(goal: ChatGoal, t: TFunction<'agent-chat'>): string | null {
  * and what a person may do to it. The whole objective and what the last check said are in the tooltip.
  */
 export function GoalDock({ chatId, info, goals }: { chatId: string; info: ChatInfo; goals: ProviderCapabilities['goals'] }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     useFormatLocale();
     const actions = useChatActions();
@@ -50,7 +51,7 @@ export function GoalDock({ chatId, info, goals }: { chatId: string; info: ChatIn
         setChanging(true);
         actions
             .goal(chatId, action)
-            .catch((e: unknown) => chatHost().notify({ kind: 'error', title: t('goal.failed'), description: e instanceof Error ? e.message : String(e) }))
+            .catch((e: unknown) => host.notify({ kind: 'error', title: t('goal.failed'), description: e instanceof Error ? e.message : String(e) }))
             .finally(() => setChanging(false));
     };
     return (

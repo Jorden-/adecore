@@ -1,12 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ChatClient } from '@adecore/agents-react/chat/chat-client';
+import { ChatHostProvider } from '@adecore/agents-react/host';
 import { ChatScopeContext, type ChatScope } from '@adecore/agents-react/scope';
 import { chatSink, useChats } from '@adecore/agents-react/state/chats';
 import { useProviderAccountsStore, watchProviderAccounts } from '@adecore/agents-react/state/provider-accounts';
 import { providerSinkFor, useProvidersStore } from '@adecore/agents-react/state/providers';
 import { useUsageStore } from '@adecore/agents-react/state/usage';
 import { initialAccounts, PROVIDERS } from './agents-data.ts';
-import { demoChats, FakeAgentHost, type DemoChats } from './agents-host.ts';
+import { DEMO_CHAT_HOST, demoChats, FakeAgentHost, type DemoChats } from './agents-host.ts';
 
 let scopes = 0;
 
@@ -40,9 +41,18 @@ function openScope(chats: DemoChats): { scope: ChatScope; close(): void } {
     };
 }
 
+/* What the app around the chat decides, as an app hands it once around everything it draws. */
+export function DemoChatHost({ children }: { children: ReactNode }) {
+    return <ChatHostProvider host={DEMO_CHAT_HOST}>{children}</ChatHostProvider>;
+}
+
 /* What an app renders around its chat views once per host; each demo gets a host of its own. */
 export function AgentDemo({ chats = demoChats, children }: { chats?: () => DemoChats; children: ReactNode }) {
     const [opened] = useState(() => openScope(chats()));
     useEffect(() => opened.close, [opened]);
-    return <ChatScopeContext.Provider value={opened.scope}>{children}</ChatScopeContext.Provider>;
+    return (
+        <DemoChatHost>
+            <ChatScopeContext.Provider value={opened.scope}>{children}</ChatScopeContext.Provider>
+        </DemoChatHost>
+    );
 }

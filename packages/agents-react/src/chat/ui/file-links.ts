@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo } from 'react';
-import { chatHost, type FileRef } from '../../host';
+import { useChatHost, type FileRef } from '../../host';
 import { ChatScopeContext } from '../../scope';
 
 /*
@@ -21,10 +21,12 @@ export function useFileLinkScopeId(): string | null {
 export function useFileLinkTarget(text: string): FileRef | null {
     const cwd = useFileLinkCwd();
     const scopeId = useFileLinkScopeId();
-    return useMemo(() => chatHost().fileLinks?.target(text, cwd, scopeId) ?? null, [text, cwd, scopeId]);
+    const { fileLinks } = useChatHost();
+    return useMemo(() => fileLinks?.target(text, cwd, scopeId) ?? null, [fileLinks, text, cwd, scopeId]);
 }
 
-/* A reference followed, the way the app opens a file or a folder. */
-export function openFileLink(cwd: string | null, ref: FileRef, scopeId: string | null = null): void {
-    chatHost().fileLinks?.open(cwd, ref, scopeId);
+/* Follows a reference the way the app opens a file or a folder. */
+export function useOpenFileLink(): (cwd: string | null, ref: FileRef, scopeId?: string | null) => void {
+    const { fileLinks } = useChatHost();
+    return (cwd, ref, scopeId = null) => fileLinks?.open(cwd, ref, scopeId);
 }

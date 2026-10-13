@@ -1,13 +1,13 @@
 import i18next from 'i18next';
 import type { AgentKind, ProviderAccount, ProviderAccounts, ProviderAccountStatus } from '@adecore/agent-contracts';
-import { chatHost } from '../host';
+import type { AccentChoice, ChatHost } from '../host';
 
 /*
  * An account wears one of the host's accents, so the app paints from one palette. A color that is none
  * of them (an older name, or one written by hand) reads as undefined, and the dot takes the accent.
  */
-export function accountColor(color: string | undefined): string | undefined {
-    return chatHost().accents.all.find((entry) => entry.id === color)?.color;
+export function accountColor(color: string | undefined, accents: readonly AccentChoice[]): string | undefined {
+    return accents.find((entry) => entry.id === color)?.color;
 }
 
 /*
@@ -102,9 +102,9 @@ export function mintAccountId(kind: AgentKind, label: string, taken: ReadonlySet
  * The first featured accent no account of the CLI wears yet, then any other, so a new one stands apart.
  * An account without a color of its own wears `fallback`, the accent the app is painted in.
  */
-export function freeAccountColor(entries: readonly AccountEntry[], fallback: string): string {
-    const { all, featured } = chatHost().accents;
-    const worn = new Set(entries.map((entry) => (accountColor(entry.account.color) === undefined ? fallback : entry.account.color)));
+export function freeAccountColor(entries: readonly AccountEntry[], accents: ChatHost['accents'], fallback: string): string {
+    const { all, featured } = accents;
+    const worn = new Set(entries.map((entry) => (accountColor(entry.account.color, all) === undefined ? fallback : entry.account.color)));
     const choices = [...featured, ...all.map((entry) => entry.id).filter((id) => !featured.includes(id))];
     return choices.find((id) => !worn.has(id)) ?? featured[entries.length % featured.length] ?? fallback;
 }

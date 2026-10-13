@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronRight, GitFork } from 'lucide-react';
 import { useForkIdsAfter } from '../../forks';
 import { ROW_GUTTER } from '../icons';
-import { chatHost } from '../../../host';
+import { useChatHost } from '../../../host';
 import { Icon, Menu } from '@adecore/ui';
 
 const LINE = '-mx-1 mb-0.5 flex h-7 items-center gap-2 rounded-md px-1 text-xs text-text-muted';
@@ -52,7 +52,8 @@ function ForksLabel({ label, link = true }: { label: string; link?: boolean }) {
 
 // A fork no longer in this project has nowhere to lead, so it only says it is there.
 function OneFork({ forkId, label }: { forkId: string; label: string }) {
-    const place = chatHost().useChatPlace(forkId);
+    const host = useChatHost();
+    const place = host.useChatPlace(forkId);
     return (
         <div className="flex">
             {place.title === null ? (
@@ -69,8 +70,9 @@ function OneFork({ forkId, label }: { forkId: string; label: string }) {
 }
 
 function ForkItem({ forkId }: { forkId: string }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
-    const place = chatHost().useChatPlace(forkId);
+    const place = host.useChatPlace(forkId);
     return (
         <Menu.Item disabled={place.title === null} onClick={place.go}>
             <Icon icon={GitFork} size={14} /> <span className="truncate">{place.title ?? t('fork.pill.label')}</span>

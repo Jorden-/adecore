@@ -97,9 +97,10 @@ A client applies a preview only while the item's text is `textLength` long, so a
 The `Timeline` of `@adecore/agents-react` draws an assistant item with `ui` through [`UiReply`](/agents-react/chat/intelligent-ui), between the reply's own Markdown. What a block may do outside itself comes from `ChatHost.intelligentUi`:
 
 ```ts
-import { setChatHost } from '@adecore/agents-react/host';
+import type { ChatHost } from '@adecore/agents-react/host';
 
-setChatHost({
+// Handed to the `ChatHostProvider` around the views.
+const CHAT_HOST: Partial<ChatHost> = {
     intelligentUi: {
         sendChoice: async (scopeId, payload) => ((await transportFor(scopeId).request('chat.uiChoice', payload)).queued ? 'queued' : 'sent'),
         query: (scopeId, payload) => transportFor(scopeId).request('ui.query', payload),
@@ -107,7 +108,7 @@ setChatHost({
         openLink: (scopeId, reading) => openInApp(scopeId, reading),
         openUrl: (scopeId, url) => openExternal(url)
     }
-});
+};
 ```
 
 `transportFor`, `openInApp` and `openExternal` are your app's. Every callback is optional except `sendChoice`. Leave one out and the block draws the quiet version: choices stay closed, live values keep their first reading, links stay text and sources cannot be opened. `subscribe(scopeId, chatId, changed)` lets the host ask a visible block to read again, for example after a reconnect; it returns the function that stops it.

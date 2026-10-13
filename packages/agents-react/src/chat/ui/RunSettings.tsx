@@ -26,7 +26,7 @@ import { CONTEXT_OPTION, contextFraction, contextSegments, orderOptions, type Co
 import { RUNTIME_MODES } from '../runtime-modes';
 import { formatClock, formatWeekdayClock, isSameDay, formatPercent, formatTokens } from '@adecore/ui/format';
 import { Icon, Menu, Pill, Tooltip, useNow } from '@adecore/ui';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { useUsageLimits } from '../../usage/limits';
 
 const MINUTE_MS = 60_000;
@@ -312,6 +312,7 @@ function sessionTone(used: number): { bar: string; text: string } {
  * the conversation goes along to those. A switch applies from the next turn.
  */
 function AccountSubmenu({ provider, account }: { provider: AgentKind; account: AccountPick }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     const { choice, started, onPick } = account;
     return (
@@ -334,7 +335,7 @@ function AccountSubmenu({ provider, account }: { provider: AgentKind; account: A
                     </Menu.RadioGroup>
                 </Menu.Group>
                 <Menu.Separator />
-                <Menu.Item className="text-text-muted" onClick={() => chatHost().openSettings('providers')}>
+                <Menu.Item className="text-text-muted" onClick={() => host.openSettings('providers')}>
                     <Icon icon={Settings} size={14} className="shrink-0 text-text-faint" />
                     {t('pickers.account.manage')}
                 </Menu.Item>

@@ -19,10 +19,11 @@ Requests that hold the agent up come first, oldest first, then optional question
 
 ## A stack of your own
 
-`usePromptSession` keeps the state of a stack: which subject is in front, a draft per request, sending and the last error. `PromptView` draws one subject. `answerPrompt(subject, action, actions)` sends a card's action as the request it is answered with.
+`usePromptSession` keeps the state of a stack: which subject is in front, a draft per request, sending and the last error. `PromptView` draws one subject. `answerPrompt(subject, action, actions, host)` sends a card's action as the request it is answered with, or to the host's `prompts.answer` for a prompt of your app.
 
 ```tsx
 import { useChatActions } from '@adecore/agents-react/chat/actions';
+import { useChatHost } from '@adecore/agents-react/host';
 import { orderPrompts } from '@adecore/agents-react/prompts/logic/prompts';
 import { answerPrompt, isBlockingSubject, promptCreatedAt, promptIdOf, type PromptSubject } from '@adecore/agents-react/prompts/logic/subjects';
 
@@ -31,6 +32,7 @@ const pick = (waiting: readonly PromptSubject[], id: string | null): PromptSubje
 
 function Stack({ subjects }: { subjects: PromptSubject[] }) {
     const actions = useChatActions();
+    const host = useChatHost();
     const session = usePromptSession({ prompts: subjects, idOf: promptIdOf, pick, disabled: false });
     const active = session.active;
     if (!active) {
@@ -43,7 +45,7 @@ function Stack({ subjects }: { subjects: PromptSubject[] }) {
                 subject={active}
                 draft={session.draftOf(id)}
                 onDraft={(draft) => session.setDraft(id, draft)}
-                onAction={(action) => void session.act(active, () => answerPrompt(active, action, actions))}
+                onAction={(action) => void session.act(active, () => answerPrompt(active, action, actions, host))}
                 more={session.waiting.length - 1}
                 hasDraft={false}
                 denyReason
@@ -64,16 +66,16 @@ Arrows, Home and End move through the choices and Space picks; Enter on a single
 
 ## Prompts of your own
 
-`setChatHost({ prompts })` adds prompts of your app beside a chat's, answered in the same place:
+The host's `prompts` adds prompts of your app beside a chat's, answered in the same place:
 
-```ts
-setChatHost({
+```tsx
+const CHAT_HOST: Partial<ChatHost> = {
     prompts: {
         useExtra: (scopeId, chatId) => usePermissionRequests(scopeId, chatId),
         render: (prompt, props) => <PermissionCard prompt={prompt} {...props} />,
         answer: (prompt, action) => permissions.answer(prompt.id, action)
     }
-});
+};
 ```
 
 A `HostPrompt` is `{ id, createdAt, blocking, asks, data }`: a stable id, whether it holds anything up, `approval` or `question` for its mark, and whatever your app needs in `data`. Return the same objects from `useExtra` while nothing changed. `PromptCard`, `PromptPrimary`, `ApprovalActions` and `QuestionActions` build a card that looks like the others, and a `choose` action answers with one of your own choices.

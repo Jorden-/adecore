@@ -15,7 +15,7 @@ import { RunningFor, ToggleLine, WorkLiveRow, WorkRow } from './WorkRows';
 import { entryTimeOf, statusWordOf, taskIdOf } from '../../subagent-list';
 import { useSubagentSupport } from '../../subagent-support';
 import { canOpenSubagent, crumbOf, type SubagentStep } from '../../subagent-view';
-import { chatHost, type SubagentTask } from '../../../host';
+import { useChatHost, type SubagentTask } from '../../../host';
 import { useChatScope } from '../../../scope';
 import { useCurrentItem } from '../../../state/chats';
 
@@ -135,10 +135,11 @@ export function SubagentRow({
     /* Opens everything it did in the thread's place, for a surface that has somewhere to open it. */
     onOpenConversation?(): void;
 }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     const { id } = useChatScope();
     const taskId = taskIdOf(item);
-    const task = chatHost().tasks.useTask(id, taskId);
+    const task = host.tasks.useTask(id, taskId);
     // A task paused on its child's limit is still a running row on the wire, but nothing is at work.
     const running = item.status === 'running' && statusWordOf(item, task) !== 'paused';
     const detail = item.description || item.summary || item.subagentType || '';

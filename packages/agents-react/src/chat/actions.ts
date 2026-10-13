@@ -1,5 +1,5 @@
 import i18next from 'i18next';
-import { chatHost, type ChatActions } from '../host';
+import { useChatHost, type ChatActions, type ChatHost } from '../host';
 import { useChatScope, type ChatScope } from '../scope';
 import { ChatTransportError, type ChatTransport } from '../transport';
 
@@ -55,9 +55,9 @@ export function transportActions(transport: ChatTransport): ChatActions {
 
 const byTransport = new WeakMap<ChatTransport, ChatActions>();
 
-/* The app's own actions when it has them, and the requests of this scope's host otherwise. */
-export function actionsOf(scope: ChatScope): ChatActions {
-    const own = chatHost().actions;
+/* The app's own actions when its host has them, and the requests of this scope's host of chats otherwise. */
+export function actionsOf(scope: ChatScope, host: Pick<ChatHost, 'actions'>): ChatActions {
+    const own = host.actions;
     if (own !== null) {
         return own;
     }
@@ -71,5 +71,5 @@ export function actionsOf(scope: ChatScope): ChatActions {
 }
 
 export function useChatActions(): ChatActions {
-    return actionsOf(useChatScope());
+    return actionsOf(useChatScope(), useChatHost());
 }

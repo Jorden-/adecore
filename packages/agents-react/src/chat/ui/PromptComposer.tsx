@@ -8,7 +8,7 @@ import { answerPrompt, isBlockingSubject, promptCreatedAt, promptIdOf, type Prom
 import { useFocusAfterAnswer } from '../../prompts/logic/useFocusAfterAnswer';
 import { usePromptSession } from '../../prompts/logic/usePromptSession';
 import { PromptView } from '../../prompts/ui/PromptView';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { useChatScope } from '../../scope';
 import { useChatActions } from '../actions';
 import { Button, Icon } from '@adecore/ui';
@@ -53,10 +53,11 @@ export function PromptComposer({
 }) {
     const { t } = useTranslation('agent-chat');
     const { id } = useChatScope();
+    const host = useChatHost();
     const actions = useChatActions();
     const elsewhere = onShowElsewhere !== undefined;
     // A card the app raises itself waits in the chat beside the CLI's own requests.
-    const extra = chatHost().prompts.useExtra(id, chatId);
+    const extra = host.prompts.useExtra(id, chatId);
     const subjects = useMemo(
         (): PromptSubject[] => [
             ...pending.map((item): PromptSubject => ({ kind: 'chat', nodeId: chatId, item })),
@@ -117,7 +118,7 @@ export function PromptComposer({
                         onAction={(action) => {
                             refocus.hold();
                             void session
-                                .act(active, () => answerPrompt(active, action, actions))
+                                .act(active, () => answerPrompt(active, action, actions, host))
                                 .then((result) => {
                                     if (result === 'failed') {
                                         refocus.release();

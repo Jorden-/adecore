@@ -6,7 +6,7 @@ import { AccountDot } from '../agents/AccountDot';
 import { accountName, FOLDER_VARIABLES, type AccountEntry } from '../agents/accounts';
 import { ConfirmDialog, DetailHeader, SettingsRow, SettingsSection } from '@adecore/ui/settings';
 import { Button, copyText, Icon, Input, Switch, Tooltip } from '@adecore/ui';
-import { chatHost } from '../host';
+import { useChatHost } from '../host';
 import { useChatScope } from '../scope';
 import { removeAccount, saveAccount } from './account-actions';
 import { AccountVariables } from './AccountVariables';
@@ -59,6 +59,7 @@ function NameField({ value, label, onSave }: { value: string; label: string; onS
 export function AccountDetail({ provider, entry, canLogIn, loginBlocked, secretsAvailable, onRemoved }: AccountDetailProps) {
     const { t } = useTranslation('agent-providers');
     const scope = useChatScope();
+    const host = useChatHost();
     const [confirming, setConfirming] = useState(false);
     const { id, account, status, isDefault } = entry;
     const name = accountName(entry, provider.name);
@@ -68,7 +69,7 @@ export function AccountDetail({ provider, entry, canLogIn, loginBlocked, secrets
 
     const showFolder = (): void => {
         copyText(folder);
-        chatHost().notify({ kind: 'success', title: t('account.folderCopied'), description: folder });
+        host.notify({ kind: 'success', title: t('account.folderCopied'), description: folder });
     };
 
     const loginDetail = (): string => {
@@ -82,7 +83,7 @@ export function AccountDetail({ provider, entry, canLogIn, loginBlocked, secrets
     };
 
     const loginButton = (
-        <Button variant="secondary" disabled={loginBlocked !== null} onClick={() => void chatHost().openLogin?.(scope.id, provider.kind, id, name)}>
+        <Button variant="secondary" disabled={loginBlocked !== null} onClick={() => void host.openLogin?.(scope.id, provider.kind, id, name)}>
             <Icon icon={LogIn} size={14} />
             {signedIn ? t('account.login.logInAgain') : t('account.login.logIn')}
         </Button>
@@ -121,7 +122,7 @@ export function AccountDetail({ provider, entry, canLogIn, loginBlocked, secrets
                             label={t('account.enabled.label')}
                             onCheckedChange={(checked) => {
                                 const { enabled: _enabled, ...rest } = account;
-                                void saveAccount(scope, id, checked ? rest : { ...rest, enabled: false });
+                                void saveAccount(scope, host, id, checked ? rest : { ...rest, enabled: false });
                             }}
                         />
                     }
@@ -129,7 +130,12 @@ export function AccountDetail({ provider, entry, canLogIn, loginBlocked, secrets
                 <SettingsRow
                     label={t('account.name')}
                     control={
-                        <NameField key={name} value={name} label={t('account.name')} onSave={(label) => void saveAccount(scope, id, { ...account, label })} />
+                        <NameField
+                            key={name}
+                            value={name}
+                            label={t('account.name')}
+                            onSave={(label) => void saveAccount(scope, host, id, { ...account, label })}
+                        />
                     }
                 />
                 <SettingsRow
@@ -138,7 +144,7 @@ export function AccountDetail({ provider, entry, canLogIn, loginBlocked, secrets
                         <AccountColors
                             value={account.color}
                             label={t('account.color')}
-                            onChange={(color) => void saveAccount(scope, id, { ...account, color })}
+                            onChange={(color) => void saveAccount(scope, host, id, { ...account, color })}
                         />
                     }
                 />
@@ -200,7 +206,7 @@ export function AccountDetail({ provider, entry, canLogIn, loginBlocked, secrets
                 description={t('account.remove.confirmDescription', { folder })}
                 confirmLabel={t('account.remove.confirm')}
                 onConfirm={async () => {
-                    await removeAccount(scope, id, provider.kind);
+                    await removeAccount(scope, host, id, provider.kind);
                     onRemoved();
                 }}
             />

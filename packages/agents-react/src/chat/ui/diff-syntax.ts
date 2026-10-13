@@ -1,7 +1,7 @@
 import type { LineToken } from '@adecore/editor';
 import { lineTokensOf, type DiffSyntaxDocument } from '@adecore/editor/shiki-worker';
 import type { DiffDocument } from '@adecore/merge';
-import { diffSyntaxRuntime, type DiffSyntaxRuntime } from './diff/syntax-runtime';
+import type { DiffSyntaxRuntime } from './diff/syntax-runtime';
 
 export { createDiffSyntaxRuntime, diffSyntaxRuntime } from './diff/syntax-runtime';
 export type { DiffSyntaxRuntime, DiffSyntaxRuntimeOptions, DiffSyntaxSession } from './diff/syntax-runtime';
@@ -18,7 +18,7 @@ export interface DiffSourceTokenSession {
 }
 
 /* Structurally accepts the editor's source mapping without depending on its React renderer. */
-export function diffSourceTokens(document: DiffDocument, mapping: DiffSyntaxMapping, runtime: DiffSyntaxRuntime = diffSyntaxRuntime()): DiffSourceTokenSession {
+export function diffSourceTokens(document: DiffDocument, mapping: DiffSyntaxMapping, runtime: DiffSyntaxRuntime): DiffSourceTokenSession {
     const sides = { old: runtime.open(mapping.documents.old), new: runtime.open(mapping.documents.new) };
     const cache = { old: new Map<number, ReadonlyArray<readonly LineToken[] | null>>(), new: new Map<number, ReadonlyArray<readonly LineToken[] | null>>() };
     const pending = { old: new Set<number>(), new: new Set<number>() };

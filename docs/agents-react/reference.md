@@ -8,7 +8,7 @@ Many props and options are not exported types. Derive them where you need one, a
 
 | Module | Exports |
 | --- | --- |
-| [`host`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/host.ts) | `AccentChoice`, `ChatToast`, `ChatActions`, `FileRef`, `ChatPlace`, `SubagentTask`, `TimelineFindOptions`, `TimelineFind`, `ComposerDictationProps`, `TextareaProps`, `ResourceUrl`, `ComposerSlotProps`, `SubagentSlotProps`, `ThreadCard`, `ReplyAuthor`, `VisualHost`, `ChatHost`, `setChatHost`, `chatHost` |
+| [`host`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/host.ts) | `AccentChoice`, `ChatToast`, `ChatActions`, `FileRef`, `ChatPlace`, `SubagentTask`, `TimelineFindOptions`, `TimelineFind`, `ComposerDictationProps`, `TextareaProps`, `ResourceUrl`, `ComposerSlotProps`, `SubagentSlotProps`, `ThreadCard`, `ReplyAuthor`, `VisualHost`, `ChatHost`, `ChatHostProvider`, `useChatHost` |
 | [`lazy`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/lazy.tsx) | `setLazyPrefetch`, `onLazyOpenError`, `lazyNamed` |
 | [`locales`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/locales.ts) | `AGENTS_NAMESPACES`, `AgentsNamespace`, `AGENTS_LOCALES` |
 | [`mounted-registry`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/mounted-registry.ts) | `MountedEntry`, `MountedRegistry` |
@@ -130,7 +130,7 @@ Many props and options are not exported types. Derive them where you need one, a
 | [`chat/ui/code-streaming`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/code-streaming.ts) | `CodeStreamingContext` |
 | [`chat/ui/code-theme`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/code-theme.ts) | `useCodeTheme`, `shikiThemeOf` |
 | [`chat/ui/diff-theme`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/diff-theme.ts) | `useDiffTheme` |
-| [`chat/ui/file-links`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/file-links.ts) | `FileLinkContext`, `useFileLinkCwd`, `useFileLinkTarget`, `openFileLink` |
+| [`chat/ui/file-links`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/file-links.ts) | `FileLinkContext`, `useFileLinkCwd`, `useFileLinkTarget`, `useOpenFileLink` |
 | [`chat/ui/find-reveal`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/find-reveal.ts) | `ChatFindField`, `FindReveal`, `FindRevealContext`, `useOpenForFind` |
 | [`chat/ui/full-diff`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/full-diff.ts) | `DiffContents`, `fullFileDiff` |
 | [`chat/ui/highlighter`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/highlighter.ts) | `Highlighter`, `GrammarState`, `loadLanguage`, `loadTheme`, `readyHighlighter`, `loadedLanguage`, `tokenizerFor`, `tokenStyle` |

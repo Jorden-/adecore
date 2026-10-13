@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import type { ProviderAccounts, ProviderAccountStatus } from '@adecore/agent-contracts';
-import { chatHost, setChatHost, type ChatHost } from '../host';
+import type { ChatHost } from '../host';
 import { accountName, accountStatusLine, accountsOfKind, canContinueOn, freeAccountColor, hasAccountChoice, mintAccountId, offeredAccounts } from './accounts';
 
 function status(id: string, patch: Partial<ProviderAccountStatus> = {}): ProviderAccountStatus {
@@ -58,12 +58,13 @@ describe('the status line', () => {
 });
 
 describe('a new account', () => {
-    const before: ChatHost['accents'] = chatHost().accents;
-    beforeAll(() => {
-        const featured = ['blue', 'orange', 'lime', 'indigo', 'pink'];
-        setChatHost({ accents: { all: [...featured, 'red'].map((id) => ({ id, color: '#000000' })), featured, label: (id) => id, current: () => 'blue' } });
-    });
-    afterAll(() => setChatHost({ accents: before }));
+    const featured = ['blue', 'orange', 'lime', 'indigo', 'pink'];
+    const accents: ChatHost['accents'] = {
+        all: [...featured, 'red'].map((id) => ({ id, color: '#000000' })),
+        featured,
+        label: (id) => id,
+        current: () => 'blue'
+    };
 
     test('gets an id from its name that no other account has', () => {
         expect(mintAccountId('claude', 'Work (EU)', new Set())).toBe('claude_work-eu');
@@ -72,13 +73,13 @@ describe('a new account', () => {
     });
 
     test('wears a featured accent the others do not, counting one without a color as the app accent', () => {
-        expect(freeAccountColor(accountsOfKind(accounts, 'claude'), 'orange')).toBe('lime');
-        expect(freeAccountColor(accountsOfKind(accounts, 'codex'), 'blue')).toBe('orange');
+        expect(freeAccountColor(accountsOfKind(accounts, 'claude'), accents, 'orange')).toBe('lime');
+        expect(freeAccountColor(accountsOfKind(accounts, 'codex'), accents, 'blue')).toBe('orange');
     });
 
     test('an old color name that is no accent counts as the app accent', () => {
         const old: ProviderAccounts = { accounts: { claude: { kind: 'claude', color: 'gray' } }, statuses: [] };
-        expect(freeAccountColor(accountsOfKind(old, 'claude'), 'blue')).toBe('orange');
+        expect(freeAccountColor(accountsOfKind(old, 'claude'), accents, 'blue')).toBe('orange');
     });
 });
 

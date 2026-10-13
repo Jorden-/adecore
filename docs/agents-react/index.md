@@ -20,7 +20,7 @@ The demos on these pages run on a host in memory: two CLIs, three accounts, a ch
 ## How it fits together
 
 ```
-your app        setChatHost(...)          words, storage, files, navigation
+your app        ChatHostProvider          words, files, navigation
   |
 scope           ChatScopeContext          one per host of chats
   |               transport               requests and events
@@ -29,7 +29,7 @@ scope           ChatScopeContext          one per host of chats
 views           Timeline, Composer, ...   read the stores of their scope
 ```
 
-The views read a chat from a store, never from the wire. A `ChatClient` fills that store from a `ChatTransport`, the one object that knows how to reach the host. A `ChatScope` bundles the two with an id and puts them in context, so an app that talks to two hosts renders a scope for each and their threads never mix. What only the app can decide, such as where a file opens or whether a stop needs a confirmation, it hands over once with `setChatHost`.
+The views read a chat from a store, never from the wire. A `ChatClient` fills that store from a `ChatTransport`, the one object that knows how to reach the host. A `ChatScope` bundles the two with an id and puts them in context, so an app that talks to two hosts renders a scope for each and their threads never mix. What only the app can decide, such as where a file opens or whether a stop needs a confirmation, it hands over in a `ChatHostProvider` around the views.
 
 ## Entry points
 
@@ -38,7 +38,7 @@ There is no root import. Every module has its own subpath, `@adecore/agents-reac
 ## Where to go next
 
 - [Getting started](/agents-react/guide/getting-started) installs the package, its CSS and its words, and renders a first chat.
-- [Host adapters](/agents-react/guide/host) lists what `setChatHost` takes and what each part does without it.
+- [Host adapters](/agents-react/guide/host) lists what a `ChatHostProvider` takes and what each part does without it.
 - [Chat client and state](/agents-react/guide/chat-client) covers opening, sending, reconnecting and reading the stores.
 - [Persistence](/agents-react/guide/persistence) covers drafts, preferences and their storage keys.
 - [Testing](/agents-react/guide/testing) shows a host in memory like the one these demos use.

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { UiProps } from '@adecore/intelligent-ui';
 import { PreviewCard, Tooltip } from '@adecore/ui';
 import { formatNumber } from '@adecore/ui/format';
-import { chatHost } from '../../../../host';
+import { useChatHost } from '../../../../host';
 import { CodeBlock } from '../../CodeBlock';
 import { CodeStreamingContext } from '../../code-streaming';
 import { ImageThumb } from '../../ImageView';
@@ -26,7 +26,8 @@ export function CodeBlockRenderer({ node }: UiRendererProps<UiProps<'CodeBlock'>
 
 /* Its own component, so the host's hook is only called for an image that names an attachment. */
 function AttachedImage({ scopeId, chatId, attachmentId, alt }: { scopeId: string; chatId: string; attachmentId: string; alt: string }) {
-    const source = chatHost().attachments.useUrl(scopeId, chatId, attachmentId);
+    const host = useChatHost();
+    const source = host.attachments.useUrl(scopeId, chatId, attachmentId);
     return <ImageThumb source={source} alt={alt} className="max-h-70 max-w-full object-contain" />;
 }
 

@@ -5,6 +5,7 @@ import { Bookmark, Pencil, X } from 'lucide-react';
 import { CHAT_BOOKMARK_LIMITS, type ChatBookmark } from '@adecore/agent-contracts';
 import { nameBookmark, removeBookmark, useBookmarkNaming } from '../bookmarks';
 import { bookmarkLabel } from '../logic/bookmarks';
+import { useChatHost } from '../../host';
 import { useChatScope } from '../../scope';
 import { ButtonGroup, Icon, IconButton, Input } from '@adecore/ui';
 
@@ -22,6 +23,7 @@ interface BookmarkMarkerProps {
 export function BookmarkMarker({ chatId, itemId, bookmark }: BookmarkMarkerProps) {
     const { t } = useTranslation('agent-chat');
     const scope = useChatScope();
+    const host = useChatHost();
     const chatKey = scope.keyOf(chatId);
     const naming = useBookmarkNaming((s) => s.chatKey === chatKey && s.itemId === itemId);
 
@@ -38,7 +40,7 @@ export function BookmarkMarker({ chatId, itemId, bookmark }: BookmarkMarkerProps
                     onDone={(name) => {
                         useBookmarkNaming.getState().close();
                         if (name !== null) {
-                            void nameBookmark(scope, chatId, itemId, name, bookmark?.name);
+                            void nameBookmark(scope, host, chatId, itemId, name, bookmark?.name);
                         }
                     }}
                 />
@@ -54,7 +56,7 @@ export function BookmarkMarker({ chatId, itemId, bookmark }: BookmarkMarkerProps
                     className="-ml-2 max-w-0 shrink-0 overflow-hidden opacity-0 group-hover/bookmark:ml-0 group-hover/bookmark:max-w-none group-hover/bookmark:opacity-100 group-has-focus-visible/bookmark:ml-0 group-has-focus-visible/bookmark:max-w-none group-has-focus-visible/bookmark:opacity-100"
                 >
                     <IconButton icon={Pencil} size="xs" label={t('bookmarks.rename')} onClick={() => useBookmarkNaming.getState().open(chatKey, itemId)} />
-                    <IconButton icon={X} size="xs" label={t('bookmarks.remove')} onClick={() => void removeBookmark(scope, chatId, bookmark)} />
+                    <IconButton icon={X} size="xs" label={t('bookmarks.remove')} onClick={() => void removeBookmark(scope, host, chatId, bookmark)} />
                 </ButtonGroup>
             )}
         </div>

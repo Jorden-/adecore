@@ -24,12 +24,12 @@ const uploads = await readAttachments(accepted.map((entry) => entry.file));
 A sent attachment is an id and a path on the host's machine. The host's `attachments.useUrl(scopeId, chatId, attachmentId)` answers a `ResourceUrl` for it, `{ url, failure }`: a URL to draw, or why there is none. Revoke an object URL you made when the hook lets go of it.
 
 ```tsx
-setChatHost({
+const CHAT_HOST: Partial<ChatHost> = {
     attachments: {
         read: (scopeId, chatId, attachmentId) => backend.readAttachment(chatId, attachmentId),
         useUrl: (scopeId, chatId, attachmentId) => useObjectUrl(() => backend.readAttachment(chatId, attachmentId), [chatId, attachmentId])
     }
-});
+};
 ```
 
 `backend` and `useObjectUrl` stand for your app's own; the hook keeps a `ResourceUrl` in state while the bytes load.

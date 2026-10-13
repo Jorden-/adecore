@@ -1,6 +1,6 @@
 import i18next from 'i18next';
 import type { ReactNode } from 'react';
-import { chatHost } from '../../host';
+import type { ChatHost } from '../../host';
 import { isBlockingPrompt, type PendingPrompt, type PromptAction, type PromptDraft } from './prompts';
 
 /*
@@ -100,10 +100,18 @@ export function approvalButtons(subject: PromptSubject, reason: string): Approva
     ];
 }
 
-/* Sends a card's action as the request its subject is answered with. A refusal comes back as an error for the card to show. */
-export async function answerPrompt(subject: PromptSubject, action: PromptAction, chat: ChatPromptClients | null): Promise<void> {
+/*
+ * Sends a card's action as the request its subject is answered with, or to `host` for a prompt it raised.
+ * A refusal comes back as an error for the card to show.
+ */
+export async function answerPrompt(
+    subject: PromptSubject,
+    action: PromptAction,
+    chat: ChatPromptClients | null,
+    host: Pick<ChatHost, 'prompts'>
+): Promise<void> {
     if (subject.kind === 'host') {
-        return chatHost().prompts.answer(subject.prompt, action);
+        return host.prompts.answer(subject.prompt, action);
     }
     if (chat === null) {
         throw new Error(i18next.t('agent-prompts:error.notConnected'));

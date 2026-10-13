@@ -1,12 +1,12 @@
 import { expect, test, spyOn } from 'bun:test';
-import { act, createElement, lazy, Suspense } from 'react';
-import { createRoot } from 'react-dom/client';
+import { act, createElement, lazy, Suspense, type ReactNode } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import { FakeEditorEngine } from '@adecore/editor/fake';
 import { createPage } from '@adecore/editor/testing';
 import type { EditorEngine } from '@adecore/editor';
 import * as merge from '@adecore/merge';
 import * as sourceBudget from './diff-source-budget';
-import { chatHost, setChatHost } from '../../../host';
+import { ChatHostProvider, type ChatHost } from '../../../host';
 import EditDiff from '../EditDiff';
 import UnifiedDiff from '../UnifiedDiff';
 import { ApprovalBody } from '../../../prompts/ui/ApprovalBody';
@@ -17,14 +17,42 @@ import EditorPatchDiff from './EditorPatchDiff';
 import { DiffFallbackBoundary } from './DiffFallbackBoundary';
 import { EDITOR_DIFF_WORK } from './editor-edit-model';
 
-async function mounted(run: (page: ReturnType<typeof createPage>, root: ReturnType<typeof createRoot>) => Promise<void>): Promise<void> {
+const CODE: ChatHost['code'] = { useMode: () => 'light', useThemes: () => ({ light: 'github-light', dark: 'github-dark' }), custom: [] };
+
+interface HostedRoot {
+    render(view: ReactNode): void;
+    unmount(): void;
+}
+
+let host: Partial<ChatHost> = {};
+let hosts = 0;
+
+/* A provider reads its host once, so a new host mounts the next render again under a key of its own. */
+function setHost(next: Partial<ChatHost>): void {
+    host = next;
+    hosts += 1;
+}
+
+function hostedRoot(root: Root): HostedRoot {
+    return {
+        render: (view) =>
+            root.render(
+                <ChatHostProvider key={hosts} host={host}>
+                    {view}
+                </ChatHostProvider>
+            ),
+        unmount: () => root.unmount()
+    };
+}
+
+async function mounted(run: (page: ReturnType<typeof createPage>, root: HostedRoot) => Promise<void>): Promise<void> {
     const page = createPage();
     const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
     Object.defineProperty(globalThis, 'window', { value: page.window, configurable: true });
     const globals = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
     const previousAct = globals.IS_REACT_ACT_ENVIRONMENT;
     globals.IS_REACT_ACT_ENVIRONMENT = true;
-    const root = createRoot(page.host, { onCaughtError: () => {} });
+    const root = hostedRoot(createRoot(page.host, { onCaughtError: () => {} }));
     try {
         await run(page, root);
     } finally {
@@ -283,7 +311,6 @@ test('changing the preview cap preserves the mounted editor and its scroll posit
 
 test('oversize edits, patches and approvals never calculate hunks or mount an engine', async () => {
     await mounted(async (page, root) => {
-        const previous = chatHost();
         const engine = new FakeEditorEngine();
         let loads = 0;
         const loadEngine = async () => {
@@ -293,7 +320,7 @@ test('oversize edits, patches and approvals never calculate hunks or mount an en
         const patch = spyOn(merge, 'patchOf');
         const parse = spyOn(merge, 'parsePatch');
         try {
-            setChatHost({ code: { ...previous.code, editor: loadEngine } });
+            setHost({ code: { ...CODE, editor: loadEngine } });
             const huge = 'x'.repeat(5000000);
             const change = { path: 'large.ts', before: '', after: huge };
             await act(async () => root.render(createElement(EditDiff, { change })));
@@ -348,7 +375,7 @@ test('oversize edits, patches and approvals never calculate hunks or mount an en
         } finally {
             patch.mockRestore();
             parse.mockRestore();
-            setChatHost(previous);
+            setHost({});
         }
     });
 });
@@ -416,11 +443,10 @@ test('reformatting 1100 lines stays in the editor instead of being omitted', asy
 
 test('the public edit and patch paths check complete sources once', async () => {
     await mounted(async (_page, root) => {
-        const previous = chatHost();
         const engine = new FakeEditorEngine();
         const check = spyOn(sourceBudget, 'diffSourceBudget');
         try {
-            setChatHost({ code: { ...previous.code, editor: async () => engine } });
+            setHost({ code: { ...CODE, editor: async () => engine } });
             await act(async () => root.render(createElement(EditDiff, { change: { path: 'a.ts', before: 'old', after: 'new' } })));
             expect(check).toHaveBeenCalledTimes(1);
             check.mockClear();
@@ -435,7 +461,7 @@ test('the public edit and patch paths check complete sources once', async () => 
             expect(check).toHaveBeenCalledTimes(1);
         } finally {
             check.mockRestore();
-            setChatHost(previous);
+            setHost({});
         }
     });
 });
@@ -443,14 +469,13 @@ test('the public edit and patch paths check complete sources once', async () => 
 for (const kind of ['edit', 'patch'] as const) {
     test(`a rejected ${kind} engine shows its own failure status without starting legacy workers`, async () => {
         await mounted(async (page, root) => {
-            const previous = chatHost();
             let workers = 0;
             const loadEngine = async (): Promise<EditorEngine> => {
                 throw new Error('engine unavailable');
             };
-            setChatHost({
+            setHost({
                 code: {
-                    ...previous.code,
+                    ...CODE,
                     editor: loadEngine,
                     legacyDiffWorker: () => {
                         workers++;
@@ -474,22 +499,21 @@ for (const kind of ['edit', 'patch'] as const) {
                 expect(page.host.querySelector('diffs-container')).toBeNull();
                 expect(workers).toBe(0);
             } finally {
-                setChatHost(previous);
+                setHost({});
             }
         });
     });
 
     test(`a failed ${kind} mount leaves a local status without a legacy renderer`, async () => {
         await mounted(async (page, root) => {
-            const previous = chatHost();
             const engine = new FakeEditorEngine();
             engine.mount = () => {
                 throw new Error('mount unavailable');
             };
             let workers = 0;
-            setChatHost({
+            setHost({
                 code: {
-                    ...previous.code,
+                    ...CODE,
                     editor: async () => engine,
                     legacyDiffWorker: () => {
                         workers++;
@@ -511,7 +535,7 @@ for (const kind of ['edit', 'patch'] as const) {
                 expect(page.host.querySelector('diffs-container')).toBeNull();
                 expect(workers).toBe(0);
             } finally {
-                setChatHost(previous);
+                setHost({});
             }
         });
     });
@@ -519,12 +543,11 @@ for (const kind of ['edit', 'patch'] as const) {
 
 test('a patch without hunks uses a bounded raw view without loading the engine or legacy workers', async () => {
     await mounted(async (page, root) => {
-        const previous = chatHost();
         let loads = 0;
         let workers = 0;
-        setChatHost({
+        setHost({
             code: {
-                ...previous.code,
+                ...CODE,
                 editor: async () => {
                     loads++;
                     return new FakeEditorEngine();
@@ -550,7 +573,7 @@ test('a patch without hunks uses a bounded raw view without loading the engine o
             expect(loads).toBe(0);
             expect(workers).toBe(0);
         } finally {
-            setChatHost(previous);
+            setHost({});
         }
     });
 });

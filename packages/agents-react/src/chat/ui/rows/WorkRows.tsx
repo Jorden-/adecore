@@ -21,7 +21,7 @@ import {
     type FileChange
 } from '../../logic/tools';
 import { useOpenForFind } from '../find-reveal';
-import { chatHost } from '../../../host';
+import { useChatHost } from '../../../host';
 import { lazyNamed } from '../../../lazy';
 import { useChatActions } from '../../actions';
 import { useChatScope } from '../../../scope';
@@ -250,9 +250,10 @@ export function WorkRow({
     label?: string;
     failed?: boolean;
 }) {
+    const host = useChatHost();
     const [open, setOpen] = useState(false);
     const image = tool.state === 'done' ? readImagePath(tool.name, tool.input) : null;
-    const { ReadImage } = chatHost();
+    const { ReadImage } = host;
     useOpenForFind(tool.id, 'output', setOpen);
     const summary = detail ?? toolSummary(tool.name, tool.input);
     const opens = hasToolBody(tool);

@@ -19,7 +19,7 @@ import type {
     ModelSelection,
     RuntimeMode
 } from '@adecore/agent-contracts';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { useChatScope } from '../../scope';
 import { errorCode } from '../../transport';
 import { useAccountChoice } from '../account-choice';
@@ -243,8 +243,9 @@ function usePromptHold(): PromptHold & { noteInput(): void; setComposing(composi
 }
 
 export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabled, readOnly = false, providerFixed, onSend, onRetarget }: ComposerProps) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
-    const sendDelivery = chatHost().useSendDelivery();
+    const sendDelivery = host.useSendDelivery();
     const sendKey = useChatPreferences((preferences) => preferences.sendKey);
     const canSteer = info.provider === 'claude' || info.provider === 'codex';
     const [draft, setDraft] = useState<ChatDraft>(() => readDraft(chatId));
@@ -263,7 +264,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
     const [takingBack, setTakingBack] = useState<string | null>(null);
     const scope = useChatScope();
     const actions = useChatActions();
-    const { isApplePlatform, notify } = chatHost();
+    const { isApplePlatform, notify, searchFiles } = host;
     const registerQuoteTaker = useContext(QuoteTakerContext);
     const inputRef = useRef<ComposerInputHandle>(null);
     const hold = usePromptHold();
@@ -277,8 +278,8 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
     const { approvals, questions } = usePendingRequests(chatId);
     const order = useChatRow(chatId, (row) => row?.order);
     const items = useChatRow(chatId, (row) => row?.structure);
-    const chats = chatHost().useReferableChats();
-    const placeholderLead = chatHost().useComposerPlaceholder(scope.id, chatId);
+    const chats = host.useReferableChats();
+    const placeholderLead = host.useComposerPlaceholder(scope.id, chatId);
 
     const pending = useMemo(() => [...approvals, ...questions], [approvals, questions]);
     const writable = !disabled && !readOnly;
@@ -361,7 +362,6 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
         }
         let stale = false;
         const search = (): void => {
-            const searchFiles = chatHost().searchFiles;
             if (searchFiles === null) {
                 return;
             }
@@ -386,7 +386,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
             stale = true;
             clearTimeout(timer);
         };
-    }, [scope, info.cwd, mention]);
+    }, [scope, info.cwd, mention, searchFiles]);
 
     /*
      * The host's skill list, once per chat, again once the CLI announced its own after the first message,
@@ -548,7 +548,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
             void actions.stopTurn(chatId, false).catch(showError);
             return;
         }
-        chatHost().confirm.stopSubagents(scope.id, chatId, () => void actions.stopTurn(chatId, true).catch(showError));
+        host.confirm.stopSubagents(scope.id, chatId, () => void actions.stopTurn(chatId, true).catch(showError));
     };
 
     /* The host decides whether a turn is in the way; only its refusal asks the person first. */
@@ -699,7 +699,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
 
     /* Opens the host's new chat once the host took the message; a host that answers nothing took it. */
     const afterSend = (sent: void | Promise<boolean>, andNew: boolean): void => {
-        const openNewChat = chatHost().openNewChat;
+        const openNewChat = host.openNewChat;
         if (!andNew || openNewChat === null) {
             return;
         }
@@ -801,7 +801,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
             if (stored.length === 0) {
                 return [];
             }
-            const files = chatHost().attachments;
+            const files = host.attachments;
             return readStoredAttachments((attachment) => files.read(scope.id, chatId, attachment.id), stored);
         };
         setTakingBack(message.id);
@@ -910,7 +910,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
             return true;
         }
         // The app's own shortcuts stay the app's while you type: Mod+Shift+Enter would otherwise send as well.
-        if (chatHost().isAppShortcut(e)) {
+        if (host.isAppShortcut(e)) {
             return false;
         }
         e.stopPropagation();
@@ -990,7 +990,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                     column: head - line.from,
                     sendKey,
                     multiline: state.doc.lines > 1,
-                    startsNewChat: chatHost().openNewChat !== null
+                    startsNewChat: host.openNewChat !== null
                 }
             );
             if (action === 'newline') {
@@ -1078,7 +1078,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
         ]);
     }, [disabled, readOnly, placeholderLead, mentionable, hasSkills, t]);
     const attachable = capabilities?.attachments !== false;
-    const Slot = chatHost().ComposerSlot;
+    const Slot = host.ComposerSlot;
 
     return (
         <div className="chat-composer-content pointer-events-none relative z-10 w-full">

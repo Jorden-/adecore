@@ -11,7 +11,7 @@ import { SubagentStopButton } from './SubagentStopButton';
 import { formatElapsedShort } from '@adecore/ui/format';
 import { Icon, IconButton, Popover, Surface, useNow } from '@adecore/ui';
 import { useChatRow, useChats } from '../../state/chats';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { useChatScope } from '../../scope';
 import { useChatActions } from '../actions';
 import { statusLookOf, type StatusWord } from '../../agents/status-look';
@@ -24,12 +24,13 @@ const ROW_BODY = 'flex min-h-9 min-w-0 grow items-center gap-2.5 rounded-md px-2
 
 /* What the chat keeps working on beside the thread, in one small line over the composer: its sub-agents and what runs in the background. */
 export function ChatActivity({ chatId }: { chatId: string }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     const order = useChatRow(chatId, (row) => row?.order) ?? NO_ITEMS;
     const structure = useChatRow(chatId, (row) => row?.structure);
     const subagents = useMemo(() => (structure === undefined ? [] : flyoutSubagents(order, structure)), [order, structure]);
     const { id, keyOf } = useChatScope();
-    const tasks = chatHost().tasks.useTasks(id);
+    const tasks = host.tasks.useTasks(id);
     const statuses = useChats((s) => s.statusByKey);
     const progress = useMemo(
         () =>
@@ -55,7 +56,7 @@ export function ChatActivity({ chatId }: { chatId: string }) {
         return null;
     }
     const { shells, monitors } = backgroundCounts(background);
-    const Slot = chatHost().SubagentSlot;
+    const Slot = host.SubagentSlot;
     const counting = progress.active > 0 && progress.total > 1;
     const label = counting
         ? [t('activity.progress', { done: progress.done, total: progress.total }), progress.waiting > 0 && t('activity.needsYou', { count: progress.waiting })]
@@ -171,10 +172,11 @@ function SubagentRows({ chatId, items }: { chatId: string; items: readonly ChatS
 }
 
 function SubagentEntry({ chatId, item, now }: { chatId: string; item: ChatSubagentItem; now: number }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     const { id, keyOf } = useChatScope();
     const refused = useSubagentSupport((s) => s.unsupported[id] === true);
-    const task = chatHost().tasks.useTask(id, taskIdOf(item));
+    const task = host.tasks.useTask(id, taskIdOf(item));
     const { show } = useSubagentTrail(chatId);
     const child = useChats((s) => (item.childId === undefined ? undefined : s.statusByKey[keyOf(item.childId)]?.info));
     const word = statusWordOf(item, task);
@@ -199,6 +201,7 @@ function SubagentEntry({ chatId, item, now }: { chatId: string; item: ChatSubage
 
 /* Only drawn while the flyout is open, so the clock ticks for nobody otherwise. */
 function BackgroundTaskRows({ chatId, tasks }: { chatId: string; tasks: readonly ChatBackgroundTask[] }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     const now = useNow(1000);
     const actions = useChatActions();
@@ -206,7 +209,7 @@ function BackgroundTaskRows({ chatId, tasks }: { chatId: string; tasks: readonly
     function stop(taskId: string): void {
         void actions.stopTask(chatId, taskId).catch((e: unknown) => {
             const description = e instanceof Error ? e.message : t('subagents.noAnswer');
-            chatHost().notify({ kind: 'error', title: t('activity.stopFailed'), description });
+            host.notify({ kind: 'error', title: t('activity.stopFailed'), description });
         });
     }
 

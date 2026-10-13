@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'bun:test';
 import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ChatAssistantItem } from '@adecore/agent-contracts';
-import { chatHost, setChatHost, type ShellCodeBlockContext } from '../../host';
+import { ChatHostProvider, type ChatHost, type ShellCodeBlockContext } from '../../host';
 import { ChatScopeContext, type ChatScope } from '../../scope';
 import { Markdown, MessageMarkdown, ReplyMarkdown } from './Markdown';
 import { AssistantRow, ReportRow, ThinkingRow } from './rows/MessageRows';
@@ -16,24 +16,28 @@ const scope: ChatScope = {
     transport: {} as ChatScope['transport'],
     chats: {} as ChatScope['chats']
 };
-const original = chatHost();
+let host: Partial<ChatHost>;
 let calls: ShellCodeBlockContext[];
 
 beforeEach(() => {
     calls = [];
-    setChatHost({
+    host = {
         useStreaming: () => 'words',
         renderShellCodeBlock: (context) => {
             calls.push(context);
             return createElement('button', { 'data-shell-action': true, disabled: !context.complete }, 'Prepare');
         }
-    });
+    };
 });
 
-afterEach(() => setChatHost(original));
-
 function render(node: ReactNode, context: { provider: 'claude'; chatId?: string } | null = null): string {
-    return renderToStaticMarkup(createElement(ChatScopeContext.Provider, { value: scope }, createElement(ReplyContext.Provider, { value: context }, node)));
+    return renderToStaticMarkup(
+        createElement(
+            ChatHostProvider,
+            { host },
+            createElement(ChatScopeContext.Provider, { value: scope }, createElement(ReplyContext.Provider, { value: context }, node))
+        )
+    );
 }
 
 function assistant(text: string, streaming = false, parentToolUseId?: string): ReactNode {
@@ -56,14 +60,14 @@ describe('shell slot through the real assistant and Markdown renderers', () => {
     });
 
     test.each(['words', 'blocks'] as const)('a closed fence stays incomplete while the main reply streams in %s mode', (mode) => {
-        setChatHost({ useStreaming: () => mode });
+        host = { ...host, useStreaming: () => mode };
         render(assistant('```sh\nprintf ready\n```\n\nThe reply continues.\n', true));
         expect(calls).toHaveLength(1);
         expect(calls[0]?.complete).toBe(false);
     });
 
     test('whole mode waits for the main reply to stop', () => {
-        setChatHost({ useStreaming: () => 'whole' });
+        host = { ...host, useStreaming: () => 'whole' };
         render(assistant('```sh\nprintf ready\n```', true));
         expect(calls).toEqual([]);
         render(assistant('```sh\nprintf ready\n```'));
@@ -123,7 +127,7 @@ describe('shell slot through the real assistant and Markdown renderers', () => {
     });
 
     test('omitting the optional callback keeps the existing render', () => {
-        setChatHost({ renderShellCodeBlock: undefined });
+        host = { ...host, renderShellCodeBlock: undefined };
         const html = render(assistant('```sh\nprintf legacy\n```'));
         expect(html).toContain('printf legacy');
         expect(html).not.toContain('data-shell-action');
@@ -131,7 +135,8 @@ describe('shell slot through the real assistant and Markdown renderers', () => {
 
     test('rendering only creates the action node', () => {
         let clicked = false;
-        setChatHost({
+        host = {
+            ...host,
             renderShellCodeBlock: () =>
                 createElement(
                     'button',
@@ -142,7 +147,7 @@ describe('shell slot through the real assistant and Markdown renderers', () => {
                     },
                     'Prepare'
                 )
-        });
+        };
         render(assistant('```sh\nprintf safe\n```'));
         expect(clicked).toBe(false);
     });

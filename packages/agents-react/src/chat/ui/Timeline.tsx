@@ -61,7 +61,7 @@ import { Row } from './rows/Rows';
 import { RowContainer } from './rows/RowContainer';
 import { ReplyHeader } from './rows/MessageRows';
 import { useChatRow, useChats } from '../../state/chats';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { useChatScope } from '../../scope';
 import { FileLinkContext } from './file-links';
 import { AgentIcon } from '../../agents/AgentIcon';
@@ -83,11 +83,12 @@ function showRowAtTop(virtualizer: Virtualizer<HTMLDivElement, Element>, followR
  * and the folder it works in, so a first question can lean on all three.
  */
 function EmptyThread({ chatId }: { chatId: string }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     const info = useChatRow(chatId, (row) => row?.info ?? null);
     const model = useModelName(info?.provider, info?.selection.model ?? '');
-    const sources = chatHost().useContextSources(chatId);
-    const hidesFolder = chatHost().useHidesFolder(chatId);
+    const sources = host.useContextSources(chatId);
+    const hidesFolder = host.useHidesFolder(chatId);
     return (
         <div className="flex grow items-center justify-center">
             <div className="flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center">
@@ -140,6 +141,8 @@ function MarkableRow({ row, chatId, bookmark, children }: { row: TimelineRow; ch
  * where it was underneath and the composer stays in reach for the prompts it answers.
  */
 export function Timeline({ chatId, composer, overlay }: { chatId: string; composer?: ReactNode; overlay?: ReactNode }) {
+    const host = useChatHost();
+    const { fork } = host;
     const { t } = useTranslation('agent-chat');
     const order = useChatRow(chatId, (row) => row?.order);
     // The structure, not the items. A delta growing a reply must not derive every row again.
@@ -211,15 +214,15 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
             { expandedGroups: groups.ids, expandedTurns: turns.ids, expandedSubagents: subagents.ids, activeTurnId, forkedTurns }
         );
     }, [order, items, groups.ids, turns.ids, subagents.ids, activeTurnId, forkedTurns]);
-    const cards = chatHost().useThreadCards(scopeId, chatId);
-    const drawsVisuals = chatHost().visuals !== null;
+    const cards = host.useThreadCards(scopeId, chatId);
+    const drawsVisuals = host.visuals !== null;
     // Where the part of the thread this client holds begins, while there is a page before it.
     const heldFrom = cursor === null ? null : (items?.[order?.[0] ?? '']?.createdAt ?? null);
     const rows = useMemo(
         () => withTimedRows(threadRows, timedRowsOf(cards, drawsVisuals ? (visuals ?? []) : null, heldFrom)),
         [threadRows, cards, drawsVisuals, visuals, heldFrom]
     );
-    const welcomes = chatHost().useWelcome(chatId);
+    const welcomes = host.useWelcome(chatId);
 
     const empty = rows.length === 0;
     // A chat that took a turn before is one whose thread has not come in yet, not one to greet.
@@ -380,7 +383,7 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
     const visibleHeight = Math.max(0, viewport - coveredHeight);
     const inView = showsScrubber ? messagesInView({ starts, scrollTop, visibleHeight }) : null;
 
-    const chatFind = chatHost().useTimelineFind({
+    const chatFind = host.useTimelineFind({
         chatId,
         frame: frameRef,
         thread: threadRef,
@@ -551,15 +554,15 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
         () => ({
             chatId,
             canFork: (turnId) => {
-                if (chatHost().fork === null) {
+                if (fork === null) {
                     return false;
                 }
                 const row = useChats.getState().byKey[keyOf(chatId)];
                 return forkRefusal(row?.info ?? null, row?.structure[turnId]) === null;
             },
-            fork: (turnId) => chatHost().fork?.(chatId, turnId)
+            fork: (turnId) => fork?.(chatId, turnId)
         }),
-        [keyOf, chatId]
+        [keyOf, chatId, fork]
     );
 
     const stepRef = useRef<(direction: -1 | 1) => boolean>(() => false);

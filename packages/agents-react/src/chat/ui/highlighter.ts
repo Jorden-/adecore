@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { BundledLanguage, BundledTheme, createHighlighter, ThemeRegistration } from 'shiki/bundle/web';
 import type { CodeToken, Tokenize } from './code-lines';
+import type { ChatHost } from '../../host';
 import { shikiThemeOf } from './code-theme';
 
 export type Highlighter = Awaited<ReturnType<typeof createHighlighter>>;
@@ -47,12 +48,12 @@ export function loadLanguage(lang: string): Promise<void> {
     return load;
 }
 
-/* Loads a theme into the highlighter, once. */
-export function loadTheme(theme: string): Promise<void> {
+/* Loads a theme into the highlighter, once: one of `custom` by its name, or a bundled one by its id. */
+export function loadTheme(theme: string, custom: ChatHost['code']['custom']): Promise<void> {
     let load = themeLoads.get(theme);
     if (!load) {
         load = loadHighlighter().then(async (loaded) => {
-            await loaded.loadTheme(shikiThemeOf(theme) as BundledTheme | ThemeRegistration);
+            await loaded.loadTheme(shikiThemeOf(theme, custom) as BundledTheme | ThemeRegistration);
             loadedThemes.add(theme);
         });
         themeLoads.set(theme, load);

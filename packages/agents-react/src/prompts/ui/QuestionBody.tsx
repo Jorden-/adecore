@@ -6,7 +6,7 @@ import type { ChatQuestion } from '@adecore/agent-contracts';
 import { answerFieldKey, choiceKey, stepIndex } from '../logic/keys';
 import { pickPromptChoice, type PromptAnswer } from '../logic/prompts';
 import { Icon } from '@adecore/ui';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 
 /* One question of a request: its choices, "Something else…", or a written answer when it offers no choices. */
 export function QuestionBody({
@@ -23,8 +23,9 @@ export function QuestionBody({
     onCommit(answer: PromptAnswer): void;
     locked: boolean;
 }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-prompts');
-    const AnswerField = chatHost().dictation.Textarea;
+    const AnswerField = host.dictation.Textarea;
     // The choices, then the "Something else…" field form one list with a single tab stop.
     const items = useRef<(HTMLElement | null)[]>([]);
     const shownQuestion = useRef(question.id);

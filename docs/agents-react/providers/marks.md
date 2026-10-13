@@ -12,4 +12,4 @@ The marks of the agent CLIs and the dot of an account's color.
 | `ProviderLogo({ provider, size?, className? })` | `agents/ProviderLogo` | The mark of a `UsageProvider`, decorative.                                                    |
 | `AccountDot({ color, className? })`         | `agents/AccountDot`      | An account's color: one of the host's `accents` by id, or the app's accent for any other.     |
 
-`size` is in pixels, 14 by default. `PROVIDER_PATHS` holds the SVG paths of the usage providers' marks, and `accountColor(id)` the CSS color of an accent.
+`size` is in pixels, 14 by default. `PROVIDER_PATHS` holds the SVG paths of the usage providers' marks, and `accountColor(id, accents)` the CSS color of one of the host's `accents.all`.

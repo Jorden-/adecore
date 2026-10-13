@@ -26,7 +26,7 @@ import {
 } from '@adecore/intelligent-ui';
 import { ErrorBoundary, Tooltip } from '@adecore/ui';
 import type { ChatUiAnswer, ChatUiQueryState } from '@adecore/agent-contracts';
-import { chatHost } from '../../../host';
+import { useChatHost } from '../../../host';
 import { UiReplyNavigationContext } from '../reply-context';
 import { ReplyMarkdown } from '../Markdown';
 import { rehypeFadeWords } from '../rehype-fade';
@@ -379,6 +379,7 @@ function UiBlockBody({
     answered?: ChatUiAnswer;
     frozen?: ChatUiQueryState['blocks'][string];
 }): ReactNode {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     const key = JSON.stringify([context.scopeId, context.chatId, context.itemId, block.id]);
     const [state] = useState(() => localState(key, block, answered));
@@ -428,7 +429,7 @@ function UiBlockBody({
         [sources, element]
     );
     const liveValue = useUiLiveValues(block, evaluation.nodes, queries.currentReadings);
-    const sendChoice = chatHost().intelligentUi?.sendChoice;
+    const sendChoice = host.intelligentUi?.sendChoice;
     const rendering: UiRenderContext = {
         ...context,
         ...links,

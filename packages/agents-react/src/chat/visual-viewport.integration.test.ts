@@ -27,26 +27,26 @@ test('a sandboxed visual follows the timeline while its own controls retain thei
         `
         import { createElement } from ${JSON.stringify(join(import.meta.dir, '../../../../node_modules/react'))};
         import { createRoot } from ${JSON.stringify(join(import.meta.dir, '../../../../node_modules/react-dom/client'))};
-        import { setChatHost } from ${JSON.stringify(join(import.meta.dir, '../host.ts'))};
+        import { ChatHostProvider } from ${JSON.stringify(join(import.meta.dir, '../host.ts'))};
         import { ChatScopeContext } from ${JSON.stringify(join(import.meta.dir, '../scope.ts'))};
         import { VisualFrame } from ${JSON.stringify(join(import.meta.dir, 'ui/VisualFrame.tsx'))};
         import { RowContainer } from ${JSON.stringify(join(import.meta.dir, 'ui/rows/RowContainer.tsx'))};
         import { threadPaddingLeft, STRIP_CLEARANCE_PX } from ${JSON.stringify(join(import.meta.dir, 'logic/scrubber.ts'))};
         const scroller = document.getElementById('scroller');
-        setChatHost({
+        const host = {
             visuals: { frameUrl: location.origin + '/visual', openLink: () => {} },
             attachments: { read: async () => new Blob([${JSON.stringify(fixture)}]), useUrl: () => ({url:null}) }
-        });
+        };
         const app = createRoot(document.getElementById('mount'));
         let layout;
         const render = (fill = false) => {
             const visual = {id:'page', title:'Chart', at:0, maxHeight:2000, size:1, layout};
             const frame = createElement(VisualFrame, {chatId:'test', visual, fill, key:fill?'expanded':'inline'});
-            app.render(createElement(ChatScopeContext.Provider, {value:{id:'test'}},
+            app.render(createElement(ChatHostProvider, {host}, createElement(ChatScopeContext.Provider, {value:{id:'test'}},
                 createElement(RowContainer, {row:{kind:'assistant',id:'text',text:'Before'},previous:null,index:0,top:0}, createElement('p', {id:'text'}, 'Before the visual')),
                 fill ? createElement('div', {'data-index':1,style:{position:'absolute',top:200,height:500,width:'100%'}}, frame)
                     : createElement(RowContainer, {row:{kind:'visual',id:'page',visual},previous:null,index:1,top:200}, frame)
-            ));
+            )));
         };
         window.setLayout = next => { layout = next; render(); };
         window.resizePane = (width, strip = false) => {

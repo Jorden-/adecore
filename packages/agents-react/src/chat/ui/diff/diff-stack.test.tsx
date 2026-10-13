@@ -1,32 +1,59 @@
 import { expect, test } from 'bun:test';
-import { act, StrictMode } from 'react';
+import { act, StrictMode, type ReactNode } from 'react';
 import type { ChatToolItem } from '@adecore/agent-contracts';
 import { ChatScopeContext, type ChatScope } from '../../../scope';
 import { ChangedFilesRow } from '../rows/WorkRows';
-import { createRoot } from 'react-dom/client';
+import { createRoot, type Root } from 'react-dom/client';
 import type { EditorEngine } from '@adecore/editor';
 import { FakeEditorEngine } from '@adecore/editor/fake';
 import { createPage } from '@adecore/editor/testing';
-import { chatHost, setChatHost } from '../../../host';
+import { ChatHostProvider, type ChatHost } from '../../../host';
 import { DiffStack, ReviewStackView } from './DiffStack';
 import { reviewEntries, type ReviewEntry } from './review-plan';
 import { useReviewStack } from './use-review-stack';
 
-async function mounted(run: (page: ReturnType<typeof createPage>, root: ReturnType<typeof createRoot>) => Promise<void>) {
+const CODE: ChatHost['code'] = { useMode: () => 'light', useThemes: () => ({ light: 'github-light', dark: 'github-dark' }), custom: [] };
+
+interface HostedRoot {
+    render(view: ReactNode): void;
+    unmount(): void;
+}
+
+let host: Partial<ChatHost> = {};
+let hosts = 0;
+
+/* A provider reads its host once, so a new host mounts the next render again under a key of its own. */
+function setHost(next: Partial<ChatHost>): void {
+    host = next;
+    hosts += 1;
+}
+
+function hostedRoot(root: Root): HostedRoot {
+    return {
+        render: (view) =>
+            root.render(
+                <ChatHostProvider key={hosts} host={host}>
+                    {view}
+                </ChatHostProvider>
+            ),
+        unmount: () => root.unmount()
+    };
+}
+
+async function mounted(run: (page: ReturnType<typeof createPage>, root: HostedRoot) => Promise<void>) {
     const page = createPage();
     const names = ['window', 'HTMLElement', 'customElements', 'requestAnimationFrame', 'cancelAnimationFrame', 'IS_REACT_ACT_ENVIRONMENT'] as const;
     const previous = names.map((name) => Object.getOwnPropertyDescriptor(globalThis, name));
-    const host = chatHost();
     Object.defineProperty(globalThis, 'window', { value: page.window, configurable: true });
     Object.defineProperty(globalThis, 'HTMLElement', { value: page.window.HTMLElement, configurable: true });
     Object.defineProperty(globalThis, 'customElements', { value: page.window.customElements, configurable: true });
     Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { value: true, configurable: true });
-    const root = createRoot(page.host);
+    const root = hostedRoot(createRoot(page.host));
     try {
         await run(page, root);
     } finally {
         await act(async () => root.unmount());
-        setChatHost(host);
+        setHost({});
         names.forEach((name, index) => {
             const descriptor = previous[index];
             if (descriptor === undefined) {
@@ -64,7 +91,7 @@ test('stacked reviews admit one editor per frame, retain stable entries and prom
     await mounted(async (page, root) => {
         const nextFrame = frames(page);
         const engine = new FakeEditorEngine();
-        setChatHost({ code: { ...chatHost().code, editor: async () => engine } });
+        setHost({ code: { ...CODE, editor: async () => engine } });
         await act(async () => root.render(<DiffStack entries={entries} />));
         expect(engine.editors).toHaveLength(1);
         expect(page.host.querySelectorAll('[data-review-pending]')).toHaveLength(2);
@@ -106,7 +133,7 @@ test('open files share one group budget and reopening a closed group starts with
     await mounted(async (page, root) => {
         const nextFrame = frames(page);
         const engine = new FakeEditorEngine();
-        setChatHost({ code: { ...chatHost().code, editor: async () => engine } });
+        setHost({ code: { ...CODE, editor: async () => engine } });
         await act(async () => root.render(<OpenFiles entries={entries} />));
         await nextFrame();
         await nextFrame();
@@ -128,7 +155,7 @@ test('closing and reopening the changed-files card restarts its per-frame admiss
     await mounted(async (page, root) => {
         const nextFrame = frames(page);
         const engine = new FakeEditorEngine();
-        setChatHost({ code: { ...chatHost().code, editor: async () => engine } });
+        setHost({ code: { ...CODE, editor: async () => engine } });
         const scope: ChatScope = {
             id: 'review',
             keyOf: (id) => id,
@@ -186,7 +213,7 @@ for (const strict of [false, true]) {
             const nextFrame = frames(page);
             const engine = new FakeEditorEngine();
             const delayed = delayedEngine();
-            setChatHost({ code: { ...chatHost().code, editor: delayed.load } });
+            setHost({ code: { ...CODE, editor: delayed.load } });
             const view = <DiffStack entries={entries} />;
             await act(async () => root.render(strict ? <StrictMode>{view}</StrictMode> : view));
             for (let index = 0; index < 3; index++) {
@@ -208,7 +235,7 @@ test('a rejected grouped engine settles its status before admitting the next rev
     await mounted(async (page, root) => {
         const nextFrame = frames(page);
         const delayed = delayedEngine();
-        setChatHost({ code: { ...chatHost().code, editor: delayed.load } });
+        setHost({ code: { ...CODE, editor: delayed.load } });
         const fallbackEntries = reviewEntries(
             entries.slice(1).map((entry) => ({ path: entry.path, kind: 'update', diff: 'raw fallback' })),
             [{ path: 'first.txt', before: 'old\n'.repeat(201), after: 'new\n'.repeat(201) }]
@@ -231,9 +258,9 @@ test('an omitted head settles without loading an engine', async () => {
         const nextFrame = frames(page);
         const engine = new FakeEditorEngine();
         let loads = 0;
-        setChatHost({
+        setHost({
             code: {
-                ...chatHost().code,
+                ...CODE,
                 editor: async () => {
                     loads++;
                     return engine;
@@ -254,7 +281,7 @@ test('removing a waiting review does not block its successor', async () => {
         const nextFrame = frames(page);
         const delayed = delayedEngine();
         const engine = new FakeEditorEngine();
-        setChatHost({ code: { ...chatHost().code, editor: delayed.load } });
+        setHost({ code: { ...CODE, editor: delayed.load } });
         await act(async () => root.render(<DiffStack entries={entries} />));
         await nextFrame();
         await act(async () => root.render(<DiffStack entries={entries.slice(1)} />));
@@ -272,13 +299,13 @@ test('reopening a review group with a fresh cold loader waits for its first moun
     await mounted(async (page, root) => {
         const nextFrame = frames(page);
         const engine = new FakeEditorEngine();
-        setChatHost({ code: { ...chatHost().code, editor: async () => engine } });
+        setHost({ code: { ...CODE, editor: async () => engine } });
         await act(async () => root.render(<OpenFiles entries={entries} />));
         await nextFrame();
         await nextFrame();
         await act(async () => root.render(<OpenFiles entries={[]} />));
         const delayed = delayedEngine();
-        setChatHost({ code: { ...chatHost().code, editor: delayed.load } });
+        setHost({ code: { ...CODE, editor: delayed.load } });
         await act(async () => root.render(<OpenFiles entries={entries} />));
         await nextFrame();
         await nextFrame();

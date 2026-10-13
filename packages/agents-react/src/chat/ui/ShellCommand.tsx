@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type { BundledLanguage } from 'shiki/bundle/web';
 import { EMBEDDED_CODE_LIMIT, SHELL_LANGUAGE, embeddedCode } from '../logic/embedded-code';
 import type { CodeToken } from './code-lines';
+import { useChatHost } from '../../host';
 import { useCodeTheme } from './code-theme';
 import { loadLanguage, loadTheme, loadedLanguage, readyHighlighter, tokenStyle, type Highlighter } from './highlighter';
 
@@ -109,6 +110,7 @@ function draw(command: string, runs: readonly Run[]): ReactNode[] {
  */
 export function ShellCommand({ command }: { command: string }) {
     const theme = useCodeTheme();
+    const { custom } = useChatHost().code;
     // Bumped when a load settles, so the cache is asked again.
     const [, setLoads] = useState(0);
     const tooLong = command.length > EMBEDDED_CODE_LIMIT;
@@ -119,13 +121,13 @@ export function ShellCommand({ command }: { command: string }) {
             return;
         }
         let cancelled = false;
-        Promise.all([loadTheme(theme), ...[...languagesOf(command)].map(loadLanguage)])
+        Promise.all([loadTheme(theme, custom), ...[...languagesOf(command)].map(loadLanguage)])
             .then(() => !cancelled && setLoads((count) => count + 1))
             .catch(() => undefined);
         return () => {
             cancelled = true;
         };
-    }, [command, theme, runs, tooLong]);
+    }, [command, theme, custom, runs, tooLong]);
 
     return <>{runs === null ? command : draw(command, runs)}</>;
 }

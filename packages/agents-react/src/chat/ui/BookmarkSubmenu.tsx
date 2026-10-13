@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Bookmark, Pencil, X } from 'lucide-react';
 import { goToBookmark, removeBookmark } from '../bookmarks';
 import { bookmarkLabel, bookmarksInThreadOrder } from '../logic/bookmarks';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { useChatScope } from '../../scope';
 import { useChatRow } from '../../state/chats';
 import { Icon, Menu } from '@adecore/ui';
@@ -15,7 +15,8 @@ export function BookmarkSubmenu({ chatId }: { chatId: string }) {
     const scope = useChatScope();
     const bookmarks = useChatRow(chatId, (row) => row?.bookmarks);
     const order = useChatRow(chatId, (row) => row?.order);
-    const place = chatHost().useChatPlace(chatId);
+    const host = useChatHost();
+    const place = host.useChatPlace(chatId);
     const sorted = useMemo(() => bookmarksInThreadOrder(bookmarks ?? [], order ?? []), [bookmarks, order]);
     if (sorted.length === 0) {
         return null;
@@ -40,7 +41,7 @@ export function BookmarkSubmenu({ chatId }: { chatId: string }) {
                             <span className={clsx('min-w-0 grow truncate', bookmark.name === undefined && 'text-text-muted')}>{bookmarkLabel(bookmark)}</span>
                         </Menu.Item>
                         <Menu.RowAction icon={Pencil} label={t('bookmarks.rename')} onClick={() => go(bookmark.itemId, true)} />
-                        <Menu.RowAction icon={X} label={t('bookmarks.remove')} onClick={() => void removeBookmark(scope, chatId, bookmark)} />
+                        <Menu.RowAction icon={X} label={t('bookmarks.remove')} onClick={() => void removeBookmark(scope, host, chatId, bookmark)} />
                     </Menu.Row>
                 ))}
             </Menu.Popup>

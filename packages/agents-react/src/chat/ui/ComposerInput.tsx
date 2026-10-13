@@ -1,7 +1,7 @@
 import { useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react';
 import { Compartment, EditorState, Prec, Transaction, type Extension } from '@codemirror/state';
 import { EditorView, placeholder as placeholderText } from '@codemirror/view';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { composerEditorExtensions, externalChange } from './composer/editor';
 import { insertAtSelection } from './composer/insert';
 
@@ -63,6 +63,7 @@ export function ComposerInput({
     aria = NO_ARIA,
     ...handlers
 }: ComposerInputProps) {
+    const { dictation } = useChatHost();
     const hostRef = useRef<HTMLDivElement>(null);
     const targetRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
@@ -93,7 +94,7 @@ export function ComposerInput({
                 selection: { anchor: initial.length },
                 extensions: [
                     composerEditorExtensions(),
-                    chatHost().dictation.composer?.extensions ?? [],
+                    dictation.composer?.extensions ?? [],
                     compartments.attributes.of([]),
                     compartments.editable.of([]),
                     compartments.placeholder.of([]),
@@ -137,7 +138,7 @@ export function ComposerInput({
             view.destroy();
             viewRef.current = null;
         };
-    }, [compartments]);
+    }, [compartments, dictation.composer?.extensions]);
 
     useLayoutEffect(() => {
         viewRef.current?.dispatch({
@@ -192,7 +193,7 @@ export function ComposerInput({
         []
     );
 
-    const Dictation = chatHost().dictation.composer?.Control;
+    const Dictation = dictation.composer?.Control;
     return (
         <div ref={targetRef} className="min-w-0">
             <div ref={hostRef} className={className} />

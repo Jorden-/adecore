@@ -7,7 +7,7 @@ import {
     type DiffSyntaxService,
     type DiffSyntaxTokens
 } from '@adecore/editor/shiki-worker';
-import { chatHost } from '../../../host';
+import type { ChatHost } from '../../../host';
 
 interface Pending {
     promise: Promise<DiffSyntaxTokens | null>;
@@ -39,11 +39,16 @@ export interface DiffSyntaxRuntimeOptions {
 }
 
 let nextGeneration = 0;
-let shared: DiffSyntaxRuntime | undefined;
+const shared = new WeakMap<ChatHost['code'], DiffSyntaxRuntime>();
 
-export function diffSyntaxRuntime(): DiffSyntaxRuntime {
-    const code = chatHost().code;
-    return (shared ??= createDiffSyntaxRuntime({ workerFactory: code.syntaxWorker, themes: code.custom, highlighter: code.highlighter }));
+/* The runtime of a host's `code`, made on first use and shared by every diff under that host. */
+export function diffSyntaxRuntime(code: ChatHost['code']): DiffSyntaxRuntime {
+    let runtime = shared.get(code);
+    if (runtime === undefined) {
+        runtime = createDiffSyntaxRuntime({ workerFactory: code.syntaxWorker, themes: code.custom, highlighter: code.highlighter });
+        shared.set(code, runtime);
+    }
+    return runtime;
 }
 
 export function createDiffSyntaxRuntime(options: DiffSyntaxRuntimeOptions): DiffSyntaxRuntime {

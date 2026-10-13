@@ -12,7 +12,6 @@ const drafts = await import('@adecore/agents-react/chat/drafts');
 const preferences = await import('@adecore/agents-react/chat/preferences');
 const usage = await import('@adecore/agents-react/state/usage');
 const storage = await import('@adecore/agents-react/storage');
-const { setChatHost, chatHost } = await import('@adecore/agents-react/host');
 assert.equal(reads, 0);
 
 const records = new Map([
@@ -22,24 +21,21 @@ const records = new Map([
     ['ruimte.usage', JSON.stringify({ period: '30d', metric: 'tokens', currency: 'EUR' })]
 ]);
 let refuseWrites = false;
-setChatHost({
+storage.configureChatStorage({
+    namespace: 'example',
+    legacyNamespaces: ['ruimte'],
+    keys: { preferences: 'custom.preferences' },
     storage: {
-        namespace: 'example',
-        legacyNamespaces: ['ruimte'],
-        keys: { preferences: 'custom.preferences' },
-        storage: {
-            getItem: (key) => records.get(key) ?? null,
-            setItem: (key, value) => {
-                if (refuseWrites) {
-                    throw new Error('Quota exceeded');
-                }
-                records.set(key, value);
+        getItem: (key) => records.get(key) ?? null,
+        setItem: (key, value) => {
+            if (refuseWrites) {
+                throw new Error('Quota exceeded');
             }
+            records.set(key, value);
         }
     }
 });
 assert.equal(reads, 0);
-assert.equal(chatHost().storage.namespace, 'example');
 assert.equal(preferences.CHAT_PREFERENCES_KEY, 'custom.preferences');
 assert.equal(usage.USAGE_PREFERENCES_KEY, 'example.usage');
 assert.deepEqual(drafts.useDrafts.getState().ids, ['chat']);

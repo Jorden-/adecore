@@ -15,7 +15,7 @@ describe('ShellCommand', () => {
         const plain = render(command);
         expect(plain.textContent).toBe(command);
         expect(plain.querySelector('span')).toBeNull();
-        await Promise.all([loadTheme('github-light'), loadLanguage('shellscript'), loadLanguage('python')]);
+        await Promise.all([loadTheme('github-light', []), loadLanguage('shellscript'), loadLanguage('python')]);
         const drawn = render(command);
         expect(drawn.textContent).toBe(command);
         const colored = [...drawn.querySelectorAll('span')].filter((span) => span.getAttribute('style')?.includes('color'));

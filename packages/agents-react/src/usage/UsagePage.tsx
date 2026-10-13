@@ -4,7 +4,7 @@ import { ChartNoAxesColumn, RefreshCw } from 'lucide-react';
 import { USAGE_PROVIDERS, type UsageAccount } from '@adecore/agent-contracts';
 import { Button, CloseButton, Dialog, EmptyState, FormError, IconButton, Segmented, Select, Skeleton } from '@adecore/ui';
 import { AccountDot } from '../agents/AccountDot';
-import { chatHost } from '../host';
+import { useChatHost } from '../host';
 import { useChatScope } from '../scope';
 import { useProvidersStore } from '../state/providers';
 import { askedKey, summaryPayload, USAGE_PERIODS, useUsage, useUsageStore, type UsageMetric, type UsagePeriod } from '../state/usage';
@@ -39,6 +39,7 @@ function useAnswering(transport: ChatTransport): boolean {
  * agent looks like too, and the way to fix that is the agent settings.
  */
 function HostAgents() {
+    const host = useChatHost();
     const { t } = useTranslation('agent-usage');
     const { id } = useChatScope();
     const row = useProvidersStore((s) => s.byScope[id]);
@@ -51,7 +52,7 @@ function HostAgents() {
             <p className="text-xs text-text-muted">
                 {installed.length === 0 ? t('agents.none') : t('agents.installed', { list: installed.map((provider) => provider.name).join(', ') })}
             </p>
-            <Button size="sm" variant="secondary" onClick={() => chatHost().openSettings('agents')}>
+            <Button size="sm" variant="secondary" onClick={() => host.openSettings('agents')}>
                 {t('agents.settings')}
             </Button>
         </div>

@@ -2,21 +2,19 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { parseHTML } from 'linkedom';
-import { chatHost, setChatHost, type ChatHost, type FileRef } from '../../host';
+import { ChatHostProvider, type ChatHost, type FileRef } from '../../host';
 import { ChatScopeContext, type ChatScope } from '../../scope';
-import { FileLinkContext, openFileLink } from '../ui/file-links';
+import { FileLinkContext, useOpenFileLink } from '../ui/file-links';
 import { Markdown, MessageMarkdown } from '../ui/Markdown';
 import { readTimelineTarget, revealUiReplyBlock, uiReplyJump, withCurrentText } from './timeline-target';
 import { compileUi } from '@adecore/intelligent-ui';
 import type { TimelineRow } from './timeline';
 
-const original = chatHost();
 const windowBefore = Object.getOwnPropertyDescriptor(globalThis, 'window');
 const scope = { id: 'original-machine' } as ChatScope;
 
 beforeEach(() => Object.defineProperty(globalThis, 'window', { configurable: true, value: { getSelection: () => null } }));
 afterEach(() => {
-    setChatHost(original);
     if (windowBefore) {
         Object.defineProperty(globalThis, 'window', windowBefore);
     } else {
@@ -27,7 +25,7 @@ afterEach(() => {
 test('the real Markdown link captures its full ref, cwd and scope without aliasing the host ref', () => {
     const ref: FileRef = { path: 'a folder/日本語.ts', line: 12, column: 4, endLine: 16, directory: false };
     let owner: string | null | undefined;
-    setChatHost({
+    const host: Partial<ChatHost> = {
         fileLinks: {
             target: (_text, _cwd, scopeId) => {
                 owner = scopeId;
@@ -35,12 +33,16 @@ test('the real Markdown link captures its full ref, cwd and scope without aliasi
             },
             open: () => {}
         }
-    });
+    };
     const markup = renderToStaticMarkup(
         createElement(
-            ChatScopeContext.Provider,
-            { value: scope },
-            createElement(FileLinkContext.Provider, { value: '/original-cwd' }, createElement(Markdown, { text: '[Source](<a folder/日本語.ts:12:4-16>)' }))
+            ChatHostProvider,
+            { host },
+            createElement(
+                ChatScopeContext.Provider,
+                { value: scope },
+                createElement(FileLinkContext.Provider, { value: '/original-cwd' }, createElement(Markdown, { text: '[Source](<a folder/日本語.ts:12:4-16>)' }))
+            )
         )
     );
     const { document } = parseHTML(markup);
@@ -56,8 +58,8 @@ test('the real Markdown link captures its full ref, cwd and scope without aliasi
 });
 
 test('standalone Markdown uses an explicit null owner and preserves directory refs', () => {
-    setChatHost({ fileLinks: { target: () => ({ path: '/folder/', directory: true }), open: () => {} } });
-    const { document } = parseHTML(renderToStaticMarkup(createElement(Markdown, { text: '[Folder](/folder/)' })));
+    const host: Partial<ChatHost> = { fileLinks: { target: () => ({ path: '/folder/', directory: true }), open: () => {} } };
+    const { document } = parseHTML(renderToStaticMarkup(createElement(ChatHostProvider, { host }, createElement(Markdown, { text: '[Folder](/folder/)' }))));
     expect(readTimelineTarget(document.querySelector('button')!, document.body, []).file).toEqual({
         ref: { path: '/folder/', directory: true },
         cwd: null,
@@ -110,9 +112,12 @@ test('two-argument file adapters and helper calls remain supported', () => {
             calls.push({ cwd, ref });
         }
     };
-    setChatHost({ fileLinks });
     const ref = fileLinks.target('/legacy', null)!;
-    openFileLink(null, ref);
+    function Opener() {
+        useOpenFileLink()(null, ref);
+        return null;
+    }
+    renderToStaticMarkup(createElement(ChatHostProvider, { host: { fileLinks } }, createElement(Opener)));
     expect(calls).toEqual([{ cwd: null, ref }]);
 });
 

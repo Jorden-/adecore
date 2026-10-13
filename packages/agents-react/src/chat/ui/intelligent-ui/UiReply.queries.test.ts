@@ -3,13 +3,12 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { z } from 'zod';
 import { compileUiBlock } from '@adecore/intelligent-ui';
-import { chatHost, setChatHost } from '../../../host';
+import { ChatHostProvider, type ChatHost } from '../../../host';
 import { UiReply } from './UiReply';
 
 test.skipIf(typeof document === 'undefined')('changing a query input closes its choice until matching data is read', async () => {
     const observer = globalThis.IntersectionObserver;
     Object.defineProperty(globalThis, 'IntersectionObserver', { configurable: true, writable: true, value: undefined });
-    const previous = chatHost().intelligentUi;
     const originalNow = Date.now;
     let now = originalNow();
     Date.now = () => now;
@@ -24,7 +23,7 @@ test.skipIf(typeof document === 'undefined')('changing a query input closes its 
     block.revision = 'revision';
     block.start = 0;
     block.end = text.length;
-    setChatHost({
+    const host: Partial<ChatHost> = {
         intelligentUi: {
             query: async (_scope, payload) => {
                 reads.push(payload.values);
@@ -42,18 +41,22 @@ test.skipIf(typeof document === 'undefined')('changing a query input closes its 
                 return 'sent';
             }
         }
-    });
+    };
     const element = document.createElement('div');
     document.body.append(element);
     const root = createRoot(element);
     try {
         await act(async () =>
             root.render(
-                createElement(UiReply, {
-                    text,
-                    blocks: [block],
-                    context: { scopeId: 'query-test', chatId: 'chat', itemId: 'item', phase: 'final' }
-                })
+                createElement(
+                    ChatHostProvider,
+                    { host },
+                    createElement(UiReply, {
+                        text,
+                        blocks: [block],
+                        context: { scopeId: 'query-test', chatId: 'chat', itemId: 'item', phase: 'final' }
+                    })
+                )
             )
         );
         const choose = () => [...element.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Choose')!;
@@ -83,13 +86,12 @@ test.skipIf(typeof document === 'undefined')('changing a query input closes its 
         await act(async () => root.unmount());
         element.remove();
         Date.now = originalNow;
-        setChatHost({ intelligentUi: previous });
         Object.defineProperty(globalThis, 'IntersectionObserver', { configurable: true, writable: true, value: observer });
     }
 });
 
 /* A block with one query on a Switch and one Choice, mounted with `query` as the host's reader. */
-async function mountQueryBlock(scopeId: string, query: NonNullable<NonNullable<ReturnType<typeof chatHost>['intelligentUi']>['query']>) {
+async function mountQueryBlock(scopeId: string, query: NonNullable<NonNullable<ChatHost['intelligentUi']>['query']>) {
     const source =
         '$flag = false\n$data = @Query("status", {flag: $flag})\n<Stats><Stat label="Count" value={$data.count}/></Stats><Switch value={$flag}>Flag</Switch><Choices><Choice>Choose</Choice></Choices>';
     const text = '```ui\n' + source + '\n```';
@@ -98,28 +100,37 @@ async function mountQueryBlock(scopeId: string, query: NonNullable<NonNullable<R
     block.start = 0;
     block.end = text.length;
     let refresh = () => {};
-    const host = (read: typeof query) => ({
-        query: read,
-        subscribe: (_scope: string, _chat: string, listener: () => void) => {
-            refresh = listener;
-            return () => {};
-        },
-        sendChoice: async () => 'sent' as const
-    });
-    setChatHost({ intelligentUi: host(query) });
+    let reader = query;
+    const host: Partial<ChatHost> = {
+        intelligentUi: {
+            query: (scope, payload) => reader(scope, payload),
+            subscribe: (_scope, _chat, listener) => {
+                refresh = listener;
+                return () => {};
+            },
+            sendChoice: async () => 'sent'
+        }
+    };
     const element = document.createElement('div');
     document.body.append(element);
     const root = createRoot(element);
-    const draw = () => root.render(createElement(UiReply, { text, blocks: [block], context: { scopeId, chatId: 'chat', itemId: 'item', phase: 'final' } }));
-    await act(async () => draw());
+    const draw = (drawn: typeof block) =>
+        root.render(
+            createElement(
+                ChatHostProvider,
+                { host },
+                createElement(UiReply, { text, blocks: [drawn], context: { scopeId, chatId: 'chat', itemId: 'item', phase: 'final' } })
+            )
+        );
+    await act(async () => draw(block));
     return {
         element,
         choose: () => [...element.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Choose')!,
         refresh: () => refresh(),
-        /* Hands the view a new reader, which runs the query effect's cleanup and starts it again. */
+        /* Reads with `read` from now on, and draws the block anew, which runs the query effect's cleanup and starts it again. */
         swap: async (read: typeof query) => {
-            setChatHost({ intelligentUi: host(read) });
-            await act(async () => draw());
+            reader = read;
+            await act(async () => draw({ ...block }));
         },
         unmount: async () => {
             await act(async () => root.unmount());
@@ -131,7 +142,6 @@ async function mountQueryBlock(scopeId: string, query: NonNullable<NonNullable<R
 test.skipIf(typeof document === 'undefined')('a read its cleanup cut short leaves the choices open on the reading before it', async () => {
     const observer = globalThis.IntersectionObserver;
     Object.defineProperty(globalThis, 'IntersectionObserver', { configurable: true, writable: true, value: undefined });
-    const previous = chatHost().intelligentUi;
     const originalNow = Date.now;
     let now = originalNow();
     Date.now = () => now;
@@ -153,7 +163,6 @@ test.skipIf(typeof document === 'undefined')('a read its cleanup cut short leave
     } finally {
         await view.unmount();
         Date.now = originalNow;
-        setChatHost({ intelligentUi: previous });
         Object.defineProperty(globalThis, 'IntersectionObserver', { configurable: true, writable: true, value: observer });
     }
 });
@@ -161,7 +170,6 @@ test.skipIf(typeof document === 'undefined')('a read its cleanup cut short leave
 test.skipIf(typeof document === 'undefined')('a changed input reads once it rested, not after the refresh interval', async () => {
     const observer = globalThis.IntersectionObserver;
     Object.defineProperty(globalThis, 'IntersectionObserver', { configurable: true, writable: true, value: undefined });
-    const previous = chatHost().intelligentUi;
     const reads: unknown[] = [];
     const view = await mountQueryBlock('settle-test', async (_scope, payload) => {
         reads.push(payload.values);
@@ -181,15 +189,13 @@ test.skipIf(typeof document === 'undefined')('a changed input reads once it rest
         expect(view.choose().getAttribute('aria-disabled')).not.toBe('true');
     } finally {
         await view.unmount();
-        setChatHost({ intelligentUi: previous });
         Object.defineProperty(globalThis, 'IntersectionObserver', { configurable: true, writable: true, value: observer });
     }
 });
 
 test.skipIf(typeof document === 'undefined')('a changed input checks again only the links it moved, once it rested', async () => {
-    const previous = chatHost().intelligentUi;
     const asked: string[] = [];
-    setChatHost({
+    const host: Partial<ChatHost> = {
         intelligentUi: {
             link: async (_scope, payload) => {
                 asked.push(payload.nodeId);
@@ -198,7 +204,7 @@ test.skipIf(typeof document === 'undefined')('a changed input checks again only 
             openLink: () => {},
             sendChoice: async () => 'sent'
         }
-    });
+    };
     const text = '```ui\n$flag = false\n<File path="readme.md"/><Switch value={$flag}>Flag</Switch>\n```';
     const { compileUi } = await import('@adecore/intelligent-ui');
     const blocks = compileUi(text, { id: 'links-dom', final: true }).map((block) => ({ ...block, revision: 'revision' }));
@@ -208,7 +214,13 @@ test.skipIf(typeof document === 'undefined')('a changed input checks again only 
     try {
         const rest = (milliseconds: number) => act(async () => void (await new Promise((resolve) => setTimeout(resolve, milliseconds))));
         await act(async () =>
-            root.render(createElement(UiReply, { text, blocks, context: { scopeId: 'links-test', chatId: 'chat', itemId: 'item', phase: 'final' } }))
+            root.render(
+                createElement(
+                    ChatHostProvider,
+                    { host },
+                    createElement(UiReply, { text, blocks, context: { scopeId: 'links-test', chatId: 'chat', itemId: 'item', phase: 'final' } })
+                )
+            )
         );
         await rest(10);
         expect(asked).toHaveLength(1);
@@ -219,16 +231,14 @@ test.skipIf(typeof document === 'undefined')('a changed input checks again only 
     } finally {
         await act(async () => root.unmount());
         element.remove();
-        setChatHost({ intelligentUi: previous });
     }
 });
 
 test.skipIf(typeof document === 'undefined')('a citation reveals and focuses its Source without opening its URL', async () => {
     const scroll = HTMLElement.prototype.scrollIntoView;
-    const previous = chatHost().intelligentUi;
     HTMLElement.prototype.scrollIntoView = () => {};
     const urls: string[] = [];
-    setChatHost({ intelligentUi: { openUrl: (_scope, url) => urls.push(url), sendChoice: async () => 'sent' } });
+    const host: Partial<ChatHost> = { intelligentUi: { openUrl: (_scope, url) => urls.push(url), sendChoice: async () => 'sent' } };
     const text =
         '```ui\n<Callout tone="info">Read [1].</Callout><Sections><Section title="References"><Tabs><Tab title="Other"><Summary>Other</Summary></Tab><Tab title="Links"><Sources><Source title="Docs" url="https://adecore.dev"/></Sources></Tab></Tabs></Section></Sections>\n```';
     const { compileUi } = await import('@adecore/intelligent-ui');
@@ -239,11 +249,15 @@ test.skipIf(typeof document === 'undefined')('a citation reveals and focuses its
     try {
         await act(async () =>
             root.render(
-                createElement(UiReply, {
-                    text,
-                    blocks,
-                    context: { scopeId: 'citation-test', chatId: 'chat', itemId: 'item', phase: 'final' }
-                })
+                createElement(
+                    ChatHostProvider,
+                    { host },
+                    createElement(UiReply, {
+                        text,
+                        blocks,
+                        context: { scopeId: 'citation-test', chatId: 'chat', itemId: 'item', phase: 'final' }
+                    })
+                )
             )
         );
         const chip = element.querySelector<HTMLButtonElement>('button[aria-label="Source 1: Docs"]')!;
@@ -264,6 +278,5 @@ test.skipIf(typeof document === 'undefined')('a citation reveals and focuses its
         await act(async () => root.unmount());
         element.remove();
         HTMLElement.prototype.scrollIntoView = scroll;
-        setChatHost({ intelligentUi: previous });
     }
 });

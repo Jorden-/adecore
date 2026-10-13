@@ -6,6 +6,7 @@ import { ButtonGroup, IconButton } from '@adecore/ui';
 import { IncrementalLines, type CodeToken } from './code-lines';
 import { CodeStreamingContext } from './code-streaming';
 import { WHOLE_FADE_CLASS } from './rehype-fade';
+import { useChatHost } from '../../host';
 import { useCodeTheme } from './code-theme';
 import { loadLanguage, loadTheme, tokenizerFor, tokenStyle } from './highlighter';
 
@@ -33,6 +34,7 @@ const CodeLine = memo(function CodeLine({ tokens }: { tokens: CodeToken[] }) {
 export function CodeBlock({ code, lang, actions, view }: { code: string; lang: string; actions?: ReactNode; view?: ReactNode }) {
     const { t } = useTranslation('agent-chat');
     const theme = useCodeTheme();
+    const { custom } = useChatHost().code;
     const streaming = useContext(CodeStreamingContext);
     const [copyState, setCopyState] = useState<'idle' | 'copying' | 'copied' | 'failed'>('idle');
     const copying = useRef(false);
@@ -74,13 +76,13 @@ export function CodeBlock({ code, lang, actions, view }: { code: string; lang: s
             return;
         }
         let cancelled = false;
-        Promise.all([loadLanguage(lang), loadTheme(theme)])
+        Promise.all([loadLanguage(lang), loadTheme(theme, custom)])
             .then(() => !cancelled && setLoaded(`${lang}:${theme}`))
             .catch(() => !cancelled && setLoaded('failed'));
         return () => {
             cancelled = true;
         };
-    }, [lang, theme, tokenizer]);
+    }, [lang, theme, custom, tokenizer]);
 
     const pending = (tokenizer === null || tokens === null) && loaded !== 'failed';
     return (

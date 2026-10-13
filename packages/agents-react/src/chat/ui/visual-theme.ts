@@ -1,6 +1,6 @@
 import { useLayoutEffect, useState, type RefObject } from 'react';
 import { cleanVisualVariables, type VisualAppearance, type VisualTheme, type VisualThemeVariable } from '@adecore/agent-contracts/visual';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 
 /* The tokens of the app's theme where a frame stands; each answers '' for a token the theme lacks. */
 export interface VisualTokens {
@@ -167,7 +167,8 @@ const THEME_ATTRIBUTES = ['class', 'style', 'data-theme'];
  * accent or a font a person picks reaches every frame as well.
  */
 export function useVisualTheme(ref: RefObject<HTMLElement | null>): VisualTheme | null {
-    const mode = chatHost().code.useMode();
+    const host = useChatHost();
+    const mode = host.code.useMode();
     const [theme, setTheme] = useState<VisualTheme | null>(null);
     useLayoutEffect(() => {
         const element = ref.current;

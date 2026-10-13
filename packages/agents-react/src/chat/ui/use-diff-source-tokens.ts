@@ -1,15 +1,16 @@
 import { useLayoutEffect, useMemo } from 'react';
 import { diffSyntaxDocument, type DiffSourceTokens } from '@adecore/editor-react';
 import type { DiffDocument } from '@adecore/merge';
-import { diffSourceTokens, type DiffSourceTokenSession, type DiffSyntaxRuntime } from './diff-syntax';
+import { useChatHost } from '../../host';
+import { diffSourceTokens, diffSyntaxRuntime, type DiffSourceTokenSession, type DiffSyntaxRuntime } from './diff-syntax';
 
-function createSourceBinding(document: DiffDocument, language: string, theme: string, runtime?: DiffSyntaxRuntime) {
+function createSourceBinding(document: DiffDocument, language: string, theme: string, runtime: () => DiffSyntaxRuntime) {
     const mapping = diffSyntaxDocument(document, language, theme);
     const listeners = new Set<() => void>();
     let source: DiffSourceTokenSession | undefined;
     const current = (): DiffSourceTokenSession => {
         if (source === undefined) {
-            source = diffSourceTokens(document, mapping, runtime);
+            source = diffSourceTokens(document, mapping, runtime());
             source.subscribe(() => {
                 for (const listener of [...listeners]) {
                     listener();
@@ -36,8 +37,13 @@ function createSourceBinding(document: DiffDocument, language: string, theme: st
     };
 }
 
+/* Without a `runtime`, the shared one of the host's `code`. */
 export function useDiffSourceTokens(document: DiffDocument, language: string, theme: string, runtime?: DiffSyntaxRuntime): DiffSourceTokens {
-    const binding = useMemo(() => createSourceBinding(document, language, theme, runtime), [document, language, theme, runtime]);
+    const { code } = useChatHost();
+    const binding = useMemo(
+        () => createSourceBinding(document, language, theme, () => runtime ?? diffSyntaxRuntime(code)),
+        [document, language, theme, runtime, code]
+    );
     useLayoutEffect(() => () => binding.release(), [binding]);
     return binding.tokens;
 }

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { visualThemeFragment, type ChatVisual, type VisualAppearance, type VisualTheme } from '@adecore/agent-contracts/visual';
 import { Spinner, useMeasuredWidth } from '@adecore/ui';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { useChatScope } from '../../scope';
 import { initialVisualContentHeight, rememberVisualHeight } from '../logic/visual-height';
 import { VisualBridge } from '../visual-bridge';
@@ -33,9 +33,10 @@ function personActsIn(frame: HTMLIFrameElement): boolean {
  * when the host page is served on the app's own. Its box keeps one height while it loads or fails.
  */
 export function VisualFrame({ chatId, visual, fill = false, className }: VisualFrameProps) {
+    const { visuals, attachments } = useChatHost();
     const { t } = useTranslation('agent-chat');
     const scope = useChatScope();
-    const frameUrl = chatHost().visuals?.frameUrl ?? null;
+    const frameUrl = visuals?.frameUrl ?? null;
     const boxRef = useRef<HTMLDivElement | null>(null);
     const frameRef = useRef<HTMLIFrameElement>(null);
     const bridgeRef = useRef<VisualBridge | null>(null);
@@ -75,12 +76,10 @@ export function VisualFrame({ chatId, visual, fill = false, className }: VisualF
         const bridge = new VisualBridge({
             frame: () => frame.contentWindow,
             visual: { maxHeight: visual.maxHeight },
-            page: chatHost()
-                .attachments.read(scope.id, chatId, visual.id)
-                .then((blob) => blob.text()),
+            page: attachments.read(scope.id, chatId, visual.id).then((blob) => blob.text()),
             theme: opening.theme,
             mayOpenLink: () => personActsIn(frame),
-            openLink: (url) => chatHost().visuals?.openLink(url),
+            openLink: (url) => visuals?.openLink(url),
             onHeight: (next) => {
                 if (fill) {
                     return;
@@ -106,7 +105,7 @@ export function VisualFrame({ chatId, visual, fill = false, className }: VisualF
             bridge.dispose();
             bridgeRef.current = null;
         };
-    }, [opening, scope.id, chatId, visual.id, visual.maxHeight, fill]);
+    }, [opening, scope.id, chatId, visual.id, visual.maxHeight, fill, visuals, attachments]);
 
     useLayoutEffect(() => {
         const box = boxRef.current;

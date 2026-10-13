@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { compileUi, resolveUiChoice } from '@adecore/intelligent-ui';
-import { chatHost, setChatHost } from '../../../host';
+import { ChatHostProvider, type ChatHost } from '../../../host';
 import { UiReply } from './UiReply';
 import { useTruncated } from './use-truncated';
 
@@ -17,7 +17,6 @@ const SOURCES = {
 test.skipIf(typeof document === 'undefined')('no row of a choice the host refuses can be pressed, and a valid choice sends once', async () => {
     const observer = globalThis.IntersectionObserver;
     Object.defineProperty(globalThis, 'IntersectionObserver', { configurable: true, writable: true, value: undefined });
-    const previous = chatHost().intelligentUi;
     const replies = Object.fromEntries(
         Object.entries(SOURCES).map(([key, source]) => {
             const text = '```ui\n' + source + '\n```';
@@ -30,7 +29,7 @@ test.skipIf(typeof document === 'undefined')('no row of a choice the host refuse
     );
     const sent: { item: string; label: string }[] = [];
     const refused: string[] = [];
-    setChatHost({
+    const host: Partial<ChatHost> = {
         intelligentUi: {
             sendChoice: async (_scope, payload) => {
                 const block = replies[payload.itemId]!.blocks.find((candidate) => candidate.id === payload.blockId)!;
@@ -43,7 +42,7 @@ test.skipIf(typeof document === 'undefined')('no row of a choice the host refuse
                 }
             }
         }
-    });
+    };
     const element = document.createElement('div');
     document.body.append(element);
     const root = createRoot(element);
@@ -52,11 +51,15 @@ test.skipIf(typeof document === 'undefined')('no row of a choice the host refuse
     try {
         await act(async () =>
             root.render(
-                Object.entries(replies).map(([key, reply]) =>
-                    createElement(
-                        'div',
-                        { key, 'data-reply': key },
-                        createElement(UiReply, { ...reply, context: { scopeId: 'choices', chatId: 'chat', itemId: key, phase: 'final' } })
+                createElement(
+                    ChatHostProvider,
+                    { host },
+                    Object.entries(replies).map(([key, reply]) =>
+                        createElement(
+                            'div',
+                            { key, 'data-reply': key },
+                            createElement(UiReply, { ...reply, context: { scopeId: 'choices', chatId: 'chat', itemId: key, phase: 'final' } })
+                        )
                     )
                 )
             )
@@ -74,7 +77,6 @@ test.skipIf(typeof document === 'undefined')('no row of a choice the host refuse
     } finally {
         await act(async () => root.unmount());
         element.remove();
-        setChatHost({ intelligentUi: previous });
         Object.defineProperty(globalThis, 'IntersectionObserver', { configurable: true, writable: true, value: observer });
     }
 });

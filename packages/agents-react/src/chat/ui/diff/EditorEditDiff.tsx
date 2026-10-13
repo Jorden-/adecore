@@ -5,7 +5,7 @@ import { getFiletypeFromFileName } from '@pierre/diffs';
 import type { EditorEngine } from '@adecore/editor';
 import { DiffView } from '@adecore/editor-react';
 import { diffDocument, patchOf, type DiffDocument } from '@adecore/merge';
-import { chatHost } from '../../../host';
+import { useChatHost } from '../../../host';
 import type { FileChange } from '../../logic/tools';
 import { useDiffSourceTokens } from '../use-diff-source-tokens';
 import { diffSourceBudget } from './diff-source-budget';
@@ -34,10 +34,11 @@ function ReadyDiff({
     layout: 'unified' | 'split';
     maxHeight: number;
 }) {
+    const host = useChatHost();
     useReviewSettled();
     const { t } = useTranslation('agent-chat');
-    const mode = chatHost().code.useMode();
-    const theme = chatHost().code.useThemes()[mode];
+    const mode = host.code.useMode();
+    const theme = host.code.useThemes()[mode];
     const language = getFiletypeFromFileName(path);
     const tokens = useDiffSourceTokens(document, language, theme);
     return (

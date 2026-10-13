@@ -7,7 +7,7 @@ import { AccountDot } from '../agents/AccountDot';
 import { ACCOUNT_TONE_CLASSES, accountName, accountsOfKind, accountStatusLine, type AccountEntry } from '../agents/accounts';
 import { ErrorBoundary, Icon, IconButton, SectionLabel, Skeleton } from '@adecore/ui';
 import { MasterDetail } from '@adecore/ui/settings';
-import { chatHost } from '../host';
+import { useChatHost } from '../host';
 import { useChatScope } from '../scope';
 import { AccountDetail } from './AccountDetail';
 import { AddAccountForm } from './AddAccountForm';
@@ -63,8 +63,9 @@ export function ProvidersPane({ target = null, detailOf, defaults = true }: Prov
     const providers = useProviders((s) => s.providers);
     const loaded = useProviders((s) => s.loaded);
     const accounts = useProviderAccounts((s) => s.accounts);
-    const { openLogin } = chatHost();
-    const loginBlocked = chatHost().useLoginBlocked(scopeId);
+    const host = useChatHost();
+    const { openLogin } = host;
+    const loginBlocked = host.useLoginBlocked(scopeId);
     const [picked, setPicked] = useState<Picked | null>(() => (target === 'providers.apple' ? { kind: 'cli', cli: 'apple' } : null));
 
     const installed = useMemo(() => providers.filter((provider) => provider.installed || provider.kind === 'apple'), [providers]);

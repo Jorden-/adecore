@@ -61,19 +61,30 @@ for (const [namespace, words] of Object.entries(await AGENTS_LOCALES.en!())) {
 
 ## The host
 
-`setChatHost` takes what only your app can decide, once, before the first render. Everything you leave out keeps a default that leaves that part out. See [Host adapters](/agents-react/guide/host).
+Configure where drafts and preferences are kept before anything reads a store: once one was read, it is fixed. See [Persistence](/agents-react/guide/persistence).
 
 ```ts
-import { setChatHost } from '@adecore/agents-react/host';
+import { configureChatStorage } from '@adecore/agents-react/storage';
 
-setChatHost({
-    storage: { namespace: 'my-app' },
-    notify: (toast) => showToast(toast),
-    searchFiles: (scopeId, cwd, query, limit) => backend.searchFiles(cwd, query, limit)
-});
+configureChatStorage({ namespace: 'my-app' });
 ```
 
-`storage` has to come first: once a store was read, it is fixed. See [Persistence](/agents-react/guide/persistence).
+A `ChatHostProvider` hands the views what only your app can decide. Keep the object in a constant, since the provider reads it once. Everything you leave out keeps a default that leaves that part out. See [Host adapters](/agents-react/guide/host).
+
+```tsx
+import { ChatHostProvider, type ChatHost } from '@adecore/agents-react/host';
+
+const CHAT_HOST: Partial<ChatHost> = {
+    notify: (toast) => showToast(toast),
+    searchFiles: (scopeId, cwd, query, limit) => backend.searchFiles(cwd, query, limit)
+};
+
+createRoot(element).render(
+    <ChatHostProvider host={CHAT_HOST}>
+        <App />
+    </ChatHostProvider>
+);
+```
 
 ## A scope
 

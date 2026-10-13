@@ -6,7 +6,7 @@ import { AgentIcon } from '../../agents/AgentIcon';
 import { ProviderLogo } from '../../agents/ProviderLogo';
 import { agentChipOf, modelName } from '../../agents/model-name';
 import { modelRequirementOf } from '../../agents/model-requirement';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { ChatScopeContext } from '../../scope';
 import { useReportedModels } from '../../state/chats';
 import { pickerEntriesOf, type PickerEntry } from '../logic/picker-entries';
@@ -58,6 +58,7 @@ export function ModelPicker({
     finalFocus,
     footer
 }: ModelPickerProps) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     const [query, setQuery] = useState('');
     const [legacyOpen, setLegacyOpen] = useState(false);
@@ -73,7 +74,7 @@ export function ModelPicker({
 
     const entries = useMemo(() => pickerEntriesOf(providers, trimmed, legacyOpen), [providers, trimmed, legacyOpen]);
     const scope = useContext(ChatScopeContext);
-    const machine = chatHost().useMachineLabel(scope?.id ?? '');
+    const machine = host.useMachineLabel(scope?.id ?? '');
     const reported = useReportedModels(provider);
     const requirementOf = (entry: PickerEntry & { kind: 'model' }) => modelRequirementOf(entry.model, entry.provider, reported);
     // A CLI that is too old blocks all its models; one way to its settings under the group says it once.
@@ -226,7 +227,7 @@ export function ModelPicker({
                                         className="cursor-row flex w-full items-center rounded-md px-2.5 py-1.5 text-left text-xs text-text-muted"
                                         onClick={() => {
                                             setOpen(false);
-                                            chatHost().openSettings('providers');
+                                            host.openSettings('providers');
                                         }}
                                     >
                                         {t('pickers.model.providerSettings')}

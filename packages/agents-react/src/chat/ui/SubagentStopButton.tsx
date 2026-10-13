@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Square } from 'lucide-react';
 import type { ChatSubagentItem } from '@adecore/agent-contracts';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { useChatScope } from '../../scope';
 import { useChatRow } from '../../state/chats';
 import { useChatActions } from '../actions';
@@ -20,6 +20,7 @@ export function SubagentStopButton({
     size?: 'sm' | 'xs';
     className?: string;
 }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     const { id } = useChatScope();
     const actions = useChatActions();
@@ -32,12 +33,12 @@ export function SubagentStopButton({
         void actions.stopSubagent(chatId, item.toolUseId).catch((e: unknown) => {
             const stale = e instanceof Error && 'code' in e && e.code === 'subagent-stale';
             const description = stale ? t('subagents.stale') : e instanceof Error ? e.message : t('subagents.noAnswer');
-            chatHost().notify({ kind: 'error', title: t('subagents.stopFailed'), description });
+            host.notify({ kind: 'error', title: t('subagents.stopFailed'), description });
         });
     };
     const run = (): void => {
         if (stop === 'task' && item.childId !== undefined) {
-            chatHost().confirm.stopTask(id, item.childId, subagentTitle(item), send);
+            host.confirm.stopTask(id, item.childId, subagentTitle(item), send);
             return;
         }
         send();

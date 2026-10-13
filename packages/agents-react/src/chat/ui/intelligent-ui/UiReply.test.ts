@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { compileUi } from '@adecore/intelligent-ui';
 import { parseHTML } from 'linkedom';
-import { chatHost, setChatHost } from '../../../host';
+import { ChatHostProvider, type ChatHost } from '../../../host';
 import { UiReplyNavigationContext } from '../reply-context';
 import { UiReply } from './UiReply';
 import { uiReplyParts } from './reply-parts';
@@ -36,10 +36,10 @@ test('renders compiled nodes in the actual reply composition and falls back for 
     expect(renderToStaticMarkup(createElement(UiReply, { text, blocks: future, context }))).toContain('Future fallback');
 });
 
-function drawn(source: string, extra: Partial<Omit<typeof context, 'phase'>> & { phase?: 'streaming' | 'final' } = {}): string {
+function drawn(source: string, extra: Partial<Omit<typeof context, 'phase'>> & { phase?: 'streaming' | 'final' } = {}, host: Partial<ChatHost> = {}): string {
     const text = '```ui\n' + source + '\n```';
     const blocks = compileUi(text, { id: 'item', final: true });
-    return renderToStaticMarkup(createElement(UiReply, { text, blocks, context: { ...context, ...extra } }));
+    return renderToStaticMarkup(createElement(ChatHostProvider, { host }, createElement(UiReply, { text, blocks, context: { ...context, ...extra } })));
 }
 
 test('draws written prose as inline Markdown and keeps the space beside a tag', () => {
@@ -82,10 +82,13 @@ test('keeps headings, lists, images and raw addresses out of prose', () => {
     expect(markup).not.toContain('<a');
     expect(markup).not.toContain('javascript:');
     expect(markup).toContain('site');
-    const previous = chatHost().intelligentUi;
-    setChatHost({ intelligentUi: { openUrl: () => undefined, sendChoice: async () => 'sent' } });
-    const linked = drawn('<Summary>See [site](https://example.com) and [bad](javascript:alert(1))</Summary>');
-    setChatHost({ intelligentUi: previous });
+    const linked = drawn(
+        '<Summary>See [site](https://example.com) and [bad](javascript:alert(1))</Summary>',
+        {},
+        {
+            intelligentUi: { openUrl: () => undefined, sendChoice: async () => 'sent' }
+        }
+    );
     expect(linked.match(/<button[^>]*>site<\/button>/g)).toHaveLength(1);
     expect(linked).toContain('and bad');
 });

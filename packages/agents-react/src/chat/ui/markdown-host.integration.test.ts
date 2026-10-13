@@ -19,7 +19,7 @@ test('real Markdown links, timeline menus and shell slots retain their source co
             import { createRoot } from ${resolve('react-dom/client')};
             import i18next from ${resolve('i18next')};
             import { UIProvider, ContextMenu } from ${resolve('@adecore/ui')};
-            import { setChatHost } from ${resolve('@adecore/agents-react/host')};
+            import { ChatHostProvider } from ${resolve('@adecore/agents-react/host')};
             import { ChatScopeContext } from ${resolve('@adecore/agents-react/scope')};
             import { Markdown, MessageMarkdown } from ${resolve('@adecore/agents-react/chat/ui/Markdown')};
             import { FileLinkContext } from ${resolve('@adecore/agents-react/chat/ui/file-links')};
@@ -31,7 +31,7 @@ test('real Markdown links, timeline menus and shell slots retain their source co
             window.opens=[]; window.targets=[]; window.shell=[]; window.clicks=[];
             const code='  printf "héllo"  ';
             const closed='\x60\x60\x60bash\\n'+code+'\\n\x60\x60\x60\\n';
-            setChatHost({
+            const host={
                 useStreaming:()=> 'blocks',
                 code:{useMode:()=> 'light',useThemes:()=>({light:'missing-theme-for-fallback-test',dark:'missing-theme-for-fallback-test'}),custom:[]},
                 fileLinks:{
@@ -48,7 +48,7 @@ test('real Markdown links, timeline menus and shell slots retain their source co
                     window.shell.push(context);
                     return <button data-shell-action disabled={!context.complete} onClick={()=>window.clicks.push(context)}>Prepare</button>;
                 }
-            });
+            };
             function Fixture(){
                 const thread=React.useRef(null);
                 const [target,setTarget]=React.useState(EMPTY_TARGET);
@@ -72,7 +72,7 @@ test('real Markdown links, timeline menus and shell slots retain their source co
                     </ContextMenu.Trigger><TimelineMenuPopup target={target} thread={thread}/></ContextMenu.Root>
                 </FileLinkContext.Provider></ChatScopeContext.Provider>;
             }
-            createRoot(document.getElementById('root')).render(<UIProvider i18n={i18next}><Fixture/></UIProvider>);
+            createRoot(document.getElementById('root')).render(<UIProvider i18n={i18next}><ChatHostProvider host={host}><Fixture/></ChatHostProvider></UIProvider>);
         `
         );
         const build = await Bun.build({

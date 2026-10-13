@@ -1,4 +1,4 @@
-import type { ComponentProps, ComponentType, ReactNode, RefObject } from 'react';
+import { createContext, createElement, useContext, useState, type ComponentProps, type ComponentType, type ReactNode, type RefObject } from 'react';
 import type { Extension } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import type { Highlighter, ThemeRegistration } from 'shiki';
@@ -22,7 +22,6 @@ import type { FindReveal } from './chat/ui/find-reveal';
 import type { PromptAction } from './prompts/logic/prompts';
 import type { HostPrompt, PromptViewProps } from './prompts/logic/subjects';
 import { PlainTextarea } from './ui/PlainTextarea';
-import { configureChatStorage, type ChatStorageOptions } from './storage';
 
 /* A color an account may wear, by the name the host stores it under. */
 export interface AccentChoice {
@@ -197,13 +196,11 @@ export interface ReplyAuthor {
 }
 
 /*
- * What the app around the chat decides and the chat cannot. Set once, before the first render, with
- * `setChatHost`; whatever an app leaves out keeps the default here, which is the chat without that
- * part. The same in every scope, so a function that is about one host of chats is told its scope id.
- * The hooks are called as hooks: an app hands the same function for the life of the page.
+ * What the app around the chat decides and the chat cannot, handed to the views by a `ChatHostProvider`.
+ * Whatever an app leaves out keeps the default here, which is the chat without that part. One host may
+ * serve several scopes, so a function that is about one host of chats is told its scope id.
  */
 export interface ChatHost {
-    storage?: ChatStorageOptions;
     intelligentUi?: {
         subscribe?(scopeId: string, chatId: string, changed: () => void): () => void;
         link?(scopeId: string, payload: ChatUiLinkPayload): Promise<ChatUiLinkReading>;
@@ -383,15 +380,25 @@ const DEFAULT_HOST: ChatHost = {
     visuals: null
 };
 
-let host: ChatHost = DEFAULT_HOST;
+const ChatHostContext = createContext<ChatHost>(DEFAULT_HOST);
 
-export function setChatHost(patch: Partial<ChatHost>): void {
-    if (patch.storage !== undefined) {
-        configureChatStorage(patch.storage);
+/*
+ * Hands the views under it a host: `host` over the one of a provider above it, member by member, and
+ * over the defaults at the top. A part of an app that loads later and adds hooks renders a provider of
+ * its own around what it draws, so every view under it calls the same hooks from its first render on.
+ * The host is read once, as the provider mounts, since a hook that changed under a mounted view would
+ * break the order of its hooks: a provider that gets another `host` throws, and a new `key` remounts it.
+ */
+export function ChatHostProvider({ host, children }: { host: Partial<ChatHost>; children?: ReactNode }) {
+    const parent = useContext(ChatHostContext);
+    const [pinned] = useState(() => ({ host, value: { ...parent, ...host } }));
+    if (pinned.host !== host) {
+        throw new Error('A ChatHostProvider reads its host once: hand it the same object on every render, or a new key to mount it with another');
     }
-    host = { ...host, ...patch };
+    return createElement(ChatHostContext.Provider, { value: pinned.value }, children);
 }
 
-export function chatHost(): ChatHost {
-    return host;
+/* The host of the nearest `ChatHostProvider`, or the defaults outside one. */
+export function useChatHost(): ChatHost {
+    return useContext(ChatHostContext);
 }

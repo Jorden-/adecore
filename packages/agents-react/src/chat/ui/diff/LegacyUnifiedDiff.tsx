@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import clsx from 'clsx';
 import { FileDiff, PatchDiff } from '@pierre/diffs/react';
 import type { ChatFileChange } from '@adecore/agent-contracts';
-import { chatHost } from '../../../host';
+import { useChatHost } from '../../../host';
 import { useDiffTheme } from '../diff-theme';
 import { fullFileDiff } from '../full-diff';
 import type { UnifiedDiffProps } from './diff-props';
@@ -45,8 +45,9 @@ function lineClass(line: string): string {
 }
 
 export default function LegacyUnifiedDiff({ change, overflow = 'wrap', diffStyle = 'unified', fill = false, contents, maxHeight }: UnifiedDiffProps) {
+    const host = useChatHost();
     useReviewSettled();
-    const resolved = chatHost().code.useMode();
+    const resolved = host.code.useMode();
     const theme = useDiffTheme();
     const patch = useMemo(() => asPatch(change), [change]);
     const oldText = contents?.old;

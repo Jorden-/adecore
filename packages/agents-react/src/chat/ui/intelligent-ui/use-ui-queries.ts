@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChatUiQueryReading, ChatUiQueryState } from '@adecore/agent-contracts';
 import { uiInputValues, UI_CATALOG_VERSION, UI_HOST_LIMITS, UiState, type UiBlock, type UiViewNode, type UiNode } from '@adecore/intelligent-ui';
-import { chatHost } from '../../../host';
+import { useChatHost } from '../../../host';
 import type { UiLiveValue, UiLiveStatus, UiRenderContext } from './render-context';
 
 interface LocalReading {
@@ -43,6 +43,7 @@ export function useUiQueries(
     element: HTMLDivElement | null,
     frozen?: ChatUiQueryState['blocks'][string]
 ) {
+    const host = useChatHost();
     const [readings, setReadings] = useState<Record<string, LocalReading>>({});
     const [busyInput, setBusyInput] = useState<string | null>(null);
     const lastRead = useRef({ inputKey: '', at: 0 });
@@ -70,8 +71,8 @@ export function useUiQueries(
     };
     const reads = readsFor(JSON.parse(inputs));
     const ready = reads !== null;
-    const query = chatHost().intelligentUi?.query;
-    const subscribe = chatHost().intelligentUi?.subscribe;
+    const query = host.intelligentUi?.query;
+    const subscribe = host.intelligentUi?.subscribe;
     useEffect(() => {
         const scope = state.scope();
         for (const name of Object.keys(block.queries)) {

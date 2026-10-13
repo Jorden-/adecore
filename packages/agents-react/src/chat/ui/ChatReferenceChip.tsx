@@ -1,16 +1,15 @@
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { MessageSquare, X } from 'lucide-react';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { CHIP_IN_MESSAGE, MENTION_TONE } from './chips';
 import { Icon, Tooltip } from '@adecore/ui';
 
 /* A chat attached to a message, under the title it has now rather than the one it had when it was attached. */
 export function ChatReferenceChip({ chatId, onRemove }: { chatId: string; onRemove?: () => void }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
-    const chat = chatHost()
-        .useReferableChats()
-        .find((candidate) => candidate.id === chatId);
+    const chat = host.useReferableChats().find((candidate) => candidate.id === chatId);
     const title = chat === undefined ? t('chatReference.gone') : chat.title || t('chatReference.untitled');
     return (
         <span className={clsx(MENTION_TONE, CHIP_IN_MESSAGE)}>

@@ -1,7 +1,8 @@
 import globalI18next from 'i18next';
 import { useSyncExternalStore } from 'react';
 import type { AgentEventType, AgentRequestType, ChatBookmark, ChatEvent, ChatInfo, ChatItem, ProviderAccounts } from '@adecore/agent-contracts';
-import { setChatHost, type FileRef } from '@adecore/agents-react/host';
+import type { ChatHost, FileRef } from '@adecore/agents-react/host';
+import { configureChatStorage } from '@adecore/agents-react/storage';
 import { ChatTransportError, type ChatEventMap, type ChatRequestMap, type ChatTransport } from '@adecore/agents-react/transport';
 import chatEn from '@adecore/agents-react/locales/en/agent-chat.json';
 import promptsEn from '@adecore/agents-react/locales/en/agent-prompts.json';
@@ -90,9 +91,11 @@ function attachmentUrl(attachmentId: string): { url: string | null; failure: str
 /* A path in an answer, such as `src/http.ts:14`, as a link; the demos open nothing. */
 const PATH = /^(?<path>[\w.-]+(?:\/[\w.-]+)*\.\w+)(?::(?<line>\d+))?$/;
 
-setChatHost({
-    // Drafts, preferences and the stash last until the page reloads.
-    storage: { namespace: 'docs', storage: null },
+// Drafts, preferences and the stash last until the page reloads.
+configureChatStorage({ namespace: 'docs', storage: null });
+
+/* What the demos' app decides, which `DemoChatHost` hands every demo. */
+export const DEMO_CHAT_HOST: Partial<ChatHost> = {
     accents: { all: ACCENTS, featured: ['blue', 'violet', 'rose', 'amber'], label: (id) => ACCENT_NAMES[id] ?? id, current: () => 'blue' },
     searchFiles: async (_scopeId, _cwd, query, limit) => FILES.filter((path) => path.toLowerCase().includes(query.toLowerCase())).slice(0, limit),
     useReferableChats: () => REFERABLE,
@@ -124,7 +127,7 @@ setChatHost({
     },
     openLogin: async () => undefined,
     useChatPlace: (chatId) => ({ title: FORK_TITLES[chatId] ?? null, go: () => undefined })
-});
+};
 
 type Handlers = { [T in AgentRequestType]?: (payload: ChatRequestMap[T]['payload']) => ChatRequestMap[T]['result'] | Promise<ChatRequestMap[T]['result']> };
 

@@ -42,9 +42,9 @@ Keep the pane component the same between renders, or its forms start over.
 
 The detail is made of `CliDetail`, `AccountDetail`, `AddAccountForm`, `AccountVariables` and `AccountColors`. The actions they run are exported from `providers/account-actions`:
 
-- `saveAccounts(scope, accounts)` sends the whole map and answers `false`, with a toast, when the host refused. `saveAccount(scope, id, account)` changes one account in the map the store holds.
+- `saveAccounts(scope, host, accounts)` sends the whole map and answers `false`, with a toast through the chat host's `notify`, when the host of chats refused. `saveAccount(scope, host, id, account)` changes one account in the map the store holds.
 - `createAccount(scope, kind, label, color)` asks the host for an account in a folder it makes, and answers its id.
 - `linkAccount(scope, id, account)` adds an account in a folder that exists.
-- `removeAccount(scope, id, kind)` forgets the account and leaves its folder; a new chat that was to use it goes back to the CLI's default account.
+- `removeAccount(scope, host, id, kind)` forgets the account and leaves its folder; a new chat that was to use it goes back to the CLI's default account.
 
 `accountsOfKind`, `accountName`, `accountStatusLine`, `mintAccountId` and `freeAccountColor` in `agents/accounts`, and `draftsOf`, `variablesProblem` and `variablesOf` in `providers/variables`, are the logic of the forms. `providerAbilities(provider)` says in words where a CLI opens and whether it reports its status.

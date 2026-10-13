@@ -4,7 +4,7 @@ import { LogIn } from 'lucide-react';
 import type { UsageProvider } from '@adecore/agent-contracts';
 import { AccountDot } from '../agents/AccountDot';
 import { Button, Icon, SectionLabel, Segmented, Tooltip, useNow } from '@adecore/ui';
-import { chatHost } from '../host';
+import { useChatHost } from '../host';
 import { PROVIDER_COLORS, PROVIDER_LABELS } from './format';
 import { accountNote, checkedLabel, hasSeveralAccounts, isSignedOut, type LimitAccount } from './limit-groups';
 import { WindowBar } from './LimitsList';
@@ -93,14 +93,15 @@ function LimitCard({ account, named, now, login }: { account: LimitAccount; name
  * credential: every CLI holds its own login and answers the question when the daemon starts one and asks.
  */
 export function UsageLimits() {
+    const host = useChatHost();
     const { t } = useTranslation('agent-usage');
     const limits = useUsageLimits();
     const groups = useLimitGroups(limits);
     const now = useNow(MINUTE_MS);
     const scopeId = useChatScope().id;
     const loginCommands = useProviderAccountsStore((s) => s.byScope[scopeId]?.accounts?.loginCommands);
-    const { openLogin } = chatHost();
-    const blocked = chatHost().useLoginBlocked(scopeId);
+    const { openLogin } = host;
+    const blocked = host.useLoginBlocked(scopeId);
     const [filter, setFilter] = useState<Filter>('all');
 
     if (limits === null) {

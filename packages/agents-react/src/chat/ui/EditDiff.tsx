@@ -5,7 +5,7 @@ import { diffSourceBudget, legacyDiffBudget } from './diff/diff-source-budget';
 import { DiffOmitted } from './diff/DiffOmitted';
 import { DiffUnavailable } from './diff/DiffUnavailable';
 import { DiffFallbackBoundary } from './diff/DiffFallbackBoundary';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 
 import type { FileChange } from '../logic/tools';
 
@@ -13,8 +13,9 @@ const LegacyEditDiff = lazyNamed(() => import('./diff/LegacyEditDiff'), 'default
 const EditorEditDiff = lazyNamed(() => import('./diff/EditorEditDiff'), 'default');
 
 export default function EditDiff({ change, allowEditor = true, maxHeight }: { change: FileChange; allowEditor?: boolean; maxHeight?: number }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
-    const loadEngine = chatHost().code.editor;
+    const loadEngine = host.code.editor;
     const sourceAllowed = useMemo(() => diffSourceBudget(change.before, change.after), [change.before, change.after]);
     const legacyMode = !allowEditor || loadEngine === undefined;
     const legacyAllowed = useMemo(() => legacyMode && legacyDiffBudget(change.before, change.after), [legacyMode, change.before, change.after]);

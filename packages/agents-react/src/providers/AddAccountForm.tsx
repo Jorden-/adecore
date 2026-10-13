@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronRight } from 'lucide-react';
 import type { ProviderInfo } from '@adecore/agent-contracts';
 import { freeAccountColor, mintAccountId, type AccountEntry } from '../agents/accounts';
-import { chatHost } from '../host';
+import { useChatHost } from '../host';
 import { useChatScope } from '../scope';
 import { createAccount, linkAccount } from './account-actions';
 import { AccountColors } from './AccountColors';
@@ -28,8 +28,9 @@ interface AddAccountFormProps {
 export function AddAccountForm({ provider, entries, onCancel, onAdded }: AddAccountFormProps) {
     const { t } = useTranslation('agent-providers');
     const scope = useChatScope();
+    const { accents } = useChatHost();
     const [name, setName] = useState('');
-    const [color, setColor] = useState<string>(() => freeAccountColor(entries, chatHost().accents.current()));
+    const [color, setColor] = useState<string>(() => freeAccountColor(entries, accents, accents.current()));
     const [advanced, setAdvanced] = useState(false);
     const [folder, setFolder] = useState('');
     const [busy, setBusy] = useState(false);

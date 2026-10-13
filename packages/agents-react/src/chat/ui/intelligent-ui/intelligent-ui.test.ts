@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { createElement, Fragment, type ComponentType, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { compileUiBlock, evaluateUiBlock, UI_CATALOG, UiState, type UiComponentName, type UiViewNode } from '@adecore/intelligent-ui';
-import { chatHost, setChatHost } from '../../../host';
+import { ChatHostProvider, type ChatHost } from '../../../host';
 import { UiPageMemory } from './block-local';
 import { uiChartAxis, uiChartCharacter, uiChartData, uiChartRange, uiChartText, uiChartTextWidth, niceCeiling, UI_CHART_SERIES } from './chart-data';
 import i18next from 'i18next';
@@ -45,10 +45,12 @@ function drawn(nodes: readonly UiViewNode[], context: UiRenderContext): ReactNod
     });
 }
 
+let host: Partial<ChatHost> = {};
+
 function markup(source: string, context: Partial<UiRenderContext> = {}, final = true): string {
     const full = { ...CONTEXT, ...context };
     const { nodes } = evaluate(source, final);
-    return renderToStaticMarkup(createElement(Frame, { nodes, phase: full.phase }, drawn(nodes, full)));
+    return renderToStaticMarkup(createElement(ChatHostProvider, { host }, createElement(Frame, { nodes, phase: full.phase }, drawn(nodes, full))));
 }
 
 const REVIEW =
@@ -515,12 +517,15 @@ describe('links', () => {
 });
 
 describe('content', () => {
-    const before = chatHost().attachments;
-    afterEach(() => setChatHost({ attachments: before }));
+    afterEach(() => {
+        host = {};
+    });
 
     test('an image reads only an attachment of the chat', () => {
         expect(markup('<Image generated="latest" alt="A rabbit"/>')).not.toContain('<img');
-        setChatHost({ attachments: { ...before, useUrl: (_scope, _chat, id) => ({ url: `blob:${id}`, failure: null }) } });
+        host = {
+            attachments: { useUrl: (_scope, _chat, id) => ({ url: `blob:${id}`, failure: null }), read: () => Promise.reject(new Error('Not read here')) }
+        };
         const html = markup('<Image attachment="rabbit" alt="A rabbit">The rabbit</Image>');
         expect(html).toContain('src="blob:rabbit"');
         expect(html).toContain('<figcaption');

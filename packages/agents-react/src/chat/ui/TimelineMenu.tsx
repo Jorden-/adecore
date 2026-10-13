@@ -7,10 +7,10 @@ import { CHAT_READING_WIDTHS, readingWidthLabel, type ChatReadingWidth } from '.
 import { forkRefusal, turnIdOfRow } from '../logic/fork';
 import { markdownOf, messageTextOf } from '../logic/timeline-copy';
 import type { TimelineTarget } from '../logic/timeline-target';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { useChatScope } from '../../scope';
 import { useChatRow } from '../../state/chats';
-import { openFileLink, useFileLinkCwd, useFileLinkScopeId } from './file-links';
+import { useFileLinkCwd, useFileLinkScopeId, useOpenFileLink } from './file-links';
 import { ContextMenu, copyText, DisabledReason, EDIT_SHORTCUTS, Icon, Kbd, selectAllWithin } from '@adecore/ui';
 
 /* The menu behind a right-click in a thread, mostly for copying: a whole message, a code block or an answer's markdown. */
@@ -36,7 +36,8 @@ export function TimelineMenuPopup({
     // A thread outside a chat (a sub-agent's transcript) has no cwd of its own; the app answers for it then.
     const cwd = useFileLinkCwd();
     const scopeId = useFileLinkScopeId();
-    const { fork, fileLinks } = chatHost();
+    const { fork, fileLinks } = useChatHost();
+    const openFileLink = useOpenFileLink();
     const openInPreview = (): void => {
         if (target.file != null) {
             openFileLink(target.file.cwd, target.file.ref, target.file.scopeId);
@@ -101,12 +102,13 @@ export function TimelineMenuPopup({
 export function BookmarkMenuItems({ chatId, itemId, onName }: { chatId: string; itemId: string; onName?: () => void }) {
     const { t } = useTranslation('agent-chat');
     const scope = useChatScope();
+    const host = useChatHost();
     const bookmark = useChatRow(chatId, (row) => row?.bookmarks?.find((candidate) => candidate.itemId === itemId) ?? null);
     if (bookmark === null) {
         return (
             <ContextMenu.Item
                 onClick={() => {
-                    void placeBookmark(scope, chatId, itemId);
+                    void placeBookmark(scope, host, chatId, itemId);
                     onName?.();
                 }}
             >
@@ -124,7 +126,7 @@ export function BookmarkMenuItems({ chatId, itemId, onName }: { chatId: string; 
             >
                 <Icon icon={Pencil} size={14} /> {t('bookmarks.rename')}
             </ContextMenu.Item>
-            <ContextMenu.Item onClick={() => void removeBookmark(scope, chatId, bookmark)}>
+            <ContextMenu.Item onClick={() => void removeBookmark(scope, host, chatId, bookmark)}>
                 <Icon icon={BookmarkX} size={14} /> {t('bookmarks.remove')}
             </ContextMenu.Item>
         </>

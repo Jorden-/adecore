@@ -6,7 +6,7 @@ import { placeBookmark } from '../bookmarks';
 import { forkRefusal } from '../logic/fork';
 import type { TimelineRow } from '../logic/timeline';
 import { markdownOf, messageTextOf } from '../logic/timeline-copy';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { useChatScope } from '../../scope';
 import { useChatRow, useChats } from '../../state/chats';
 import { ButtonGroup, copyText, IconButton, Tooltip } from '@adecore/ui';
@@ -22,7 +22,8 @@ export function MessageActions({ chatId, row }: { chatId: string; row: MessageRo
     const { t } = useTranslation('agent-chat');
     useFormatLocale();
     const scope = useChatScope();
-    const { fork } = chatHost();
+    const host = useChatHost();
+    const { fork } = host;
     const turnId = row.item.turnId;
     const bookmark = useChatRow(chatId, (chat) => chat?.bookmarks?.find((candidate) => candidate.itemId === row.id) ?? null);
     const canFork = useChatRow(chatId, (chat) => turnId !== null && forkRefusal(chat?.info ?? null, chat?.structure[turnId]) === null);
@@ -67,7 +68,7 @@ export function MessageActions({ chatId, row }: { chatId: string; row: MessageRo
             {!streaming && (
                 <ButtonGroup render={<span />}>
                     {bookmark === null && (
-                        <IconButton icon={Bookmark} size="sm" label={t('bookmarks.add')} onClick={() => void placeBookmark(scope, chatId, row.id)} />
+                        <IconButton icon={Bookmark} size="sm" label={t('bookmarks.add')} onClick={() => void placeBookmark(scope, host, chatId, row.id)} />
                     )}
                     {canFork && turnId !== null && fork !== null && (
                         <IconButton icon={GitFork} size="sm" label={t('timeline.menu.forkFromHere')} onClick={() => fork(chatId, turnId)} />

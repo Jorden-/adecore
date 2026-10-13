@@ -6,16 +6,17 @@ import { DiffOmitted } from './diff/DiffOmitted';
 import { DiffUnavailable } from './diff/DiffUnavailable';
 import { RawDiff } from './diff/RawDiff';
 import { DiffFallbackBoundary } from './diff/DiffFallbackBoundary';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import type { UnifiedDiffProps } from './diff/diff-props';
 
 const LegacyUnifiedDiff = lazyNamed(() => import('./diff/LegacyUnifiedDiff'), 'default', { prefetch: false });
 const EditorPatchDiff = lazyNamed(() => import('./diff/EditorPatchDiff'), 'default');
 
 export default function UnifiedDiff(props: UnifiedDiffProps) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     const { change, contents, allowEditor = true, ignoreWhitespace = false, overflow = 'wrap', diffStyle = 'unified', fill = false, maxHeight } = props;
-    const loadEngine = chatHost().code.editor;
+    const loadEngine = host.code.editor;
     const oldText = contents?.old ?? '';
     const newText = contents?.new ?? '';
     const sourceAllowed = useMemo(() => diffSourceBudget(oldText, newText) && patchSourceBudget(change.diff), [oldText, newText, change.diff]);

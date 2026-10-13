@@ -1,7 +1,7 @@
 import type { KeyboardEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Hand, MessageCircleQuestionMark, type LucideIcon } from 'lucide-react';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { headingKey, isPrimaryKey, staysInCard, stepIndex, toolbarKey } from '../logic/keys';
 import { Icon } from '@adecore/ui';
 
@@ -32,11 +32,11 @@ interface PromptCardProps {
  * The keys every card shares: Mod+Enter, entering from the heading and the action row. The body handles
  * its own keys first and says so with `preventDefault`.
  */
-function onCardKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+function onCardKeyDown(event: KeyboardEvent<HTMLDivElement>, apple: boolean) {
     const card = event.currentTarget;
     const target = event.target instanceof HTMLElement ? event.target : null;
     if (!event.defaultPrevented) {
-        if (isPrimaryKey(event.nativeEvent, chatHost().isApplePlatform())) {
+        if (isPrimaryKey(event.nativeEvent, apple)) {
             event.preventDefault();
             // A click on the button itself, so a disabled Next or Answer stays as disabled as it looks.
             card.querySelector<HTMLButtonElement>('[data-prompt-primary]:not(:disabled)')?.click();
@@ -62,8 +62,15 @@ function onCardKeyDown(event: KeyboardEvent<HTMLDivElement>) {
 /* What every prompt looks like, whatever asked it: in a chat's composer and in a canvas's stack. */
 export function PromptCard({ kind, heading, meta, top, actions, busy, notice, error, children }: PromptCardProps) {
     const { t } = useTranslation('agent-prompts');
+    const { isApplePlatform } = useChatHost();
     const card = (
-        <div className="prompt-card flex min-h-0 flex-col gap-2 p-3" role="group" aria-label={t(`card.${kind}`)} aria-busy={busy} onKeyDown={onCardKeyDown}>
+        <div
+            className="prompt-card flex min-h-0 flex-col gap-2 p-3"
+            role="group"
+            aria-label={t(`card.${kind}`)}
+            aria-busy={busy}
+            onKeyDown={(event) => onCardKeyDown(event, isApplePlatform())}
+        >
             {/* The scroll box would clip the focus ring of whatever sits against its edge, so it carries the
                 room that ring needs and gives the same amount back to the card's own padding. */}
             <div className="-m-1.5 max-h-[min(50dvh,480px)] overflow-auto overscroll-contain p-1.5">

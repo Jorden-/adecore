@@ -10,7 +10,7 @@ import { configureChatStorage } from '@adecore/agents-react/storage';
 configureChatStorage({ namespace: 'my-app' });
 ```
 
-`setChatHost({ storage })` calls the same function. Importing a module reads nothing; the first read of any record (a hook, `getState`, a subscription) fixes the configuration, and configuring after that throws `Configure chat storage before using chat stores`. There is no reset: a page that needs another configuration is a new page.
+Call it before the first render, outside React, since the stores are shared by every view on the page. Importing a module reads nothing; the first read of any record (a hook, `getState`, a subscription) fixes the configuration, and configuring after that throws `Configure chat storage before using chat stores`. There is no reset: a page that needs another configuration is a new page.
 
 | Record        | Key                        |
 | ------------- | -------------------------- |

@@ -9,7 +9,7 @@ import { RunningFor, ToggleLine, WorkLiveRow, WorkRow } from './WorkRows';
 import { useChatScope } from '../../../scope';
 import { Icon, IconButton } from '@adecore/ui';
 import { useChatActions } from '../../actions';
-import { chatHost } from '../../../host';
+import { useChatHost } from '../../../host';
 
 function AgentLine({ view, onOpen }: { view: WorkflowAgentView; onOpen?(step: SubagentStep): void }) {
     const { agent, state } = view;
@@ -75,6 +75,7 @@ export function WorkflowRow({
     chatId?: string;
     onOpenAgent?(step: SubagentStep): void;
 }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     const { id } = useChatScope();
     // A host that does not answer `chat.subagent` has no conversation to open for anyone.
@@ -86,7 +87,7 @@ export function WorkflowRow({
     const stop = (): void => {
         if (chatId && workflow.taskId) {
             void actions.stopTask(chatId, workflow.taskId).catch((error: unknown) => {
-                chatHost().notify({
+                host.notify({
                     kind: 'error',
                     title: t('activity.stopFailed'),
                     description: error instanceof Error ? error.message : t('subagents.noAnswer')

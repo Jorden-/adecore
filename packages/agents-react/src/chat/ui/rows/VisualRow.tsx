@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Ellipsis, Maximize2, Trash2 } from 'lucide-react';
 import type { ChatVisual } from '@adecore/agent-contracts';
 import { ButtonGroup, ErrorBoundary, Icon, IconButton, Menu, Surface } from '@adecore/ui';
-import { chatHost } from '../../../host';
+import { useChatHost } from '../../../host';
 import { useChatScope } from '../../../scope';
 import { useVisualDialog } from '../../visuals';
 import { VisualFrame } from '../VisualFrame';
@@ -14,9 +14,10 @@ import { VisualFrame } from '../VisualFrame';
  * sit here.
  */
 export function VisualRow({ chatId, visual }: { chatId: string; visual: ChatVisual }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     const { keyOf } = useChatScope();
-    if (chatHost().visuals === null) {
+    if (host.visuals === null) {
         return null;
     }
     const open = (kind: 'expand' | 'remove'): void => useVisualDialog.getState().open(keyOf(chatId), visual.id, kind);

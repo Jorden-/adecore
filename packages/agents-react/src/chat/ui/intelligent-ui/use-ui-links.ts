@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChatUiLinkReading, ChatUiQueryState } from '@adecore/agent-contracts';
 import { uiLinkTargets, type UiLinkTarget } from '@adecore/intelligent-ui/links';
 import { uiInputValues, UI_HOST_LIMITS, type UiBlock, UiState } from '@adecore/intelligent-ui';
-import { chatHost } from '../../../host';
+import { useChatHost } from '../../../host';
 import type { UiRenderContext } from './render-context';
 
 interface LinkState {
@@ -23,7 +23,7 @@ export function useUiLinks(
     const [checked, setChecked] = useState<Record<string, LinkState>>({});
     // What each node was last checked as, so a change of input checks only the targets it moved.
     const asked = useRef(new Map<string, string>());
-    const host = chatHost().intelligentUi;
+    const host = useChatHost().intelligentUi;
     const values = uiInputValues(block, state);
     const scope = state.scope();
     const queryValues = Object.fromEntries(

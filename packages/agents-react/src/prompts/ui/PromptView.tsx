@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { toolSummary } from '../../chat/logic/tools';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { answerValue, promptAnswers, questionAnswer, type PromptDraft } from '../logic/prompts';
 import { approvalButtons, type PromptViewProps } from '../logic/subjects';
 import { ApprovalBody } from './ApprovalBody';
@@ -12,12 +12,13 @@ import { QuestionBody } from './QuestionBody';
 export function PromptView(props: PromptViewProps) {
     const { subject, draft, onDraft, onAction, more, hasDraft, denyReason, disabled, sending, error, top } = props;
     const { t } = useTranslation('agent-prompts');
+    const { prompts } = useChatHost();
     const locked = sending || disabled;
     const notice = disabled ? t('error.notConnected') : null;
     const buttons = approvalButtons(subject, draft.reason).map(({ action, ...button }) => ({ ...button, onPress: () => onAction(action) }));
 
     if (subject.kind === 'host') {
-        return chatHost().prompts.render(subject.prompt, props);
+        return prompts.render(subject.prompt, props);
     }
 
     const { item } = subject;

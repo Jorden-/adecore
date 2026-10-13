@@ -1,7 +1,7 @@
 import i18next from 'i18next';
 import { create } from 'zustand';
 import type { ChatBookmark } from '@adecore/agent-contracts';
-import { chatHost } from '../host';
+import type { ChatHost } from '../host';
 import type { ChatScope } from '../scope';
 import { jumpToTimelineItem } from './timeline-scroll';
 
@@ -20,24 +20,26 @@ export const useBookmarkNaming = create<BookmarkNaming>((set) => ({
     close: () => set({ chatKey: null, itemId: null })
 }));
 
-function failed(title: string, e: unknown): void {
-    chatHost().notify({ title, description: e instanceof Error ? e.message : String(e), kind: 'error' });
+type Notifier = Pick<ChatHost, 'notify'>;
+
+function failed(host: Notifier, title: string, e: unknown): void {
+    host.notify({ title, description: e instanceof Error ? e.message : String(e), kind: 'error' });
 }
 
-async function add(scope: ChatScope, chatId: string, itemId: string, name?: string): Promise<boolean> {
+async function add(scope: ChatScope, host: Notifier, chatId: string, itemId: string, name?: string): Promise<boolean> {
     try {
         await scope.chats.addBookmark(chatId, itemId, name);
         return true;
     } catch (e) {
-        failed(i18next.t('agent-chat:bookmarks.addFailed'), e);
+        failed(host, i18next.t('agent-chat:bookmarks.addFailed'), e);
         return false;
     }
 }
 
 /* Marks a message and opens the field for its name at once, before the host answered. */
-export async function placeBookmark(scope: ChatScope, chatId: string, itemId: string): Promise<void> {
+export async function placeBookmark(scope: ChatScope, host: Notifier, chatId: string, itemId: string): Promise<void> {
     useBookmarkNaming.getState().open(scope.keyOf(chatId), itemId);
-    if (!(await add(scope, chatId, itemId))) {
+    if (!(await add(scope, host, chatId, itemId))) {
         useBookmarkNaming.getState().close();
     }
 }
@@ -46,34 +48,41 @@ export async function placeBookmark(scope: ChatScope, chatId: string, itemId: st
  * The name a field settles on. A name goes through `addBookmark`, which also names a bookmark that
  * already stands, so a name typed before the mark itself landed is not refused.
  */
-export async function nameBookmark(scope: ChatScope, chatId: string, itemId: string, name: string, previous: string | undefined): Promise<void> {
+export async function nameBookmark(
+    scope: ChatScope,
+    host: Notifier,
+    chatId: string,
+    itemId: string,
+    name: string,
+    previous: string | undefined
+): Promise<void> {
     const next = name.trim();
     if (next === (previous ?? '')) {
         return;
     }
     if (next !== '') {
-        await add(scope, chatId, itemId, next);
+        await add(scope, host, chatId, itemId, next);
         return;
     }
     try {
         await scope.chats.renameBookmark(chatId, itemId, '');
     } catch (e) {
-        failed(i18next.t('agent-chat:bookmarks.renameFailed'), e);
+        failed(host, i18next.t('agent-chat:bookmarks.renameFailed'), e);
     }
 }
 
 /* Takes a bookmark away at once; the toast puts it back, name and all. */
-export async function removeBookmark(scope: ChatScope, chatId: string, bookmark: ChatBookmark): Promise<void> {
+export async function removeBookmark(scope: ChatScope, host: Notifier, chatId: string, bookmark: ChatBookmark): Promise<void> {
     try {
         await scope.chats.removeBookmark(chatId, bookmark.itemId);
     } catch (e) {
-        failed(i18next.t('agent-chat:bookmarks.removeFailed'), e);
+        failed(host, i18next.t('agent-chat:bookmarks.removeFailed'), e);
         return;
     }
-    chatHost().notify({
+    host.notify({
         title: i18next.t('agent-chat:bookmarks.removed'),
         kind: 'deleted',
-        action: { label: i18next.t('agent-chat:common.action.undo'), run: () => void add(scope, chatId, bookmark.itemId, bookmark.name) }
+        action: { label: i18next.t('agent-chat:common.action.undo'), run: () => void add(scope, host, chatId, bookmark.itemId, bookmark.name) }
     });
 }
 

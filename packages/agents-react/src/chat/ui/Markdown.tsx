@@ -12,8 +12,8 @@ import { splitMarkdownBlocks } from './markdown-blocks';
 import { rehypeChips, type ChipOptions } from './rehype-chips';
 import { rehypeFadeWords } from './rehype-fade';
 import { remarkHtmlAsText } from './remark-html-as-text';
-import { chatHost, type FileRef, type ShellCodeBlockContext } from '../../host';
-import { openFileLink, useFileLinkCwd, useFileLinkScopeId, useFileLinkTarget } from './file-links';
+import { useChatHost, type FileRef, type ShellCodeBlockContext } from '../../host';
+import { useFileLinkCwd, useFileLinkScopeId, useFileLinkTarget, useOpenFileLink } from './file-links';
 import { ErrorBoundary, FileIcon, Icon } from '@adecore/ui';
 import { useTranslation } from 'react-i18next';
 
@@ -75,6 +75,7 @@ const INLINE_CODE = 'rounded-sm bg-surface-sunken px-1 py-px font-mono text-code
 function FileLink({ target, className, children }: { target: FileRef; className?: string; children: ReactNode }) {
     const cwd = useFileLinkCwd();
     const scopeId = useFileLinkScopeId();
+    const openFileLink = useOpenFileLink();
     return (
         // A button is not selectable on its own, and a thread is copied as often as it is clicked.
         <button
@@ -218,6 +219,7 @@ const replyComponents = {
 function ReplyCode({ className, children, node }: { className?: string; children?: ReactNode } & ExtraProps) {
     const reply = useContext(ShellCodeBlockReplyContext);
     const block = useContext(BlockCodeContext);
+    const { renderShellCodeBlock } = useChatHost();
     const properties = node?.properties;
     const language = properties?.['data-shell-language'];
     const code = properties?.['data-shell-code'];
@@ -238,11 +240,7 @@ function ReplyCode({ className, children, node }: { className?: string; children
     }
     if (block) {
         return (
-            <CodeBlock
-                code={text.replace(/\n$/, '')}
-                lang={languageOf(className)}
-                actions={context !== null ? chatHost().renderShellCodeBlock?.(context) : undefined}
-            />
+            <CodeBlock code={text.replace(/\n$/, '')} lang={languageOf(className)} actions={context !== null ? renderShellCodeBlock?.(context) : undefined} />
         );
     }
     return <InlineCode text={text} />;

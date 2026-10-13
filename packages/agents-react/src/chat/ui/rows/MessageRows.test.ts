@@ -5,7 +5,7 @@ import { createInstance } from 'i18next';
 import { I18nextProvider } from 'react-i18next';
 import type { ChatInfo, ChatUserItem, ProviderCapabilities } from '@adecore/agent-contracts';
 import { formatMoment } from '@adecore/ui/format';
-import { chatHost, setChatHost } from '../../../host';
+import { ChatHostProvider, type ChatHost } from '../../../host';
 import { ChatScopeContext, type ChatScope } from '../../../scope';
 import { useChats } from '../../../state/chats';
 import { useProvidersStore } from '../../../state/providers';
@@ -19,7 +19,7 @@ const scope: ChatScope = {
     transport: {} as ChatScope['transport'],
     chats: {} as ChatScope['chats']
 };
-const authorBefore = chatHost().useReplyAuthor;
+let host: Partial<ChatHost> = {};
 const i18n = createInstance();
 await i18n.init({
     lng: 'en',
@@ -53,16 +53,20 @@ const capabilities: ProviderCapabilities = {
 function render(context: { provider: ChatInfo['provider']; chatId?: string } | null = null) {
     return renderToStaticMarkup(
         createElement(
-            I18nextProvider,
-            { i18n },
+            ChatHostProvider,
+            { host },
             createElement(
-                ChatScopeContext.Provider,
-                { value: scope },
+                I18nextProvider,
+                { i18n },
                 createElement(
-                    ReplyContext.Provider,
-                    { value: context },
-                    createElement(AssistantRow, { chatId: 'parent', item }),
-                    createElement(ReplyHeader, { chatId: 'parent', at: null })
+                    ChatScopeContext.Provider,
+                    { value: scope },
+                    createElement(
+                        ReplyContext.Provider,
+                        { value: context },
+                        createElement(AssistantRow, { chatId: 'parent', item }),
+                        createElement(ReplyHeader, { chatId: 'parent', at: null })
+                    )
                 )
             )
         )
@@ -93,13 +97,12 @@ beforeEach(() => {
     // Server rendering reads Zustand's initial snapshot instead of the current browser state.
     useProvidersStore.getInitialState().byScope[scope.id] = useProvidersStore.getState().byScope[scope.id]!;
     useChats.getInitialState().byKey[scope.keyOf('parent')] = useChats.getState().byKey[scope.keyOf('parent')]!;
-    setChatHost({ useReplyAuthor: () => null });
+    host = {};
 });
 
 afterEach(() => {
     delete useProvidersStore.getInitialState().byScope[scope.id];
     delete useChats.getInitialState().byKey[scope.keyOf('parent')];
-    setChatHost({ useReplyAuthor: authorBefore });
     useProvidersStore.getState().forget(scope.id);
     useChats.getState().forget(scope.keyOf('parent'));
 });
@@ -111,7 +114,7 @@ describe('reply identity in a child conversation', () => {
     });
 
     test('a delegated chat uses its own named author in both heading and header', () => {
-        setChatHost({ useReplyAuthor: (_scopeId, chatId) => ({ name: chatId === 'child' ? 'Child author' : 'Parent author' }) });
+        host = { useReplyAuthor: (_scopeId, chatId) => ({ name: chatId === 'child' ? 'Child author' : 'Parent author' }) };
         const child = render({ provider: 'claude', chatId: 'child' });
         expect(child).toContain('>Child author</h3>');
         expect(child).not.toContain('Parent author');
@@ -119,7 +122,7 @@ describe('reply identity in a child conversation', () => {
     });
 
     test('a native transcript never borrows the root author', () => {
-        setChatHost({ useReplyAuthor: () => ({ name: 'Parent author' }) });
+        host = { useReplyAuthor: () => ({ name: 'Parent author' }) };
         const child = render({ provider: 'claude' });
         expect(child).toContain('>Claude Code</h3>');
         expect(child).not.toContain('Parent author');

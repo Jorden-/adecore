@@ -2,7 +2,6 @@ import { expect, test } from 'bun:test';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { ChatApprovalItem, ChatSubagentResult } from '@adecore/agent-contracts';
-import { chatHost, setChatHost } from '../../host';
 import { ChatScopeContext, type ChatScope } from '../../scope';
 import type { ChatTransport, ChatTransportStatus } from '../../transport';
 import { SubagentTimeline } from './SubagentTimeline';
@@ -52,11 +51,9 @@ test.skipIf(typeof document === 'undefined')("a hidden child shows its approval 
         transport,
         chats: {} as ChatScope['chats']
     };
-    const actions = chatHost().actions;
     const element = document.createElement('div');
     document.body.append(element);
     const root = createRoot(element);
-    setChatHost({ actions: null });
     try {
         await act(async () => {
             root.render(createElement(ChatScopeContext.Provider, { value: scope }, createElement(SubagentTimeline, { chatId: 'parent', toolUseId: 'task' })));
@@ -94,6 +91,5 @@ test.skipIf(typeof document === 'undefined')("a hidden child shows its approval 
             root.unmount();
         });
         element.remove();
-        setChatHost({ actions });
     }
 });

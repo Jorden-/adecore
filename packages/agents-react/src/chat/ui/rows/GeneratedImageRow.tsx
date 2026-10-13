@@ -5,14 +5,14 @@ import { Trans, useTranslation } from 'react-i18next';
 import { Check, Copy, Ellipsis, ExternalLink, FolderDown, ImageIcon, Maximize2 } from 'lucide-react';
 import type { ChatAttachment, ChatToolItem } from '@adecore/agent-contracts';
 import { Button, ButtonGroup, copyText, ErrorBoundary, FileIcon, Icon, IconButton, Menu, Surface } from '@adecore/ui';
-import { chatHost } from '../../../host';
+import { useChatHost } from '../../../host';
 import { useChatScope } from '../../../scope';
 import { useCurrentItem } from '../../../state/chats';
 import { formatBytes } from '../../attachments';
 import { attachmentAspect, generatedImageView, type GeneratedImageFailure } from '../../logic/generated-image';
 import { toolStartedAt } from '../../logic/tools';
 import { CHIP_IN_MESSAGE, MENTION_TONE } from '../chips';
-import { openFileLink, useFileLinkCwd } from '../file-links';
+import { useFileLinkCwd, useOpenFileLink } from '../file-links';
 import { ImageThumb } from '../ImageView';
 import { ROW_GUTTER } from '../icons';
 import { RunningFor, WorkRow } from './WorkRows';
@@ -67,13 +67,15 @@ function HeadLine({ label, detail, live, startedAt }: { label: string; detail?: 
 function SavedFile({ path }: { path: string }) {
     const cwd = useFileLinkCwd();
     const { id } = useChatScope();
+    const { fileLinks } = useChatHost();
+    const openFileLink = useOpenFileLink();
     const chip = (
         <>
             <FileIcon path={path} size={14} />
             <span className="truncate">{path}</span>
         </>
     );
-    if (chatHost().fileLinks === null) {
+    if (fileLinks === null) {
         return <span className={clsx(CHIP_IN_MESSAGE, MENTION_TONE)}>{chip}</span>;
     }
     return (
@@ -91,7 +93,7 @@ function SavedFile({ path }: { path: string }) {
 function ReadyImage({ chatId, attachment, prompt, transparent }: { chatId: string; attachment: ChatAttachment; prompt: string | null; transparent: boolean }) {
     const { t } = useTranslation('agent-chat');
     const { id: scopeId } = useChatScope();
-    const { attachments } = chatHost();
+    const { attachments } = useChatHost();
     const source = attachments.useUrl(scopeId, chatId, attachment.id);
     const savedKey = `${scopeId}\n${chatId}\n${attachment.id}`;
     const [lightbox, setLightbox] = useState(false);

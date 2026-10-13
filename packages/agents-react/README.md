@@ -27,16 +27,19 @@ Import the theme after the one of `@adecore/ui`, let Tailwind scan the package, 
 @source "../node_modules/@adecore/agents-react/dist";
 ```
 
-Add the words of `AGENTS_LOCALES` to your i18next, call `setChatHost` once, and render the views in a `ChatScopeContext`:
+Add the words of `AGENTS_LOCALES` to your i18next, and render the views in a `ChatHostProvider` and a `ChatScopeContext`:
 
 ```tsx
 import { Composer } from '@adecore/agents-react/chat/ui/Composer';
 import { Timeline } from '@adecore/agents-react/chat/ui/Timeline';
+import { ChatHostProvider } from '@adecore/agents-react/host';
 import { ChatScopeContext } from '@adecore/agents-react/scope';
 
-<ChatScopeContext.Provider value={scope}>
-    <Timeline chatId={chatId} composer={<Composer chatId={chatId} info={info} {...composerProps} />} />
-</ChatScopeContext.Provider>;
+<ChatHostProvider host={CHAT_HOST}>
+    <ChatScopeContext.Provider value={scope}>
+        <Timeline chatId={chatId} composer={<Composer chatId={chatId} info={info} {...composerProps} />} />
+    </ChatScopeContext.Provider>
+</ChatHostProvider>;
 ```
 
 [Getting started](https://adecore.dev/agents-react/guide/getting-started) covers the words, the host, the scope and its transport.
@@ -48,7 +51,7 @@ Every module has its own subpath, `@adecore/agents-react/<path>`; there is no ro
 | Page | What it covers |
 |---|---|
 | [Getting started](https://adecore.dev/agents-react/guide/getting-started) | Install, CSS, words, the host and a first chat |
-| [Host adapters](https://adecore.dev/agents-react/guide/host) | Everything `setChatHost` takes |
+| [Host adapters](https://adecore.dev/agents-react/guide/host) | Everything a `ChatHostProvider` takes |
 | [Chat client and state](https://adecore.dev/agents-react/guide/chat-client) | The transport, `ChatClient` and the stores |
 | [Persistence](https://adecore.dev/agents-react/guide/persistence) | Drafts, preferences and their storage keys |
 | [Chat](https://adecore.dev/agents-react/chat/timeline) | The timeline, the composer, prompts and their parts, each with a live demo |

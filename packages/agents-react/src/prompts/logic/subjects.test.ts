@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import type { ChatApprovalItem, ChatQuestionItem } from '@adecore/agent-contracts';
-import { chatHost, setChatHost, type ChatHost } from '../../host';
+import type { ChatHost } from '../../host';
 import { PROMPT_SAMPLES } from './prompts.fixtures';
 import {
     answerPrompt,
@@ -18,6 +18,10 @@ function sampleOf(label: string) {
 }
 const command = sampleOf('Permission · Command') as ChatApprovalItem;
 const optional = sampleOf('Question · Optional') as ChatQuestionItem;
+// A chat's own prompt never reaches the app's host, so one that refuses everything fails such a test.
+const NO_HOST: Pick<ChatHost, 'prompts'> = {
+    prompts: { useExtra: () => [], render: () => null, answer: () => Promise.reject(new Error('The host was asked')) }
+};
 
 function recorder() {
     const calls: unknown[][] = [];
@@ -52,9 +56,9 @@ describe('answering a subject', () => {
     test('a chat subject sends chat.approve, chat.answer and chat.dismiss for its own chat', async () => {
         const { calls, clients } = recorder();
         const subject: PromptSubject = { kind: 'chat', nodeId: 'chat-1', item: command };
-        await answerPrompt(subject, { kind: 'approve', decision: 'deny', message: 'no' }, clients);
-        await answerPrompt({ kind: 'chat', nodeId: 'chat-1', item: optional }, { kind: 'answer', answers: { endpoints: 'All three' } }, clients);
-        await answerPrompt({ kind: 'chat', nodeId: 'chat-1', item: optional }, { kind: 'dismiss' }, clients);
+        await answerPrompt(subject, { kind: 'approve', decision: 'deny', message: 'no' }, clients, NO_HOST);
+        await answerPrompt({ kind: 'chat', nodeId: 'chat-1', item: optional }, { kind: 'answer', answers: { endpoints: 'All three' } }, clients, NO_HOST);
+        await answerPrompt({ kind: 'chat', nodeId: 'chat-1', item: optional }, { kind: 'dismiss' }, clients, NO_HOST);
         expect(calls).toEqual([
             ['approve', 'chat-1', command.requestId, 'deny', 'no'],
             ['answer', 'chat-1', optional.requestId, { endpoints: 'All three' }],
@@ -63,21 +67,19 @@ describe('answering a subject', () => {
     });
 
     test('a chat subject without clients says the chat is not connected', async () => {
-        await expect(answerPrompt({ kind: 'chat', nodeId: 'chat-1', item: command }, { kind: 'dismiss' }, null)).rejects.toThrow();
+        await expect(answerPrompt({ kind: 'chat', nodeId: 'chat-1', item: command }, { kind: 'dismiss' }, null, NO_HOST)).rejects.toThrow();
     });
 });
 
 describe("an app's own prompt", () => {
     const answered: unknown[][] = [];
-    const before: ChatHost['prompts'] = chatHost().prompts;
-    beforeAll(() => {
-        setChatHost({ prompts: { ...before, answer: async (prompt, action) => void answered.push([prompt.id, action]) } });
-    });
-    afterAll(() => setChatHost({ prompts: before }));
+    const host: Pick<ChatHost, 'prompts'> = {
+        prompts: { useExtra: () => [], render: () => null, answer: async (prompt, action) => void answered.push([prompt.id, action]) }
+    };
 
     test('is answered by the app, never by the chat', async () => {
         const { calls, clients } = recorder();
-        await answerPrompt({ kind: 'host', nodeId: 'chat-1', prompt: hostPrompt('mine', 1) }, { kind: 'choose', choiceId: 'once' }, clients);
+        await answerPrompt({ kind: 'host', nodeId: 'chat-1', prompt: hostPrompt('mine', 1) }, { kind: 'choose', choiceId: 'once' }, clients, host);
         expect(answered).toEqual([['mine', { kind: 'choose', choiceId: 'once' }]]);
         expect(calls).toEqual([]);
     });

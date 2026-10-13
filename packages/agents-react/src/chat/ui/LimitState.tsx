@@ -10,7 +10,7 @@ import { useFormatLocale } from '@adecore/ui/format';
 import { Switch, Button, Icon, Pill, Tooltip, useNow } from '@adecore/ui';
 import { useUsageLimits } from '../../usage/limits';
 import { useChats } from '../../state/chats';
-import { chatHost } from '../../host';
+import { useChatHost } from '../../host';
 import { useChatScope, type ChatScope } from '../../scope';
 import { useChatActions } from '../actions';
 import { useUsageStore } from '../../state/usage';
@@ -43,10 +43,11 @@ function readUnreadAccounts(scope: ChatScope): void {
  * switch off it stands off and says where that switch is.
  */
 function ResumeAtResetToggle({ chatId, info }: { chatId: string; info: ChatInfo }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     const { id } = useChatScope();
     const actions = useChatActions();
-    const machineAllows = chatHost().useResumeAtReset(id);
+    const machineAllows = host.useResumeAtReset(id);
     const set = (on: boolean): void => {
         void actions.configure(chatId, { resumeAtReset: on }).catch(() => undefined);
     };
@@ -66,6 +67,7 @@ function ResumeAtResetToggle({ chatId, info }: { chatId: string; info: ChatInfo 
  * conversation takes it over; any other goes on in a fork, which then opens the way a fork does.
  */
 function ContinueOn({ chatId, info, choice }: { chatId: string; info: ChatInfo; choice: AccountChoice }) {
+    const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     const scope = useChatScope();
     const actions = useChatActions();
@@ -89,7 +91,7 @@ function ContinueOn({ chatId, info, choice }: { chatId: string; info: ChatInfo; 
         actions
             .continueOn(chatId, target.id)
             .catch((e: unknown) =>
-                chatHost().notify({
+                host.notify({
                     kind: 'error',
                     title: t('limit.continueFailed', { account: name }),
                     description: e instanceof Error ? e.message : String(e)

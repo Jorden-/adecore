@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Lock, LockOpen, Plus, X } from 'lucide-react';
 import type { ProviderAccount } from '@adecore/agent-contracts';
+import { useChatHost } from '../host';
 import { useChatScope } from '../scope';
 import { saveAccount } from './account-actions';
 import { draftsOf, emptyDraft, variablesChanged, variablesOf, variablesProblem, type VariableDraft } from './variables';
@@ -22,6 +23,7 @@ interface AccountVariablesProps {
 export function AccountVariables({ id, account, secretsAvailable }: AccountVariablesProps) {
     const { t } = useTranslation('agent-providers');
     const scope = useChatScope();
+    const host = useChatHost();
     const [drafts, setDrafts] = useState<VariableDraft[]>(() => draftsOf(account.env));
     const [saving, setSaving] = useState(false);
     const changed = variablesChanged(drafts, account.env);
@@ -36,7 +38,7 @@ export function AccountVariables({ id, account, secretsAvailable }: AccountVaria
         const { env: _env, ...rest } = account;
         setSaving(true);
         try {
-            await saveAccount(scope, id, env.length === 0 ? rest : { ...rest, env });
+            await saveAccount(scope, host, id, env.length === 0 ? rest : { ...rest, env });
         } finally {
             setSaving(false);
         }
