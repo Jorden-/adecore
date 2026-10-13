@@ -94,6 +94,11 @@
             "types": "./dist/chat/chat-references.d.ts",
             "default": "./dist/chat/chat-references.js"
         },
+        "./chat/composer-send": {
+            "source": "./src/chat/composer-send.ts",
+            "types": "./dist/chat/composer-send.d.ts",
+            "default": "./dist/chat/composer-send.js"
+        },
         "./chat/drafts": {
             "source": "./src/chat/drafts.ts",
             "types": "./dist/chat/drafts.d.ts",

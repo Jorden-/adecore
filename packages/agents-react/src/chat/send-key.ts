@@ -1,5 +1,5 @@
 import i18next from 'i18next';
-import { KEY_SHORTCUTS, type Shortcut } from '@adecore/ui';
+import { KEY_SHORTCUTS, shortcut, type Shortcut } from '@adecore/ui';
 
 /*
  * Which key sends a message: Enter, Enter until the message runs over more than one line and Mod+Enter
@@ -10,6 +10,9 @@ export type ChatSendKey = 'enter' | 'mod-enter-multiline' | 'mod-enter';
 export const CHAT_SEND_KEYS: readonly ChatSendKey[] = ['enter', 'mod-enter-multiline', 'mod-enter'];
 
 export const DEFAULT_SEND_KEY: ChatSendKey = 'enter';
+
+/* Sends, then opens a new chat through the host's `openNewChat`; a key of the composer, for a menu or a list of keys to print. */
+export const SEND_AND_NEW_SHORTCUT = /* @__PURE__ */ shortcut('Mod+Alt+Enter');
 
 export function isChatSendKey(value: unknown): value is ChatSendKey {
     return typeof value === 'string' && (CHAT_SEND_KEYS as readonly string[]).includes(value);

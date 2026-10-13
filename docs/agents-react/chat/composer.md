@@ -28,6 +28,8 @@ import { Composer } from '@adecore/agents-react/chat/ui/Composer';
 
 `onSend` may return nothing, and the composer clears its draft at once, without waiting for the host. If a send can fail in your app, keep the text and files until `send` resolves, so a person can try again. Return a promise of whether the host took the message, and a send that also opens a new chat waits for it: Mod+Alt+Enter sends, and once the promise resolves `true` (or once `onSend` returned nothing) calls the host's `openNewChat(scopeId, chatId)`. Without `openNewChat`, Mod+Alt+Enter sends the other way, like Alt+Enter.
 
+A command of your own, such as a menu row, sends what a composer on screen holds the way its keys do: `sendFromComposer(key, how)` from `chat/composer-send`, with the scope's `keyOf(chatId)` and a `ComposerSend` (`default`, `alternate` or `and-new`). It answers `false` when that chat has no composer on screen; each composer registers itself with `registerComposerSender`. `SEND_AND_NEW_SHORTCUT` in `chat/send-key` is Mod+Alt+Enter, for a menu or a list of keys to print.
+
 Before the first message, picking another CLI's model calls `onRetarget(provider, selection)`, which moves the empty chat. After it, or with `providerFixed`, the picker offers only the chat's own CLI.
 
 ## Keys

@@ -52,6 +52,7 @@ import { PROMPT_MAX_CHARS, pasteBecomesAttachment, pastedTextName, promptGuard, 
 import { withQuote } from '../quote';
 import { rememberChatAccount, rememberChatPreferences, rememberChatSelection, useChatPreferences } from '../preferences';
 import { sendShortcut } from '../send-key';
+import { registerComposerSender, type ComposerSend } from '../composer-send';
 import { STASH_SHORTCUT, stashDraft, type StashedPrompt, useStash } from '../stash';
 import { jumpToTimelineItem, pageTimeline, scrollTimelineToEnd, subscribeTimelineEnd, timelineAtEnd } from '../timeline-scroll';
 import { ChatActivity } from './ChatActivity';
@@ -161,9 +162,7 @@ function hintedPlaceholder(lead: string, joiner: string, hints: ReadonlyArray<{ 
     return root;
 }
 
-type SendHow = 'default' | 'alternate' | 'and-new';
-
-const SEND_HOW: Readonly<Record<'send' | 'send-alternate' | 'send-and-new', SendHow>> = {
+const SEND_HOW: Readonly<Record<'send' | 'send-alternate' | 'send-and-new', ComposerSend>> = {
     send: 'default',
     'send-alternate': 'alternate',
     'send-and-new': 'and-new'
@@ -709,7 +708,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
             .catch(() => undefined);
     };
 
-    const submit = (how: SendHow = 'default'): void => {
+    const submit = (how: ComposerSend = 'default'): void => {
         const alternate = how === 'alternate';
         const delivery = canSteer && (alternate ? sendDelivery === 'queue' : sendDelivery === 'steer') ? 'steer' : 'queue';
         const trimmed = text.trim();
@@ -756,6 +755,13 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
         setSkillQuery(null);
         setHistoryIndex(null);
     };
+
+    // A menu row means the draft as it stands when it is picked, so the registration reads the latest submit.
+    const submitRef = useRef(submit);
+    useEffect(() => {
+        submitRef.current = submit;
+    });
+    useEffect(() => registerComposerSender(scope.keyOf(chatId), (how) => submitRef.current(how)), [scope, chatId]);
 
     /*
      * A stashed prompt comes back as text, mentions and skills; its files were never kept. Its quote
