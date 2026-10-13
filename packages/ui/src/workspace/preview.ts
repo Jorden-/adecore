@@ -1,3 +1,5 @@
+import type { SplitRect } from './geometry.ts';
+
 /* The gap above the indicator's tab, so it reads as a tab standing in the bar. */
 export const TAB_TOP_INSET = 4;
 
@@ -27,13 +29,6 @@ export interface DropPreviewShape {
     radius: number;
 }
 
-export interface PreviewRect {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-}
-
 function coordinate(value: number): string {
     return String(Math.round(value * 100) / 100 + 0);
 }
@@ -42,12 +37,12 @@ function coordinate(value: number): string {
  * The preview for a split or a trade: the rectangle as a tab with no height, parked just inside its
  * top left corner so the corner keeps its radius. It is where a tab target grows out of the rectangle.
  */
-export function rectPreview({ x, y, width, height }: PreviewRect): DropPreviewShape {
+export function rectDropPreview({ x, y, width, height }: SplitRect): DropPreviewShape {
     return { x, y, width, height, barHeight: 0, tabLeft: x + BODY_RADIUS, tabWidth: 0, tabTop: y, radius: TAB_RADIUS };
 }
 
 /* The preview for a tab: the tab and the body of the cell it lands in, `origin` being the cell's top left in the grid. */
-export function tabPreview(drop: TabDrop, origin: { x: number; y: number }): DropPreviewShape {
+export function tabDropPreview(drop: TabDrop, origin: { x: number; y: number }): DropPreviewShape {
     return {
         x: origin.x,
         y: origin.y,
@@ -61,6 +56,7 @@ export function tabPreview(drop: TabDrop, origin: { x: number; y: number }): Dro
     };
 }
 
+/* Two shapes that draw the same outline, so a drag that stays in one place can skip a render. */
 export function sameDropPreview(left: DropPreviewShape | null, right: DropPreviewShape | null): boolean {
     if (left === null || right === null) {
         return left === right;

@@ -236,7 +236,7 @@ describe.skipIf(typeof document === 'undefined')('workspace interaction', () => 
         const view = container.querySelector<HTMLElement>('.ade-split-view')!;
         await change(() => container.querySelector('[data-document-tab="a"] [role="tab"]')!.dispatchEvent(dragEvent('dragstart', 20, 10)));
         await change(() => view.dispatchEvent(dragEvent('dragover', 780, 200)));
-        expect(view.querySelector('.ade-split-preview')).not.toBeNull();
+        expect(view.querySelector('.ade-drop-preview')).not.toBeNull();
         const settled = viewRenders;
         for (const x of [776, 770, 764, 790]) {
             await change(() => view.dispatchEvent(dragEvent('dragover', x, 210)));

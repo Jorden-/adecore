@@ -31,7 +31,8 @@ import {
 } from './geometry.ts';
 import { splitPanes, updateSplitLayout, type SplitCommand, type SplitLayout, type SplitPane } from './model.ts';
 import { TabStrip, type TabStripItem, type TabStripProps } from './TabStrip.tsx';
-import { dropPreviewPath, rectPreview, sameDropPreview, tabPreview, type DropPreviewShape } from './preview.ts';
+import { DropPreview } from './DropPreview.tsx';
+import { rectDropPreview, sameDropPreview, tabDropPreview, type DropPreviewShape } from './preview.ts';
 
 export interface SplitViewInfo {
     paneId: string;
@@ -445,7 +446,7 @@ export function SplitView({
             return null;
         }
         if (side === 'center') {
-            return { target, shape: rectPreview(rect) };
+            return { target, shape: rectDropPreview(rect) };
         }
         if (side) {
             const horizontal = side === 'left' || side === 'right';
@@ -453,7 +454,7 @@ export function SplitView({
             const height = horizontal ? rect.height : Math.max(0, (rect.height - gap) / 2);
             return {
                 target,
-                shape: rectPreview({
+                shape: rectDropPreview({
                     x: side === 'right' ? rect.x + rect.width - width : rect.x,
                     y: side === 'bottom' ? rect.y + rect.height - height : rect.y,
                     width,
@@ -462,7 +463,7 @@ export function SplitView({
             };
         }
         if (header === 0) {
-            return { target, shape: rectPreview(rect) };
+            return { target, shape: rectDropPreview(rect) };
         }
         const tabWidth = Math.min(rect.width, (drag.current?.width ?? 128) / (measurement.scaleX || 1));
         const next = tabRects[index ?? tabRects.length];
@@ -470,7 +471,7 @@ export function SplitView({
         const relative = Math.max(0, Math.min(rect.width - tabWidth, (left - measurement.left) / (measurement.scaleX || 1) - rect.x));
         return {
             target,
-            shape: tabPreview(
+            shape: tabDropPreview(
                 { gap: index ?? rect.pane.views.length, left: relative, tabWidth, width: rect.width, height: rect.height, barHeight: header },
                 { x: rect.x, y: rect.y }
             )
@@ -687,11 +688,7 @@ export function SplitView({
                             }
                         />
                     ))}
-                    {preview && (
-                        <svg className="ade-split-preview" width="100%" height="100%" aria-hidden="true">
-                            <path style={{ d: `path("${dropPreviewPath(preview)}")` }} />
-                        </svg>
-                    )}
+                    <DropPreview shape={preview} />
                 </>
             )
         }

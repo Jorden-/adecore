@@ -129,6 +129,8 @@ export { Workspace, type WorkspaceProps } from './workspace/Workspace.tsx';
 export type { WorkspaceLayout } from './workspace/context.ts';
 export { DocumentTab, TabStrip, type DocumentTabProps, type TabStripProps, type TabStripItem } from './workspace/TabStrip.tsx';
 export { SplitView, type SplitViewProps, type SplitViewInfo, type SplitViewBounds, type SplitDropTarget, type SplitDrag } from './workspace/SplitView.tsx';
+export { DropPreview, type DropPreviewProps } from './workspace/DropPreview.tsx';
+export { dropPreviewPath, rectDropPreview, sameDropPreview, tabDropPreview, type DropPreviewShape, type TabDrop } from './workspace/preview.ts';
 export {
     createSplitLayout,
     normalizeSplitLayout,
@@ -142,4 +144,4 @@ export {
     type SplitLayout,
     type SplitCommand
 } from './workspace/model.ts';
-export type { SplitRect, SplitEdges, SplitMinimum } from './workspace/geometry.ts';
+export { tabGapAt, type SplitRect, type SplitEdges, type SplitMinimum } from './workspace/geometry.ts';

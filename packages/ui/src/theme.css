@@ -824,14 +824,14 @@
     .ade-workspace[data-layout="roomy"][data-toolbar][data-sidebar] > .ade-workspace-center > .ade-workspace-content { border-top-left-radius: 8px; }
     .ade-workspace[data-layout="roomy"][data-toolbar][data-side-panel] > .ade-workspace-center > .ade-workspace-content { border-top-right-radius: 8px; }
     .ade-split-divider:is(:hover, :focus-visible, [data-resizing])::after { background: var(--accent); }
-    .ade-split-preview {
+    .ade-drop-preview {
         position: absolute;
         inset: 0;
         z-index: 4;
         pointer-events: none;
         overflow: visible;
     }
-    .ade-split-preview path {
+    .ade-drop-preview path {
         fill: color-mix(in srgb, var(--accent) 8%, transparent);
         stroke: var(--accent);
         stroke-width: 2px;
@@ -894,7 +894,7 @@
     .ade-document-tab[data-detail] .ade-document-tab-open { max-width: 200px; }
     .ade-tab-unsaved { width: 6px; height: 6px; flex: none; border-radius: 999px; background: var(--text-muted); }
     .ade-tab-insertion { position: absolute; top: 4px; bottom: 4px; width: 2px; pointer-events: none; background: var(--accent); }
-    @media (prefers-reduced-motion: reduce) { .ade-split-preview path { transition: none; } }
+    @media (prefers-reduced-motion: reduce) { .ade-drop-preview path { transition: none; } }
 }
 
 @layer components {

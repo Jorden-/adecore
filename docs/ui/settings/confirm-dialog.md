@@ -20,5 +20,7 @@ import { ConfirmDialog } from '@adecore/ui/settings';
 | `description` | `string` | | Required. |
 | `confirmLabel` | `string` | | Required. |
 | `onConfirm` | `() => Promise<void>` | | Required. |
+| `className` | `string` | | On the popup. |
+| `ref` | `Ref<HTMLDivElement>` | | On the popup. |
 
 `ConfirmDialogProps` is an exported type.
