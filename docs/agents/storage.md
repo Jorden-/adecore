@@ -20,6 +20,8 @@ An id becomes a file name with `encodeURIComponent` (`recordFileName`). A host's
 
 A record this version cannot read is left as it is and refused with `chat-unreadable`; creating the chat again does not write over it. A log can rebuild a record that is missing, when it holds a start to rebuild from.
 
+A record starts with its `info`. `ChatStore.settled` reads only that and the last info in the log, so `recoverInterrupted` parses in full only the chats with a turn in flight or a resume after a limit. A record that starts with another key is read in full.
+
 ## Writing
 
 `ChatCore` writes a small record at once and waits a moment with a large one, and joins deltas before they are written. `save` and `persisted(chatId)` wait for a write. The log is what makes replay possible: `after(since)` answers the events after a sequence number while the log still holds all of them, and a client gets a whole snapshot otherwise. Compacting folds old events into the record. `host.close()` writes every record, even of a turn still running, and ends the CLIs even when a write fails; `persistAllSync` is for an exit that cannot wait.

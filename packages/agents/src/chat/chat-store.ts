@@ -1,5 +1,5 @@
 import { mkdirSync } from 'node:fs';
-import { mkdir, readdir, readFile, rm, stat } from 'node:fs/promises';
+import { mkdir, open, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ChatInfoSchema, ChatItemSchema, type ChatInfo, type ChatItem } from '@adecore/agent-contracts';
 import { z } from 'zod';
@@ -57,6 +57,7 @@ function logName(chatId: string): string {
     return `${encodeURIComponent(chatId)}.log`;
 }
 
+// `settled` reads the info from the head of the record, so it stays the first key.
 function recordBody(
     info: ChatInfo,
     items: ChatItem[],
@@ -223,6 +224,19 @@ export class ChatStore {
         return (await this.readSnapshot(chatId)) === UNREADABLE;
     }
 
+    /*
+     * Whether the chat has neither a turn in flight nor a resume after a limit, by the info its record
+     * starts with and the last one its log wrote, without parsing the thread. False whenever that
+     * cannot be told so cheaply, which leaves the decision to `read`.
+     */
+    async settled(chatId: string): Promise<boolean> {
+        if (!settledInfo(await leadingInfo(join(this.dir, recordFileName(chatId))))) {
+            return false;
+        }
+        const last = lastLoggedInfo((await readOrNull(this.logPath(chatId))) ?? '');
+        return last === undefined || settledInfo(last);
+    }
+
     private async readSnapshot(chatId: string): Promise<z.infer<typeof RecordSchema> | typeof UNREADABLE | null> {
         const raw = await readOrNull(join(this.dir, recordFileName(chatId)));
         if (raw === null) {
@@ -252,6 +266,95 @@ export class ChatStore {
 }
 
 const UNREADABLE = Symbol('unreadable');
+
+const RECORD_HEAD = Buffer.from('{"info":{');
+const HEAD_CHUNK_BYTES = 16384;
+const QUOTE = 0x22;
+const BACKSLASH = 0x5c;
+const OPEN_BRACE = 0x7b;
+const CLOSE_BRACE = 0x7d;
+
+/*
+ * The info a record starts with, read only as far as it goes; undefined for a record that is missing,
+ * starts otherwise (an older or hand-edited one) or ends before its info does. Scanning bytes is safe
+ * in UTF-8, where no byte of a multibyte character equals a quote, a backslash or a brace.
+ */
+async function leadingInfo(path: string): Promise<unknown> {
+    let handle: Awaited<ReturnType<typeof open>>;
+    try {
+        handle = await open(path, 'r');
+    } catch (e) {
+        if (isNotFound(e)) {
+            return undefined;
+        }
+        throw e;
+    }
+    try {
+        let head = Buffer.alloc(0);
+        let at = RECORD_HEAD.length;
+        let depth = 1;
+        let inString = false;
+        let escaped = false;
+        const chunk = Buffer.alloc(HEAD_CHUNK_BYTES);
+        let { bytesRead } = await handle.read(chunk, 0, chunk.length, 0);
+        while (bytesRead > 0) {
+            head = Buffer.concat([head, chunk.subarray(0, bytesRead)]);
+            if (!head.subarray(0, RECORD_HEAD.length).equals(RECORD_HEAD.subarray(0, Math.min(head.length, RECORD_HEAD.length)))) {
+                return undefined;
+            }
+            for (; at < head.length; at++) {
+                const byte = head[at]!;
+                if (escaped) {
+                    escaped = false;
+                } else if (inString) {
+                    escaped = byte === BACKSLASH;
+                    inString = byte !== QUOTE;
+                } else if (byte === QUOTE) {
+                    inString = true;
+                } else if (byte === OPEN_BRACE) {
+                    depth += 1;
+                } else if (byte === CLOSE_BRACE) {
+                    depth -= 1;
+                    if (depth === 0) {
+                        return parseOrUndefined(head.subarray(RECORD_HEAD.length - 1, at + 1).toString('utf8'));
+                    }
+                }
+            }
+            ({ bytesRead } = await handle.read(chunk, 0, chunk.length, head.length));
+        }
+        return undefined;
+    } finally {
+        await handle.close();
+    }
+}
+
+/* The info of the last info or reset line in a log, unvalidated; undefined when no line carries one. */
+function lastLoggedInfo(raw: string): unknown {
+    const lines = raw.split('\n');
+    for (let i = lines.length - 1; i >= 0; i--) {
+        // Most lines are items and deltas, which are larger and never carry this key.
+        if (!lines[i]!.includes('"info"')) {
+            continue;
+        }
+        const event = (parseOrUndefined(lines[i]!) as { event?: { type?: unknown; info?: unknown } } | null | undefined)?.event;
+        if (event?.type === 'info' || event?.type === 'reset') {
+            return event.info;
+        }
+    }
+    return undefined;
+}
+
+function settledInfo(info: unknown): boolean {
+    return typeof info === 'object' && info !== null && (info as { activeTurnId?: unknown }).activeTurnId === null && !('resumeAt' in info);
+}
+
+function parseOrUndefined(text: string): unknown {
+    try {
+        return JSON.parse(text);
+    } catch {
+        return undefined;
+    }
+}
 
 async function exists(path: string): Promise<boolean> {
     try {

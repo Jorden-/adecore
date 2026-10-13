@@ -1034,6 +1034,10 @@ export class ChatCore {
             if (this.chats.has(chatId) || this.creating.has(chatId)) {
                 continue;
             }
+            // Parsing the whole thread of every settled chat was most of the cost of a start.
+            if (await this.store.settled(chatId).catch(() => false)) {
+                continue;
+            }
             const record = await this.store.read(chatId).catch(() => null);
             const unowed = record?.info.resumeAt !== undefined && this.limitResume?.owed(chatId) === false;
             if (record !== null && (interruptedTurn(record) !== null || unowed)) {

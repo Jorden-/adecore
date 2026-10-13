@@ -134,4 +134,46 @@ describe('ChatStore', () => {
         expect(await store.discardLog('chat')).toBe(1);
         expect(await store.list()).toEqual([]);
     });
+
+    test('tells a settled chat by the head of its record, without parsing the thread behind it', async () => {
+        const path = join(store.dir, 'chat.json');
+        await store.write('chat', info(), [user('u1', 'hi')]);
+        expect(await store.settled('chat')).toBe(true);
+
+        // Braces, quotes and multibyte characters in a string, past the first chunk, do not end the info early.
+        const title = `{"}\\é😀${'x'.repeat(20_000)}`;
+        const head = JSON.stringify({ info: { ...info(), suggestedTitle: title } });
+        await writeFile(path, `${head.slice(0, -1)},"items":[{"broken`);
+        expect(await store.settled('chat')).toBe(true);
+        expect(await store.read('chat')).toBeNull();
+
+        await writeFile(path, `${JSON.stringify({ info: info({ activeTurnId: 't1' }) }).slice(0, -1)},"items":[{"broken`);
+        expect(await store.settled('chat')).toBe(false);
+        await store.write('chat', info({ resumeAt: 5 }), []);
+        expect(await store.settled('chat')).toBe(false);
+    });
+
+    test('leaves a chat to a full read when its log says more or its record starts otherwise', async () => {
+        await store.write('chat', info(), [], { seq: 1, resetSeq: 0 });
+        logEvents(
+            [
+                { type: 'info', info: info({ activeTurnId: 't1', status: 'running' }) },
+                { type: 'item', item: user('u1', 'hi') }
+            ],
+            1
+        );
+        expect(await store.settled('chat')).toBe(false);
+        logEvents([{ type: 'info', info: info() }], 3);
+        expect(await store.settled('chat')).toBe(true);
+
+        await rm(store.logPath('chat'));
+        await writeFile(join(store.dir, 'chat.json'), JSON.stringify({ items: [], info: info() }));
+        expect(await store.settled('chat')).toBe(false);
+        await writeFile(join(store.dir, 'chat.json'), JSON.stringify({ info: info() }).slice(0, 40));
+        expect(await store.settled('chat')).toBe(false);
+
+        await rm(join(store.dir, 'chat.json'));
+        logEvents([{ type: 'info', info: info() }]);
+        expect(await store.settled('chat')).toBe(false);
+    });
 });
