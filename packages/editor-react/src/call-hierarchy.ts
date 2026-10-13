@@ -75,7 +75,7 @@ export class CallHierarchyFeature {
     }
 
     get isOpen(): boolean {
-        return (this.language.popups.getState().callHierarchy ?? null) !== null;
+        return this.language.popups.getState().callHierarchy !== null;
     }
 
     /* Whether a server of this document answers the three requests the tree is made of. */
@@ -137,7 +137,7 @@ export class CallHierarchyFeature {
 
     close(): void {
         this.reset();
-        if (this.language.popups.getState().callHierarchy == null) {
+        if (this.language.popups.getState().callHierarchy === null) {
             return;
         }
         this.language.popups.setState({ callHierarchy: null });
@@ -148,7 +148,7 @@ export class CallHierarchyFeature {
 
     /* Starts the tree over from the same symbols for the other direction. */
     setDirection(direction: CallDirection): void {
-        const view = this.language.popups.getState().callHierarchy ?? null;
+        const view = this.language.popups.getState().callHierarchy;
         if (view === null || view.direction === direction) {
             return;
         }
@@ -173,7 +173,7 @@ export class CallHierarchyFeature {
         }
         if (node.expanded) {
             this.patch(id, { expanded: false });
-            const view = this.language.popups.getState().callHierarchy ?? null;
+            const view = this.language.popups.getState().callHierarchy;
             if (view !== null && this.hasAncestor(view.active, id)) {
                 this.select(id);
             }
@@ -200,7 +200,7 @@ export class CallHierarchyFeature {
         }
         this.patch(parent, { shown: Math.min(node.children.length, node.shown + CALL_LEVEL_LIMIT) });
         const first = node.children[node.shown];
-        const view = this.language.popups.getState().callHierarchy ?? null;
+        const view = this.language.popups.getState().callHierarchy;
         // The row that offered more is gone once everything shows, so the selection moves on to what it brought.
         if (first !== undefined && view?.active === moreIdOf(parent)) {
             this.select(first);
@@ -209,7 +209,7 @@ export class CallHierarchyFeature {
 
     /* Makes a row the active one and shows the code of its call. */
     select(id: string, site = 0): void {
-        const view = this.language.popups.getState().callHierarchy ?? null;
+        const view = this.language.popups.getState().callHierarchy;
         const node = this.nodes.get(id);
         if (view === null || !view.rows.some((row) => row.id === id)) {
             return;
@@ -224,7 +224,7 @@ export class CallHierarchyFeature {
 
     /* Steps through the places a call is made from when the active one has more than one. */
     stepSite(direction: 1 | -1): void {
-        const view = this.language.popups.getState().callHierarchy ?? null;
+        const view = this.language.popups.getState().callHierarchy;
         if (view !== null && view.sites > 1) {
             this.select(view.active, (view.site + direction + view.sites) % view.sites);
         }
@@ -232,7 +232,7 @@ export class CallHierarchyFeature {
 
     /* Goes to the call of a row, or to the symbol of a root, and closes the tree. */
     go(id: string): void {
-        const view = this.language.popups.getState().callHierarchy ?? null;
+        const view = this.language.popups.getState().callHierarchy;
         const node = this.nodes.get(id);
         if (view === null || node === undefined) {
             return;
@@ -259,7 +259,7 @@ export class CallHierarchyFeature {
     }
 
     private mounted(container: HTMLElement): void {
-        const view = this.language.popups.getState().callHierarchy ?? null;
+        const view = this.language.popups.getState().callHierarchy;
         if (view !== null && view.container !== container) {
             this.language.popups.setState({ callHierarchy: { ...view, container } });
             revealRow(this.timers, container);
@@ -268,7 +268,7 @@ export class CallHierarchyFeature {
 
     private patch(id: string, change: Partial<CallNode>): void {
         const node = this.nodes.get(id);
-        const view = this.language.popups.getState().callHierarchy ?? null;
+        const view = this.language.popups.getState().callHierarchy;
         if (node === undefined || view === null) {
             return;
         }
@@ -329,7 +329,7 @@ export class CallHierarchyFeature {
                 this.texts.set(uri, text);
             }
         }
-        const view = this.language.popups.getState().callHierarchy ?? null;
+        const view = this.language.popups.getState().callHierarchy;
         if (view === null || view.active !== node.id) {
             return;
         }
@@ -354,7 +354,7 @@ export class CallHierarchyFeature {
     }
 
     private key(event: KeyboardEvent): boolean {
-        const view = this.language.popups.getState().callHierarchy ?? null;
+        const view = this.language.popups.getState().callHierarchy;
         if (view === null || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.isComposing) {
             return false;
         }

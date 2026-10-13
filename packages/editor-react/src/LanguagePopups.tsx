@@ -38,7 +38,7 @@ export function LanguagePopups<Language extends EditorLanguage>({ language, cont
     const pick = useStore(language.popups, (state) => state.pick);
     const rename = useStore(language.popups, (state) => state.rename);
     const peek = useStore(language.popups, (state) => state.peek);
-    const callHierarchy = useStore(language.popups, (state) => state.callHierarchy ?? null);
+    const callHierarchy = useStore(language.popups, (state) => state.callHierarchy);
     const symbols = useStore(language.popups, (state) => state.symbols);
     const menu = useStore(language.popups, (state) => state.menu);
     const authors = useStore(language.popups, (state) => state.authors);

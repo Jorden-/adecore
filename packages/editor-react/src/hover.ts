@@ -73,7 +73,7 @@ export class HoverFeature {
                     this.quickInfo();
                     return true;
                 }
-                if (event.key === 'Escape' && this.language.popups.getState().hover !== null && this.language.popups.getState().callHierarchy == null) {
+                if (event.key === 'Escape' && this.language.popups.getState().hover !== null && this.language.popups.getState().callHierarchy === null) {
                     this.hide();
                     return true;
                 }

@@ -492,7 +492,7 @@ export class SnippetFeature {
             const popups = this.language.popups?.getState();
             if (
                 popups !== undefined &&
-                [popups.completion, popups.signature, popups.hover, popups.pick, popups.peek, popups.callHierarchy ?? null].some((popup) => popup !== null)
+                [popups.completion, popups.signature, popups.hover, popups.pick, popups.peek, popups.callHierarchy].some((popup) => popup !== null)
             ) {
                 return false;
             }
