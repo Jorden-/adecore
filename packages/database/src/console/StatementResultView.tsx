@@ -69,6 +69,15 @@ export function StatementResultView({
     const sqlTarget = useMemo((): SqlTarget | undefined => (engine === undefined ? undefined : { engine, table: RESULT_TABLE }), [engine]);
     const elapsed = t('console.elapsed', { value: formatDecimal(result.elapsedMs) });
 
+    if (result.kind === 'error' && result.error.code === 'cancelled') {
+        return (
+            <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
+                <Banner icon={CircleAlert} tone="neutral" className="min-w-0" message={t('console.cancelled')} />
+                <p className="px-1 text-xs text-text-muted tabular-nums">{elapsed}</p>
+            </div>
+        );
+    }
+
     if (result.kind === 'error') {
         return (
             <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">

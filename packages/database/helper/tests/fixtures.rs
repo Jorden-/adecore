@@ -58,7 +58,7 @@ fn round_trip_result(call: &Call, result: &Value) -> Value {
 
 #[test]
 fn every_fixture_is_read() {
-    assert!(fixtures().len() >= 17);
+    assert!(fixtures().len() >= 19);
 }
 
 #[test]
@@ -118,6 +118,7 @@ fn requests_pick_the_right_call() {
         ("rows", "Rows"),
         ("apply", "Apply"),
         ("execute", "Execute"),
+        ("execute-cancelled", "Execute"),
         ("cancel", "Cancel"),
         ("close", "Close"),
     ];
@@ -135,7 +136,7 @@ fn requests_pick_the_right_call() {
 fn the_ready_line_has_the_agreed_shape() {
     let line = ready_line("1.2.3");
 
-    assert_eq!(line, r#"{"event":"ready","protocol":3,"version":"1.2.3"}"#);
+    assert_eq!(line, r#"{"event":"ready","protocol":4,"version":"1.2.3"}"#);
 }
 
 #[test]

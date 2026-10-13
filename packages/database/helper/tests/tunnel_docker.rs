@@ -71,7 +71,7 @@ async fn works_through(container: &str, process: Option<&str>) -> Client {
     assert_eq!(client.ok("cancel", json!({ "request": id })).await, json!({ "cancelled": true }));
 
     let cancelled: Value = serde_json::from_str(&tokio::time::timeout(Duration::from_secs(15), sleeping).await.expect("the query stops").unwrap()).unwrap();
-    assert_eq!(cancelled["error"]["code"], "cancelled", "{cancelled}");
+    assert_eq!(cancelled["result"]["results"][0]["error"]["code"], "cancelled", "{cancelled}");
     assert!(started.elapsed() < Duration::from_secs(15));
 
     let after = client.ok("execute", json!({ "session": session, "sql": "SELECT 42" })).await;

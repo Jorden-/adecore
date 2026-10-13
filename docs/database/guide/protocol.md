@@ -78,7 +78,7 @@ A session is what `open` returns. Every method except `open`, `test`, `sample`, 
 - `cell` returns the whole `Value` of one cell. `key` is a `RowKey`: the columns of the row key with their values.
 - `apply` runs a list of `RowChange` values in one transaction. An `insert` has `values`, an `update` has a `key` and `values`, a `delete` has a `key`. A value is an `EditValue`: a `Value`, or `{ kind: 'default' }` for the column's default, which SQLite only takes in an insert. An update or a delete that matches no row or more than one rolls everything back and fails with `conflict`, and `change` says which change, counted from zero.
 - `execute` runs one statement or several, separated by semicolons, and answers one `StatementResult` per statement: `rows`, `done` (with `affected` and `lastInsertId`) or `error`. A failed statement ends the list. `limit` is the rows per result, at most 10000 and 500 when left out, and `cellLimit` is 65536 when left out. `schema` is switched to first and stays selected for the session. `inTransaction` says whether a transaction is open afterwards. On MySQL the helper sets `sql_select_limit` to the limit plus one, so a `LIMIT` in a statement overrides it.
-- `cancel` stops the request with that id and answers whether it was still running. The request itself fails with `cancelled`.
+- `cancel` stops the request with that id and answers whether it was still running. The request itself fails with `cancelled`, except an `execute` that had begun: it answers its `results` up to the statement the cancel stopped, which is an `error` with code `cancelled`, and the real `inTransaction`, so a write that completed and a transaction the script opened stay in sight.
 
 A `ResultColumn` of `rows`, `page` and `execute` has a `name`, the engine's `type`, its `kind`, and a `source` when the server says which column of which table it holds: a `ColumnSource` of `schema`, `table` and `column`. A column of an expression, or an alias of one, has none. MySQL and MariaDB send it with every column definition; MariaDB names a derived table as if it were a table, and a view as the view. SQLite looks through a view or a subquery to the table it reads, which the helper reaches with the column metadata the bundled SQLite is built with.
 
@@ -174,12 +174,12 @@ A `DatabaseError` has a `code` (a `DatabaseErrorCode`), a `message`, the five ch
 
 The host talks to the helper over its standard streams, one JSON message per line. Anything else can speak the same wire, such as a test that starts the binary by hand.
 
-- Before it reads a request, the helper writes a ready line (`HelperReady`): `{"event":"ready","protocol":3,"version":"0.1.0"}`. `protocol` is its `PROTOCOL_VERSION` and `version` its own release.
+- Before it reads a request, the helper writes a ready line (`HelperReady`): `{"event":"ready","protocol":4,"version":"0.1.0"}`. `protocol` is its `PROTOCOL_VERSION` and `version` its own release.
 - The host stops a helper whose `protocol` differs from its own, or that writes no ready line within `readyTimeoutMs` (10000 by default). The request that started it fails with `helper-unavailable`.
 - Then one request per line on stdin and one response per line on stdout. An empty line is ignored, and a line that is not a valid request gets `invalid-request`, with its id when one could be read.
 - Requests run concurrently, so responses can arrive in another order; the `id` matches them. Requests on one session queue up in the order they arrived, on its single connection.
 - A session whose connection to MySQL or MariaDB is lost (a killed connection, `wait_timeout`, a dropped tunnel) ends. The request that ran into it, and every request queued behind it, answer `unknown-session`.
-- `cancel` interrupts the statement on SQLite, and runs `KILL QUERY` from a second connection on MySQL. The cancelled request answers `cancelled`, except a write that completed, which answers its result.
+- `cancel` interrupts the statement on SQLite, again while the request has not yet stopped, since SQLite ignores an interrupt that arrives before its statement begins. On MySQL it runs `KILL QUERY` once, from a second connection. The cancelled request answers `cancelled`, except a write that completed, which answers its result, and an `execute` that had begun.
 - stderr holds log lines for a person, one per line, and is not part of the protocol. `spawnHelper` hands each to `onLog`.
 - A line can be megabytes, such as a page of rows with long cells.
 - When stdin closes, the helper gives running requests up to two seconds, cancels what still runs, rolls back open transactions, closes its sessions and exits with code 0.
@@ -188,4 +188,4 @@ The host sends each request to the helper under an id of its own (`h1`, `h2`, ..
 
 ## Versions
 
-`PROTOCOL_VERSION` is `2`. It rises whenever a message changes shape, so a host refuses a helper of another release instead of misreading it. A release of the package ships a host and a helper that agree; an app that ships its own helper binary rebuilds it when it updates the package.
+`PROTOCOL_VERSION` is `4`. It rises whenever a message changes shape, so a host refuses a helper of another release instead of misreading it. A release of the package ships a host and a helper that agree; an app that ships its own helper binary rebuilds it when it updates the package.

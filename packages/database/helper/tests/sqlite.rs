@@ -676,7 +676,9 @@ async fn cancels_a_long_query() {
 
     let answer: Value = serde_json::from_str(&tokio::time::timeout(Duration::from_secs(10), long).await.expect("the query stops").unwrap()).unwrap();
     assert_eq!(answer["id"], json!(id));
-    assert_eq!(answer["error"]["code"], "cancelled");
+    assert_eq!(answer["result"]["results"].as_array().unwrap().len(), 1, "{answer}");
+    assert_eq!(answer["result"]["results"][0]["error"]["code"], "cancelled");
+    assert_eq!(answer["result"]["inTransaction"], false);
 
     let next: Value = serde_json::from_str(&queued.await.unwrap()).unwrap();
     assert_eq!(next["result"]["count"], 3, "the session serves the next request: {next}");
@@ -711,7 +713,10 @@ async fn cancels_a_request_that_is_still_queued() {
     let waited: Value = serde_json::from_str(&waiting.await.unwrap()).unwrap();
     let blocked: Value = serde_json::from_str(&blocker.await.unwrap()).unwrap();
     assert_eq!(waited["error"]["code"], "cancelled");
-    assert_eq!(blocked["error"]["code"], "cancelled");
+    assert_eq!(
+        blocked["result"]["results"][0]["error"]["code"], "cancelled",
+        "a running script answers what it did"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -783,6 +788,14 @@ async fn cancelling_a_finished_request_leaves_the_session_alone() {
     let answer: Value = serde_json::from_str(&long.await.unwrap()).unwrap();
     assert_eq!(answer["ok"], true, "{answer}");
     assert_eq!(answer["result"]["results"][0]["rows"], json!([[3_000_000]]));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sqlite_cancels_a_script_after_a_write() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut client = Client::new();
+    let endless = "WITH RECURSIVE forever(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM forever) SELECT COUNT(*) FROM forever";
+    scenarios::cancels_a_script_after_a_write(&mut scenario_db(&mut client, &directory).await, endless).await;
 }
 
 async fn scenario_db<'a>(client: &'a mut Client, directory: &tempfile::TempDir) -> scenarios::Db<'a> {

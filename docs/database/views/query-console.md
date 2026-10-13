@@ -18,7 +18,7 @@ The demo's in-memory server only runs `SELECT * FROM <table>`; see [Testing](/da
 
 Run, or Cmd or Ctrl and Enter, runs the selection, or the statement under the caret when nothing is selected. Run all, or Cmd or Ctrl, Shift and Enter, runs the whole text. The statements are split on semicolons outside strings, quoted names and comments. Each statement that ran has a tab of its own in the results, named after it.
 
-While a run is busy, Run becomes Cancel, with a spinner beside it, which aborts the request and sends a `cancel` for it. A run that failed as a whole, or was cancelled, says so at the top of the results.
+While a run is busy, Run becomes Cancel, with a spinner beside it, which aborts the request and sends a `cancel` for it. A run the cancel stopped midway shows the statements that ran before it and a tab for the statement it stopped, and the transaction controls show a transaction the run left open. A run that failed as a whole, or was cancelled before anything ran, says so at the top of the results.
 
 - A statement that returns rows shows them in a grid, with the number of rows and the time it took.
 - A statement that changes something shows the rows it affected and the last insert id.

@@ -56,6 +56,10 @@ pub struct MysqlCanceller {
 }
 
 impl MysqlCanceller {
+    pub fn new(opts: Opts, connection_id: u32) -> MysqlCanceller {
+        MysqlCanceller { opts, connection_id }
+    }
+
     pub async fn cancel(&self) -> Result<()> {
         let mut connection = connect_with_timeout(self.opts.clone()).await.map_err(DatabaseError::from)?;
         let outcome = connection.query_drop(format!("KILL QUERY {}", self.connection_id)).await;
@@ -570,10 +574,7 @@ impl MysqlEngine {
                 .map_err(|e| DatabaseError::connect_failed(e.to_string()))?;
         }
 
-        let canceller = MysqlCanceller {
-            opts,
-            connection_id: connection.id(),
-        };
+        let canceller = MysqlCanceller::new(opts, connection.id());
 
         Ok((
             MysqlEngine {
@@ -1070,11 +1071,12 @@ impl MysqlEngine {
         let mut results = Vec::new();
 
         for statement in split_statements(script, DIALECT) {
-            if cancelled.load(Ordering::SeqCst) {
-                return Err(DatabaseError::cancelled());
-            }
-
             let started = Instant::now();
+
+            if cancelled.load(Ordering::SeqCst) {
+                results.push(StatementResult::cancelled(statement, 0.0));
+                break;
+            }
 
             if self.read_only && escapes_read_only(&statement) {
                 results.push(StatementResult::Error {
@@ -1086,10 +1088,16 @@ impl MysqlEngine {
             }
 
             match self.run_statement(&statement, limit, cell_limit, started).await {
+                // The server may end an interrupted read without an error (`SLEEP` does), with only some of its rows.
+                Ok(StatementResult::Rows { .. }) if cancelled.load(Ordering::SeqCst) => {
+                    results.push(StatementResult::cancelled(statement, elapsed_ms(started.elapsed())));
+                    break;
+                }
                 Ok(result) => results.push(result),
                 Err(error) if error.connection_lost => return Err(error),
                 Err(error) if error.sql_state.as_deref() == Some(QUERY_INTERRUPTED_STATE) || cancelled.load(Ordering::SeqCst) => {
-                    return Err(DatabaseError::cancelled());
+                    results.push(StatementResult::cancelled(statement, elapsed_ms(started.elapsed())));
+                    break;
                 }
                 Err(error) => {
                     results.push(StatementResult::Error {

@@ -1,0 +1,44 @@
+{
+  "request": {
+    "id": "r8",
+    "method": "execute",
+    "params": {
+      "session": "s2",
+      "sql": "START TRANSACTION; UPDATE users SET name = 'x' WHERE id = 1; SELECT SLEEP(30)",
+      "schema": "shop",
+      "limit": 500
+    }
+  },
+  "response": {
+    "id": "r8",
+    "ok": true,
+    "result": {
+      "results": [
+        {
+          "kind": "done",
+          "sql": "START TRANSACTION",
+          "affected": 0,
+          "lastInsertId": null,
+          "elapsedMs": 0.2
+        },
+        {
+          "kind": "done",
+          "sql": "UPDATE users SET name = 'x' WHERE id = 1",
+          "affected": 1,
+          "lastInsertId": null,
+          "elapsedMs": 1.2
+        },
+        {
+          "kind": "error",
+          "sql": "SELECT SLEEP(30)",
+          "error": {
+            "code": "cancelled",
+            "message": "The request was cancelled."
+          },
+          "elapsedMs": 812.4
+        }
+      ],
+      "inTransaction": true
+    }
+  }
+}

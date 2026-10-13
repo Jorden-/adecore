@@ -5,7 +5,7 @@ use serde_json::{Number, json};
 
 use crate::error::DatabaseError;
 
-pub const PROTOCOL_VERSION: u32 = 3;
+pub const PROTOCOL_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "engine", rename_all = "lowercase")]
@@ -335,6 +335,15 @@ pub enum StatementResult {
 }
 
 impl StatementResult {
+    /// The entry of a script for the statement a cancel stopped, or kept from starting.
+    pub fn cancelled(sql: String, elapsed_ms: f64) -> Self {
+        StatementResult::Error {
+            sql,
+            error: DatabaseError::cancelled(),
+            elapsed_ms,
+        }
+    }
+
     pub fn rows(sql: String, result: RowsResult) -> Self {
         StatementResult::Rows {
             sql,

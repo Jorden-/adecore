@@ -69,6 +69,11 @@ export interface DatabaseSession {
     count(schema: string, table: string, where?: string, options?: RequestOptions): Promise<number>;
     cell(schema: string, table: string, key: RowKey, column: string, options?: RequestOptions): Promise<Value>;
     apply(schema: string, table: string, changes: readonly RowChange[], options?: RequestOptions): Promise<number>;
+    /*
+     * Aborting an `execute` the helper began waits for its answer: the results of what ran, ending with an
+     * `error` of code `cancelled`, and whether a transaction is open. It rejects with `cancelled` when
+     * nothing ran, or when the cancel could not be sent.
+     */
     execute(sql: string, options?: ExecuteOptions): Promise<ExecuteResult>;
     page(sql: string, query: PageQuery, options?: RequestOptions): Promise<RowsResult>;
     /* Resolves whether a transaction is open after the action. */

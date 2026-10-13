@@ -133,7 +133,7 @@ async fn tunnels_through_ssh() {
     tokio::time::sleep(std::time::Duration::from_millis(700)).await;
     assert_eq!(client.ok("cancel", json!({ "request": id })).await, json!({ "cancelled": true }));
     let cancelled: Value = serde_json::from_str(&sleeping.await.unwrap()).unwrap();
-    assert_eq!(cancelled["error"]["code"], "cancelled", "{cancelled}");
+    assert_eq!(cancelled["result"]["results"][0]["error"]["code"], "cancelled", "{cancelled}");
 
     client.ok("close", json!({ "session": session })).await;
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;

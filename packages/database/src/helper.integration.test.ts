@@ -113,14 +113,18 @@ describe.skipIf(!available)('the page, the host and the helper together', () => 
         expect(result?.kind === 'rows' ? result.columns.map((column) => column.kind) : []).toEqual(['integer', 'float', 'text']);
     });
 
-    test('an aborted query is cancelled on the server', async () => {
+    test('an aborted script is cancelled on the server and answers what it wrote first', async () => {
         const session = client.session(shop);
         const controller = new AbortController();
-        const running = session.execute('WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n) SELECT COUNT(*) FROM n', {
-            signal: controller.signal
-        });
+        const running = session.execute(
+            "UPDATE customers SET note = 'seen' WHERE id = 1; WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n) SELECT COUNT(*) FROM n",
+            { signal: controller.signal }
+        );
         setTimeout(() => controller.abort(), 100);
-        await expect(running).rejects.toMatchObject({ code: 'cancelled' });
+        const { results, inTransaction } = await running;
+        expect(results.map((result) => (result.kind === 'error' ? result.error.code : result.kind))).toEqual(['done', 'cancelled']);
+        expect(inTransaction).toBe(false);
+        expect(await session.cell('main', 'customers', { id: 1 }, 'note')).toBe('seen');
         expect(await session.count('main', 'customers')).toBe(3);
     });
 });

@@ -95,7 +95,8 @@ export const createDatabaseClient = (transport: DatabaseTransport, options: Data
         }
     };
 
-    const send = async <M extends DatabaseMethod>(method: M, params: DatabaseParams<M>, signal?: AbortSignal): Promise<DatabaseResult<M>> => {
+    /* With `settles`, an abort sends the cancel and waits for the answer, which can still carry what ran. */
+    const send = async <M extends DatabaseMethod>(method: M, params: DatabaseParams<M>, signal?: AbortSignal, settles = false): Promise<DatabaseResult<M>> => {
         if (signal?.aborted) {
             throw cancelledError();
         }
@@ -106,8 +107,15 @@ export const createDatabaseClient = (transport: DatabaseTransport, options: Data
         return new Promise<DatabaseResult<M>>((resolve, reject) => {
             const onAbort = (): void => {
                 const cancel = { id: createId(), method: 'cancel', params: { request: id } } as DatabaseRequest;
-                new Promise((done) => done(transport(cancel))).catch(() => {});
-                reject(cancelledError());
+                const cancelling = new Promise((done) => done(transport(cancel)));
+
+                if (settles) {
+                    // Without a cancel on its way, nothing tells the request to stop, so its answer may never come.
+                    cancelling.catch(() => reject(cancelledError()));
+                } else {
+                    cancelling.catch(() => {});
+                    reject(cancelledError());
+                }
             };
 
             signal?.addEventListener('abort', onAbort, { once: true });
@@ -168,7 +176,8 @@ export const createDatabaseClient = (transport: DatabaseTransport, options: Data
             method: M,
             build: (session: string) => DatabaseParams<M>,
             requestOptions: RequestOptions | undefined,
-            retry: boolean
+            retry: boolean,
+            settles = false
         ): Promise<DatabaseResult<M>> => {
             const signal = requestOptions?.signal;
 
@@ -179,7 +188,7 @@ export const createDatabaseClient = (transport: DatabaseTransport, options: Data
             const current = await raceAbort(open(), signal);
 
             try {
-                return await send(method, build(current.session), signal);
+                return await send(method, build(current.session), signal, settles);
             } catch (error) {
                 if (!isUnknownSession(error)) {
                     throw error;
@@ -190,7 +199,7 @@ export const createDatabaseClient = (transport: DatabaseTransport, options: Data
                 }
 
                 if (retry) {
-                    return request(method, build, requestOptions, false);
+                    return request(method, build, requestOptions, false, settles);
                 }
 
                 throw error;
@@ -248,7 +257,7 @@ export const createDatabaseClient = (transport: DatabaseTransport, options: Data
             },
             async execute(sql, executeOptions?: ExecuteOptions) {
                 const { signal: _signal, ...rest } = executeOptions ?? {};
-                const result = await request('execute', (id) => ({ session: id, sql, ...rest }), executeOptions, false);
+                const result = await request('execute', (id) => ({ session: id, sql, ...rest }), executeOptions, false, true);
 
                 if (result.results.some((item) => item.kind !== 'error' && changesSchema(item.sql))) {
                     notifySchemaChange({ connectionId: connection.id, ...(rest.schema === undefined ? {} : { schema: rest.schema }) });

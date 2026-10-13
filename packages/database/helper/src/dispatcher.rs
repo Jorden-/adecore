@@ -227,7 +227,10 @@ impl Dispatcher {
             Reach::Queued => to_json(CancelResult { cancelled: true }),
             Reach::Running(killer) => {
                 kill(killer).await;
-                tokio::spawn(repeat_cancel(self.running.clone(), state));
+
+                if state.canceller.repeats() {
+                    tokio::spawn(repeat_cancel(self.running.clone(), state));
+                }
 
                 to_json(CancelResult { cancelled: true })
             }
@@ -315,7 +318,7 @@ async fn kill(kill: Option<Kill>) {
     }
 }
 
-/// SQLite ignores an interrupt that arrives before its statement has begun, so a cancel repeats while the request is still the running one.
+/// Interrupts SQLite again while the request is still the running one.
 async fn repeat_cancel(running: Running, state: Arc<RequestState>) {
     for _ in 0..CANCEL_RETRIES {
         tokio::time::sleep(CANCEL_RETRY_DELAY).await;
@@ -421,7 +424,10 @@ async fn session_worker(worker: Worker, mut engine: Engine, mut commands: mpsc::
             return;
         }
 
-        let writes = matches!(call, Call::Apply(_) | Call::Import(_) | Call::Export(_) | Call::Transaction(_));
+        let keeps_result = matches!(
+            call,
+            Call::Apply(_) | Call::Import(_) | Call::Export(_) | Call::Transaction(_) | Call::Execute(_)
+        );
         let cancelled = state.cancelled.clone();
         let task = tokio::spawn(async move {
             let outcome = run_call(&mut engine, call, cancelled).await;
@@ -460,9 +466,10 @@ async fn session_worker(worker: Worker, mut engine: Engine, mut commands: mpsc::
         }
 
         // A server may end an interrupted query without an error (MySQL's `SLEEP` does), and a committed write stays committed.
+        // A script answers with the statements it completed and the one the cancel stopped.
         let outcome = match outcome {
             Err(error) if was_cancelled && matches!(error.code, ErrorCode::QueryFailed | ErrorCode::Internal) => Err(DatabaseError::cancelled()),
-            Ok(_) if was_cancelled && !writes => Err(DatabaseError::cancelled()),
+            Ok(_) if was_cancelled && !keeps_result => Err(DatabaseError::cancelled()),
             other => other,
         };
 
@@ -534,5 +541,42 @@ mod tests {
         let line: Json = serde_json::from_str(&tokio::time::timeout(Duration::from_secs(5), next).await.unwrap().unwrap()).unwrap();
         assert_eq!(line["result"]["results"][0]["rows"], serde_json::json!([[1]]));
         assert!(gate.try_read_owned().is_ok(), "the gate is free again for the next kill");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_mysql_cancel_kills_once() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let kills = Arc::new(AtomicU64::new(0));
+        let counted = kills.clone();
+        tokio::spawn(async move {
+            while let Ok((stream, _)) = listener.accept().await {
+                counted.fetch_add(1, Ordering::SeqCst);
+                drop(stream);
+            }
+        });
+
+        let opts: mysql_async::Opts = mysql_async::OptsBuilder::default().ip_or_hostname("127.0.0.1").tcp_port(port).into();
+        let dispatcher = Arc::new(Dispatcher::new());
+        let state = Arc::new(RequestState {
+            id: "r1".to_string(),
+            cancelled: Arc::new(AtomicBool::new(false)),
+            finished: AtomicBool::new(false),
+            slot: Arc::new(Mutex::new(Some("r1".to_string()))),
+            gate: Gate::default(),
+            canceller: Arc::new(Canceller::Mysql(MysqlCanceller::new(opts, 7))),
+        });
+        locked(&dispatcher.running).insert("r1".to_string(), state);
+
+        let cancelled = answer(
+            &dispatcher,
+            serde_json::json!({ "id": "c1", "method": "cancel", "params": { "request": "r1" } }),
+        )
+        .await;
+        assert_eq!(cancelled["result"], serde_json::json!({ "cancelled": true }));
+
+        // Long enough for every repeat a SQLite cancel makes.
+        tokio::time::sleep(CANCEL_RETRY_DELAY * (CANCEL_RETRIES + 5)).await;
+        assert_eq!(kills.load(Ordering::SeqCst), 1);
     }
 }

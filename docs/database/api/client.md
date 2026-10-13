@@ -93,6 +93,8 @@ The client announces a change itself after an `execute` in which a statement suc
 
 Aborting the `signal` of a call rejects it at once with code `cancelled`, and sends a `cancel` request so the server stops the work. A signal that is already aborted rejects without sending anything. The host only cancels requests of the owner that sent them.
 
+An `execute` the helper already began waits for its answer instead. The results hold what ran before the cancel and end with an `error` of code `cancelled`, and `inTransaction` says whether a transaction stayed open, so a committed write or an open transaction does not go unseen. It still rejects with `cancelled` when nothing ran, or when the `cancel` could not be sent.
+
 ```ts
 const controller = new AbortController();
 const counting = session.count('main', 'orders', "status = 'pending'", { signal: controller.signal });

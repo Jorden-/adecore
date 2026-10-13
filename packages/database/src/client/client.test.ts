@@ -501,6 +501,57 @@ describe('abort', () => {
         expect((await pending).code).toBe('cancelled');
     });
 
+    test('lets an execute that was sent answer with what ran before the cancel', async () => {
+        let release: (response: DatabaseResponse) => void = () => {};
+        const { transport, calls, methods } = scripted((request) =>
+            request.method === 'execute' ? new Promise<DatabaseResponse>((resolve) => (release = resolve)) : undefined
+        );
+        const session = createDatabaseClient(transport, { createId: counterIds() }).session(connection);
+        await session.server();
+
+        const controller = new AbortController();
+        const pending = session.execute('UPDATE t SET a = 1; SELECT SLEEP(9)', { signal: controller.signal });
+        await tick();
+        controller.abort();
+        await tick();
+        expect(methods()).toEqual(['open', 'execute', 'cancel']);
+
+        const partial = {
+            results: [
+                { kind: 'done', sql: 'UPDATE t SET a = 1', affected: 1, lastInsertId: null, elapsedMs: 1 },
+                { kind: 'error', sql: 'SELECT SLEEP(9)', error: { code: 'cancelled', message: 'The request was cancelled.' }, elapsedMs: 3 }
+            ],
+            inTransaction: true
+        };
+        release(ok(calls[1]!.id, partial));
+        expect(await pending).toEqual(partial as never);
+    });
+
+    test('rejects an execute with cancelled when nothing ran, or when the cancel cannot be sent', async () => {
+        let release: (response: DatabaseResponse) => void = () => {};
+        let cancels = 0;
+        const { transport, calls } = scripted((request) => {
+            if (request.method === 'cancel' && ++cancels === 2) {
+                throw new Error('no channel');
+            }
+            return request.method === 'execute' ? new Promise<DatabaseResponse>((resolve) => (release = resolve)) : undefined;
+        });
+        const session = createDatabaseClient(transport).session(connection);
+
+        const queued = new AbortController();
+        const waiting = caught(session.execute('SELECT 1', { signal: queued.signal }));
+        await tick();
+        queued.abort();
+        release(err(calls.find((call) => call.method === 'execute')!.id, 'cancelled'));
+        expect((await waiting).code).toBe('cancelled');
+
+        const unreachable = new AbortController();
+        const stranded = caught(session.execute('SELECT 2', { signal: unreachable.signal }));
+        await tick();
+        unreachable.abort();
+        expect((await stranded).code).toBe('cancelled');
+    });
+
     test('stops waiting for an open without cancelling the open for the others', async () => {
         let release: (response: DatabaseResponse) => void = () => {};
         const { transport, methods } = scripted((request) =>

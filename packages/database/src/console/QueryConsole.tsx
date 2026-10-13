@@ -282,11 +282,8 @@ export function QueryConsole({
             if (mode === 'manual' && !inTransaction) {
                 setInTransaction(await session.transaction('begin', { signal: controller.signal }));
             }
+            // A cancel that stopped the run midway still answers what ran and whether a transaction stayed open.
             const executed = await session.execute(target, { schema: activeSchema, limit: PAGE_SIZE, signal: controller.signal });
-            if (controller.signal.aborted) {
-                setRun({ status: 'cancelled' });
-                return;
-            }
             setInTransaction(executed.inTransaction);
             setTab(0);
             setPages({});

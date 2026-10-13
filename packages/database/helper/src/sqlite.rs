@@ -685,15 +685,19 @@ fn execute_script(connection: &Connection, params: &ExecuteParams, cancelled: &A
     let mut results = Vec::new();
 
     for statement in split_statements(&params.sql, DIALECT) {
-        if cancelled.load(Ordering::SeqCst) {
-            return Err(DatabaseError::cancelled());
-        }
-
         let started = Instant::now();
+
+        if cancelled.load(Ordering::SeqCst) {
+            results.push(StatementResult::cancelled(statement, 0.0));
+            break;
+        }
 
         match run_statement(connection, &statement, limit, cell_limit, started) {
             Ok(result) => results.push(result),
-            Err(error) if error.code == ErrorCode::Cancelled => return Err(error),
+            Err(error) if error.code == ErrorCode::Cancelled => {
+                results.push(StatementResult::cancelled(statement, elapsed_ms(started.elapsed())));
+                break;
+            }
             Err(error) => {
                 results.push(StatementResult::Error {
                     sql: statement,

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { useImperativeHandle, useRef } from 'react';
 import type { DatabaseAction, DatabaseFiles, DatabaseNotice } from '../actions.ts';
 import type { Connection } from '../client/types.ts';
+import type { DatabaseResponse, StatementResult } from '../protocol/index.ts';
 import type { Mounted, RecordedTransport } from '../testing/dom/harness.tsx';
 import { SHOP_PATH, shopDatabase } from '../testing/dom/shop.ts';
 import {
@@ -166,6 +167,45 @@ describe.skipIf(typeof document === 'undefined')('QueryConsole in a DOM', () => 
 
         await click(byText('button', 'Commit'));
         expect(recorded.of('transaction').map((request) => request.params.action)).toEqual(['begin', 'commit']);
+    });
+
+    test('a cancelled run shows what ran before the cancel and the transaction it left open', async () => {
+        await mounted.unmount();
+        await client.dispose();
+        const script = 'BEGIN; UPDATE customers SET name = 1 WHERE id = 1; SELECT SLEEP(9)';
+        let answer: (response: DatabaseResponse) => void = () => {};
+        let running = '';
+        client = clientOver(async (request) => {
+            if (request.method === 'execute') {
+                running = request.id;
+                return new Promise<DatabaseResponse>((resolve) => (answer = resolve));
+            }
+            if (request.method === 'cancel') {
+                const stopped: StatementResult = {
+                    kind: 'error',
+                    sql: 'SELECT SLEEP(9)',
+                    error: { code: 'cancelled', message: 'The request was cancelled.' },
+                    elapsedMs: 4
+                };
+                answer({
+                    id: running,
+                    ok: true,
+                    result: { results: [done('BEGIN', 0), done('UPDATE customers SET name = 1 WHERE id = 1'), stopped], inTransaction: true }
+                });
+                return { id: request.id, ok: true, result: { cancelled: true } };
+            }
+            return recorded.transport(request);
+        });
+        mounted = await mount(<QueryConsole connection={connection} />, { client, storage });
+
+        await type(editor(), script);
+        await press(editor(), 'Enter', { ...MOD, shiftKey: true });
+        await click(byText('button', 'Cancel'));
+
+        await waitFor(() => expect(findAll('[role=tab]')).toHaveLength(3));
+        expect(document.body.textContent).toContain('Transaction open');
+        await click(findAll('[role=tab]')[2]!);
+        expect(document.body.textContent).toContain('The statement was cancelled.');
     });
 
     test('runs on a session of its own, apart from the one the other views of the connection share', async () => {

@@ -4,7 +4,7 @@ import type { ResultColumn, SchemaInfo, TableInfo, TableStructure } from './sche
 import type { Cell, EditValue, Value } from './values.ts';
 
 /* Raised whenever a message changes shape, so a host refuses a helper from another release. */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 export type RowKey = Readonly<Record<string, Value>>;
 
@@ -21,7 +21,10 @@ export interface RowsResult {
     readonly elapsedMs: number;
 }
 
-/* What one statement of an `execute` did. A failed statement ends the list, and the ones after it never ran. */
+/*
+ * What one statement of an `execute` did. A failed statement ends the list, and the ones after it never ran.
+ * A cancel ends it with an `error` of code `cancelled`, for the statement it stopped or kept from starting.
+ */
 export type StatementResult =
     | ({ readonly kind: 'rows'; readonly sql: string } & RowsResult)
     | { readonly kind: 'done'; readonly sql: string; readonly affected: number; readonly lastInsertId: number | string | null; readonly elapsedMs: number }
@@ -140,7 +143,10 @@ export interface DatabaseMethods {
     };
     /* The running containers that look like database servers. */
     discover: { params: { readonly kind: 'docker'; readonly context?: string }; result: { readonly containers: readonly DockerContainer[] } };
-    /* Stops the request with this id. Answers whether it was still running; the request itself fails with `cancelled`. */
+    /*
+     * Stops the request with this id. Answers whether it was still running. The request itself fails with
+     * `cancelled`, except an `execute` that had begun: it answers with what ran before the cancel.
+     */
     cancel: { params: { readonly request: string }; result: { readonly cancelled: boolean } };
 }
 

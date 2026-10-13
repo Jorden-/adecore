@@ -880,7 +880,9 @@ async fn cancels_a_running_query() {
     assert_eq!(sandbox.client.ok("cancel", json!({ "request": id })).await, json!({ "cancelled": true }));
 
     let answer: Value = serde_json::from_str(&tokio::time::timeout(Duration::from_secs(10), sleeping).await.expect("the query stops").unwrap()).unwrap();
-    assert_eq!(answer["error"]["code"], "cancelled", "{answer}");
+    assert_eq!(answer["result"]["results"].as_array().unwrap().len(), 1, "{answer}");
+    assert_eq!(answer["result"]["results"][0]["sql"], "SELECT SLEEP(30)");
+    assert_eq!(answer["result"]["results"][0]["error"]["code"], "cancelled", "{answer}");
     assert!(started.elapsed() < Duration::from_secs(10));
 
     let next: Value = serde_json::from_str(&queued.await.unwrap()).unwrap();
@@ -983,6 +985,15 @@ async fn mysql_cancels_an_export() {
     let directory = tempfile::tempdir().unwrap();
     let endless = "SELECT a.COLUMN_NAME FROM information_schema.COLUMNS a, information_schema.COLUMNS b, information_schema.COLUMNS c";
     scenarios::cancels_an_export(&mut sandbox.db(), directory.path(), endless).await;
+    sandbox.finish().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn mysql_cancels_a_script_after_a_write() {
+    let Some(mut sandbox) = Sandbox::new("script_cancel").await else {
+        return;
+    };
+    scenarios::cancels_a_script_after_a_write(&mut sandbox.db(), "SELECT SLEEP(30)").await;
     sandbox.finish().await;
 }
 

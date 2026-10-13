@@ -40,6 +40,12 @@ pub async fn connect(config: &ConnectionConfig) -> Result<(Engine, ServerInfo, C
 }
 
 impl Canceller {
+    /// SQLite ignores an interrupt that arrives before its statement has begun, so a cancel repeats it. A MySQL kill opens
+    /// a connection each time, and a request checks its cancel flag between statements, so one is enough.
+    pub fn repeats(&self) -> bool {
+        matches!(self, Canceller::Sqlite(_))
+    }
+
     /// Interrupts SQLite at once. MySQL needs a round trip, so its killer is handed back to be run after the caller's lock is released.
     pub fn trigger(&self) -> Option<MysqlCanceller> {
         match self {

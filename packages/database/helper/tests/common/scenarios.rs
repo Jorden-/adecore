@@ -434,6 +434,50 @@ pub async fn cancels_an_export(db: &mut Db<'_>, directory: &Path, endless: &str)
     );
 }
 
+/// `endless` is a statement that runs until it is stopped.
+pub async fn cancels_a_script_after_a_write(db: &mut Db<'_>, endless: &str) {
+    db.seed_items().await;
+
+    for (label, open) in [("z", true), ("y", false)] {
+        let update = format!("UPDATE items SET label = '{label}' WHERE id = 1");
+        let sql = if open {
+            format!("{}; {update}; {endless}", db.begin_sql())
+        } else {
+            format!("{update}; {endless}")
+        };
+        let id = db.client.next_id();
+        let line = json!({ "id": id, "method": "execute", "params": { "session": db.session, "schema": db.schema, "sql": sql } }).to_string();
+        let running = tokio::spawn(db.client.dispatcher.submit(&line));
+
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        assert_eq!(db.client.ok("cancel", json!({ "request": id })).await, json!({ "cancelled": true }));
+
+        let answer: Value = serde_json::from_str(&tokio::time::timeout(Duration::from_secs(10), running).await.expect("the script stops").unwrap()).unwrap();
+        let results = answer["result"]["results"].as_array().expect("a cancelled script answers its results");
+        let [.., updated, stopped] = results.as_slice() else {
+            panic!("{answer}");
+        };
+
+        assert_eq!(results.len(), if open { 3 } else { 2 }, "{answer}");
+        assert_eq!(updated["sql"], json!(update));
+        assert_eq!(updated["affected"], 1, "{answer}");
+        assert_eq!(stopped["sql"], json!(endless));
+        assert_eq!(stopped["error"]["code"], "cancelled", "{answer}");
+        assert_eq!(answer["result"]["inTransaction"], open, "{answer}");
+
+        if open {
+            assert_eq!(db.ok("transaction", json!({ "action": "rollback" })).await, json!({ "active": false }));
+        }
+    }
+
+    let labels = db.script("SELECT label FROM items WHERE id = 1").await;
+    assert_eq!(
+        labels["results"][0]["rows"],
+        json!([["y"]]),
+        "the write outside a transaction stays, the one inside is rolled back"
+    );
+}
+
 /// Whether an export to `name` left a partial file of its own, which is named `<name>.<pid>-<n>.partial`.
 fn has_partial(directory: &Path, name: &str) -> bool {
     std::fs::read_dir(directory).unwrap().any(|entry| {
