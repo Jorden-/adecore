@@ -27,13 +27,12 @@ function uiExample(language: string): string {
         '<Summary badge="Draft">Release overview</Summary>',
         '<Stats><Stat label="Tests" value={42}/></Stats>',
         '<Switch value={$enabled}>Notify me</Switch>',
-        '<Choices><Choice context="Review the release overview">Continue</Choice></Choices>',
         '```'
     ].join('\n');
 }
 
 export function uiSessionNote({ fenceLanguage = UI_FENCE_LANGUAGE }: UiTextOptions = {}): string {
-    return `${uiSyntax(fenceLanguage)} Prose outside. Only named catalog props, no styling. $name = literal JSON; input value={$name}; Button action={@Set($name, literal)}, {@Reset($name)} or {@Reset()} changes local state only; braced expressions: @Count, @Filter(list,row,predicate), @Sum, @Join, @Round. Show/Each control children. Choices only offer optional next steps after a finished answer; ask for information or a decision needed before acting with your own question tool if you have one, otherwise in prose. Choice labels and precise context stay visible and send once. Image: attachment or generated="latest", never URL/path. No code execution. State resets on reload. Catalog (? means optional props): ${uiCompactCatalog()}\nExample:\n${uiExample(fenceLanguage)}\n`;
+    return `${uiSyntax(fenceLanguage)} Prose outside. Only named catalog props, no styling. $name = literal JSON; input value={$name}; Button action={@Set($name, literal)}, {@Reset($name)} or {@Reset()} changes local state only; braced expressions: @Count, @Filter(list,row,predicate), @Sum, @Join, @Round. Show/Each control children. Choices are shortcuts after finished work that the person may ignore. When your turn would end waiting on the person (a missing fact, a decision, a go-ahead for work you would otherwise do), ask with your own question tool if you have one, otherwise in prose, never with Choices. Choice labels and precise context stay visible and send once. Image: attachment or generated="latest", never URL/path. No code execution. State resets on reload. Catalog (? means optional props): ${uiCompactCatalog()}\nExample:\n${uiExample(fenceLanguage)}\n`;
 }
 
 export function uiReferenceText({ fenceLanguage = UI_FENCE_LANGUAGE }: UiTextOptions = {}): string {

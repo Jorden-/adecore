@@ -35,7 +35,7 @@ The agent writes a block like the one above in a fenced code block of its reply.
 - Compute text and props with a small [expression language](/intelligent-ui/language/expressions): arithmetic, comparisons, `@Count`, `@Filter`, `@Sum`, `@Join` and `@Round`.
 - Read [live data](/intelligent-ui/host/queries) from a source the host registered.
 - Name a file, a diff, a commit or a node, which the host turns into a [link](/intelligent-ui/host/links).
-- Offer optional next steps after a finished answer with [Choices](/intelligent-ui/host/choices); a question the agent needs answered before it acts goes through its own question tool or prose.
+- Offer shortcuts after finished work with [Choices](/intelligent-ui/host/choices). A question the agent's turn waits on goes through its own question tool or prose.
 
 A block cannot run code, fetch an address, style anything or act outside itself. The [security model](/intelligent-ui/guide/security) lists every boundary.
 

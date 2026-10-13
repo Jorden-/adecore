@@ -27,8 +27,8 @@ export const UI_GROUPS = {
         rules: 'Bind value={$name}. A Button sets a literal with action={@Set($name, value)} or restores a default with {@Reset($name)} or {@Reset()}. State stays local until a Choice sends visible context.'
     },
     choices: {
-        description: 'Offer optional next steps after a finished answer.',
-        rules: 'Never ask for information or a decision needed before acting: use your own question tool if you have one, otherwise ask in prose. Give a short label and precise visible context. A Choice sends once after streaming ends.'
+        description: 'Offer shortcuts after finished work that the person may ignore.',
+        rules: 'Never a question your turn waits on (a missing fact, a decision, a go-ahead for work you would otherwise do): ask that with your own question tool if you have one, otherwise in prose. Give a short label and precise visible context. A Choice sends once after streaming ends.'
     }
 } as const;
 
@@ -136,7 +136,7 @@ export const UI_CATALOG = {
         description: 'Repeat children over local data.',
         schema: z.strictObject({ items: z.array(z.unknown()).max(1000), as: name.regex(/^[A-Za-z_][A-Za-z_\d]*$/) })
     },
-    Choices: { group: 'choices', description: 'Optional next steps after a finished answer.', schema: empty, children: ['Choice'] },
+    Choices: { group: 'choices', description: 'Shortcuts after finished work, never a question you wait on.', schema: empty, children: ['Choice'] },
     Choice: {
         group: 'choices',
         description: 'Send its label and visible context once.',

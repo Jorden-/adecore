@@ -1,6 +1,6 @@
 # Choices
 
-Optional next steps after a finished answer. Information or a decision the agent needs before it acts is not a Choice: the agent asks with its own question tool when it has one, and otherwise in prose. A Choice sends its label and its context as a message, once, after the reply finished streaming. See [Choices](/intelligent-ui/host/choices) for what the host checks.
+Shortcuts after finished work that the person may ignore. A question the agent's turn waits on (a missing fact, a decision, a go-ahead for work it would otherwise do) is not a Choice: the agent asks with its own question tool when it has one, and otherwise in prose. A Choice sends its label and its context as a message, once, after the reply finished streaming. See [Choices](/intelligent-ui/host/choices) for what the host checks.
 
 <Demo src="intelligent-ui/choices" />
 
