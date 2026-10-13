@@ -20,6 +20,6 @@ The answer is applied only while the text is exactly the one it was asked about 
 
 The edits are applied with `editor.applyEdits(edits, { mergeUndo: true })`, which joins the undo step of the typed character, so one undo takes the formatting and the character away together and redo brings both back.
 
-## Turning it off
+## Enabling it
 
-It is on wherever the server offers it. A host with a setting for it calls `language.formatOnType.configure(false)`, which also cancels a request that is out, and `configure(true)` when the setting comes back. `isEnabled` reads the current state.
+It is off by default. A host enables it explicitly with `language.formatOnType.configure(true)` after the person chooses it. `configure(false)` turns it off and cancels a request that is out. `isEnabled` reads the current state.

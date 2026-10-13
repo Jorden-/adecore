@@ -34,7 +34,8 @@ interface Setup {
 async function setup(
     answer: (call: LanguageCall) => TextEdit[] | null | Promise<TextEdit[] | null> = () => [],
     text = 'x = 1',
-    provider: ProviderOptions | null = TRIGGERS
+    provider: ProviderOptions | null = TRIGGERS,
+    enable = true
 ): Promise<Setup> {
     const service = new FakeLanguageService();
     if (provider !== null) {
@@ -43,6 +44,9 @@ async function setup(
     const project = new ProjectLanguage(service);
     const editor = new FakeEditorEngine().mount({} as HTMLElement, { text, theme: 'light' });
     const language = new EditorLanguage(project, editor, uri, 'typescript', new ManualTimers());
+    if (enable) {
+        language.formatOnType.configure(true);
+    }
     await language.document.ready;
     open.push(language);
     return { service, editor, language, questions: service.calls.filter((call) => call.method === METHOD) };
@@ -55,6 +59,15 @@ function asked(service: FakeLanguageService): LanguageCall[] {
 const indent = (text: string): TextEdit => ({ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }, newText: text });
 
 describe('format on type', () => {
+    test('is off by default even when the server offers trigger characters', async () => {
+        const { editor, service, language } = await setup(() => [indent('    ')], 'x = 1', TRIGGERS, false);
+        expect(language.formatOnType.isEnabled).toBe(false);
+        editor.type('x = 1;');
+        await settle();
+        expect(editor.getText()).toBe('x = 1;');
+        expect(asked(service)).toHaveLength(0);
+    });
+
     test('asks after a trigger character with the caret, the character and the indentation of the editor', async () => {
         const { service, editor } = await setup(() => null);
         editor.setIndentation({ tabSize: 2, insertSpaces: false });

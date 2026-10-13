@@ -32,6 +32,7 @@ async function setup(text: string, answer: (call: LanguageCall) => TextEdit[] | 
     const end = { line: lines.length - 1, character: lines.at(-1)!.length };
     mounted.editor.setSelection({ start: end, end });
     const language = new EditorLanguage(new ProjectLanguage(service), mounted.editor, uri, 'typescript', new ManualTimers());
+    language.formatOnType.configure(true);
     await language.document.ready;
     open.push(language);
     const questions = (): string[] => service.calls.filter((call) => call.method === METHOD).map((call) => (call.params as { ch: string }).ch);

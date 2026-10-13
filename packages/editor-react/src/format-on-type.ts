@@ -26,12 +26,11 @@ function overlaps(edits: readonly TextEdit[]): boolean {
  * second caret, a read-only editor or a snippet session, whose tab stops an edit could move. An answer is applied
  * only while the text is exactly what it was asked about, and the caret where it was.
  *
- * The edits join the undo step of the typed character, so one undo takes both back. On by default where the server offers it; `configure(false)`
- * turns it off for a host that has a setting for it.
+ * The edits join the undo step of the typed character, so one undo takes both back. Off by default; a host enables it explicitly with `configure(true)`.
  */
 export class FormatOnTypeFeature {
     private readonly language: EditorLanguage;
-    private enabled = true;
+    private enabled = false;
     /* Raised by every change of the text, so an answer for an older text is told from the one for the text that is. */
     private revision = 0;
     private controller = new AbortController();
