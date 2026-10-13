@@ -30,7 +30,7 @@ export { type ChatRecordExtras, type ChatRecord, ChatStore, type ChatSeq, type C
 export { suggestChatTitle, type ChatTitleInput } from './chat-title.ts';
 export type { ClaudeBackendOptions } from './claude-backend.ts';
 export { ClaudeTitleReader } from './claude-title.ts';
-export { spokenText, claudeProjectSlug } from './claude-transcript.ts';
+export { spokenText, claudeProjectSlug, findClaudeSession } from './claude-transcript.ts';
 export type { CodexBackendOptions } from './codex-backend.ts';
 export { forkThreadOnce, type ThreadItemsParams, type CodexProcessSpec, type ThreadForkParams } from './codex-thread.ts';
 export type { CodexClientInfo } from './codex-transport.ts';

@@ -134,7 +134,7 @@ export interface ChatCoreOptions {
     // What a running turn says about the plan its CLI runs on; the usage monitor takes it from here.
     onLimits?: (update: LimitsUpdate) => void;
     // Where Claude Code's own name for a session is read, in the projects folder of the chat's account; the other CLIs write none down.
-    claudeTitles?: { forSession(agentSessionId: string, projectsDir: string): Promise<string | null> };
+    claudeTitles?: { forSession(agentSessionId: string, projectsDir: string, cwd: string): Promise<string | null> };
     // A name for a Codex chat, asked of a one-shot CLI: its app-server names no thread on its own.
     nameChat?: (provider: AgentKind, input: ChatTitleInput) => Promise<string | null>;
     // Where a subagent's whole conversation is read and how its growth is noticed; a test hands in fakes.
@@ -436,7 +436,7 @@ export class ChatCore {
             save: () => this.persistNow(payload.chatId),
             persistSoon: () => this.persistSoon(payload.chatId),
             ...(kind === 'claude' && claudeTitles
-                ? { readTitle: (agentSessionId: string) => claudeTitles.forSession(agentSessionId, this.claudeProjectsDirOf(session.info)) }
+                ? { readTitle: (agentSessionId: string) => claudeTitles.forSession(agentSessionId, this.claudeProjectsDirOf(session.info), session.info.cwd) }
                 : {}),
             ...(kind === 'codex' && nameChat ? { nameThread: (input: ChatTitleInput) => nameChat(kind, input) } : {}),
             ...(kind === 'claude' ? { subagentSettlement: (toolUseId: string) => this.subagents.claudeSettlement(payload.chatId, toolUseId) } : {}),

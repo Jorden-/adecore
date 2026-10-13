@@ -1,8 +1,9 @@
 import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { ChatHistoryResult, ChatItem } from '@adecore/agent-contracts';
 import { isRecord } from '@adecore/agent-contracts';
+import { fileExists } from '../fs.ts';
 import { readLines } from '../title-file.ts';
 import { ClaudeProtocol } from './claude-protocol.ts';
 import { readingThread, settledReading } from './subagent-projection.ts';
@@ -42,32 +43,54 @@ export function claudeProjectSlug(cwd: string): string {
     return cwd.replace(/[^a-zA-Z0-9]/g, '-');
 }
 
+// Where each session was found last, by projects folder and session id; a path whose file went is searched for again.
+const sessionPaths = new Map<string, string>();
+
 /*
- * Where the subagents of a session keep their transcripts. The folder of the chat's own directory
- * first; a slug the CLI wrote differently (or a session resumed from somewhere else) is found by the
- * session id alone, which is unique across every project.
+ * The transcript Claude Code keeps of a session, found by its id: in the folder of `cwd` first, then
+ * where it was found before, then in every project folder, since the id is unique across all of them
+ * and a slug the CLI wrote differently (or a session resumed from elsewhere) sits in another folder.
+ * Null when no folder holds it, and for an id that would reach outside the projects folder.
  */
-export async function findSubagentsDir(projectsDir: string, cwd: string, sessionId: string): Promise<string | null> {
-    if (projectsDir === '' || sessionId.includes('/') || sessionId.includes('..')) {
+export async function findClaudeSession(projectsDir: string, sessionId: string, cwd?: string): Promise<string | null> {
+    if (projectsDir === '' || sessionId === '' || /[/\\]|\.\./.test(sessionId)) {
         return null;
     }
-    const own = join(projectsDir, claudeProjectSlug(cwd), sessionId, 'subagents');
-    if (existsSync(own)) {
+    const file = `${sessionId}.jsonl`;
+    const key = `${projectsDir}\n${sessionId}`;
+    const own = cwd === undefined ? null : join(projectsDir, claudeProjectSlug(cwd), file);
+    if (own !== null && (await fileExists(own))) {
+        sessionPaths.set(key, own);
         return own;
     }
+    const known = sessionPaths.get(key);
+    if (known !== undefined && known !== own && (await fileExists(known))) {
+        return known;
+    }
+    sessionPaths.delete(key);
     let dirs: string[];
     try {
         dirs = await readdir(projectsDir);
     } catch {
         return null;
     }
-    for (const dir of dirs) {
-        const candidate = join(projectsDir, dir, sessionId, 'subagents');
-        if (existsSync(candidate)) {
-            return candidate;
-        }
+    const candidates = dirs.map((dir) => join(projectsDir, dir, file)).filter((candidate) => candidate !== own);
+    const present = await Promise.all(candidates.map(fileExists));
+    const found = candidates.find((_candidate, i) => present[i]) ?? null;
+    if (found !== null) {
+        sessionPaths.set(key, found);
     }
-    return null;
+    return found;
+}
+
+/* Where the subagents of a session keep their transcripts: the folder beside its own transcript, once the CLI made it. */
+export async function findSubagentsDir(projectsDir: string, cwd: string, sessionId: string): Promise<string | null> {
+    const transcript = await findClaudeSession(projectsDir, sessionId, cwd);
+    if (transcript === null) {
+        return null;
+    }
+    const dir = join(dirname(transcript), sessionId, 'subagents');
+    return (await fileExists(dir)) ? dir : null;
 }
 
 /* Every meta file in a subagents folder that says which agent it is about; one that does not parse is left out. */

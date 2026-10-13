@@ -54,7 +54,7 @@ The core, a session per chat, the thread and what is written of it, and the two 
 | [`chat/chat-title`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/chat-title.ts) | `suggestChatTitle`, `ChatTitleInput` |
 | [`chat/claude-backend`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/claude-backend.ts) | `ClaudeBackendOptions` |
 | [`chat/claude-title`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/claude-title.ts) | `ClaudeTitleReader` |
-| [`chat/claude-transcript`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/claude-transcript.ts) | `spokenText`, `claudeProjectSlug` |
+| [`chat/claude-transcript`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/claude-transcript.ts) | `spokenText`, `claudeProjectSlug`, `findClaudeSession` |
 | [`chat/codex-backend`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/codex-backend.ts) | `CodexBackendOptions` |
 | [`chat/codex-thread`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/codex-thread.ts) | `forkThreadOnce`, `ThreadItemsParams`, `CodexProcessSpec`, `ThreadForkParams` |
 | [`chat/codex-transport`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/codex-transport.ts) | `CodexClientInfo` |

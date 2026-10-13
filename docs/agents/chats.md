@@ -34,7 +34,7 @@ A goal runs as turns of its own. While one is active, a message waits in the que
 
 ## Searching and resuming
 
-`searchThreadItems(items, query, { limit })` from `@adecore/agents/chat` returns `ThreadHit` records for the user and assistant messages of a thread that contain the query, with a snippet around the match (`ThreadSearchOptions` holds the limit). `spokenText` from `@adecore/agents/chat` is the text of a Claude transcript line as the person saw it.
+`searchThreadItems(items, query, { limit })` from `@adecore/agents/chat` returns `ThreadHit` records for the user and assistant messages of a thread that contain the query, with a snippet around the match (`ThreadSearchOptions` holds the limit). `spokenText` from `@adecore/agents/chat` is the text of a Claude transcript line as the person saw it. `findClaudeSession(projectsDir, sessionId, cwd?)` answers the path of a Claude session's transcript: in the project folder of `cwd` first, then in any other, since a session id is unique across all of them. It remembers where it found a session and searches again once that file is gone, so code that copies or forks a transcript can call it as often as it needs.
 
 `listClaudeSessions` and `listCodexSessions` from `@adecore/agents/chat` list the CLI sessions that were started outside your app, newest first, as `ExternalSession` records with the provider, account, session id, title and folder. They read through a `SessionFs`, and `nodeSessionFs()` is the one over the real disk. Codex sessions that are forks or subagents of another (`isForkOrSubagent`) are left out.
 

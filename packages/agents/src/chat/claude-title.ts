@@ -1,8 +1,8 @@
-import { existsSync } from 'node:fs';
-import { readdir, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { stat } from 'node:fs/promises';
+import { isRecord } from '@adecore/agent-contracts';
 import { cleanTitle, readLines } from '../title-file.ts';
 import { usageRoots } from '../usage/roots.ts';
+import { findClaudeSession } from './claude-transcript.ts';
 
 interface Progress {
     offset: number;
@@ -22,7 +22,6 @@ const MARKERS = ['"ai-title"', '"custom-title"'];
  */
 export class ClaudeTitleReader {
     private readonly progress = new Map<string, Progress>();
-    private readonly found = new Map<string, string>();
     private readonly projectsDir: string;
     private readonly chunkBytes: number;
 
@@ -31,9 +30,9 @@ export class ClaudeTitleReader {
         this.chunkBytes = chunkBytes;
     }
 
-    /* The title of a session found by its id, for a chat, which knows no transcript path; in the projects of its account. */
-    async forSession(agentSessionId: string, projectsDir: string = this.projectsDir): Promise<string | null> {
-        const path = await this.locate(agentSessionId, projectsDir);
+    /* The title of a session found by its id, for a chat, which knows no transcript path; in the projects of its account, its own folder first. */
+    async forSession(agentSessionId: string, projectsDir: string = this.projectsDir, cwd?: string): Promise<string | null> {
+        const path = await findClaudeSession(projectsDir, agentSessionId, cwd);
         return path === null ? null : await this.forTranscript(path);
     }
 
@@ -67,40 +66,13 @@ export class ClaudeTitleReader {
         } catch {
             return;
         }
-        if (typeof record !== 'object' || record === null) {
+        if (!isRecord(record)) {
             return;
         }
-        const entry = record as Record<string, unknown>;
-        if (entry.type === 'ai-title') {
-            progress.aiTitle = cleanTitle(entry.aiTitle) ?? progress.aiTitle;
-        } else if (entry.type === 'custom-title') {
-            progress.customTitle = cleanTitle(entry.customTitle) ?? progress.customTitle;
+        if (record.type === 'ai-title') {
+            progress.aiTitle = cleanTitle(record.aiTitle) ?? progress.aiTitle;
+        } else if (record.type === 'custom-title') {
+            progress.customTitle = cleanTitle(record.customTitle) ?? progress.customTitle;
         }
-    }
-
-    /* The folder a transcript sits in is named after the working directory, so the file name is the only key a session id gives. */
-    private async locate(agentSessionId: string, projectsDir: string): Promise<string | null> {
-        const known = this.found.get(agentSessionId);
-        if (known !== undefined && existsSync(known)) {
-            return known;
-        }
-        if (projectsDir === '' || agentSessionId.includes('/')) {
-            return null;
-        }
-        let dirs: string[];
-        try {
-            dirs = await readdir(projectsDir);
-        } catch {
-            return null;
-        }
-        const file = `${agentSessionId}.jsonl`;
-        for (const dir of dirs) {
-            const path = join(projectsDir, dir, file);
-            if (existsSync(path)) {
-                this.found.set(agentSessionId, path);
-                return path;
-            }
-        }
-        return null;
     }
 }
