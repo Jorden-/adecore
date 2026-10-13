@@ -3,6 +3,7 @@ import { SnippetFieldTransforms, type FieldTransformTarget } from './snippet-fie
 import { SnippetTransformError } from './snippet-transform-client.ts';
 import { acquireSnippetTransforms, type SnippetTransformLease } from './snippet-transform-queue.ts';
 import { realTimers, type Timers } from './timers.ts';
+import { KEY_PRIORITY } from './key-priority.ts';
 import { MAX_TRANSFORM_CHARACTERS, type SnippetTransformJob } from './snippet-transform-protocol.ts';
 import type { EditorContentChange, EditorPosition, EditorRange, EditorTextChange } from '@adecore/editor';
 import { comparePositions, rangeHolds, shiftPosition } from './diagnostics-model.ts';
@@ -79,7 +80,7 @@ export interface SnippetInsertion {
     readonly fields?: readonly SnippetField[];
 }
 
-type SnippetHost = Pick<EditorLanguage, 'editor' | 'onDispose'> & Partial<Pick<EditorLanguage, 'popups' | 'pick' | 'project'>>;
+type SnippetHost = Pick<EditorLanguage, 'editor' | 'onDispose'> & Partial<Pick<EditorLanguage, 'popups' | 'pick' | 'project' | 'onKey'>>;
 const MAX_FRAMES = 8;
 const MAX_RANGES = 1000;
 
@@ -185,7 +186,12 @@ export class SnippetFeature {
         this.transforms = language.project === undefined ? null : acquireSnippetTransforms(language.project, timers);
         const { editor } = language;
         this.fieldTransforms = new SnippetFieldTransforms(editor, this.transforms, (targets, values) => this.applyFieldTransforms(targets, values));
-        const offs = [editor.onKeyDown((event) => this.key(event)), editor.onTextChange((change) => this.edited(change)), editor.onCaret(() => this.moved())];
+        const key = (event: KeyboardEvent): boolean => this.key(event);
+        const offs = [
+            language.onKey === undefined ? editor.onKeyDown(key) : language.onKey(key, KEY_PRIORITY.snippets),
+            editor.onTextChange((change) => this.edited(change)),
+            editor.onCaret(() => this.moved())
+        ];
         language.onDispose(() => {
             this.transforms?.dispose();
             this.end();

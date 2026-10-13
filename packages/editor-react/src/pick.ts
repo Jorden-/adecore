@@ -1,4 +1,5 @@
 import type { EditorPosition } from '@adecore/editor';
+import { KEY_PRIORITY } from './key-priority.ts';
 import type { EditorLanguage } from './editor-language.ts';
 import type { PickGroup, PickPreview } from './popups.ts';
 import { realTimers, type Timers } from './timers.ts';
@@ -45,7 +46,7 @@ export class PickFeature {
         this.timers = timers;
         const { editor } = language;
         const offs = [
-            editor.onKeyDown((event) => this.key(event)),
+            language.onKey((event) => this.key(event), KEY_PRIORITY.pick),
             editor.onTextChange(() => this.close()),
             editor.onCaret(() => this.close()),
             editor.onBlur(() => this.close())

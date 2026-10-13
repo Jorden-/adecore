@@ -1,4 +1,5 @@
 import type { EditorHover, EditorPosition, EditorRange } from '@adecore/editor';
+import { KEY_PRIORITY } from './key-priority.ts';
 import type { EditorLanguage } from './editor-language.ts';
 import { rangeHolds, type Problem } from './diagnostics-model.ts';
 import { hoverTextOf, isEmptyHover, locationsOf, type HoverText } from './hover-content.ts';
@@ -68,7 +69,7 @@ export class HoverFeature {
                     this.hide();
                 }
             }),
-            editor.onKeyDown((event) => {
+            language.onKey((event) => {
                 if (isShortcut(this.language.shortcuts.quickInfo, event)) {
                     this.quickInfo();
                     return true;
@@ -78,7 +79,7 @@ export class HoverFeature {
                     return true;
                 }
                 return false;
-            })
+            }, KEY_PRIORITY.hover)
         ];
         language.onDispose(() => {
             for (const off of offs) {

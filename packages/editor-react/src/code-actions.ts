@@ -1,4 +1,5 @@
 import { ErrorCodes, LspError, StaleResultError, type CodeAction, type Command, type Diagnostic, type Position } from '@adecore/lsp';
+import { KEY_PRIORITY } from './key-priority.ts';
 import type { EditorPosition, EditorRange } from '@adecore/editor';
 import {
     ACTION_GROUPS,
@@ -83,7 +84,7 @@ export class CodeActionsFeature {
             }),
             editor.onTextChange(() => editor.setGutterAction(null)),
             editor.onGutterAction(() => void this.open()),
-            editor.onKeyDown((event) => {
+            language.onKey((event) => {
                 if (isShortcut(this.language.shortcuts.codeActions, event)) {
                     void this.open();
                     return true;
@@ -93,7 +94,7 @@ export class CodeActionsFeature {
                     return true;
                 }
                 return false;
-            }),
+            }, KEY_PRIORITY.codeActions),
             language.diagnostics.onChange(() => this.refresher.later()),
             providers
         ];

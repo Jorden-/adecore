@@ -1,4 +1,5 @@
 import type { DocumentHighlight } from '@adecore/lsp';
+import { KEY_PRIORITY } from './key-priority.ts';
 import type { EditorHighlight, EditorHighlightKind, EditorPosition, EditorRange } from '@adecore/editor';
 import { comparePositions, rangeHolds } from './diagnostics-model.ts';
 import { isIdentifierCharacter } from './completion-model.ts';
@@ -70,13 +71,13 @@ export class HighlightsFeature {
                 this.current = [];
                 this.refresher.later();
             }),
-            editor.onKeyDown((event) => {
+            language.onKey((event) => {
                 const next = isShortcut(this.language.shortcuts.nextHighlight, event);
                 if (!next && !isShortcut(this.language.shortcuts.previousHighlight, event)) {
                     return false;
                 }
                 return this.step(next ? 1 : -1);
-            })
+            }, KEY_PRIORITY.highlights)
         ];
         language.onDispose(() => {
             for (const off of offs) {

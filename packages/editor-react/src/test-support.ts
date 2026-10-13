@@ -1,8 +1,33 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { createPage } from '@adecore/editor/testing';
+import type { LanguageShortcut } from './shortcut-keys.ts';
 
 export type Page = ReturnType<typeof createPage>;
+
+/* The keydown a person pressing the shortcut sends, as `FakeEditor.press` takes it. */
+export function keyOf(shortcut: LanguageShortcut | null): Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'> {
+    if (shortcut === null) {
+        throw new Error('The keymap has no shortcut for this');
+    }
+    const { key, apple } = shortcut;
+    const letter = /^[A-Z]$/.test(key);
+    return {
+        key: letter ? key.toLowerCase() : key,
+        code: letter ? `Key${key}` : /^[0-9]$/.test(key) ? `Digit${key}` : key,
+        ctrlKey: shortcut.ctrl || (shortcut.mod && !apple),
+        metaKey: shortcut.meta || (shortcut.mod && apple),
+        altKey: shortcut.alt,
+        shiftKey: shortcut.shift
+    };
+}
+
+/* The fake language service has no I/O; a few event-loop turns drain its promise chains. */
+export async function settle(): Promise<void> {
+    for (let i = 0; i < 6; i++) {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+}
 
 /* Runs `run` with a page of its own as the global window and document, which a portal renders into. */
 export async function inPage(run: (page: Page, root: Root) => Promise<void>): Promise<void> {

@@ -1,4 +1,5 @@
 import type { EditorLanguage } from './editor-language.ts';
+import { KEY_PRIORITY } from './key-priority.ts';
 import type { Place } from './navigation-history.ts';
 import { isShortcut } from './shortcut-keys.ts';
 
@@ -8,7 +9,7 @@ export class HistoryFeature {
 
     constructor(language: EditorLanguage) {
         this.language = language;
-        const off = language.editor.onKeyDown((event) => {
+        const off = language.onKey((event) => {
             if (isShortcut(this.language.shortcuts.historyBack, event)) {
                 this.back();
                 return true;
@@ -22,7 +23,7 @@ export class HistoryFeature {
                 return true;
             }
             return false;
-        });
+        }, KEY_PRIORITY.history);
         language.onDispose(off);
     }
 

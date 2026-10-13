@@ -1,4 +1,5 @@
 import { StaleResultError, type Location, type PrepareRenameResult, type WorkspaceEdit } from '@adecore/lsp';
+import { KEY_PRIORITY } from './key-priority.ts';
 import type { EditorRange } from '@adecore/editor';
 import type { EditorLanguage } from './editor-language.ts';
 import { lineTextOf } from './line-text.ts';
@@ -37,13 +38,13 @@ export class RenameFeature {
         this.language = language;
         const { editor } = language;
         const offs = [
-            editor.onKeyDown((event) => {
+            language.onKey((event) => {
                 if (!isShortcut(this.language.shortcuts.rename, event)) {
                     return false;
                 }
                 void this.start();
                 return true;
-            }),
+            }, KEY_PRIORITY.rename),
             editor.onTextChange(() => this.cancel())
         ];
         language.onDispose(() => {

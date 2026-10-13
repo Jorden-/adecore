@@ -1,4 +1,5 @@
 import { SnippetTransformQueueError } from './snippet-transform-queue.ts';
+import { KEY_PRIORITY } from './key-priority.ts';
 import { SnippetTransformError } from './snippet-transform-client.ts';
 import { MAX_TRANSFORM_JOBS, MAX_TRANSFORM_WORK, type SnippetTransformJob } from './snippet-transform-protocol.ts';
 import { fileUriToPath, StaleResultError, type CompletionContext, type CompletionItem } from '@adecore/lsp';
@@ -118,7 +119,7 @@ export class CompletionFeature {
         this.timers = timers;
         const { editor } = language;
         const offs = [
-            editor.onKeyDown((event) => this.key(event)),
+            language.onKey((event) => this.key(event), KEY_PRIORITY.completion),
             editor.onTextChange((change) => this.edited(change)),
             editor.onCaret((position) => this.caretMoved(position)),
             editor.onBlur(() => {

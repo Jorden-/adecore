@@ -50,6 +50,24 @@ editor.dispose();
 
 Attach one `EditorLanguage` per editor. `EditorView` already makes one, so do not attach a second to its editor. `language.goTo(location)` and `language.jump(position)` move the caret and record where it was; `visit(place)` moves it without a record. `language.onDispose(callback)` runs a callback when the language goes.
 
+### Keys
+
+The features see the editor's keys through `language.onKey(handler, priority?)`, which returns the function that removes the handler. A handler with a higher priority sees a key first, of two with the same priority the one added first, and the first to return `true` takes the key. `KEY_PRIORITY` holds the priority of each feature, a hundred apart from highest to lowest: `pick`, `diagnostics`, `hover`, `completion`, `snippets`, `signature`, `highlights`, `codeActions`, `rename`, `navigation`, `peek`, `callHierarchy`, `symbolPicker`, `history` and `renderedDocs`. Without a priority a handler comes after every feature.
+
+A subclass that must see a key before a feature registers after `super()` with a priority above it:
+
+```ts
+class AssistedLanguage extends EditorLanguage {
+    constructor(project: ProjectLanguage, editor: Editor, uri: string, languageId: string) {
+        super(project, editor, uri, languageId);
+        // Tab accepts the inline suggestion before the suggestion list and the snippet fields see it.
+        this.onKey((event) => event.key === 'Tab' && acceptSuggestion(this), KEY_PRIORITY.pick + 1);
+    }
+}
+```
+
+A handler on the editor itself (`editor.onKeyDown`) runs before all of these when it was added before the `EditorLanguage`, and after them when it was added later.
+
 ## LanguagePopups
 
 `<LanguagePopups language={language} />` draws every card a feature opens over the editor: hover, suggestions, signature help, the pick list, rename, peek, the call hierarchy, the symbol picker, the context menu and the authors card. `EditorView` renders it; an app that mounts by hand renders it next to the editor. Each card is placed from the screen position of its character and placed again when the editor scrolls or resizes.

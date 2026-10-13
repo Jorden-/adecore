@@ -1,4 +1,5 @@
 import type { Diagnostic } from '@adecore/lsp';
+import { KEY_PRIORITY } from './key-priority.ts';
 import type { EditorContentChange, EditorPosition, EditorReveal } from '@adecore/editor';
 import type { EditorLanguage } from './editor-language.ts';
 import { sameRange } from './hover-content.ts';
@@ -33,14 +34,14 @@ export class DiagnosticsFeature {
         });
         const edits = editor.onTextChange((change) => this.shift(change.changes));
         // These keys are the editor's while it has the keyboard; elsewhere the menu's commands answer.
-        const keys = editor.onKeyDown((event) => {
+        const keys = language.onKey((event) => {
             const next = isShortcut(this.language.shortcuts.nextProblem, event);
             if (!next && !isShortcut(this.language.shortcuts.previousProblem, event)) {
                 return false;
             }
             this.step(next ? 1 : -1);
             return true;
-        });
+        }, KEY_PRIORITY.diagnostics);
         language.onDispose(() => {
             keys();
             reports.dispose();

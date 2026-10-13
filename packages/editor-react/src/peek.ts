@@ -1,4 +1,5 @@
 import { StaleResultError, type Location, type Range } from '@adecore/lsp';
+import { KEY_PRIORITY } from './key-priority.ts';
 import type { EditorPosition } from '@adecore/editor';
 import type { EditorLanguage } from './editor-language.ts';
 import { uniquePlaces } from './navigation.ts';
@@ -45,7 +46,7 @@ export class PeekFeature {
         this.timers = timers;
         const { editor } = language;
         const offs = [
-            editor.onKeyDown((event) => {
+            language.onKey((event) => {
                 if (isShortcut(this.language.shortcuts.peekReferences, event)) {
                     void this.open();
                     return true;
@@ -55,7 +56,7 @@ export class PeekFeature {
                     return true;
                 }
                 return this.key(event);
-            }),
+            }, KEY_PRIORITY.peek),
             editor.onTextChange(() => this.close())
         ];
         language.onDispose(() => {

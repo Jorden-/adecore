@@ -1,5 +1,5 @@
 import { KEYMAP, type Keymap } from '@adecore/editor/keymap';
-import type { Editor, EditorPosition } from '@adecore/editor';
+import type { Editor, EditorKeyHandler, EditorPosition } from '@adecore/editor';
 import type { Location } from '@adecore/lsp';
 import { CallHierarchyFeature } from './call-hierarchy.ts';
 import { CodeActionsFeature } from './code-actions.ts';
@@ -13,6 +13,7 @@ import { FormatOnTypeFeature } from './format-on-type.ts';
 import { HighlightsFeature } from './highlights.ts';
 import { HistoryFeature } from './history.ts';
 import { HoverFeature } from './hover.ts';
+import { KeyDispatcher } from './key-priority.ts';
 import { NavigationFeature, locationRow } from './navigation.ts';
 import { PeekFeature } from './peek.ts';
 import { PickFeature } from './pick.ts';
@@ -73,6 +74,7 @@ export class EditorLanguage {
     readonly formatOnType: FormatOnTypeFeature;
     readonly renderedDocs: RenderedDocsFeature;
     private readonly disposers: Array<() => void> = [];
+    private readonly keys = new KeyDispatcher();
     private disposed = false;
 
     constructor(project: ProjectLanguage, editor: Editor, uri: string, languageId: string, timers: Timers = realTimers, options: EditorLanguageOptions = {}) {
@@ -83,6 +85,7 @@ export class EditorLanguage {
         this.project = project;
         this.languageId = languageId;
         this.document = project.acquire(uri, languageId, editor);
+        this.onDispose(editor.onKeyDown((event) => this.keys.dispatch(event)));
         this.pick = new PickFeature(this, timers);
         this.diagnostics = new DiagnosticsFeature(this);
         this.hover = new HoverFeature(this, timers);
@@ -175,6 +178,14 @@ export class EditorLanguage {
             listening = false;
             providers.dispose();
         };
+    }
+
+    /*
+     * Lets `handler` see the editor's keys before every handler of a lower `priority`, the first to take a key
+     * winning. `KEY_PRIORITY` holds the features'; the default, 0, comes after all of them.
+     */
+    onKey(handler: EditorKeyHandler, priority = 0): () => void {
+        return this.keys.add(handler, priority);
     }
 
     /* Runs `dispose` when the editor lets go of its document. */

@@ -1,4 +1,5 @@
 export { EditorLanguage, type EditorLanguageOptions } from './editor-language.ts';
+export { KEY_PRIORITY } from './key-priority.ts';
 export { realTimers, type Timers } from './timers.ts';
 export { DEFAULT_RANGE_LINES, DEFAULT_RANGE_CHARACTERS, type SemanticTokensOptions } from './semantic-tokens.ts';
 export { ProjectLanguage, type FileOperationTarget } from './project-language.ts';

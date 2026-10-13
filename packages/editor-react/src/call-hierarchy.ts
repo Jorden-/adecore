@@ -1,4 +1,5 @@
 import { StaleResultError, type CallHierarchyItem } from '@adecore/lsp';
+import { KEY_PRIORITY } from './key-priority.ts';
 import type { EditorPosition } from '@adecore/editor';
 import type { EditorLanguage } from './editor-language.ts';
 import {
@@ -53,7 +54,7 @@ export class CallHierarchyFeature {
         this.timers = timers;
         const { editor } = language;
         const offs = [
-            editor.onKeyDown((event) => {
+            language.onKey((event) => {
                 if (isShortcut(this.language.shortcuts.callHierarchy, event)) {
                     if (this.isOpen) {
                         this.setDirection(this.direction === 'incoming' ? 'outgoing' : 'incoming');
@@ -63,7 +64,7 @@ export class CallHierarchyFeature {
                     return true;
                 }
                 return this.key(event);
-            }),
+            }, KEY_PRIORITY.callHierarchy),
             editor.onTextChange(() => this.close())
         ];
         language.onDispose(() => {

@@ -1,4 +1,5 @@
 import { StaleResultError, fileUriToPath, type LanguageService, type Location, type LocationLink, type NavigationResult, type Range } from '@adecore/lsp';
+import { KEY_PRIORITY } from './key-priority.ts';
 import type { EditorPosition } from '@adecore/editor';
 import { basenameOf } from './paths.ts';
 import type { EditorLanguage } from './editor-language.ts';
@@ -76,14 +77,14 @@ export class NavigationFeature {
                 void this.go('definition', click.position);
                 return true;
             }),
-            editor.onKeyDown((event) => {
+            language.onKey((event) => {
                 const found = SHORTCUT_KINDS.find(([, name]) => isShortcut(this.language.shortcuts[name], event));
                 if (found === undefined) {
                     return false;
                 }
                 void this.go(found[0]);
                 return true;
-            })
+            }, KEY_PRIORITY.navigation)
         ];
         language.onDispose(() => {
             for (const off of offs) {

@@ -1,4 +1,5 @@
 import { findDocComments, type DocComment, type EditorPosition, type EditorRange, type EditorReplacement, type EditorTrackedRange } from '@adecore/editor';
+import { KEY_PRIORITY } from './key-priority.ts';
 import type { EditorLanguage } from './editor-language.ts';
 import { parseDocComment, type ParsedDocComment } from './doc-comment-model.ts';
 import { isShortcut } from './shortcut-keys.ts';
@@ -114,9 +115,9 @@ export class RenderedDocsFeature {
                     this.toggleAt(line);
                 }
             }),
-            editor.onKeyDown((event) => {
+            language.onKey((event) => {
                 return isShortcut(this.language.shortcuts.toggleRenderedDocs, event) && this.toggle();
-            }),
+            }, KEY_PRIORITY.renderedDocs),
             editor.onViewChange(() => {
                 this.sweep();
                 this.releaseRevealed();

@@ -1,4 +1,5 @@
 import type { SignatureHelp, SignatureHelpContext } from '@adecore/lsp';
+import { KEY_PRIORITY } from './key-priority.ts';
 import type { EditorPosition, EditorTextChange } from '@adecore/editor';
 import type { EditorLanguage } from './editor-language.ts';
 import { signatureViewOf } from './signature-model.ts';
@@ -30,7 +31,7 @@ export class SignatureFeature {
             editor.onTextChange((change) => this.edited(change)),
             editor.onCaret(() => this.retrigger()),
             editor.onBlur(() => this.close()),
-            editor.onKeyDown((event) => {
+            language.onKey((event) => {
                 if (event.key === 'Escape' && this.isOpen && this.language.popups.getState().callHierarchy === null) {
                     this.close();
                     return true;
@@ -43,7 +44,7 @@ export class SignatureFeature {
                     return this.cycle(event.key === 'ArrowDown' ? 1 : -1);
                 }
                 return false;
-            })
+            }, KEY_PRIORITY.signature)
         ];
         language.onDispose(() => {
             for (const off of offs) {

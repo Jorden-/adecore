@@ -1,4 +1,5 @@
 import { StaleResultError, type Location } from '@adecore/lsp';
+import { KEY_PRIORITY } from './key-priority.ts';
 import { basenameOf } from './paths.ts';
 import type { EditorLanguage } from './editor-language.ts';
 import { entriesOf, workspaceEntriesOf, type SymbolEntry, type WorkspaceEntry } from './symbol-picker-model.ts';
@@ -17,13 +18,13 @@ export class SymbolPickerFeature {
 
     constructor(language: EditorLanguage) {
         this.language = language;
-        const off = language.editor.onKeyDown((event) => {
+        const off = language.onKey((event) => {
             if (!isShortcut(this.language.shortcuts.goToSymbol, event)) {
                 return false;
             }
             void this.open();
             return true;
-        });
+        }, KEY_PRIORITY.symbolPicker);
         language.onDispose(() => {
             off();
             this.close();
