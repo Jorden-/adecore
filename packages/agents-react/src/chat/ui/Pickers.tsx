@@ -11,7 +11,7 @@ import { ChatScopeContext } from '../../scope';
 import { useReportedModels } from '../../state/chats';
 import { pickerEntriesOf, type PickerEntry } from '../logic/picker-entries';
 import { forgetStashed, STASH_SHORTCUT, useStash, type StashedPrompt } from '../stash';
-import { Icon, IconButton, Menu, Popover, Tooltip } from '@adecore/ui';
+import { Icon, IconButton, Menu, Pill, Popover, Tooltip } from '@adecore/ui';
 
 const triggerClass =
     'flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 text-xs text-text-muted hover:bg-surface-hover hover:text-text data-[popup-open]:bg-surface-active data-[popup-open]:text-text';
@@ -205,9 +205,9 @@ export function ModelPicker({
                                         <Menu.Check kind="radio" checked={chosen} />
                                         <span className="min-w-0 truncate">{entry.model.name}</span>
                                         {entry.model.badge && (
-                                            <span className="rounded bg-accent-soft px-1 text-[11px] leading-5 font-medium uppercase text-accent">
-                                                {entry.model.badge}
-                                            </span>
+                                            <Pill tone="accent" shape="tag" size="sm">
+                                                {entry.model.badge.charAt(0).toLocaleUpperCase() + entry.model.badge.slice(1)}
+                                            </Pill>
                                         )}
                                         <span className="grow" />
                                         {entry.model.legacy && <span className="text-xs text-text-faint">{t('pickers.model.legacy')}</span>}

@@ -25,7 +25,7 @@ import { modelName, shortModelName } from '../../agents/model-name';
 import { CONTEXT_OPTION, contextFraction, contextSegments, orderOptions, type ContextPart } from '../logic/context-usage';
 import { RUNTIME_MODES } from '../runtime-modes';
 import { formatClock, formatWeekdayClock, isSameDay, formatPercent, formatTokens } from '@adecore/ui/format';
-import { Icon, Menu, Tooltip, useNow } from '@adecore/ui';
+import { Icon, Menu, Pill, Tooltip, useNow } from '@adecore/ui';
 import { chatHost } from '../../host';
 import { useUsageLimits } from '../../usage/limits';
 
@@ -177,7 +177,11 @@ export function RunSettings({
                     <Menu.RadioItem key={row.slug} value={modelValue(entry.kind, row.slug)} closeOnClick>
                         <AgentIcon kind={entry.kind} size={14} className="shrink-0" />
                         <span className="min-w-0 truncate">{row.name}</span>
-                        {row.badge && <span className="rounded bg-accent-soft px-1 text-[11px] leading-5 font-medium uppercase text-accent">{row.badge}</span>}
+                        {row.badge && (
+                            <Pill tone="accent" shape="tag" size="sm">
+                                {row.badge.charAt(0).toLocaleUpperCase() + row.badge.slice(1)}
+                            </Pill>
+                        )}
                     </Menu.RadioItem>
                 ))}
             </Menu.Group>
