@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@adecore/ui';
+import { Button, Tooltip } from '@adecore/ui';
 import { formatNumber } from '@adecore/ui/format';
 import type { Editor, EditorEngine } from '@adecore/editor';
 import type { DiffDisplay } from '@adecore/merge';
@@ -36,17 +36,18 @@ export function DiffOverlays({
                     return null;
                 }
                 const text = t('diff.hidden', { count: formatNumber(Math.max(row.oldCount, row.newCount)) });
+                const isBlocked = blocked?.has(row.id) === true;
                 return createPortal(
                     <div className="adecore-editor-diff-gap">
                         {row.unfoldable ? (
-                            <Button
-                                size="xs"
-                                disabled={blocked?.has(row.id)}
-                                title={blocked?.has(row.id) ? t('diff.contextLimit') : undefined}
-                                onClick={() => unfold(row.id)}
-                            >
-                                {text}
-                            </Button>
+                            <Tooltip label={t('diff.contextLimit')} disabled={!isBlocked}>
+                                {/* A disabled button gets no pointer events, so the hint hangs on a wrapper. */}
+                                <span className="inline-flex">
+                                    <Button size="xs" disabled={isBlocked} onClick={() => unfold(row.id)}>
+                                        {text}
+                                    </Button>
+                                </span>
+                            </Tooltip>
                         ) : (
                             <span>{text}</span>
                         )}

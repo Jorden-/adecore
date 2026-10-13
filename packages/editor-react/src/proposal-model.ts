@@ -139,15 +139,6 @@ export function fitReplacement(selected: string, replacement: string): string {
     return breaks === '\n' ? fitted : fitted.replace(/\n/g, breaks);
 }
 
-/* Where the caret stands after `text` was typed at `start`. */
-export function endOfInsertion(start: EditorPosition, text: string): EditorPosition {
-    const lines = text.split('\n');
-    if (lines.length === 1) {
-        return { line: start.line, character: start.character + text.length };
-    }
-    return { line: start.line + lines.length - 1, character: lines.at(-1)!.length };
-}
-
 /* One stretch of the proposal as the card draws it. */
 export interface DiffSegment {
     readonly kind: 'same' | 'added' | 'removed';

@@ -12,10 +12,13 @@ import type { DiffSourceSide, DiffSourceTokens } from './diff-syntax.ts';
 async function pageTest(run: (page: ReturnType<typeof createPage>, root: ReturnType<typeof createRoot>) => Promise<void>): Promise<void> {
     const page = createPage();
     const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    // The hint of a blocked gap checks its trigger against the page's `Element`.
+    const previousElement = Object.getOwnPropertyDescriptor(globalThis, 'Element');
     // LinkeDOM writes window frame functions into the process globals.
     const frameNames = ['requestAnimationFrame', 'cancelAnimationFrame'] as const;
     const previousFrames = frameNames.map((name) => Object.getOwnPropertyDescriptor(globalThis, name));
     Object.defineProperty(globalThis, 'window', { value: page.window, configurable: true });
+    Object.defineProperty(globalThis, 'Element', { value: page.window.Element, configurable: true });
     const globals = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
     const previousAct = globals.IS_REACT_ACT_ENVIRONMENT;
     globals.IS_REACT_ACT_ENVIRONMENT = true;
@@ -32,6 +35,11 @@ async function pageTest(run: (page: ReturnType<typeof createPage>, root: ReturnT
             } else {
                 Object.defineProperty(globalThis, name, previous);
             }
+        }
+        if (previousElement === undefined) {
+            Reflect.deleteProperty(globalThis, 'Element');
+        } else {
+            Object.defineProperty(globalThis, 'Element', previousElement);
         }
         if (previousWindow === undefined) {
             Reflect.deleteProperty(globalThis, 'window');

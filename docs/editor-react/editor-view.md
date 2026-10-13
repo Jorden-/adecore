@@ -24,11 +24,13 @@
 | `project`          | `ProjectLanguage`                            | Optional; without it, or without `uri` or `languageId`, the editor has no features                                               |
 | `uri`              | `string`                                     | The document's `file:` URI                                                                                                       |
 | `languageId`       | `string`                                     | The LSP language id, such as `typescript` or `php`                                                                               |
+| `timers`           | `Timers`                                     | The clock of the language features, such as `ManualTimers` in a test                                                             |
+| `languageOptions`  | `EditorLanguageOptions`                      | What the app tunes about the features, as the last argument of `EditorLanguage`                                                  |
 | `onMount`          | `(editor, language) => void \| (() => void)` | Called after mounting with the `Editor` and the `EditorLanguage`, or `null`; the function it returns runs before the editor goes |
 | `contextMenuItems` | `(language) => ReactNode`                    | Rows of the app in the [context menu](/editor-react/rename#context-menu)                                                         |
 | `className`, `ref` |                                              | On the outer element, which needs a height                                                                                       |
 
-A change of `engine`, `options`, `project`, `uri`, `languageId` or `onMount` mounts the editor again. On unmount it runs the cleanup of `onMount`, disposes the `EditorLanguage` and then the editor. It never disposes the project.
+A change of `engine`, `project`, `uri` or `languageId` mounts the editor again, with a fresh undo history and document. The rest is read when it mounts, so an inline `options` object or `onMount` function costs nothing on a render. A later change of `theme`, `readOnly`, `readOnlyReason`, `wrap`, `indentation`, `smartKeys`, `guides`, `stickyScroll`, `whitespace`, `rightMargin`, `foldOutline`, `label` or `messages` reaches the editor in place; the other options only count when it mounts. On unmount it runs the cleanup of `onMount`, disposes the `EditorLanguage` and then the editor. It never disposes the project.
 
 ## EditorLanguage
 
@@ -64,6 +66,7 @@ Attach one `EditorLanguage` per editor. `EditorView` already makes one, so do no
 | `rect`                             | The box of the character, in page pixels                            |
 | `placement`                        | `PlaceOptions`: `prefer` `'above'` or `'below'`, `gap` and `margin` |
 | `className`, `children`            | The card's content                                                  |
+| `overflow`                         | `'scroll'` by default, or `'clip'` for content that scrolls         |
 | `onPointerEnter`, `onPointerLeave` | For a card that stays while the pointer is on it                    |
 
 Render it again when the rect changes; it measures and places itself on every render.

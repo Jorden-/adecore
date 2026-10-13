@@ -7,6 +7,8 @@ export interface AnchoredPopupProps {
     /* The character the popup belongs to, in the page's pixels. */
     rect: EditorRect;
     className?: string;
+    /* What the card does with content past its room: `scroll` it, or `clip` it for content that scrolls on its own. `scroll` without one. */
+    overflow?: 'scroll' | 'clip';
     children: ReactNode;
     placement?: PlaceOptions;
     onPointerEnter?(): void;
@@ -17,7 +19,7 @@ export interface AnchoredPopupProps {
  * A card next to a character of the editor, portaled to the page: inside a scaled canvas node it would be
  * drawn at that scale and clipped by the node. Placed from the character's screen rectangle, so it holds at any zoom.
  */
-export function AnchoredPopup({ rect, className, children, placement, onPointerEnter, onPointerLeave }: AnchoredPopupProps) {
+export function AnchoredPopup({ rect, className, overflow = 'scroll', children, placement, onPointerEnter, onPointerLeave }: AnchoredPopupProps) {
     const element = useRef<HTMLDivElement>(null);
 
     // Every render, since the character moves when the editor scrolls and the card's own size follows its content.
@@ -38,7 +40,7 @@ export function AnchoredPopup({ rect, className, children, placement, onPointerE
     return createPortal(
         <div
             ref={element}
-            className={`fixed top-0 left-0 z-(--z-popup) overflow-y-auto rounded-lg border border-border bg-surface-raised text-text shadow-(--float-shadow) ${className ?? ''}`}
+            className={`fixed top-0 left-0 z-(--z-popup) ${overflow === 'clip' ? 'overflow-hidden' : 'overflow-y-auto'} rounded-lg border border-border bg-surface-raised text-text shadow-(--float-shadow) ${className ?? ''}`}
             style={{ visibility: 'hidden' }}
             onPointerEnter={onPointerEnter}
             onPointerLeave={onPointerLeave}

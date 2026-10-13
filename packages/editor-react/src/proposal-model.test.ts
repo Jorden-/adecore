@@ -3,7 +3,6 @@ import { describe, expect, test } from 'bun:test';
 import {
     diffSegments,
     emphasisOf,
-    endOfInsertion,
     fitReplacement,
     inlineRangeOf,
     lineSpanOf,
@@ -13,6 +12,7 @@ import {
     replaceRange,
     textInRange
 } from './proposal-model.ts';
+import { endOfInsertion } from './diagnostics-model.ts';
 
 const at = (line: number, character: number) => ({ line, character });
 
@@ -76,6 +76,9 @@ describe('the proposal in the shape of the selection', () => {
     test('says where the caret stands after the text', () => {
         expect(endOfInsertion(at(3, 4), 'ab')).toEqual(at(3, 6));
         expect(endOfInsertion(at(3, 4), 'ab\ncde')).toEqual(at(4, 3));
+        expect(endOfInsertion(at(3, 4), 'ab\r\ncde')).toEqual(at(4, 3));
+        expect(endOfInsertion(at(3, 4), 'ab\r\n')).toEqual(at(4, 0));
+        expect(endOfInsertion(at(3, 4), 'a\rb')).toEqual(at(4, 1));
     });
 });
 

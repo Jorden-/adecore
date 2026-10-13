@@ -178,7 +178,8 @@
             "details": "Details",
             "none": "Geen suggesties",
             "transformBusy": "Snippettransformaties zijn bezig; probeer het opnieuw",
-            "transformFailed": "Snippettransformatie kon niet worden toegepast"
+            "transformFailed": "Snippettransformatie kon niet worden toegepast",
+            "failed": "De suggestie kon niet worden ingevoegd: {{message}}"
         },
         "history": {
             "recent": "Recente plekken"

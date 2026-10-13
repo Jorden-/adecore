@@ -32,6 +32,7 @@ import { isEmptyRange } from './proposal-model.ts';
 import { isShortcut } from './shortcut-keys.ts';
 import type { CompletionRow, CompletionView } from './popups.ts';
 import { realTimers, type Timers } from './timers.ts';
+import { messageOf } from './error-message.ts';
 
 const METHOD = 'textDocument/completion';
 const START_DELAY_MS = 80;
@@ -156,8 +157,17 @@ export class CompletionFeature {
         this.scheduleResolve();
     }
 
-    /* Picks a row by a click or a key. */
+    /* Picks a row by a click or a key. It never rejects: a failure is told to the person, so a caller can leave the promise alone. */
     async accept(replace: boolean, index = this.active, commit?: string): Promise<void> {
+        try {
+            await this.insert(replace, index, commit);
+        } catch (error) {
+            const { project } = this.language;
+            project.host.notify?.({ id: TOAST_ID, kind: 'error', title: project.i18n.t('editor:language.completion.failed', { message: messageOf(error) }) });
+        }
+    }
+
+    private async insert(replace: boolean, index: number, commit: string | undefined): Promise<void> {
         const entry = this.ranked[index];
         if (entry === undefined) {
             return;

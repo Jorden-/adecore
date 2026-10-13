@@ -1,6 +1,7 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { formatShortcut } from '@adecore/ui';
 import type { EditorRect } from '@adecore/editor';
 import type { EditorLanguage } from './editor-language.ts';
 import { kindLetterOf, kindToneOf, rowWindow, type KindTone } from './completion-model.ts';
@@ -64,6 +65,8 @@ const ROW_CHROME = 72;
  */
 export function CompletionPopup({ language, view, rect }: { language: EditorLanguage; view: CompletionView; rect: EditorRect }) {
     const { t } = useTranslation('editor');
+    const toggle = language.shortcuts.triggerCompletion;
+    const detailsKey = toggle === null ? null : formatShortcut(toggle, toggle.apple);
     const listId = useId();
     const list = useRef<HTMLDivElement>(null);
     const docs = useRef<HTMLDivElement>(null);
@@ -182,7 +185,11 @@ export function CompletionPopup({ language, view, rect }: { language: EditorLang
                 <div className="flex items-center gap-3 border-t border-border px-2 py-1 text-xs whitespace-nowrap text-text-faint">
                     <span>↵ {t('language.completion.insert')}</span>
                     <span>⇥ {t('language.completion.replace')}</span>
-                    <span>^Space {t('language.completion.details')}</span>
+                    {detailsKey !== null && (
+                        <span>
+                            {detailsKey} {t('language.completion.details')}
+                        </span>
+                    )}
                     <span className="ml-auto">{view.server}</span>
                 </div>
             </div>

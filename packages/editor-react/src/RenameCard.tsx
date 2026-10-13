@@ -226,7 +226,7 @@ export function RenameCard({ language, view, rect, endRect }: { language: Editor
                     }
                 }}
             />
-            <AnchoredPopup rect={{ ...rect, top: rect.top - 2, bottom: rect.bottom + 2 }} className="overflow-hidden" placement={{ gap: 2 }}>
+            <AnchoredPopup rect={{ ...rect, top: rect.top - 2, bottom: rect.bottom + 2 }} overflow="clip" placement={{ gap: 2 }}>
                 <div {...{ [CARD_ATTRIBUTE]: '' }} onPointerDown={(event) => event.preventDefault()}>
                     {view.phase === 'preview' ? <Preview language={language} view={view} /> : <Hints view={view} active={active} onPick={fill} />}
                 </div>

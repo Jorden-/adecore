@@ -43,7 +43,7 @@ const row = (label: string) => ({ label, kind: undefined, detail: '', descriptio
 test('the suggestions list is what the input points at, and the active option follows', async () => {
     await inPage(async (page, root) => {
         const editor = new FakeEditor(page.host, { text: 'fo' } as never);
-        const language = { editor, completion: { accept: () => Promise.resolve() } } as unknown as EditorLanguage;
+        const language = { editor, shortcuts: { triggerCompletion: null }, completion: { accept: () => Promise.resolve() } } as unknown as EditorLanguage;
         const view = (active: number): CompletionView => ({
             anchor: { line: 0, character: 0 },
             rows: [row('foo'), row('food'), row('fool')],

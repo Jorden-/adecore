@@ -41,7 +41,7 @@ export function comparePositions(left: EditorPosition, right: EditorPosition): n
 }
 
 /* Where an insertion of `text` at `start` ends, counting a line break of any kind once. */
-function endOfInsertion(start: EditorPosition, text: string): EditorPosition {
+export function endOfInsertion(start: EditorPosition, text: string): EditorPosition {
     const lines = text.split(/\r\n|\r|\n/);
     return lines.length === 1
         ? { line: start.line, character: start.character + text.length }

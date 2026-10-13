@@ -3,11 +3,12 @@ import { expect, spyOn, test } from 'bun:test';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createSmartEditorEngine, type Editor } from '@adecore/editor';
+import { FakeEditorEngine } from '@adecore/editor/fake';
 import { createPage, typeInto } from '@adecore/editor/testing';
 import type { EditorLanguage } from './editor-language.ts';
 import { EditorView } from './EditorView.tsx';
 import { ProjectLanguage } from './project-language.ts';
-import { FakeLanguageService } from './testing.ts';
+import { FakeLanguageService, ManualTimers } from './testing.ts';
 
 test('the React view mounts the real engine, forwards edits and releases its document on unmount', async () => {
     const page = createPage();
@@ -158,6 +159,74 @@ test('the view lets the host name the fold controls and does not lay the text ou
     } finally {
         (relayout as ReturnType<typeof spyOn> | null)?.mockRestore();
         await act(async () => root.unmount());
+        globals.IS_REACT_ACT_ENVIRONMENT = previousAct;
+        if (previousWindow === undefined) {
+            Reflect.deleteProperty(globalThis, 'window');
+        } else {
+            Object.defineProperty(globalThis, 'window', previousWindow);
+        }
+    }
+});
+
+test('a new options object or onMount function per render keeps the editor, and only engine, uri and languageId mount it again', async () => {
+    const page = createPage();
+    const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', { value: page.window, configurable: true });
+    const globals = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean };
+    const previousAct = globals.IS_REACT_ACT_ENVIRONMENT;
+    globals.IS_REACT_ACT_ENVIRONMENT = true;
+    const root = createRoot(page.host);
+    const project = new ProjectLanguage(new FakeLanguageService());
+    const engine = new FakeEditorEngine();
+    const mount = spyOn(engine, 'mount');
+    const timers = new ManualTimers();
+    const languages: (EditorLanguage | null)[] = [];
+    const render = (props: { engine?: FakeEditorEngine; uri?: string; languageId?: string; theme?: string; wrap?: boolean }) =>
+        act(async () =>
+            root.render(
+                createElement(EditorView, {
+                    engine: props.engine ?? engine,
+                    options: { text: 'hello', theme: props.theme ?? 'light', wrap: props.wrap, smartKeys: { autoPairQuotes: false } },
+                    project,
+                    uri: props.uri ?? 'file:///example.ts',
+                    languageId: props.languageId ?? 'typescript',
+                    timers,
+                    languageOptions: { semanticTokens: { rangeLines: 10 } },
+                    onMount: (_editor, language) => {
+                        languages.push(language);
+                    }
+                })
+            )
+        );
+    try {
+        await render({});
+        await render({});
+        await render({});
+        expect(mount).toHaveBeenCalledTimes(1);
+        expect(languages).toHaveLength(1);
+        const editor = engine.last;
+        editor.type('typed');
+        await render({ theme: 'dark', wrap: true });
+        expect(mount).toHaveBeenCalledTimes(1);
+        expect(editor.theme).toBe('dark');
+        expect(editor.wrap).toBe(true);
+        expect(editor.getText()).toBe('typed');
+        expect(editor.disposed).toBe(false);
+        await render({ theme: 'dark', wrap: true, uri: 'file:///other.ts' });
+        expect(mount).toHaveBeenCalledTimes(2);
+        expect(editor.disposed).toBe(true);
+        await render({ theme: 'dark', wrap: true, uri: 'file:///other.ts', languageId: 'javascript' });
+        expect(mount).toHaveBeenCalledTimes(3);
+        const other = new FakeEditorEngine();
+        await render({ engine: other, theme: 'dark', wrap: true, uri: 'file:///other.ts', languageId: 'javascript' });
+        expect(mount).toHaveBeenCalledTimes(3);
+        expect(other.editors).toHaveLength(1);
+        expect(other.last.theme).toBe('dark');
+        expect(languages).toHaveLength(4);
+    } finally {
+        mount.mockRestore();
+        await act(async () => root.unmount());
+        project.dispose();
         globals.IS_REACT_ACT_ENVIRONMENT = previousAct;
         if (previousWindow === undefined) {
             Reflect.deleteProperty(globalThis, 'window');
