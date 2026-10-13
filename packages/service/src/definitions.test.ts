@@ -80,4 +80,20 @@ describe('the service of the npm package', () => {
         // A path that only starts the same way is another program.
         expect(definitionRunsProgram(launchAgentPlist({ ...NPM_MAC, program: '/Users/bas/.worker/bin/worker-old' }), NPM_MAC.program)).toBe(false);
     });
+
+    test('a launch agent runs its first program argument, not one further on or in its environment', () => {
+        const other = { ...NPM_MAC, program: '/bin/other' };
+        expect(definitionRunsProgram(launchAgentPlist({ ...other, args: [NPM_MAC.program] }), NPM_MAC.program)).toBe(false);
+        expect(definitionRunsProgram(launchAgentPlist({ ...other, environment: { WORKER: NPM_MAC.program } }), NPM_MAC.program)).toBe(false);
+        expect(definitionRunsProgram(launchAgentPlist({ ...other, workingDirectory: NPM_MAC.program }), NPM_MAC.program)).toBe(false);
+    });
+
+    test('a launch agent with a Program key runs that program', () => {
+        const plist = launchAgentPlist({ ...NPM_MAC, program: '/bin/other' }).replace(
+            '<key>ProgramArguments</key>',
+            `<key>Program</key>\n    <string>${NPM_MAC.program}</string>\n    <key>ProgramArguments</key>`
+        );
+        expect(definitionRunsProgram(plist, NPM_MAC.program)).toBe(true);
+        expect(definitionRunsProgram(plist, '/bin/other')).toBe(false);
+    });
 });

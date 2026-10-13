@@ -92,12 +92,20 @@ export function systemdUnit(spec: ServiceSpec): string {
     return lines.join('\n');
 }
 
+/* What a launch agent starts: its `Program`, which launchd prefers, or else the first of its `ProgramArguments`. */
+function launchAgentProgram(definition: string): string | null {
+    const match =
+        /<key>Program<\/key>\s*<string>([^<]*)<\/string>/.exec(definition) ??
+        /<key>ProgramArguments<\/key>\s*<array>\s*<string>([^<]*)<\/string>/.exec(definition);
+    return match?.[1] ?? null;
+}
+
 /*
  * Callers sharing a service identity can check executable ownership before replacing its definition.
  */
 export function definitionRunsProgram(definition: string, program: string): boolean {
     return (
-        definition.includes(`<string>${xmlText(program)}</string>`) ||
+        launchAgentProgram(definition) === xmlText(program) ||
         definition.includes(`ExecStart=${unitWord(program, true)} `) ||
         definition.includes(`ExecStart=${unitWord(program, true)}\n`)
     );
