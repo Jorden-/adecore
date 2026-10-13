@@ -1,4 +1,4 @@
-import type { Plan, PlanActor, PlanOp, PlanStep, PlanStepState } from './protocol.ts';
+import type { Plan, PlanActor, PlanChecks, PlanOp, PlanStep, PlanStepState } from './protocol.ts';
 import { allSteps, effectiveChecks, holdsPersonState, isParentStep, locateItem, missingItem, refuse, type PlanRefusal } from './tree.ts';
 
 export type PlanVerdict = { ok: true } | PlanRefusal;
@@ -36,14 +36,23 @@ function mayState(plan: Plan, step: PlanStep, state: PlanStepState, actor: PlanA
     return ALLOWED;
 }
 
-/* Adding under a leaf takes its state away, which may not happen to a state a person set. */
-function mayHoldChildren(plan: Plan, under: string | undefined): PlanVerdict {
+/*
+ * Adding under a leaf takes its state away, which may not happen to a state a person set. Its state
+ * then follows from the sub-steps, so a leaf only a person checks takes only sub-steps a person checks.
+ */
+function mayHoldChildren(plan: Plan, under: string | undefined, added: readonly PlanChecks[]): PlanVerdict {
     if (under === undefined) {
         return ALLOWED;
     }
     const location = locateItem(plan, under);
-    if (location?.item.type === 'step' && !isParentStep(location.item) && holdsPersonState(location.item)) {
+    if (location?.item.type !== 'step' || isParentStep(location.item)) {
+        return ALLOWED;
+    }
+    if (holdsPersonState(location.item)) {
         return refuse('set-by-person', `A person set "${under}" to ${location.item.state}; a sub-step would take that state away`);
+    }
+    if (effectiveChecks(plan, location.item) === 'person' && added.some((checks) => checks !== 'person')) {
+        return refuse('person-only', `Only a person checks "${under}", so a sub-step under it is one a person checks too`);
     }
     return ALLOWED;
 }
@@ -95,7 +104,7 @@ export function canApply(op: PlanOp, actor: PlanActor, plan: Plan): PlanVerdict 
             return ALLOWED;
         }
         case 'add':
-            return mayHoldChildren(plan, op.under);
+            return mayHoldChildren(plan, op.under, op.type === 'step' ? [op.checks ?? plan.meta.checks] : []);
         case 'edit': {
             const location = locateItem(plan, op.id);
             if (!location) {
@@ -126,10 +135,15 @@ export function canApply(op: PlanOp, actor: PlanActor, plan: Plan): PlanVerdict 
             return ALLOWED;
         }
         case 'move': {
-            if (!locateItem(plan, op.id)) {
+            const location = locateItem(plan, op.id);
+            if (!location) {
                 return missingItem(op.id);
             }
-            return mayHoldChildren(plan, op.under);
+            return mayHoldChildren(
+                plan,
+                op.under,
+                allSteps([location.item]).map((step) => effectiveChecks(plan, step))
+            );
         }
         case 'remove': {
             const location = locateItem(plan, op.id);

@@ -294,6 +294,20 @@ describe('structure', () => {
         expect(codeOf(apply(plan, [{ op: 'move', id: 'b', under: 'a' }], 'agent'))).toBe('set-by-person');
     });
 
+    test('a step only a person checks gets no sub-step an agent could check off in its place', () => {
+        const plan = planOf([step('gate', { checks: 'person' }), step('b'), step('c', { checks: 'person' })]);
+        expect(codeOf(apply(plan, [{ op: 'add', type: 'step', title: 'Sub', under: 'gate', checks: 'agent' }], 'agent'))).toBe('person-only');
+        expect(codeOf(apply(plan, [{ op: 'add', type: 'step', title: 'Sub', under: 'gate' }], 'agent'))).toBe('person-only');
+        expect(codeOf(apply(plan, [{ op: 'move', id: 'b', under: 'gate' }], 'agent'))).toBe('person-only');
+        // Sub-steps a person checks as well keep the gate in a person's hands.
+        expect(applied(apply(plan, [{ op: 'add', type: 'step', title: 'Sub', under: 'gate', checks: 'person' }], 'agent')).plan.items[0]).toMatchObject({
+            steps: [{ title: 'Sub', checks: 'person' }]
+        });
+        expect(codeOf(apply(plan, [{ op: 'move', id: 'c', under: 'gate' }], 'agent'))).toBeUndefined();
+        const gated = planOf([step('gate')], { checks: 'person' });
+        expect(codeOf(apply(gated, [{ op: 'add', type: 'step', title: 'Sub', under: 'gate' }], 'agent'))).toBeUndefined();
+    });
+
     test('adds after an item beside it and mints ids that are free', () => {
         const plan = planOf([step('m1'), step('b')]);
         const result = applied(apply(plan, [{ op: 'add', type: 'step', title: 'Between', after: 'm1' }], 'agent'));
