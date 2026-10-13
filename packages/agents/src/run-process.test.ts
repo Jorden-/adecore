@@ -63,4 +63,31 @@ describe.skipIf(process.platform === 'win32')('runProcess', () => {
     test('a command that ends on its own answers with what it printed', async () => {
         expect(await runProcess(['sh', '-c', 'echo out; echo err >&2; exit 3'])).toEqual({ exitCode: 3, stdout: 'out\n', stderr: 'err\n' });
     });
+
+    test('hands the command its input, its folder and its environment', async () => {
+        const folder = mkdtempSync(join(tmpdir(), 'run-process-'));
+        try {
+            const result = await runProcess(['sh', '-c', 'cat; pwd; echo "$GREETING"'], {
+                stdin: 'piped\n',
+                cwd: folder,
+                env: { GREETING: 'hello', PATH: process.env.PATH }
+            });
+            expect(result.exitCode).toBe(0);
+            const [input, cwd, greeting] = result.stdout.trimEnd().split('\n');
+            expect(input).toBe('piped');
+            expect(cwd!.endsWith(folder.split('/').at(-1)!)).toBe(true);
+            expect(greeting).toBe('hello');
+        } finally {
+            rmSync(folder, { recursive: true, force: true });
+        }
+    });
+
+    test('without input the command reads an empty stream', async () => {
+        expect(await runProcess(['sh', '-c', 'cat; echo done'])).toEqual({ exitCode: 0, stdout: 'done\n', stderr: '' });
+    });
+
+    test('a command that cannot start rejects, and so does no command at all', async () => {
+        await expect(runProcess(['adecore-no-such-command-anywhere'])).rejects.toThrow();
+        await expect(runProcess([])).rejects.toThrow('No command to run');
+    });
 });
