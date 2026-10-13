@@ -218,17 +218,21 @@ export function createMemoryTransportPair(): [LspTransport, LspTransport] {
 export interface WebSocketTransportOptions {
     protocols?: string[];
     signal?: AbortSignal;
+    /* How long the socket may take to open, and how long a send waits for a full buffer to drain. */
     timeoutMs?: number;
     createWebSocket?: (url: string, protocols?: string[]) => WebSocket;
 }
 
 const MAX_SOCKET_BUFFER_BYTES = 8 * 1024 * 1024;
+/* A socket has no event for a drained buffer, so a send that waits looks again this often. */
+const DRAIN_POLL_MS = 10;
 
 /* JSON text frames over a WebSocket, which a browser can open and a daemon can serve. */
 export async function connectWebSocket(url: string, options: WebSocketTransportOptions = {}): Promise<LspTransport> {
     if (options.signal?.aborted) {
         throw new Error('WebSocket connection cancelled');
     }
+    const timeoutMs = options.timeoutMs ?? 10_000;
     const socket = options.createWebSocket ? options.createWebSocket(url, options.protocols) : new WebSocket(url, options.protocols);
     const events = new TransportEvents();
     socket.addEventListener('message', (event) => {
@@ -245,7 +249,7 @@ export async function connectWebSocket(url: string, options: WebSocketTransportO
     socket.addEventListener('close', (event) => events.finish(event.code === 1000 ? undefined : new Error(`LSP WebSocket closed (${event.code})`)));
     socket.addEventListener('error', () => events.finish(new Error('LSP WebSocket failed')));
     await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => fail(new Error('LSP WebSocket connection timed out')), options.timeoutMs ?? 10_000);
+        const timer = setTimeout(() => fail(new Error('LSP WebSocket connection timed out')), timeoutMs);
         const cleanup = (): void => {
             clearTimeout(timer);
             socket.removeEventListener('open', open);
@@ -273,12 +277,16 @@ export async function connectWebSocket(url: string, options: WebSocketTransportO
     return {
         onMessage: (listener) => events.onMessage(listener),
         onClose: (listener) => events.onClose(listener),
-        send(message) {
+        async send(message) {
+            const deadline = Date.now() + timeoutMs;
+            while (!events.closed && socket.readyState === 1 && socket.bufferedAmount > MAX_SOCKET_BUFFER_BYTES) {
+                if (Date.now() >= deadline) {
+                    throw new Error('LSP WebSocket send buffer is full');
+                }
+                await new Promise((resolve) => setTimeout(resolve, DRAIN_POLL_MS));
+            }
             if (events.closed || socket.readyState !== 1) {
                 throw new Error('LSP WebSocket is closed');
-            }
-            if (socket.bufferedAmount > MAX_SOCKET_BUFFER_BYTES) {
-                throw new Error('LSP WebSocket send buffer is full');
             }
             socket.send(JSON.stringify(message));
         },

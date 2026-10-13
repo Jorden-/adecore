@@ -36,7 +36,7 @@ const transport = createStreamTransport(stream);
 child.stderr.on('data', (chunk) => log(String(chunk)));
 ```
 
-`connectWebSocket` takes `protocols`, a `signal` to cancel the opening, `timeoutMs` (10 seconds by default) and a `createWebSocket` factory for a runtime without a global `WebSocket`. A binary frame or a frame that is no JSON closes the socket, and sending fails once the socket buffers more than 8 MiB. There is no reconnect and no authentication; those are the app's.
+`connectWebSocket` takes `protocols`, a `signal` to cancel the opening, `timeoutMs` (10 seconds by default) and a `createWebSocket` factory for a runtime without a global `WebSocket`. A binary frame or a frame that is no JSON closes the socket. While the socket buffers more than 8 MiB, a send waits for it to drain, and fails after `timeoutMs`. There is no reconnect and no authentication; those are the app's.
 
 `encodeMessage` and `ContentLengthDecoder` are the framing on their own.
 

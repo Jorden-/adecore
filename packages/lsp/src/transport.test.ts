@@ -152,6 +152,28 @@ describe('WebSocket transport', () => {
         expect(socket.closeCode).toBe(1003);
     });
 
+    it('holds a send while the buffer is full and fails only when it does not drain in time', async () => {
+        const socket = new FakeSocket();
+        const connecting = connectWebSocket('ws://example.test', { createWebSocket: () => socket as unknown as WebSocket, timeoutMs: 1_000 });
+        socket.open();
+        const transport = await connecting;
+        socket.bufferedAmount = 9 * 1024 * 1024;
+        const sending = transport.send(hello);
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        expect(socket.sent).toEqual([]);
+        socket.bufferedAmount = 0;
+        await sending;
+        expect(socket.sent.map((data) => JSON.parse(data))).toEqual([hello]);
+
+        const stuck = new FakeSocket();
+        const opening = connectWebSocket('ws://example.test', { createWebSocket: () => stuck as unknown as WebSocket, timeoutMs: 30 });
+        stuck.open();
+        const full = await opening;
+        stuck.bufferedAmount = 9 * 1024 * 1024;
+        await expect(Promise.resolve(full.send(hello))).rejects.toThrow('buffer is full');
+        expect(stuck.closeCode).toBeUndefined();
+    });
+
     it('fails when the socket closes before it opens or the signal aborts', async () => {
         const closing = new FakeSocket();
         const first = connectWebSocket('ws://example.test', { createWebSocket: () => closing as unknown as WebSocket });
