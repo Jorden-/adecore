@@ -1,8 +1,8 @@
 import { useRef, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowUp, Plus, Square } from 'lucide-react';
+import { ArrowUp, Play, Plus, Square } from 'lucide-react';
 import type { ChatInfo } from '@adecore/agent-contracts';
-import { ErrorBoundary, Icon, Tooltip, type Shortcut } from '@adecore/ui';
+import { Button, ErrorBoundary, Icon, Tooltip, type Shortcut } from '@adecore/ui';
 import { useChatHost } from '../../../host';
 import { useChatScope } from '../../../scope';
 import { useProviders } from '../../../state/providers';
@@ -20,6 +20,8 @@ interface SendProps {
     label: string;
     kbd: Shortcut;
     onSend(alternate: boolean): void;
+    /* Set when a person stopped the last turn and the box is empty: Continue stands where the send button would. */
+    onContinue: (() => void) | null;
 }
 
 interface ComposerControlsProps {
@@ -130,7 +132,15 @@ export function ComposerControls({
                         </button>
                     </Tooltip>
                 )}
-                {send.visible && (
+                {send.onContinue !== null && (
+                    <Tooltip label={t('composer.continueHint')}>
+                        <Button variant="primary" disabled={controls.configurationPending} onClick={send.onContinue}>
+                            <Icon icon={Play} size={14} />
+                            {t('composer.continue')}
+                        </Button>
+                    </Tooltip>
+                )}
+                {send.onContinue === null && send.visible && (
                     <Tooltip label={send.label} kbd={send.kbd} name>
                         <button
                             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-text hover:brightness-90 disabled:opacity-50 disabled:hover:brightness-100"

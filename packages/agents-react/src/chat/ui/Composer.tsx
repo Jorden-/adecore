@@ -36,6 +36,7 @@ import { useComposerDraft } from './composer/use-composer-draft';
 import { useComposerMenus } from './composer/use-composer-menus';
 import { useComposerSubmit } from './composer/use-composer-submit';
 import { LEAVE_DROPS_TO_THE_CARD, useDraftFiles } from './composer/use-draft-files';
+import { useContinuableTurn } from './composer/use-continuable-turn';
 import { useNotice } from './composer/use-notice';
 import { usePendingRequests } from './composer/use-pending-requests';
 import { usePromptHistory } from './composer/use-prompt-history';
@@ -96,7 +97,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
     const files = useDraftFiles({ capabilities, providerName: provider?.name, writable, draft: box, inputRef, setNotice: notice.setNotice });
     const controls = useChatControls({ chatId, info, notice, onRetarget });
     const guard = promptGuard(withQuote(draft.quote, draft.text));
-    const { submit, restoreStashed, toggleStash } = useComposerSubmit({
+    const { submit, continueTurn, restoreStashed, toggleStash } = useComposerSubmit({
         chatId,
         writable,
         guard,
@@ -121,6 +122,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
         }
     });
     const pending = usePendingRequests(chatId);
+    const continuable = useContinuableTurn(chatId, info);
     const compactionOffer = useCompactionOffer(chatId, info, capabilities?.compaction);
     const placeholder = useHintedPlaceholder({ chatId, disabled, readOnly, mentionable: capabilities?.mentions !== false, hasSkills: menus.hasSkills });
     const editorExtensions = useMemo(
@@ -290,7 +292,8 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                                 disabled: empty || !writable || guard.tooLong,
                                 label: t(sendLabelKey(busy, steerable, sendDelivery)),
                                 kbd: sendShortcut(sendKey, draft.text.includes('\n')),
-                                onSend: (alternate) => submit(alternate ? 'alternate' : 'default')
+                                onSend: (alternate) => submit(alternate ? 'alternate' : 'default'),
+                                onContinue: continuable !== null && empty && writable ? continueTurn : null
                             }}
                             dictationToolbar={setDictationToolbar}
                             onFiles={(picked) => {

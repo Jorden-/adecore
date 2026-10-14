@@ -6,6 +6,7 @@ import { checkAttachmentLimits, uploadBytes } from '../../attachments';
 import type { ChatSendExtras } from '../../chat-client';
 import { registerComposerSender, type ComposerSend } from '../../composer-send';
 import { isEmptyDraft } from '../../drafts';
+import { CONTINUE_PROMPT } from '../../logic/continue-after-stop';
 import type { PromptGuard } from '../../guards';
 import { presentMentions, presentSkills } from '../../mentions';
 import { withQuote } from '../../quote';
@@ -153,6 +154,15 @@ export function useComposerSubmit({
         inputRef.current?.focus();
     };
 
+    /* Sends the prompt that goes on after a stop through the same door as a typed one, so the host sees a person's message. */
+    const continueTurn = (): void => {
+        if (!writable) {
+            return;
+        }
+        scrollTimelineToEnd(chatId, 'instant');
+        afterSend(onSend(CONTINUE_PROMPT, {}), false);
+    };
+
     /* Cmd+S puts the draft away and clears the box; on an empty box the same key takes the last one back. */
     const toggleStash = (): void => {
         if (isEmptyDraft(draft)) {
@@ -168,5 +178,5 @@ export function useComposerSubmit({
         }
     };
 
-    return { submit, restoreStashed, toggleStash };
+    return { submit, continueTurn, restoreStashed, toggleStash };
 }

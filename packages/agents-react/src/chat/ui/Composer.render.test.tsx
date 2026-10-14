@@ -549,6 +549,49 @@ describe('the stash', () => {
     });
 });
 
+describe('continuing after a stop', () => {
+    const stopped = [
+        { id: 'turn-1', kind: 'turn', createdAt: 10, turnId: 'turn-1', state: 'aborted', endedAt: 20, costUsd: 0 },
+        { id: 'user-1', kind: 'user', createdAt: 11, turnId: 'turn-1', text: 'Do the thing' }
+    ] as ChatItem[];
+
+    test('an empty box after a stopped turn offers Continue instead of Send', async () => {
+        const composer = await mount({ items: stopped });
+        expect(composer.byLabel('Send')).toBeNull();
+        expect(composer.page.host.textContent).toContain('Continue');
+    });
+
+    test('Continue sends the plain prompt like a typed message', async () => {
+        const composer = await mount({ items: stopped });
+        const button = [...composer.page.host.querySelectorAll('button')].find((candidate) => candidate.textContent === 'Continue')!;
+        await composer.click(button);
+        expect(composer.sent).toEqual([{ text: 'Continue.', extras: {} }]);
+    });
+
+    test('typing brings the send button back, and clearing the box brings Continue back', async () => {
+        const composer = await mount({ items: stopped });
+        await composer.type('Instead, do this');
+        expect(composer.byLabel('Send')).not.toBeNull();
+        expect(composer.page.host.textContent).not.toContain('Continue');
+        await composer.press('a', { metaKey: true, code: 'KeyA' });
+        await composer.press('Backspace');
+        expect(composer.byLabel('Send')).toBeNull();
+        expect(composer.page.host.textContent).toContain('Continue');
+    });
+
+    test('Enter on the empty box sends nothing', async () => {
+        const composer = await mount({ items: stopped });
+        await composer.press('Enter');
+        expect(composer.sent).toEqual([]);
+    });
+
+    test('a turn that finished offers the send button as before', async () => {
+        const composer = await mount({ items: [{ ...stopped[0], state: 'done' }] as ChatItem[] });
+        expect(composer.byLabel('Send')).not.toBeNull();
+        expect(composer.page.host.textContent).not.toContain('Continue');
+    });
+});
+
 describe('attachments', () => {
     const file = (name: string, type = 'text/plain'): File => new File(['contents'], name, { type });
 

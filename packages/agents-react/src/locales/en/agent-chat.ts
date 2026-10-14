@@ -346,6 +346,8 @@ export default {
         tooLong: 'characters, too long to send',
         stop: 'Stop, Shift-click to also stop its sub-agents',
         queueButton: 'Queue',
+        continue: 'Continue',
+        continueHint: 'Continue where the stopped turn left off',
         send: 'Send',
         clear: {
             title: 'Clear the thread?',

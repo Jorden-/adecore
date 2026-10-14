@@ -346,6 +346,8 @@ export default {
         tooLong: 'tekens, te lang om te versturen',
         stop: 'Stoppen, Shift-klik stopt ook de sub-agents',
         queueButton: 'In de wachtrij zetten',
+        continue: 'Doorgaan',
+        continueHint: 'Ga verder waar de gestopte beurt ophield',
         send: 'Versturen',
         clear: {
             title: 'Thread wissen?',
