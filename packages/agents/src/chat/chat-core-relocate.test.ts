@@ -7,6 +7,7 @@ import { fakeClaude } from '../testing/fake-claude.ts';
 import { inProcess, type InProcessCli } from '../testing/fake-cli.ts';
 import { fakeCodex } from '../testing/fake-codex.ts';
 import { ChatCore } from './chat-core.ts';
+import { ChatStore } from './chat-store.ts';
 
 interface Launch {
     command: string;
@@ -14,7 +15,17 @@ interface Launch {
     argv: string[];
 }
 
+/* A store whose writes can be made to fail, which is how a disk that fills up looks to the core. */
+class FlakyStore extends ChatStore {
+    failing = false;
+
+    override write(...args: Parameters<ChatStore['write']>): Promise<number> {
+        return this.failing ? Promise.reject(new Error('The disk is full')) : super.write(...args);
+    }
+}
+
 let dataDir: string;
+let flaky: FlakyStore;
 let before: string;
 let after: string;
 let claude: InProcessCli;
@@ -62,6 +73,7 @@ async function openHost(): Promise<AgentHost> {
         core: (options) =>
             new ChatCore({
                 ...options,
+                store: flaky,
                 hooks: {
                     ...options.hooks,
                     admit: async (_chatId, cwd) => {
@@ -84,6 +96,7 @@ beforeEach(async () => {
     dataDir = await mkdtemp(join(tmpdir(), 'agents-relocate-'));
     before = join(dataDir, 'before');
     after = join(dataDir, 'after');
+    flaky = new FlakyStore(dataDir);
     claude = inProcess(fakeClaude);
     codex = inProcess(fakeCodex);
     launches = [];
@@ -221,10 +234,40 @@ describe('ChatCore.relocate', () => {
     test('the record on disk holds the new folder when relocate returns', async () => {
         await open('chat', 'claude');
         await turn('chat', 'hello');
+        await host.chats.save('chat');
+        expect((await new ChatStore(dataDir).read('chat'))?.info.cwd).toBe(before);
+
         await host.chats.relocate('chat', after);
 
-        const other = await openHost();
-        expect((await other.chats.create({ chatId: 'chat' })).cwd).toBe(after);
+        expect((await new ChatStore(dataDir).read('chat'))?.info.cwd).toBe(after);
+    });
+
+    test('a record that cannot be written keeps the old folder, and the queue runs in it', async () => {
+        await open('chat', 'claude');
+        await turn('chat', 'hello');
+        await host.chats.save('chat');
+        const launched = launches.length;
+
+        flaky.failing = true;
+        const errors = console.error;
+        console.error = () => undefined;
+        try {
+            await expect(
+                host.chats.relocate('chat', after, async () => {
+                    await host.chats.send('chat', 'while moving');
+                })
+            ).rejects.toThrow('The disk is full');
+            flaky.failing = false;
+            expect(info('chat').cwd).toBe(before);
+            expect(host.chats.isRelocating('chat')).toBe(false);
+            await until(() => info('chat').activeTurnId === null && (info('chat').queue ?? []).length === 0 && launches.length === launched + 1);
+        } finally {
+            console.error = errors;
+        }
+        expect(launches.at(-1)!.cwd).toBe(before);
+
+        await host.chats.relocate('chat', after);
+        expect(info('chat').cwd).toBe(after);
     });
 
     test('admit is asked for the new folder, and a refusal leaves the CLI running', async () => {
@@ -255,11 +298,54 @@ describe('what holds the CLI', () => {
         expect(info('chat').cwd).toBe(before);
     });
 
-    test('a request that waits for a person', async () => {
+    test('a request that outlives its turn', async () => {
         await open('chat', 'claude');
-        await host.chats.send('chat', 'ask: red or blue?');
-        await until(() => host.chats.get('chat')!.thread.pending().length > 0);
+        await host.chats.send('chat', 'background approval: ls');
+        await until(() => info('chat').activeTurnId === null && host.chats.get('chat')!.thread.pending().length > 0);
         await expect(host.chats.relocate('chat', after)).rejects.toMatchObject({ code: 'chat-busy' });
+    });
+
+    test('an approval alone, with no turn and no background work', async () => {
+        await open('chat', 'claude');
+        await turn('chat', 'hello');
+        const session = host.chats.get('chat')!;
+        session.upsertItems([
+            {
+                id: 'approval-1',
+                kind: 'approval',
+                createdAt: 1,
+                turnId: null,
+                requestId: 'req-1',
+                toolUseId: null,
+                toolName: 'Bash',
+                input: {},
+                description: null,
+                canAllowAlways: false,
+                decision: 'pending'
+            }
+        ]);
+        await expect(host.chats.relocate('chat', after)).rejects.toMatchObject({ code: 'chat-busy' });
+
+        session.upsertItems([{ ...session.thread.get('approval-1')!, decision: 'deny' } as never]);
+        await host.chats.relocate('chat', after);
+        expect(info('chat').cwd).toBe(after);
+    });
+
+    test('a start under way', async () => {
+        await open('chat', 'claude');
+        await host.chats.send('chat', 'hello');
+        expect(host.chats.get('chat')!.relocatable).toBe(false);
+        await expect(host.chats.relocate('chat', after)).rejects.toMatchObject({ code: 'chat-busy' });
+    });
+
+    test('a hold the host put on the chat for a person', async () => {
+        await open('chat', 'claude');
+        await turn('chat', 'hello');
+        host.chats.holdForPerson('chat', 'card');
+        await expect(host.chats.relocate('chat', after)).rejects.toMatchObject({ code: 'chat-busy' });
+
+        host.chats.releaseHold('chat', 'card');
+        await host.chats.relocate('chat', after);
     });
 
     test("background work after the turn's end", async () => {
@@ -321,14 +407,17 @@ describe('while a relocation runs', () => {
         expect(host.chats.isRelocating('chat')).toBe(false);
     });
 
-    test('a task wake finds the chat busy and opens no turn', async () => {
+    test('a wake finds the chat busy, and the same wake opens a turn once the move is done', async () => {
         await open('chat', 'claude');
         await turn('chat', 'hello');
+        const wake = { text: 'a child finished', label: 'Child', taskIds: [] };
 
         const woken: { turnId?: string | null } = {};
         await host.chats.relocate('chat', after, async () => {
-            woken.turnId = host.chats.get('chat')!.wake({ text: 'a child finished', label: 'Child', taskIds: [] });
+            woken.turnId = host.chats.get('chat')!.wake(wake);
         });
         expect(woken.turnId).toBeNull();
+
+        expect(host.chats.get('chat')!.wake(wake)).not.toBeNull();
     });
 });

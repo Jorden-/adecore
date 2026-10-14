@@ -49,6 +49,21 @@ describe('deliverMessageHandler', () => {
         expect(woken).toEqual([{ text: '3 messages above', label: 'From Lead, Builder, Lead', taskIds: [], messageFrom: ['chat-1', 'chat-3'] }]);
     });
 
+    test('waits while the chat is being moved to another folder, and wakes nobody yet', async () => {
+        const woken: unknown[] = [];
+        const chat: WakeChat = {
+            items: () => [],
+            relocating: () => true,
+            wake: (wake) => {
+                woken.push(wake);
+                return true;
+            }
+        };
+        const handler = deliverMessageHandler({ notices: { waiting: () => [notice('chat-1', 'Lead')] }, chat: async () => chat, placed: () => true, words });
+        expect(await handler(entry)).toBe('wait');
+        expect(woken).toEqual([]);
+    });
+
     test('wakes nobody when the messages were taken already, the node went or it has no thread', async () => {
         for (const { woken, handler } of [
             fixture([]),

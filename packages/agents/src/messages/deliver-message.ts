@@ -27,8 +27,9 @@ export interface DeliverMessageDeps {
  * Opens the turn a message earns a chat. The messages wait in the notice store and the turn's preamble
  * takes them (`NoticeNotes`), as a person's own prompt does, so a message is heard once either way.
  *
- * One attempt, never `wait`: a chat already in a turn reads the message in front of its next one, and
- * holding the entry would start turns nobody asked for long after the news mattered.
+ * One attempt: a chat already in a turn reads the message in front of its next one, and holding the
+ * entry would start turns nobody asked for long after the news mattered. The one exception is a chat
+ * being moved to another folder, which has no turn and turns every wake away until the move ends.
  */
 export function deliverMessageHandler(deps: DeliverMessageDeps) {
     return async (entry: DeliverMessageEntry): Promise<OutboxOutcome> => {
@@ -43,6 +44,9 @@ export function deliverMessageHandler(deps: DeliverMessageDeps) {
         const chat = await deps.chat(entry.target);
         if (chat === null) {
             return;
+        }
+        if (chat.relocating?.() === true) {
+            return 'wait';
         }
         // No note and no preamble on the thread: a person read the message as it landed (`showNotices`),
         // and the label on the turn names who it came from.

@@ -10,6 +10,8 @@ export interface WakeChat {
     items(): ChatItem[];
     persist?(): Promise<void>;
     wake(wake: { text: string; label: string; note?: string; taskIds: string[]; messageFrom?: string[] }): boolean;
+    /* Whether the host is moving the chat to another folder, which turns every wake away until it ends. */
+    relocating?(): boolean;
 }
 
 export interface ChatOpenerDeps {
@@ -39,6 +41,7 @@ export function chatOpener(deps: ChatOpenerDeps) {
         return session
             ? {
                   items: () => session.thread.list(),
+                  relocating: () => session.isRelocating,
                   persist: () => deps.chats.save(chatId),
                   // A turn before the reset would stop on the same limit and spend one of the resume's tries, so it waits for the resume turn.
                   wake: (wake) => session.info.resumeAt === undefined && session.wake(wake) !== null

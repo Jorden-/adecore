@@ -1027,12 +1027,8 @@ export class ChatCore {
     }
 
     /*
-     * Moves a loaded chat to another working folder once its CLI is gone. `during` is the host's own work
-     * (moving files, writing projects) and runs with the CLI ended and new messages held in the queue;
-     * they run in the new folder afterwards, on the same conversation. A `during` that throws leaves the
-     * folder as it was and lets the queue go there. Refused with `chat-busy` while a turn, work beside
-     * it, an open request or a start holds the CLI, or while the chat is being relocated already. A
-     * write of the record that fails throws after the folder changed in memory.
+     * Moves a loaded chat to another working folder. `during` is the host's own work and runs with the CLI
+     * already ended; messages sent meanwhile queue and go out in the new folder. Any throw keeps the old folder.
      */
     async relocate(chatId: string, cwd: string, during?: () => Promise<void>): Promise<ChatInfo> {
         const session = this.require(chatId);
@@ -1069,17 +1065,15 @@ export class ChatCore {
         try {
             await session.dropProcess();
             await during?.();
-        } catch (e) {
-            session.endRelocate();
-            throw e;
-        }
-        try {
             session.setCwd(cwd);
             await this.persistNow(chatId, true);
+        } catch (e) {
+            session.setCwd(previous);
+            throw e;
         } finally {
-            this.skillIndex.forget(session.info.provider, previous);
             session.endRelocate();
         }
+        this.skillIndex.forget(session.info.provider, previous);
         return session.info;
     }
 
@@ -1102,7 +1096,10 @@ export class ChatCore {
     /* Removes a chat: its CLI, its record, its log, its attachments, its bookmarks and its visuals. */
     async kill(chatId: string): Promise<void> {
         await this.loaded(chatId);
-        await this.relocations.get(chatId);
+        const moving = this.relocations.get(chatId);
+        if (moving) {
+            await moving;
+        }
         const session = this.require(chatId);
         // A write already out would put the record back after the delete.
         const writing = this.writes.get(chatId);

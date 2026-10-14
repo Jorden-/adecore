@@ -79,6 +79,10 @@ export class ChatThread {
         return { type: 'info', info: this.info };
     }
 
+    get held(): boolean {
+        return this.holds.size > 0;
+    }
+
     /* False when the key held the chat already. */
     hold(key: string): boolean {
         if (this.holds.has(key)) {

@@ -340,9 +340,15 @@ export class ChatSession {
         return this.thread.info;
     }
 
-    /* Whether nothing holds the process: no turn, no work or request beside it, no start under way, no other relocation. */
     get relocatable(): boolean {
-        return !this.relocating && this.thread.info.activeTurnId === null && !this.processInUse() && this.pendingStart === null;
+        return (
+            !this.frozen &&
+            !this.relocating &&
+            this.thread.info.activeTurnId === null &&
+            !this.processInUse() &&
+            this.pendingStart === null &&
+            !this.thread.held
+        );
     }
 
     get isRelocating(): boolean {
@@ -354,10 +360,14 @@ export class ChatSession {
         this.relocating = true;
     }
 
-    /* Lets the queue go, in whichever folder the chat has now. */
+    /*
+     * Lets the queue go, in whichever folder the chat has now. A wake that found the chat relocating
+     * was turned away and waits for an event of this chat, so one goes out even when the queue was empty.
+     */
     endRelocate(): void {
         this.relocating = false;
         this.drainQueue();
+        this.emit([this.thread.patchInfo({})]);
     }
 
     /*
