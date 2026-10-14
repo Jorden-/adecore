@@ -12,6 +12,7 @@ Every public name, by the entry point you import it from: `@adecore/intelligent-
 | [`runtime`](https://github.com/basmilius/adecore/blob/main/packages/intelligent-ui/src/runtime.ts) | `UiBinding`, `UiViewNode`, `UiEvaluation`, `UiState`, `evaluateUiBlock`, `UiChoiceSelection`, `uiInputValues`, `resolveUiChoice`, `uiChoiceLabel` |
 | [`query`](https://github.com/basmilius/adecore/blob/main/packages/intelligent-ui/src/query.ts) | `uiValidatedState`, `uiQueryArguments`, `uiQueryFallback` |
 | [`links`](https://github.com/basmilius/adecore/blob/main/packages/intelligent-ui/src/links.ts) | `UiLinkTargetSchema`, `UiLinkTarget`, `UiLinkResolutionSchema`, `UiLinkResolution`, `uiLinkTargets` |
+| [`places`](https://github.com/basmilius/adecore/blob/main/packages/intelligent-ui/src/places.ts) | `UiPlaceQuery`, `uiPlaceQueries` |
 | [`protocol`](https://github.com/basmilius/adecore/blob/main/packages/intelligent-ui/src/protocol.ts) | `UiNodeSchema`, `UiDiagnosticSchema`, `UiBlockSchema`, `UiBlocksSchema` |
 | [`text`](https://github.com/basmilius/adecore/blob/main/packages/intelligent-ui/src/text.ts) | `uiCompactCatalog`, `UiTextOptions`, `uiSessionNote`, `uiGroupReference`, `uiReferenceText`, `uiFallbackText` |
 | [`event-time`](https://github.com/basmilius/adecore/blob/main/packages/intelligent-ui/src/event-time.ts) | `UiEventTime`, `parseUiEventTime` |
@@ -29,3 +30,4 @@ Every public name, by the entry point you import it from: `@adecore/intelligent-
 | `resolveUiChoice`, `uiChoiceLabel`, `uiInputValues`, `uiValidatedState` | [Choices](/intelligent-ui/host/choices) |
 | `parseUiEventTime` | [Status](/intelligent-ui/components/status#timeline-and-event) |
 | `uiLinkTargets` and the link schemas | [Links](/intelligent-ui/host/links) |
+| `uiPlaceQueries` | [Live queries](/intelligent-ui/host/queries#places) |

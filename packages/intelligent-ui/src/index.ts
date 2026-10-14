@@ -46,4 +46,5 @@ export { UiNodeSchema, UiDiagnosticSchema, UiBlockSchema, UiBlocksSchema } from 
 export { uiCompactCatalog, uiSessionNote, uiGroupReference, uiReferenceText, uiFallbackText, type UiTextOptions } from './text.ts';
 export { UI_STREAM_INTERVAL_MS, UiStream, type UiStreamClock, type UiStreamOptions, type UiStreamPreview } from './stream.ts';
 
+export { uiPlaceQueries, type UiPlaceQuery } from './places.ts';
 export { UiLinkTargetSchema, UiLinkResolutionSchema, uiLinkTargets, type UiLinkTarget, type UiLinkResolution } from './links.ts';

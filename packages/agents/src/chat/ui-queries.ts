@@ -3,13 +3,17 @@ import type { z } from 'zod';
 import type {
     ChatUiLinkPayload,
     ChatUiLinkReading,
+    ChatUiPlaceReading,
+    ChatUiQueryState,
     ChatAssistantItem,
     ChatInfo,
     ChatUiChoicePayload,
     ChatUiQueryPayload,
     ChatUiQueryReading
 } from '@adecore/agent-contracts';
+import { ChatUiPlaceReadingSchema } from '@adecore/agent-contracts';
 import { copyUiValue, UI_HOST_LIMITS, UiBudget, uiMayReferenceHost, type UiValue } from '@adecore/intelligent-ui';
+import { uiPlaceQueries, type UiPlaceQuery } from '@adecore/intelligent-ui/places';
 import { UiLinkResolutionSchema, uiLinkTargets, type UiLinkTarget } from '@adecore/intelligent-ui/links';
 import { uiQueryArguments, uiQueryFallback } from '@adecore/intelligent-ui/query';
 import type { UiBlock } from '@adecore/intelligent-ui/compiler';
@@ -27,6 +31,12 @@ export interface ChatUiHost {
     capture(info: ChatInfo): Promise<unknown>;
     sources: Readonly<Record<string, ChatUiSource>>;
     link?(info: ChatInfo, access: unknown, target: UiLinkTarget): Promise<ChatUiLinkReading>;
+    /*
+     * Looks up the point of a Place that names an address, once, when its reply settles; the reading is
+     * frozen beside the block for every client. `signal` aborts after five seconds. A host without it
+     * freezes nothing, and such a place reads as not found.
+     */
+    place?(info: ChatInfo, query: UiPlaceQuery, signal: AbortSignal): Promise<ChatUiPlaceReading>;
 }
 
 interface CachedReading {
@@ -63,6 +73,7 @@ export class ChatUiRefusal extends UiQueryError {
 const MAX_QUERY_BYTES = 64 * 1024;
 const MAX_SNAPSHOT_BYTES = 128 * 1024;
 const READ_TIMEOUT_MS = 8_000;
+const PLACE_TIMEOUT_MS = 5_000;
 // A changed input reads at once, but a query never reads more often than this across its inputs.
 const INPUT_READ_MS = 250;
 
@@ -139,6 +150,17 @@ export class ChatUiQueries {
                             }
                         }
                     }
+                    const places: Record<string, ChatUiPlaceReading> = Object.create(null);
+                    const found: string[] = [];
+                    if (this.host.place) {
+                        for (const [id, query] of Object.entries(uiPlaceQueries(block, {}, values)).slice(0, UI_HOST_LIMITS.places)) {
+                            const reading = await this.placeReading(session.info, query);
+                            places[id] = reading;
+                            if (reading.state === 'found') {
+                                found.push(`${query.name || query.address}: ${reading.lat}, ${reading.lon}`);
+                            }
+                        }
+                    }
                     const latest = session.thread.get(item.id);
                     if (latest?.kind !== 'assistant' || !latest.uiQueries || latest.ui?.find((entry) => entry.id === block.id)?.revision !== block.revision) {
                         return;
@@ -150,11 +172,12 @@ export class ChatUiQueries {
                         .filter(([, reading]) => reading.state !== 'fresh')
                         .map(([name, reading]) => `${name}: ${reading.reason}`)
                         .join('\n');
-                    const frozen = {
+                    const frozen: ChatUiQueryState['blocks'][string] = {
                         revision: block.revision!,
                         readings,
                         links,
-                        fallback: `${uiQueryFallback(block, values).slice(0, 8192)}${names ? `\nSources: ${names}` : ''}${failures ? `\n${failures}` : ''}`
+                        ...(Object.keys(places).length > 0 ? { places } : {}),
+                        fallback: `${uiQueryFallback(block, values).slice(0, 8192)}${names ? `\nSources: ${names}` : ''}${failures ? `\n${failures}` : ''}${found.length > 0 ? `\nPlaces: ${found.join('; ')}` : ''}`
                     };
                     const blocks = { ...latest.uiQueries.blocks, [block.id]: frozen };
                     if (Buffer.byteLength(JSON.stringify(blocks)) > MAX_SNAPSHOT_BYTES) {
@@ -167,6 +190,14 @@ export class ChatUiQueries {
                         frozen.links = Object.fromEntries(
                             Object.keys(links).map((id) => [id, { state: 'plain', code: 'link-unchecked', reason: 'This link must be checked again.' }])
                         );
+                        if (frozen.places) {
+                            frozen.places = Object.fromEntries(
+                                Object.keys(places).map((id) => [
+                                    id,
+                                    { state: 'missing', code: 'snapshot-too-large', reason: 'The frozen places are too large.' }
+                                ])
+                            );
+                        }
                         frozen.fallback = `${block.fallback.slice(0, 2048)}\nSources: ${names}\nThe frozen query values are too large.`;
                     }
                     if (Buffer.byteLength(JSON.stringify(blocks)) > MAX_SNAPSHOT_BYTES) {
@@ -177,6 +208,31 @@ export class ChatUiQueries {
             })
             .catch(() => {})
             .finally(() => this.freezing.delete(key));
+    }
+
+    /* One lookup, cut off after five seconds; whatever goes wrong is a reading that says the place is missing and why. */
+    private async placeReading(info: ChatInfo, query: UiPlaceQuery): Promise<ChatUiPlaceReading> {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), PLACE_TIMEOUT_MS);
+        timeout.unref?.();
+        try {
+            const reading = await Promise.race([
+                this.host.place!(info, query, controller.signal),
+                new Promise<never>((_, reject) =>
+                    controller.signal.addEventListener('abort', () => reject(new UiQueryError('refused-query', 'timed-out', 'The place lookup timed out.')), {
+                        once: true
+                    })
+                )
+            ]);
+            const parsed = ChatUiPlaceReadingSchema.parse(copyUiValue(reading, new UiBudget()));
+            return parsed.state === 'found' && (parsed.lat === undefined || parsed.lon === undefined)
+                ? { state: 'missing', code: 'place-unreadable', reason: 'The host found no point for this address.' }
+                : parsed;
+        } catch (error) {
+            return { state: 'missing', ...this.failure(error) };
+        } finally {
+            clearTimeout(timeout);
+        }
     }
 
     /* The writer's access for a reply, captured once; null where it was denied or is unavailable. */

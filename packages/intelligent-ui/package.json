@@ -32,6 +32,11 @@
             "types": "./dist/links.d.ts",
             "default": "./dist/links.js"
         },
+        "./places": {
+            "source": "./src/places.ts",
+            "types": "./dist/places.d.ts",
+            "default": "./dist/places.js"
+        },
         "./query": {
             "source": "./src/query.ts",
             "types": "./dist/query.d.ts",

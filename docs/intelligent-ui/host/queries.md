@@ -120,3 +120,27 @@ A host may also refuse with one of the codes that `uiReasonText` words without b
 | `outside-project`    | The source or target lies outside the writer's project       |
 | `target-unavailable` | The file, commit, diff or node a link names is gone          |
 | `no-unique-match`    | A name the source looks up matches nothing, or more than one |
+
+## Places
+
+A `Place` can give an address instead of coordinates. A host that registers `ChatUiHost.place` has each such address looked up once, when the reply settles, and the point is frozen beside the block in `uiQueries.blocks[id].places`, by node id. Every client then draws the same point, also months later, and a reader of the fallback finds the coordinates in its `Places:` line.
+
+```ts
+import { uiPlaceQueries } from '@adecore/intelligent-ui/places';
+
+const intelligentUi: ChatUiHost = {
+    capture: async () => null,
+    sources: {},
+    // One lookup of one address; `signal` aborts after five seconds.
+    place: async (info, { address, name }, signal) => {
+        const match = await geocode(address, signal);
+        return match ? { state: 'found', lat: match.lat, lon: match.lon, label: match.label } : { state: 'missing', code: 'no-match' };
+    }
+};
+```
+
+`uiPlaceQueries(block, input?, queries?)` gives the complete Places with an address and no coordinates as `{ [nodeId]: { address, name } }`; the host itself calls `place` for at most `UI_HOST_LIMITS.places` (50) of them, one after the other. `uiMayReferenceHost` is true for text with a `<Place` that has `address=`, so the daemon looks at such a reply.
+
+A reading is `found` with `lat`, `lon` and an optional `label`, or `missing` with an optional `code` and `reason`. A lookup that throws, takes longer than five seconds or answers something the schema refuses is frozen as `missing` with the reason, and nothing looks again: a machine that was offline or signed out when the reply settled keeps `missing` for that reply. A host without `place` freezes nothing, and the renderers draw such a place as not on the map. The write is dropped when the block changed while the lookups ran.
+
+A frozen reading is the host's to keep or drop: a host that may not store coordinates leaves `place` out, and a map then draws only the places the agent gave coordinates for.

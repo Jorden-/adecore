@@ -40,7 +40,7 @@ A `Place` that gives `lat` without `lon` (or the other way round), or neither co
 
 ## Looking up an address
 
-A renderer does not look anything up. `UiRenderContext.place(nodeId)` hands it the point the host read, which is `undefined` until the block is frozen, and `null` for a place with no point. The list says `Looking up` for the first and `Not on the map` for the second; a place without a point has no marker. [Queries](/intelligent-ui/host/queries) says how the machine freezes the points.
+A renderer does not look anything up. `UiRenderContext.place(nodeId)` hands it the point the host read, which is `undefined` until the block is frozen, and `null` for a place with no point. The list says `Looking up` for the first and `Not on the map` for the second; a place without a point has no marker. [Live queries](/intelligent-ui/host/queries#places) says how the machine freezes the points.
 
 ## What the host draws
 

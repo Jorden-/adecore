@@ -11,8 +11,8 @@ export const UI_FENCE_LANGUAGE = 'ui';
 
 export const UI_REPLY_LIMITS = { blocks: 16, characters: 262144, nodes: 2048, milliseconds: 60 } as const;
 
-// What a host reads for one block: its queries, its link targets and how often a visible block reads again.
-export const UI_HOST_LIMITS = { queries: 8, links: 64, refreshMilliseconds: 10_000 } as const;
+// What a host reads for one block: its queries, its link targets, the places it looks up and how often a visible block reads again.
+export const UI_HOST_LIMITS = { queries: 8, links: 64, places: 50, refreshMilliseconds: 10_000 } as const;
 
 /* A Place that names an address, whose tag may hold quoted text with a `>` before it. */
 const ADDRESSED_PLACE = /<Place\b(?:[^>"']|"[^"]*"|'[^']*')*?\baddress\s*=/;
