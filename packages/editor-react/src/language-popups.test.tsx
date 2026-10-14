@@ -52,3 +52,45 @@ test('the hover card carries the sections of the app at its foot, and the layer 
         });
     });
 });
+
+test('the rename field leaves the character after the name uncovered', async () => {
+    await inPage(async (page, root) => {
+        // The page has no selection, and the field selects the name when it opens.
+        const inputs = (page.window as unknown as { HTMLInputElement: { prototype: { select?: () => void } } }).HTMLInputElement.prototype;
+        inputs.select ??= () => undefined;
+        const project = new ProjectLanguage(new FakeLanguageService());
+        const editor = new FakeEditorEngine().mount(page.host, { text: 'export function greetAll(names) {}', theme: 'light' });
+        const language = new NamedLanguage(project, editor, 'file:///work/a.ts', 'typescript', new ManualTimers());
+        await act(async () => root.render(createElement(LanguagePopups<NamedLanguage>, { language })));
+
+        const range = { start: at(0, 16), end: at(0, 24) };
+        await act(async () =>
+            language.popups.setState({
+                rename: {
+                    phase: 'input',
+                    range,
+                    original: 'greetAll',
+                    placeholder: 'greetAll',
+                    occurrences: null,
+                    busy: false,
+                    error: null,
+                    name: 'greetAll',
+                    files: [],
+                    suggestions: []
+                }
+            })
+        );
+        const input = page.document.querySelector('input') as HTMLInputElement;
+        const start = editor.rectAt(range.start)!;
+        const end = editor.rectAt(range.end)!;
+        const border = 1;
+        expect(Number.parseFloat(input.style.left)).toBe(start.left - border);
+        expect(Number.parseFloat(input.style.left) + Number.parseFloat(input.style.minWidth)).toBe(end.left + border);
+        expect(input.className).toContain('px-0');
+
+        await act(async () => {
+            language.dispose();
+            project.dispose();
+        });
+    });
+});

@@ -208,12 +208,13 @@ export function RenameCard({ language, view, rect, endRect }: { language: Editor
                 spellCheck={false}
                 autoComplete="off"
                 aria-label={view.original}
-                className="fixed z-(--z-popup) rounded-sm border border-accent bg-surface px-1 font-mono text-code text-text shadow-(--float-shadow) outline-none [field-sizing:content]"
+                className="fixed z-(--z-popup) rounded-sm border border-accent bg-surface px-0 font-mono text-(length:--code-font-size) text-text shadow-(--float-shadow) outline-none [font-kerning:none] [field-sizing:content]"
                 style={{
-                    left: Math.round(rect.left) - 5,
+                    // Only the border stands beside the name: any padding would cover the character after it, often a `(`.
+                    left: Math.round(rect.left) - 1,
                     top: Math.round(rect.top) - 2,
                     height: Math.round(rect.bottom - rect.top) + 4,
-                    minWidth: Math.round(symbolWidth) + 10
+                    minWidth: Math.round(symbolWidth) + 2
                 }}
                 onChange={(event) => {
                     setValue(event.target.value);
