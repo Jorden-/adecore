@@ -1,143 +1,17 @@
-export {
-    isIdentifierCharacter,
-    identifierPrefix,
-    type MatchDetail,
-    matchDetail,
-    matchScore,
-    editRangeOf,
-    itemsOf,
-    prefixFor,
-    type Ranked,
-    rankCompletions,
-    matchedCharacters,
-    qualifierOf,
-    qualifiersOf,
-    snippetToText,
-    METHOD_KIND,
-    FUNCTION_KIND,
-    CONSTRUCTOR_KIND,
-    CLASS_KIND,
-    SNIPPET_FORMAT,
-    type Insertion,
-    type SnippetInsertionOptions,
-    insertionOf,
-    mirroredInsertions,
-    documentationText,
-    completionDocsOf,
-    type KindTone,
-    kindLetterOf,
-    kindToneOf,
-    type RowWindow,
-    rowWindow
-} from './completion-model.ts';
-export { PARAMETER_HINTS_COMMAND, type CallPlan, type CallSite, isCallItem, hasParameters, planCall, withParentheses } from './completion-call.ts';
-export {
-    type Problem,
-    severityOf,
-    markerOf,
-    comparePositions,
-    shiftPosition,
-    endOfInsertion,
-    shiftRange,
-    rangeHolds,
-    problemsAt,
-    neighborProblem,
-    codeLabelOf
-} from './diagnostics-model.ts';
-export {
-    type SignatureBlock,
-    type HoverText,
-    splitSignatures,
-    hoverTextOf,
-    isEmptyHover,
-    locationsOf,
-    sameRange,
-    type DocTag,
-    splitDocTags,
-    type HoverSection,
-    type BaselineLevel,
-    type Baseline,
-    docblockMarkdown,
-    type MarkdownPart,
-    markdownParts,
-    hoverSectionsOf
-} from './hover-content.ts';
-export { type SignatureViewModel, parameterSpan, signatureViewOf } from './signature-model.ts';
-export {
-    wordRangeAt,
-    type RenameTarget,
-    renameTargetOf,
-    type Occurrences,
-    occurrencesOf,
-    type RenameRow,
-    type RenameFile,
-    renameRowsOf,
-    renamePreviewOf
-} from './rename-model.ts';
-export {
-    type NameRange,
-    type PeekPlace,
-    type PeekFile,
-    PEEK_READ_FILES,
-    peekFilesOf,
-    type PeekSnippet,
-    snippetOf,
-    definitionSnippetOf,
-    distinguishingFolders,
-    visualColumnOf
-} from './peek-model.ts';
-export {
-    type CallDirection,
-    type CallLoad,
-    type CallNode,
-    type CallRow,
-    CALL_LEVEL_LIMIT,
-    rootsOf,
-    childrenOf,
-    rowsOf,
-    stepsOf,
-    targetOf,
-    statusIdOf,
-    moreIdOf
-} from './call-hierarchy-model.ts';
-export {
-    type SymbolGroup,
-    SYMBOL_GROUPS,
-    groupOfKind,
-    letterOfKind,
-    type SymbolTone,
-    toneOfKind,
-    type SymbolEntry,
-    entriesOf,
-    scoreOf,
-    filterEntries,
-    type EntryGroup,
-    groupEntries,
-    type PickerMode,
-    modeOf,
-    type WorkspaceEntry,
-    workspaceEntriesOf
-} from './symbol-picker-model.ts';
-export { SYMBOL_LINK_CLASS, isTypeName, linkTypeNames, declaredNameOf, placesOfName } from './symbol-links.ts';
+export { type MatchDetail, type Ranked, type Insertion, type SnippetInsertionOptions, insertionOf, type KindTone, type RowWindow } from './completion-model.ts';
+export { type CallPlan, type CallSite } from './completion-call.ts';
+export { type Problem, severityOf, endOfInsertion, codeLabelOf } from './diagnostics-model.ts';
+export { type SignatureBlock, type HoverText, type DocTag, type HoverSection, type BaselineLevel, type Baseline, type MarkdownPart } from './hover-content.ts';
+export { type SignatureViewModel } from './signature-model.ts';
+export { type RenameTarget, type Occurrences, type RenameRow, type RenameFile } from './rename-model.ts';
+export { type NameRange, type PeekPlace, type PeekFile, type PeekSnippet, distinguishingFolders } from './peek-model.ts';
+export { type CallDirection, type CallLoad, type CallNode, type CallRow } from './call-hierarchy-model.ts';
+export { type SymbolGroup, type SymbolTone, type SymbolEntry, type EntryGroup, type PickerMode, type WorkspaceEntry } from './symbol-picker-model.ts';
 export { scopesOf, decodeSemanticTokens } from './semantic-model.ts';
-export { applySemanticEdits } from './semantic-delta.ts';
-export {
-    type ActionGroup,
-    ACTION_GROUPS,
-    REFACTOR_GROUPS,
-    type ActionEntry,
-    groupOf,
-    actionsOf,
-    mergeEntries,
-    isHint,
-    fixableOnLine,
-    diagnosticsAt,
-    type EditPreview,
-    previewOf
-} from './code-actions-model.ts';
-export { resourceOperationsOf, type ResourceOperationView } from './workspace-edit.ts';
-export { MAX_DECLARATIONS, type CodeVisionDeclaration, type DeclarationSource, startAfterComments, declarationsOf, usagesText } from './code-vision-model.ts';
-export { UNCOMMITTED, mapBlame, type CodeAuthor, type CodeAuthorship, shortName, authorshipOf, authorsText } from './code-authors.ts';
+export { type ActionGroup, type ActionEntry, type EditPreview } from './code-actions-model.ts';
+export { type ResourceOperationView } from './workspace-edit.ts';
+export { type CodeVisionDeclaration, type DeclarationSource } from './code-vision-model.ts';
+export { type CodeAuthor, type CodeAuthorship } from './code-authors.ts';
 export {
     type SnippetTransform,
     type SnippetStop,
@@ -163,8 +37,6 @@ export {
     type DiffSegment,
     diffSegments,
     emphasisOf,
-    offsetOf,
-    textInRange,
     replaceRange,
     locateSelection
 } from './proposal-model.ts';
@@ -181,11 +53,10 @@ export {
     matchesIn,
     stepIndex
 } from './find-query.ts';
-export { type PopupSize, type PopupPlacement, type PlaceOptions, placePopup, placeBeside } from './popup-placement.ts';
+export { type PopupSize, type PopupPlacement, type PlaceOptions } from './popup-placement.ts';
 export { planConflict, type ConflictStretch, type ConflictPlan } from './conflict-model.ts';
 export {
     patchLayoutOf,
-    DEFAULT_PATCH_LIMITS,
     type PatchLayout,
     type PatchLayoutLine,
     type PatchLineRole,

@@ -6,7 +6,7 @@
 
 Typing an identifier character, or a trigger character the service lists in the `triggerCharacters` of its completion options, asks for suggestions after a pause of 80 milliseconds. Each later character filters the list that is there, unless the service marked it incomplete; then the list is asked again. `completion.invoke()` asks at once, as Ctrl+Space does.
 
-`CompletionPopup` draws the list: the matched letters, a letter and color per kind, and the documentation of the active row beside it, resolved through `completionItem/resolve` when the service supports it. A complete list is never asked for again while it is open; only when the service turns down a resolve because the text moved on is the list asked for at the new text, and an accept does the same. A failed accept is told through the host's `notify`, so `accept()` never rejects. The keys while it is open:
+The popup draws the list: the matched letters, a letter and color per kind, and the documentation of the active row beside it, resolved through `completionItem/resolve` when the service supports it. A complete list is never asked for again while it is open; only when the service turns down a resolve because the text moved on is the list asked for at the new text, and an accept does the same. A failed accept is told through the host's `notify`, so `accept()` never rejects. The keys while it is open:
 
 | Key                | What it does                                                                                        |
 | ------------------ | --------------------------------------------------------------------------------------------------- |
@@ -59,7 +59,7 @@ There are at most eight frames and 1,000 ranges across frames and instances. Exc
 
 ## Signature help
 
-Typing a trigger character of the service's signature help, such as `(` or `,`, asks for the signatures of the call around the caret. `signature.invoke()` asks at once, as Mod+P does, and `close()` closes the card. `SignatureCard` draws the active signature with the active parameter in bold, its documentation, and which of several signatures it is. Its prop is a `SignatureViewModel`, made by `signatureViewOf` from the service's answer.
+Typing a trigger character of the service's signature help, such as `(` or `,`, asks for the signatures of the call around the caret. `signature.invoke()` asks at once, as Mod+P does, and `close()` closes the card. `SignatureCard` draws the active signature with the active parameter in bold, its documentation, and which of several signatures it is. Its prop is a `SignatureViewModel`.
 
 ### Isolated snippet transforms
 

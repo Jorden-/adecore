@@ -28,7 +28,7 @@ A person who edits the patch breaks its counts. The reading goes on: a hunk whos
 
 ### Limits
 
-`limits` has `maxLines` (50,000 by default) and `maxCharacters` (4,000,000); `DEFAULT_PATCH_LIMITS` holds both. Past either one, `lines` ends and `truncated` is `true`. The lines after the cut have no role and the last section ends where the reading stopped.
+`limits` has `maxLines` (50,000 by default) and `maxCharacters` (4,000,000);  Past either one, `lines` ends and `truncated` is `true`. The lines after the cut have no role and the last section ends where the reading stopped.
 
 ```ts
 import { patchLayoutOf } from '@adecore/editor-react/models';

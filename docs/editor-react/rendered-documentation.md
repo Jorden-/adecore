@@ -34,7 +34,7 @@ The description is Markdown, then the tags are gathered by name in the order a r
 
 A type is written in braces, `{number}`, as JSDoc does. PHPDoc writes it without: `@param array<string, int> $filter`. It is read that way in a PHP document only, so `@returns The sum` in TypeScript stays text. `psalm-` and `phpstan-` prefixes read as the plain tag. A dash between a name and its text (TSDoc) is dropped.
 
-Inline `{@link Name}`, `{@link Name label}`, `{@link Name|label}`, `{@linkcode}`, `{@linkplain}` and `{@see}` are links, `{@code text}` is code. HTML is turned into Markdown for a small fixed set of elements (`p`, `br`, `b`, `strong`, `i`, `em`, `code`, `tt`, `kbd`, `pre`, `a`, `ul`, `ol`, `li`, `h1` to `h6`, `blockquote`, `hr`) and the entities `&lt;`, `&gt;`, `&amp;`, `&quot;`, `&#39;`, `&nbsp;` and the numeric ones. Nothing else is passed on: `script`, `style`, `iframe`, `img` and the like go with their content, attributes are never copied except the `href` of a link to `http`, `https` or `mailto`, and what is left over is drawn as text. The code never sets HTML from a comment. `parseDocComment(body, { php })`, `sectionsOf(tags)` and `htmlToMarkdown(text)` are the pure functions behind this.
+Inline `{@link Name}`, `{@link Name label}`, `{@link Name|label}`, `{@linkcode}`, `{@linkplain}` and `{@see}` are links, `{@code text}` is code. HTML is turned into Markdown for a small fixed set of elements (`p`, `br`, `b`, `strong`, `i`, `em`, `code`, `tt`, `kbd`, `pre`, `a`, `ul`, `ol`, `li`, `h1` to `h6`, `blockquote`, `hr`) and the entities `&lt;`, `&gt;`, `&amp;`, `&quot;`, `&#39;`, `&nbsp;` and the numeric ones. Nothing else is passed on: `script`, `style`, `iframe`, `img` and the like go with their content, attributes are never copied except the `href` of a link to `http`, `https` or `mailto`, and what is left over is drawn as text. The code never sets HTML from a comment.
 
 ## Switching
 
@@ -52,11 +52,11 @@ A link to a name is followed with Cmd (Ctrl elsewhere) held, as a definition is,
 
 The block uses the editor's code face for names and types and the interface face for prose, its colors from the theme, and is at most 520 pixels wide like a hover card. It stands at the indentation of the comment and is as tall as its content: the rows under it follow, and so does the scroll position. Folding a rendered comment shows the fold's own placeholder, and unfolding draws the formatted block again. Only the comments in view are drawn and parsed.
 
-`RenderedDocs` draws the formatted text into the elements the editor makes for the rows, and `LanguagePopups` mounts it. A host that draws its own popups mounts `RenderedDocs` beside them, or reads `language.renderedDocs.entries()` and draws each `RenderedDocEntry` into its `container`.
+`LanguagePopups` draws the formatted text into the elements the editor makes for the rows. A host that draws its own popups reads `language.renderedDocs.entries()` and draws each `RenderedDocEntry` into its `container`.
 
 ## Exports
 
-`RenderedDocsFeature` is the class behind `language.renderedDocs`, with `RenderedDocsSettings` for `configure` and `RenderedDocEntry` for `entries()`. The model is `parseDocComment` returning a `ParsedDocComment` of a description and `DocTagEntry`s, `sectionsOf` gathering them into `DocTagSection`s, `htmlToMarkdown`, and `DOC_LINK_PREFIX`, the start of the address a `{@link}` to a name gets in the Markdown until the view follows it.
+`RenderedDocsFeature` is the class behind `language.renderedDocs`, with `RenderedDocsSettings` for `configure` and `RenderedDocEntry` for `entries()`. The model is a `ParsedDocComment` of a description and `DocTagEntry`s, gathered into `DocTagSection`s.
 
 ## Replacing lines in the editor
 

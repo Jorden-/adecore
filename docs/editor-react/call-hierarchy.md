@@ -8,7 +8,7 @@ The callers of a symbol, or the symbols it calls, as a tree between the lines of
 
 The tree asks only when the service has `prepareCallHierarchy`, `incomingCalls` and `outgoingCalls` (all three are optional on [`LanguageService`](/lsp/language-service)) and `supports('textDocument/prepareCallHierarchy', uri)` is true, which is a server announcing `callHierarchyProvider`. `language.callHierarchy.supported` says so. Otherwise `open` shows a notification and asks nothing.
 
-A node asks the server for its calls when it is opened, once; folding it and opening it again uses the answer it has. The roots are opened as the tree opens. Requests of different nodes run side by side (`parallel: true`). The calls of a level keep the order the server gave them. A level draws at most `CALL_LEVEL_LIMIT` (50) calls and ends with a row that brings the next 50.
+A node asks the server for its calls when it is opened, once; folding it and opening it again uses the answer it has. The roots are opened as the tree opens. Requests of different nodes run side by side (`parallel: true`). The calls of a level keep the order the server gave them. A level draws at most 50 calls and ends with a row that brings the next 50.
 
 An answer for a tree that was closed, restarted in the other direction or opened again is dropped. When the service says the text moved on (`StaleResultError`) the tree closes, as it does when the text changes: a position into text that is gone leads nowhere.
 
@@ -22,7 +22,7 @@ The code on the right is the first call site (`fromRanges`) of the active row, o
 
 The editor keeps the focus, as in the peek. Up and Down move through the rows, Home and End go to the first and last. Right opens a closed node, asks again after a failure and steps into an open one; Left folds an open node and steps out of a closed one. Enter goes to the call, in this file or through the host's `openPlace`, and on the `Show more` row brings the next calls. Escape closes the tree, as does typing. Keys with a modifier stay the editor's.
 
-`select(id)`, `toggle(id)`, `showMore(parent)`, `retry(id)`, `setDirection(direction)`, `go(id)` and `close()` are the same actions for a host that draws its own tree from the `callHierarchy` field of `language.popups`, a `CallHierarchyView`. `CallHierarchyPanel` draws that view and portals into the editor widget row it owns, so opening a peek closes the tree and the other way round.
+`select(id)`, `toggle(id)`, `showMore(parent)`, `retry(id)`, `setDirection(direction)`, `go(id)` and `close()` are the same actions for a host that draws its own tree from the `callHierarchy` field of `language.popups`, a `CallHierarchyView`. The tree is drawn into the editor widget row it owns, so opening a peek closes the tree and the other way round.
 
 ## Accessibility
 
@@ -30,4 +30,4 @@ The tree is a `role="tree"` named `Call hierarchy`. A row is a `treeitem` with `
 
 ## Models
 
-The pure parts are in `@adecore/editor-react/models`: `rootsOf` makes the roots from the prepared items, `childrenOf` makes the nodes of an answer, `rowsOf` flattens the tree to the rows that are drawn, `stepsOf` keeps the rows a key can land on, `targetOf` is where a node goes, and `statusIdOf` and `moreIdOf` name the lines under a node. `CallNode`, `CallRow`, `CallDirection` and `CallLoad` are their types.
+`CallNode`, `CallRow`, `CallDirection` and `CallLoad` are the types of the nodes and rows.

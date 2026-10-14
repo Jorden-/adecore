@@ -1,7 +1,7 @@
 export { EditorLanguage, type EditorLanguageOptions } from './editor-language.ts';
 export { KEY_PRIORITY } from './key-priority.ts';
 export { realTimers, type Timers } from './timers.ts';
-export { DEFAULT_RANGE_LINES, DEFAULT_RANGE_CHARACTERS, type SemanticTokensOptions } from './semantic-tokens.ts';
+export { type SemanticTokensOptions } from './semantic-tokens.ts';
 export { ProjectLanguage, type FileOperationTarget } from './project-language.ts';
 export type { LanguageDocumentHandle } from './project-language.ts';
 export type {
@@ -19,27 +19,16 @@ export type { EditorViewProps } from './EditorView.tsx';
 export { LanguagePopups } from './LanguagePopups.tsx';
 export type { LanguagePopupsProps } from './LanguagePopups.tsx';
 export { AnchoredPopup } from './AnchoredPopup.tsx';
-export { HoverCard } from './HoverCard.tsx';
-export { CompletionPopup } from './CompletionPopup.tsx';
 export { SignatureCard } from './SignatureCard.tsx';
-export { RenameCard } from './RenameCard.tsx';
-export { PickPopup } from './PickPopup.tsx';
-export { PeekPanel } from './PeekPanel.tsx';
-export { CallHierarchyPanel } from './CallHierarchyPanel.tsx';
-export { SymbolPicker } from './SymbolPicker.tsx';
-export { CodeAuthorsCard } from './CodeAuthorsCard.tsx';
-export { RenderedDocs } from './RenderedDocs.tsx';
-export { RenderedDocsFeature } from './rendered-docs.ts';
+export { type RenderedDocsFeature } from './rendered-docs.ts';
 export type { RenderedDocEntry, RenderedDocsSettings } from './rendered-docs.ts';
-export { parseDocComment, sectionsOf, htmlToMarkdown, DOC_LINK_PREFIX } from './doc-comment-model.ts';
 export type { DocTagEntry, DocTagSection, ParsedDocComment } from './doc-comment-model.ts';
-export { EditorContextMenu } from './EditorContextMenu.tsx';
 export { EditorRenderingProvider } from './rendering.tsx';
 export type { EditorRendering } from './rendering-context.ts';
 export { FindReplace } from './FindReplace.tsx';
 export { ChangeReview } from './ChangeReview.tsx';
 export type { ChangeReviewProps } from './ChangeReview.tsx';
-export { ProjectProblems, serviceProblems, countsOf, compareRows } from './project-problems.ts';
+export { ProjectProblems, serviceProblems, countsOf } from './project-problems.ts';
 export type { ProblemFile, ProblemRow, ProblemReport, ProblemSource } from './project-problems.ts';
 export { applyWorkspaceEdit, supportedResourceOperations } from './workspace-edit.ts';
 export type { ProjectFiles, StagedFile, WorkspaceEditHost } from './workspace-edit.ts';
@@ -47,7 +36,6 @@ export { useProblemCounts } from './use-problem-counts.ts';
 export type { ProblemCounts } from './diagnostics.ts';
 export type { BlameSource, CodeVisionSettings } from './code-vision.ts';
 export type { HoverSettings } from './hover.ts';
-export type { Problem } from './diagnostics-model.ts';
 export type {
     PopupState,
     PopupStore,
@@ -71,8 +59,8 @@ export type {
 } from './popups.ts';
 export { RowHost, LineActionHost } from './row-host.ts';
 export type { HostedRow, HostedAction } from './row-host.ts';
-export { HighlightLayers, highlightLayers } from './highlight-layers.ts';
-export { NavigationHistory } from './navigation-history.ts';
+export { type HighlightLayers, highlightLayers } from './highlight-layers.ts';
+export { type NavigationHistory } from './navigation-history.ts';
 export type { Place } from './navigation-history.ts';
 export { openingPlace, viewStates, followViewStates, viewStateKey, forgetMovesFrom } from './view-state.ts';
 export type { ViewState, RevealLineRequest } from './view-state.ts';

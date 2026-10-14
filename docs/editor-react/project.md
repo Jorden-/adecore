@@ -72,7 +72,7 @@ A target is an absolute path, a file unless it is `{ path, directory: true }`. O
 
 Without `exists`, what `read` has no text for is of unknown existence. A move or delete of it is planned and the machine decides, `ignoreIfNotExists` cannot be honored, and a create or move onto it is planned as no overwrite, so `create` and `rename` must refuse a target that is there. A folder that only exists because an earlier move in the same edit made it is looked for where it was and refused.
 
-`WorkspaceEditHost` also takes `versionOf(uri)`, `isReadOnly(uri)` and `openUris()`. A read only editor is refused before any step runs, from `isReadOnly(uri)` or else the editor's own `isReadOnly()`; an editor that can say neither is found out when its step runs, and the steps before it stay applied. A failure halfway is never rolled back: the steps that ran stay done. The `resourceOperationsOf(edit)` model lists the files an edit makes, moves and deletes, as the rename card and the code action preview do.
+`WorkspaceEditHost` also takes `versionOf(uri)`, `isReadOnly(uri)` and `openUris()`. A read only editor is refused before any step runs, from `isReadOnly(uri)` or else the editor's own `isReadOnly()`; an editor that can say neither is found out when its step runs, and the steps before it stay applied. A failure halfway is never rolled back: the steps that ran stay done.
 
 ## Problems
 
@@ -92,4 +92,4 @@ const project = new ProjectLanguage(service, {
 });
 ```
 
-`compareRows` is the order of the rows. For the counts of one file, see [`useProblemCounts`](/editor-react/hover#problems).
+For the counts of one file, see [`useProblemCounts`](/editor-react/hover#problems).
