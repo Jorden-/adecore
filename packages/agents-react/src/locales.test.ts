@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'bun:test';
 import { AGENTS_LOCALES, AGENTS_NAMESPACES } from './locales';
@@ -7,13 +7,13 @@ const HERE = new URL('.', import.meta.url).pathname;
 
 function namespacesOn(language: string): string[] {
     return readdirSync(join(HERE, 'locales', language))
-        .filter((name) => name.endsWith('.json'))
-        .map((name) => name.slice(0, -'.json'.length))
+        .filter((name) => name.endsWith('.ts'))
+        .map((name) => name.slice(0, -'.ts'.length))
         .sort();
 }
 
-function read(language: string, namespace: string): unknown {
-    return JSON.parse(readFileSync(join(HERE, 'locales', language, `${namespace}.json`), 'utf8'));
+async function read(language: string, namespace: string): Promise<unknown> {
+    return ((await import(`./locales/${language}/${namespace}`)) as { default: unknown }).default;
 }
 
 function strings(value: unknown, prefix = ''): Array<[string, string]> {
@@ -38,9 +38,9 @@ describe('the words of @adecore/agents-react', () => {
         }
     });
 
-    test.each([...AGENTS_NAMESPACES])('Dutch has every key of %s English has, with the same placeholders, and no other', (namespace) => {
-        const english = new Map(strings(read('en', namespace)));
-        const dutch = new Map(strings(read('nl', namespace)));
+    test.each([...AGENTS_NAMESPACES])('Dutch has every key of %s English has, with the same placeholders, and no other', async (namespace) => {
+        const english = new Map(strings(await read('en', namespace)));
+        const dutch = new Map(strings(await read('nl', namespace)));
         expect([...dutch.keys()].sort()).toEqual([...english.keys()].sort());
         for (const [key, text] of english) {
             expect([key, placeholders(dutch.get(key) ?? '')]).toEqual([key, placeholders(text)]);

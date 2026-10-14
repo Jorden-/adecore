@@ -10,14 +10,14 @@ import {
     type ChatRequestMap,
     type ChatTransport
 } from '@adecore/agents-react';
-import chatEn from '@adecore/agents-react/locales/en/agent-chat.json';
-import promptsEn from '@adecore/agents-react/locales/en/agent-prompts.json';
-import providersEn from '@adecore/agents-react/locales/en/agent-providers.json';
-import usageEn from '@adecore/agents-react/locales/en/agent-usage.json';
-import chatNl from '@adecore/agents-react/locales/nl/agent-chat.json';
-import promptsNl from '@adecore/agents-react/locales/nl/agent-prompts.json';
-import providersNl from '@adecore/agents-react/locales/nl/agent-providers.json';
-import usageNl from '@adecore/agents-react/locales/nl/agent-usage.json';
+import chatEn from '@adecore/agents-react/locales/en/agent-chat';
+import promptsEn from '@adecore/agents-react/locales/en/agent-prompts';
+import providersEn from '@adecore/agents-react/locales/en/agent-providers';
+import usageEn from '@adecore/agents-react/locales/en/agent-usage';
+import chatNl from '@adecore/agents-react/locales/nl/agent-chat';
+import promptsNl from '@adecore/agents-react/locales/nl/agent-prompts';
+import providersNl from '@adecore/agents-react/locales/nl/agent-providers';
+import usageNl from '@adecore/agents-react/locales/nl/agent-usage';
 import { i18n } from './i18n.ts';
 import {
     ACCENTS,

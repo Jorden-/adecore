@@ -1,6 +1,7 @@
 import type { i18n as I18n } from 'i18next';
-import en from './locales/en.json' with { type: 'json' };
-import nl from './locales/nl.json' with { type: 'json' };
+/* The words are modules, not JSON: Node needs `with { type: 'json' }` on a JSON import, and a browser refuses it on the JavaScript Vite serves. */
+import en from './locales/en.ts';
+import nl from './locales/nl.ts';
 
 /* The words of this library live in a namespace of their own, which the app adds to its i18next beside its own namespaces. */
 export const UI_NAMESPACE = 'ui';

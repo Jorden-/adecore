@@ -44,7 +44,7 @@ The views read a chat from a store, never from the wire. A `ChatClient` fills th
 | `@adecore/agents-react/locales` | The words of the views, by namespace |
 | `@adecore/agents-react/testing` | Prompts in every state, for tests and demos |
 
-The [export reference](/agents-react/reference) lists every name; a module that no entry exports is internal. `DiffPool`, `EditDiff` and `UnifiedDiff` are named exports of `@adecore/agents-react/chat/ui`. Two entries are assets: `@adecore/agents-react/theme.css` and the words under `@adecore/agents-react/locales/<language>/<namespace>.json`.
+The [export reference](/agents-react/reference) lists every name; a module that no entry exports is internal. `DiffPool`, `EditDiff` and `UnifiedDiff` are named exports of `@adecore/agents-react/chat/ui`. Two entries hold data rather than names: `@adecore/agents-react/theme.css`, and the words under `@adecore/agents-react/locales/<language>/<namespace>`, a module whose default export is one namespace in one language.
 
 ## Where to go next
 

@@ -14,20 +14,21 @@ async function open(files: Files): Promise<Record<AgentsNamespace, Bundle>> {
     >;
 }
 
+/* The words are modules, not JSON: Node needs `with { type: 'json' }` on a JSON import, and a browser refuses it on the JavaScript Vite serves. */
 /* One loader per language that answers every namespace of it, so a bundler splits them and a window only downloads the language it shows. */
 export const AGENTS_LOCALES: Record<string, () => Promise<Record<AgentsNamespace, Bundle>>> = {
     en: () =>
         open({
-            'agent-chat': () => import('./locales/en/agent-chat.json', { with: { type: 'json' } }),
-            'agent-prompts': () => import('./locales/en/agent-prompts.json', { with: { type: 'json' } }),
-            'agent-providers': () => import('./locales/en/agent-providers.json', { with: { type: 'json' } }),
-            'agent-usage': () => import('./locales/en/agent-usage.json', { with: { type: 'json' } })
+            'agent-chat': () => import('./locales/en/agent-chat'),
+            'agent-prompts': () => import('./locales/en/agent-prompts'),
+            'agent-providers': () => import('./locales/en/agent-providers'),
+            'agent-usage': () => import('./locales/en/agent-usage')
         }),
     nl: () =>
         open({
-            'agent-chat': () => import('./locales/nl/agent-chat.json', { with: { type: 'json' } }),
-            'agent-prompts': () => import('./locales/nl/agent-prompts.json', { with: { type: 'json' } }),
-            'agent-providers': () => import('./locales/nl/agent-providers.json', { with: { type: 'json' } }),
-            'agent-usage': () => import('./locales/nl/agent-usage.json', { with: { type: 'json' } })
+            'agent-chat': () => import('./locales/nl/agent-chat'),
+            'agent-prompts': () => import('./locales/nl/agent-prompts'),
+            'agent-providers': () => import('./locales/nl/agent-providers'),
+            'agent-usage': () => import('./locales/nl/agent-usage')
         })
 };

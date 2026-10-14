@@ -5,7 +5,7 @@ import { parseHTML } from 'linkedom';
 import { createInstance } from 'i18next';
 import { I18nextProvider } from 'react-i18next';
 import type { ChatToolItem } from '@adecore/agent-contracts';
-import words from '../../locales/en/agent-chat.json';
+import words from '../../locales/en/agent-chat';
 import { AnsiOutput } from '../ui/AnsiOutput';
 import { WorkLiveRow } from '../ui/rows/WorkRows';
 import { ChatScopeContext, type ChatScope } from '../../scope';

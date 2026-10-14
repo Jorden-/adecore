@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import en from './locales/en.json';
-import nl from './locales/nl.json';
+import en from './locales/en.ts';
+import nl from './locales/nl.ts';
 
 const leavesOf = (value: unknown, prefix = ''): [string, unknown][] => {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {

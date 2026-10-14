@@ -42,7 +42,7 @@ Tool output, code and diffs take the colors of the terminal when the app imports
 
 ## Words
 
-Four namespaces hold the words, in English and Dutch: `agent-chat`, `agent-prompts`, `agent-providers` and `agent-usage` (`AGENTS_NAMESPACES`). `AGENTS_LOCALES.en()` and `AGENTS_LOCALES.nl()` load all four of a language, so a bundler splits them per language.
+Four namespaces hold the words, in English and Dutch: `agent-chat`, `agent-prompts`, `agent-providers` and `agent-usage` (`AGENTS_NAMESPACES`). `AGENTS_LOCALES.en()` and `AGENTS_LOCALES.nl()` load all four of a language, so a bundler splits them per language. To import one namespace by itself, `@adecore/agents-react/locales/<language>/<namespace>` has it as its default export.
 
 The components read the words through `react-i18next`, but some helpers call the default `i18next` instance directly. Add the words to that instance and pass the same instance to `UIProvider`:
 

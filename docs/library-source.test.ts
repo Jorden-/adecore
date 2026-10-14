@@ -11,7 +11,7 @@ test('docs resolve exact, nested, wildcard and asset source exports from workspa
     expect(resolve('@adecore/ui/testing/dedupe')).toEndWith('/packages/ui/src/testing/dedupe.ts');
     expect(resolve('@adecore/agents/chat')).toEndWith('/packages/agents/src/chat/index.ts');
     expect(resolve('@adecore/agents/providers/codex-models.json')).toEndWith('/packages/agents/src/providers/codex-models.json');
-    expect(resolve('@adecore/agents-react/locales/nl/agent-chat.json')).toEndWith('/packages/agents-react/src/locales/nl/agent-chat.json');
+    expect(resolve('@adecore/agents-react/locales/nl/agent-chat')).toEndWith('/packages/agents-react/src/locales/nl/agent-chat.ts');
     expect(resolve('@adecore/service/definitions')).toEndWith('/packages/service/src/definitions.ts');
     expect(resolve('@adecore/terminal/terminal.css')).toEndWith('/packages/terminal/src/terminal.css');
     expect(resolve('@adecore/ui-unknown')).toBeUndefined();

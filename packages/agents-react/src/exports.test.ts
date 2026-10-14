@@ -19,8 +19,8 @@ const ENTRIES: Record<string, string> = {
     './locales': 'locales.ts'
 };
 
-/* The exports that are data, not modules. */
-const ASSETS = ['./locales/*.json', './theme.css'];
+/* The exports that hold data rather than names, so no snapshot covers them. */
+const ASSETS = ['./locales/*', './theme.css'];
 
 type Statement = Program['body'][number];
 type Declaration = NonNullable<Extract<Statement, { type: 'ExportNamedDeclaration' }>['declaration']>;
