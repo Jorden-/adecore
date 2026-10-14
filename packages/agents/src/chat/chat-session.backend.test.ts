@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ChatInfo, ChatItem } from '@adecore/agent-contracts';
+import { abortedByEnd, abortedByMachine, type ChatInfo, type ChatItem } from '@adecore/agent-contracts';
 import { claudeProvider } from '../providers/claude-provider.ts';
 import { codexProvider } from '../providers/codex-provider.ts';
 import type { BackendEvent, BackendHost, BackendLaunch, ChatBackend, TurnInput } from './backend.ts';
@@ -80,6 +80,10 @@ function replacementRig(provider = claudeProvider, options: Partial<ChatSessionO
             failNextStart = true;
         }
     };
+}
+
+function turnOf(items: readonly ChatItem[], id: string): Extract<ChatItem, { kind: 'turn' }> {
+    return items.find((item): item is Extract<ChatItem, { kind: 'turn' }> => item.kind === 'turn' && item.id === id)!;
 }
 
 describe('backend replacement with live work', () => {
@@ -269,6 +273,27 @@ describe('backend replacement with live work', () => {
             }
             await run.session.dispose();
         }
+    });
+
+    test('ending the process leaves a note that tells the aborted turn from one a person stopped', async () => {
+        const stopped = replacementRig();
+        const { turnId } = stopped.session.send('start');
+        await flush();
+        stopped.session.cancel();
+        const stoppedTurn = turnOf(stopped.session.thread.list(), turnId);
+        expect(abortedByEnd(stoppedTurn, stopped.session.thread.list())).toBe(false);
+        await stopped.session.dispose();
+
+        const ended = replacementRig();
+        const second = ended.session.send('start');
+        await flush();
+        ended.session.end('Stopped with its children');
+        const items = ended.session.thread.list();
+        const endedTurn = turnOf(items, second.turnId);
+        expect(endedTurn).toMatchObject({ state: 'aborted' });
+        expect(abortedByEnd(endedTurn, items)).toBe(true);
+        expect(abortedByMachine(endedTurn, items)).toBe(false);
+        await ended.session.dispose();
     });
 
     test('native compaction refuses a settings replacement without opening a turn', async () => {

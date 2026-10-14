@@ -19,7 +19,7 @@ import type {
     ModelSelection,
     RuntimeMode
 } from '@adecore/agent-contracts';
-import { HOST_TASK_ORIGIN, notResumedNote } from '@adecore/agent-contracts';
+import { ENDED_NOTE_PREFIX, HOST_TASK_ORIGIN, notResumedNote } from '@adecore/agent-contracts';
 import { resolveUiChoice, UI_FENCE_LANGUAGE, UiFailure } from '@adecore/intelligent-ui';
 import type { ChatProvider } from '../providers/provider.ts';
 import type { LimitsUpdate } from '../usage/limits/normalize.ts';
@@ -1244,7 +1244,7 @@ export class ChatSession {
             }
         }
         if (turnId !== null) {
-            events.push(this.thread.upsert({ id: newId('note'), kind: 'note', createdAt: now, turnId, level: 'warning', text: reason }));
+            events.push(this.thread.upsert({ id: newId(`${ENDED_NOTE_PREFIX}note`), kind: 'note', createdAt: now, turnId, level: 'warning', text: reason }));
         }
         events.push(
             this.thread.patchInfo({

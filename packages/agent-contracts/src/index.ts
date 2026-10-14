@@ -120,6 +120,8 @@ export {
     ChatTurnItemSchema,
     notResumedNote,
     abortedByMachine,
+    ENDED_NOTE_PREFIX,
+    abortedByEnd,
     WAITING_NOTE_PREFIX,
     ChatNoteItemSchema,
     ChatCompactionItemSchema,

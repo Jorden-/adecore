@@ -50,7 +50,7 @@ A running tool's `progress.output` holds only the last `TOOL_OUTPUT_TAIL` UTF-16
 
 An `assistant` or `tool` item with a `parentToolUseId` is work a subagent did: draw it under that subagent, not as the chat's own answer. A subagent item's `itemsTruncated` says the thread holds only the start of its work; `chat.subagent` reads the rest from the CLI's own transcript. A workflow's agent has no call of its own, so `chat.subagent` names it as `workflowAgentRef(agentId)`, and `workflowAgentIdOf(ref)` reads the id back, or `null` for any other reference.
 
-A turn without `origin` was started by a person, and one without `attempt` ran on one process. A turn that a restart could not take up again is aborted with a warning note that `notResumedNote(reason)` writes; `abortedByMachine(turn, items)` tells such a turn from one a person stopped.
+A turn without `origin` was started by a person, and one without `attempt` ran on one process. A turn that a restart could not take up again is aborted with a warning note that `notResumedNote(reason)` writes; `abortedByMachine(turn, items)` tells such a turn from one a person stopped. A turn the host ended along with its chat, because the agent that opened the chat was stopped, is aborted with a warning note whose id starts with `ENDED_NOTE_PREFIX`; `abortedByEnd(turn, items)` recognizes it.
 
 The schema for each kind is exported on its own (`ChatUserItemSchema` up to `ChatCompactionItemSchema`), with a type for each (`ChatUserItem` up to `ChatCompactionItem`).
 

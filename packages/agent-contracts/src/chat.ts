@@ -637,6 +637,14 @@ export function abortedByMachine(
     );
 }
 
+/* The id prefix of the note a host leaves in a turn it ended because the agent that opened the chat was stopped. */
+export const ENDED_NOTE_PREFIX = 'ended-';
+
+/* Whether the host ended this aborted turn along with its chat, which no person stopped and a person did not ask to be sent on. */
+export function abortedByEnd(turn: { id: string; state: string }, items: readonly { id: string; kind: string; turnId: string | null }[]): boolean {
+    return turn.state === 'aborted' && items.some((item) => item.kind === 'note' && item.turnId === turn.id && item.id.startsWith(ENDED_NOTE_PREFIX));
+}
+
 /* The id prefix of the note a host leaves in a parent about a child that waits on a request. */
 export const WAITING_NOTE_PREFIX = 'waiting-';
 
