@@ -172,7 +172,24 @@ describe('TextField and Select', () => {
     });
 
     test('falls back to the label and the options, never the typed value', () => {
-        expect(block(FORM).fallback).toBe('Name\nBug\nIdea\nSend\nReport bug from Ada');
+        expect(block(FORM).fallback).toBe('Name\nBug (chosen)\nIdea\nSend\nReport bug from Ada');
+    });
+
+    test('a dropdown and a segmented control say which option they start on, and a bare value of no option marks none', () => {
+        expect(block('<Segmented value="all"><Option value="failed">Failed</Option><Option value="all">All</Option></Segmented>').fallback).toBe(
+            'Failed\nAll (chosen)'
+        );
+        expect(block('$kind = 2\n<Select value={$kind}>Kind<Option value={1}>Bug</Option><Option value={2}>Idea</Option></Select>').fallback).toBe(
+            'Kind\nBug\nIdea (chosen)'
+        );
+        expect(block('<Select value="other"><Option value="a">A</Option></Select>').fallback).toBe('A');
+    });
+
+    test('a select keeps the text beside its options as its label', () => {
+        const compiled = block(FORM.replace('<Select value={$kind}>', '<Select value={$kind}>Kind of report'));
+        expect(compiled.diagnostics).toEqual([]);
+        const select = evaluateUiBlock(compiled).nodes[1];
+        expect(select.children.filter((child) => child.type === '$text').map((child) => child.props.text)).toEqual(['Kind of report']);
     });
 });
 

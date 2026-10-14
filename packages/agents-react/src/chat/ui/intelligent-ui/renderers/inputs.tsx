@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { UiProps } from '@adecore/intelligent-ui';
 import { Button, Checkbox, Input, Segmented, Select, Slider, Switch, Tooltip } from '@adecore/ui';
 import { formatNumber } from '@adecore/ui/format';
-import { uiChildrenOf, uiNodeLabel, uiWithUnit } from '../node-text';
+import { uiChildrenOf, uiNodeLabel, uiOwnLabel, uiWithUnit } from '../node-text';
 import type { UiRendererProps } from '../render-context';
 import { useTruncated } from '../use-truncated';
 import { bindingOf, PENDING } from './binding';
@@ -142,6 +142,8 @@ export function TextFieldRenderer({ node, children, context }: UiRendererProps<U
     const binding = bindingOf(node, context);
     const { maxLength = DEFAULT_MAX_LENGTH, placeholder } = node.props;
     const value = binding?.value ?? node.props.value;
+    const countId = `${id}-count`;
+    const counting = value.length >= maxLength * COUNT_FROM;
     return (
         <div className={clsx('flex flex-col gap-1 px-2', !node.complete && PENDING)}>
             <label htmlFor={id} className="text-sm text-text-muted">
@@ -150,14 +152,16 @@ export function TextFieldRenderer({ node, children, context }: UiRendererProps<U
             <Input
                 id={id}
                 value={value}
+                size="sm"
                 maxLength={maxLength}
                 placeholder={placeholder}
                 disabled={binding === null}
+                aria-describedby={counting ? countId : undefined}
                 className="max-w-96"
                 onChange={(event) => binding?.onValueChange(event.target.value)}
             />
-            {value.length >= maxLength * COUNT_FROM && (
-                <span className="text-xs text-text-faint tabular-nums">
+            {counting && (
+                <span id={countId} className="text-xs text-text-faint tabular-nums">
                     {t('blocks.textField.count', { used: formatNumber(value.length), max: formatNumber(maxLength) })}
                 </span>
             )}
@@ -165,18 +169,23 @@ export function TextFieldRenderer({ node, children, context }: UiRendererProps<U
     );
 }
 
-/* Left aligned, never the full width. Like Segmented, each Option is an item by its place, since a value may be any scalar. */
+/*
+ * Left aligned, never the full width. Like Segmented, each Option is an item by its place, since a value may be any scalar.
+ * The text beside its options is its label, drawn above it and read as its name.
+ */
 export function SelectRenderer({ node, context }: UiRendererProps<UiProps<'Select'>>) {
     const { t } = useTranslation('agent-chat');
     const binding = bindingOf(node, context);
     const current = binding?.value ?? node.props.value;
     const options = uiChildrenOf(node, 'Option').map((option, index) => ({ id: String(index), label: uiNodeLabel(option), value: option.props.value }));
+    const label = uiOwnLabel(node);
     return (
-        <div className={clsx('flex px-2', !node.complete && PENDING)}>
+        <div className={clsx('flex flex-col items-start gap-1 px-2', !node.complete && PENDING)}>
+            {label !== '' && <span className="text-sm text-text-muted">{label}</span>}
             <Select
                 value={options.find((option) => option.value === current)?.id ?? null}
                 items={options.map((option) => ({ value: option.id, label: option.label }))}
-                label={t('blocks.options')}
+                label={label === '' ? t('blocks.options') : label}
                 disabled={binding === null || options.length === 0}
                 onValueChange={(id) => {
                     const option = options[Number(id)];

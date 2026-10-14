@@ -2,7 +2,7 @@ import { safeKey, UI_LIMITS, UiBudget, UiFailure, type UiLimits } from './budget
 import { isUiComponent, UI_CATALOG, UI_CATALOG_VERSION } from './catalog.ts';
 import { uiActionProp, uiActionTarget, uiLocalState } from './actions.ts';
 import { uiNodeFallback, uiPlainText } from './fallback.ts';
-import { evaluateUiExpression, type UiExpression, type UiValue } from './expression.ts';
+import { evaluateUiExpression, sameUiValue, type UiExpression, type UiValue } from './expression.ts';
 import { parseUiSyntax, uiDiagnostic, type UiDiagnostic, type UiSyntaxNode } from './syntax.ts';
 import { type z } from 'zod';
 
@@ -335,7 +335,17 @@ export function compileUiBlock(source: string, options: UiCompileOptions): UiBlo
         }
         const effectiveParent = syntax.type === 'Show' || syntax.type === 'Each' ? parent : syntax.type;
         node.children = syntax.children.map((child) => compile(child, depth + 1, effectiveParent));
-        const childText = node.children.map((child) => child.fallback).join('');
+        // A reader of the fallback has no control to look at, so the option a dropdown or a segmented control starts on says it is chosen.
+        const chosen = syntax.type === 'Select' || syntax.type === 'Segmented' ? fallbackProps.value : undefined;
+        const childText = node.children
+            .map((child) =>
+                syntax.type === 'Select' && child.type === '$text' && child.fallback.trim() !== ''
+                    ? `${child.fallback.trim()}\n`
+                    : chosen !== undefined && child.type === 'Option' && !child.error && sameUiValue(child.props.value, chosen)
+                      ? `${child.fallback.trimEnd()} (chosen)\n`
+                      : child.fallback
+            )
+            .join('');
         node.fallback = uiNodeFallback(syntax.type, fallbackProps, childText);
         // A part drawn as its text keeps the words written inside it, also where its kind reads only props.
         if (node.error !== undefined && childText.trim() !== '' && !node.fallback.includes(childText.trim())) {

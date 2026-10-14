@@ -99,6 +99,9 @@ export function GalleryRenderer({ node, children }: UiRendererProps<UiProps<'Gal
 // The shape of the frame until the first picture reports its own.
 const COMPARE_ASPECT = 4 / 3;
 
+/* The tallest a comparison stands, in pixels: `max-h-96`. */
+const COMPARE_MAX_HEIGHT = 384;
+
 /*
  * Two attachments in one frame, shaped like the first. The split is only this renderer's state. With one
  * attachment gone the other stands alone with the reason; with both gone the thumbnail says why.
@@ -114,6 +117,8 @@ export function CompareRenderer({ node, children, context }: UiRendererProps<UiP
     const [split, setSplit] = useState(0.5);
     const [aspect, setAspect] = useState(COMPARE_ASPECT);
     const caption = uiNodeLabel(node);
+    // Each picture is named by its side and by what the whole comparison shows.
+    const describe = (side: string): string => (caption === '' ? side : `${side}: ${caption}`);
     const loading = (source: typeof first) => source.url === null && source.failure === null;
     const label = t('blocks.compare.label', { before: beforeLabel, after: afterLabel });
     let body: ReactNode;
@@ -121,7 +126,11 @@ export function CompareRenderer({ node, children, context }: UiRendererProps<UiP
         body = <ImageThumb source={{ url: null, failure: null }} alt={label} aspect={COMPARE_ASPECT} />;
     } else if (first.url !== null && second.url !== null) {
         body = (
-            <div className="relative w-full max-h-96 overflow-hidden rounded-lg border border-border bg-surface-sunken" style={{ aspectRatio: aspect }}>
+            // The frame keeps the picture's shape inside its tallest height: past it the width follows, so a portrait picture is not letterboxed.
+            <div
+                className="relative max-h-96 overflow-hidden rounded-lg border border-border bg-surface-sunken"
+                style={{ aspectRatio: aspect, width: `min(100%, ${COMPARE_MAX_HEIGHT * aspect}px)` }}
+            >
                 <Wipe
                     value={split}
                     onValueChange={setSplit}
@@ -129,7 +138,7 @@ export function CompareRenderer({ node, children, context }: UiRendererProps<UiP
                     before={
                         <img
                             src={first.url}
-                            alt={beforeLabel}
+                            alt={describe(beforeLabel)}
                             draggable={false}
                             className="size-full object-contain select-none"
                             onLoad={(event) => {
@@ -140,7 +149,7 @@ export function CompareRenderer({ node, children, context }: UiRendererProps<UiP
                             }}
                         />
                     }
-                    after={<img src={second.url} alt={afterLabel} draggable={false} className="size-full object-contain select-none" />}
+                    after={<img src={second.url} alt={describe(afterLabel)} draggable={false} className="size-full object-contain select-none" />}
                 />
                 <CompareChip side="left" label={beforeLabel} />
                 <CompareChip side="right" label={afterLabel} />
@@ -149,7 +158,7 @@ export function CompareRenderer({ node, children, context }: UiRendererProps<UiP
     } else if (first.url === null && second.url === null) {
         body = <ImageThumb source={first} alt={label} aspect={COMPARE_ASPECT} />;
     } else {
-        const shown = first.url !== null ? { source: first, name: beforeLabel } : { source: second, name: afterLabel };
+        const shown = first.url !== null ? { source: first, name: describe(beforeLabel) } : { source: second, name: describe(afterLabel) };
         body = (
             <>
                 <ImageThumb source={shown.source} alt={shown.name} className="max-h-70 max-w-full object-contain" />

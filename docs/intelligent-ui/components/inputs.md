@@ -78,7 +78,7 @@ Choose one value. `Segmented` holds only `Option`, and binds the chosen option's
 
 ## Select
 
-Choose one value from a dropdown, for more or longer options than a `Segmented` holds. `Select` holds only `Option` and binds the chosen option's value, as `Segmented` does; see [Segmented and Option](#segmented-and-option) for the option. A person can only pick one of its options, and a Choice refuses a value no option offers. It carries no label of its own, so put a line of prose or a `Summary` before it that says what the choice is for.
+Choose one value from a dropdown, for more or longer options than a `Segmented` holds. `Select` holds only `Option` and binds the chosen option's value, as `Segmented` does; see [Segmented and Option](#segmented-and-option) for the option. A person can only pick one of its options, and a Choice refuses a value no option offers. Text written beside its options is its label: the renderer draws it above the dropdown and gives it to a screen reader as the name, so write `<Select value={$kind}>Kind of report<Option ...>`. Without one the dropdown is only called `Options`, so give it a label.
 
 | Prop    | Type   | Required | Notes    |
 | ------- | ------ | -------- | -------- |

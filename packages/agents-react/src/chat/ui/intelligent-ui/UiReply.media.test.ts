@@ -15,7 +15,7 @@ test.skipIf(typeof document === 'undefined')('the arrows move the comparison onl
     const element = document.createElement('div');
     document.body.append(element);
     const root = createRoot(element);
-    const key = (target: Element, name: string) =>
+    const key = (target: EventTarget, name: string) =>
         act(async () => {
             target.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }));
         });
@@ -31,9 +31,14 @@ test.skipIf(typeof document === 'undefined')('the arrows move the comparison onl
         );
         const handle = () => element.querySelector('[role="slider"]')!;
         expect(handle().getAttribute('aria-valuenow')).toBe('50');
-        await key(element.querySelector('figure')!, 'ArrowRight');
-        await key(element.querySelector('img')!, 'ArrowRight');
+        // A key goes to the focused element only. Nothing here has the focus, so a listener anywhere else (the window, the frame, a sibling) must not move the split.
+        expect(document.activeElement).not.toBe(handle());
+        for (const target of [window, document, document.body, element.querySelector('figure')!, handle().parentElement!, element.querySelector('img')!]) {
+            await key(target, 'ArrowRight');
+        }
         expect(handle().getAttribute('aria-valuenow')).toBe('50');
+        await act(async () => (handle() as HTMLElement).focus());
+        expect(document.activeElement).toBe(handle());
         await key(handle(), 'ArrowRight');
         expect(handle().getAttribute('aria-valuenow')).toBe('52');
         await key(handle(), 'ArrowLeft');

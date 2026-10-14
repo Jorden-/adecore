@@ -172,7 +172,7 @@ export const UI_CATALOG = {
     Segmented: { group: 'inputs', description: 'Choose one local value.', schema: z.strictObject({ value: scalar }), children: ['Option'], binding: 'value' },
     Select: {
         group: 'inputs',
-        description: 'Choose one local value from a dropdown; for more or longer options than Segmented holds.',
+        description: 'Choose one local value from a dropdown, for more or longer options than Segmented holds; the text beside its Options is its label.',
         schema: z.strictObject({ value: scalar }),
         children: ['Option'],
         binding: 'value'
