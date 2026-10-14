@@ -45,7 +45,23 @@ An app that links a checkout of the library (see [Getting started](/ui/guide/get
 preload = ["@adecore/ui/testing/dedupe", "./test-preload.ts"]
 ```
 
-It loads every file of `react`, `react-dom`, `i18next`, `react-i18next` and `@base-ui/react` inside the checkout as a stand-in for the same file in the app's copy. The app's copy is the one the folder `bun test` runs in resolves to, or else the one of the first workspace that depends on the library. A package the checkout has no copy of is left alone, so the preload does nothing once the library comes from the registry.
+It loads every file of these packages inside the checkout as a stand-in for the same file in the app's copy:
+
+- `react`, `react-dom`, `i18next`, `react-i18next` and `@base-ui/react`, which every package of the library shares with the page.
+- `@codemirror/*` and `@lezer/*`. CodeMirror rejects an extension or a facet made by a second copy, with "multiple instances of @codemirror/state", and the chat views take editor extensions from the app.
+- `shiki`, for a highlighter the app hands to the chat views.
+
+The checkout's copies are those of every package in its repository, so a linked chat package counts as much as `@adecore/ui`. The app's copy is the one the folder `bun test` runs in resolves to, or else the one of the first workspace that depends on the library. A package the app has no copy of is left alone, and so is everything once the library comes from the registry, where the package manager already decided what to share.
+
+An app adds names in its own `package.json`, the one in the folder `bun test` runs in or in a workspace that depends on the library. `@scope/*` stands for every package of a scope, here as in the built-in list:
+
+```json
+{
+    "adecore": {
+        "dedupe": ["@xterm/*", "yjs"]
+    }
+}
+```
 
 A bunfig at the root of a monorepo with an isolated install may not resolve the package itself, since only the workspace depends on it. Point at the file through the workspace instead:
 

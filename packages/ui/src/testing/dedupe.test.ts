@@ -69,3 +69,99 @@ describe('the dedupe preload', () => {
         expect(passed).toBe(true);
     });
 });
+
+/*
+ * A linked checkout as a monorepo: another of its packages holds the copies, as a chat package holds
+ * CodeMirror. Each package says which copy it is, so a run reports the copy every import lands on.
+ */
+describe('the dedupe preload over every package of the checkout', () => {
+    let fixture: string;
+
+    const fakePackage = (folder: string, name: string, body: string, exports: Record<string, string> = { '.': './index.js' }): void => {
+        mkdirSync(folder, { recursive: true });
+        writeFileSync(join(folder, 'package.json'), JSON.stringify({ name, type: 'module', exports }));
+        writeFileSync(join(folder, 'index.js'), body);
+    };
+
+    const copyOfName = (folder: string, name: string, copy: string): void =>
+        fakePackage(join(folder, 'node_modules', name), name, `export const copy = '${copy}';\n`);
+
+    const fakeLibrary = (folder: string): void => {
+        fakePackage(folder, '@adecore/ui', "export { copy as state } from '@codemirror/state';\n", {
+            '.': './index.js',
+            './testing/dedupe': './src/testing/dedupe.ts'
+        });
+        mkdirSync(join(folder, 'src', 'testing'), { recursive: true });
+        cpSync(join(import.meta.dir, 'dedupe.ts'), join(folder, 'src', 'testing', 'dedupe.ts'));
+    };
+
+    const fakeApp = (folder: string, body: string[]): void => {
+        copyOfName(folder, '@codemirror/state', 'app');
+        copyOfName(folder, '@acme/store', 'app');
+        writeFileSync(join(folder, 'copies.test.ts'), ["import { test } from 'bun:test';", ...body].join('\n'));
+    };
+
+    /* What a run prints, with the preload or without it, and with what the app adds to the list. */
+    const run = (folder: string, preload: boolean, dedupe?: string[]): string => {
+        const manifest = {
+            name: 'app',
+            private: true,
+            dependencies: { '@adecore/ui': 'link:@adecore/ui' },
+            ...(dedupe === undefined ? {} : { adecore: { dedupe } })
+        };
+        writeFileSync(join(folder, 'package.json'), JSON.stringify(manifest));
+        writeFileSync(join(folder, 'bunfig.toml'), preload ? '[test]\npreload = ["@adecore/ui/testing/dedupe"]\n' : '');
+        const result = Bun.spawnSync([process.execPath, 'test'], { cwd: folder, stdout: 'pipe', stderr: 'pipe' });
+        return `${result.stdout.toString()}${result.stderr.toString()}`;
+    };
+
+    beforeAll(() => {
+        fixture = mkdtempSync(join(tmpdir(), 'adecore-ui-dedupe-scoped-'));
+
+        const checkout = join(fixture, 'checkout');
+        mkdirSync(checkout, { recursive: true });
+        writeFileSync(join(checkout, 'package.json'), JSON.stringify({ name: 'checkout', private: true, workspaces: ['packages/*'] }));
+        fakeLibrary(join(checkout, 'packages', 'ui'));
+        const chat = join(checkout, 'packages', 'chat');
+        fakePackage(chat, '@adecore/chat', "export { copy as state } from '@codemirror/state';\nexport { copy as store } from '@acme/store';\n");
+        copyOfName(chat, '@codemirror/state', 'checkout');
+        copyOfName(chat, '@acme/store', 'checkout');
+
+        const linked = join(fixture, 'linked');
+        fakeApp(linked, [
+            "import { copy } from '@codemirror/state';",
+            "import { state, store } from '@adecore/chat';",
+            "test('copies', () => console.log(`app=${copy} checkout=${state} store=${store}`));"
+        ]);
+        mkdirSync(join(linked, 'node_modules', '@adecore'), { recursive: true });
+        symlinkSync(join(checkout, 'packages', 'ui'), join(linked, 'node_modules', '@adecore', 'ui'));
+        symlinkSync(chat, join(linked, 'node_modules', '@adecore', 'chat'));
+
+        const installed = join(fixture, 'installed');
+        fakeApp(installed, ["import { state } from '@adecore/ui';", "test('copies', () => console.log(`library=${state}`));"]);
+        const library = join(installed, 'node_modules', '@adecore', 'ui');
+        fakeLibrary(library);
+        copyOfName(library, '@codemirror/state', 'nested');
+    });
+
+    afterAll(() => {
+        rmSync(fixture, { recursive: true, force: true });
+    });
+
+    test('a linked checkout loads its own copy of a scoped package without it', () => {
+        expect(run(join(fixture, 'linked'), false)).toContain('app=app checkout=checkout');
+    });
+
+    test('the app and the checkout land on the app copy of a package in a scope of the list', () => {
+        expect(run(join(fixture, 'linked'), true)).toContain('app=app checkout=app');
+    });
+
+    test('a name the app adds in its package.json joins the list', () => {
+        expect(run(join(fixture, 'linked'), true)).toContain('store=checkout');
+        expect(run(join(fixture, 'linked'), true, ['@acme/*'])).toContain('store=app');
+    });
+
+    test('a library installed from the registry keeps the copy it holds', () => {
+        expect(run(join(fixture, 'installed'), true, ['@acme/*'])).toContain('library=nested');
+    });
+});
