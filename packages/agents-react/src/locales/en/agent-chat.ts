@@ -595,6 +595,9 @@ export default {
         sources: 'Sources',
         citation: 'Source {{number}}: {{title}}',
         outsideProject: 'Outside the project, shown as text',
+        textField: {
+            count: '{{used}} of {{max}} characters'
+        },
         options: 'Options',
         choices: 'Choices',
         checklist: 'Checklist',

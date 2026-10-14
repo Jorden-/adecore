@@ -595,6 +595,9 @@ export default {
         sources: 'Bronnen',
         citation: 'Bron {{number}}: {{title}}',
         outsideProject: 'Buiten het project, als tekst getoond',
+        textField: {
+            count: '{{used}} van {{max}} tekens'
+        },
         options: 'Opties',
         choices: 'Keuzes',
         checklist: 'Checklijst',

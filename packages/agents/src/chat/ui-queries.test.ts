@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test';
 import { z } from 'zod';
 import type { ChatAssistantItem, ChatEvent, ChatInfo } from '@adecore/agent-contracts';
-import { compileUiBlock, resolveUiChoice } from '@adecore/intelligent-ui';
+import { compileUiBlock, resolveUiChoice, uiQueryArguments } from '@adecore/intelligent-ui';
 import { claudeProvider } from '../providers/claude-provider.ts';
 import { ChatSession } from './chat-session.ts';
 import { ChatUiQueries, ChatUiRefusal, type ChatUiHost } from './ui-queries.ts';
@@ -258,6 +258,38 @@ describe('reading again', () => {
         expect((await r.queries.query(r.session, { ...payload, values: { $limit: 5 } })).state).toBe('fresh');
         setSystemTime(new Date(500));
         expect(await r.queries.query(r.session, { ...payload, values: { $limit: 6 } })).toMatchObject({ state: 'failed', code: 'refresh-limit' });
+        expect(r.counts().reads).toBe(2);
+    });
+});
+
+describe('a query that reads a text field', () => {
+    afterEach(() => {
+        setSystemTime();
+    });
+
+    test('reads again after the text changed, once the interval between two reads has passed, and refuses a text past its limit', async () => {
+        const r = rig();
+        const block = {
+            ...compileUiBlock('$q = "a"\n$rows = @Query("status", {repo: $q})\n<TextField value={$q} maxLength={5}>Repository</TextField>', {
+                id: 'block',
+                final: true,
+                querySchemas: { status: r.queries.schemas.status! }
+            }),
+            revision: 'rev'
+        };
+        expect(block.diagnostics).toEqual([]);
+        r.session.thread.upsert({ ...r.item, ui: [block] });
+        const payload = { ...r.payload, query: '$rows' };
+        setSystemTime(new Date(0));
+        expect((await r.queries.query(r.session, payload)).state).toBe('fresh');
+        setSystemTime(new Date(100));
+        expect(await r.queries.query(r.session, { ...payload, values: { $q: 'ab' } })).toMatchObject({ state: 'failed', code: 'refresh-limit' });
+        setSystemTime(new Date(400));
+        expect((await r.queries.query(r.session, { ...payload, values: { $q: 'abc' } })).state).toBe('fresh');
+        expect(uiQueryArguments(block, '$rows', { $q: 'abc' })).toEqual({ repo: 'abc' });
+        expect(r.counts().reads).toBe(2);
+        setSystemTime(new Date(800));
+        expect((await r.queries.query(r.session, { ...payload, values: { $q: 'abcdef' } })).state).toBe('refused');
         expect(r.counts().reads).toBe(2);
     });
 });

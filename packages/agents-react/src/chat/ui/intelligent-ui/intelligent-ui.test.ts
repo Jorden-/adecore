@@ -63,7 +63,7 @@ const REVIEW =
 describe('the registry of intelligent UI renderers', () => {
     test('accounts for every catalog name, and only those', () => {
         expect(Object.keys(UI_RENDERERS).sort()).toEqual(Object.keys(UI_CATALOG).sort());
-        expect(Object.keys(UI_RENDERERS)).toHaveLength(40);
+        expect(Object.keys(UI_RENDERERS)).toHaveLength(42);
         const empty = Object.entries(UI_RENDERERS)
             .filter(([, renderer]) => renderer === null)
             .map(([name]) => name)
@@ -254,6 +254,34 @@ describe('local inputs', () => {
         );
         expect(markup('$mode = "a"\n<Segmented value={$mode}><Option value="a">One</Option><Option value="b">Two</Option></Segmented>')).not.toContain(
             'aria-orientation'
+        );
+    });
+
+    test('a text field is a labeled input that stops at its limit and counts only when it nears it', () => {
+        const field = (value: string, extra = '') => `$q = "${value}"\n<TextField value={$q} maxLength={10} placeholder="Name"${extra}>Who</TextField>`;
+        const html = markup(field('Ada'));
+        expect(html).toMatch(/<label for="[^"]+" class="text-sm text-text-muted">Who<\/label>/);
+        expect(html).toContain('maxLength="10"');
+        expect(html).toContain('placeholder="Name"');
+        expect(html).toContain('value="Ada"');
+        expect(html).not.toContain('characters');
+        expect(markup(field('Ada Lovela'))).toContain('10 of 10 characters');
+        expect(markup(field('Ada Love'))).toContain('8 of 10 characters');
+        expect(markup('$q = ""\n<TextField value={$q}>Who</TextField>')).toContain('maxLength="256"');
+        expect(markup(field('Ada'), { answer: { choiceId: 'other', state: 'sent' } })).toContain('disabled');
+        expect(markup('$q = "Ada"\n<TextField value={$q}>Who', {}, false)).toContain('opacity-60');
+    });
+
+    test('a select shows the label of the chosen option, stays a trigger, and closes without a binding or an option', () => {
+        const source = '$kind = "idea"\n<Select value={$kind}><Option value="bug">Bug</Option><Option value="idea">Idea</Option></Select>';
+        const html = markup(source);
+        expect(html).toContain('aria-label="Options"');
+        expect(html).toContain('Idea');
+        expect(html).not.toContain('data-disabled=""');
+        expect(markup(source, { answer: { choiceId: 'other', state: 'sent' } })).toContain('data-disabled=""');
+        const readOnly = { ...evaluate('<Select value="bug"><Option value="bug">Bug</Option></Select>').nodes[0]!, bindings: {} };
+        expect(renderToStaticMarkup(createElement(UI_RENDERERS.Select as Drawable<UiRendererProps<unknown>>, { node: readOnly, context: CONTEXT }))).toContain(
+            'data-disabled=""'
         );
     });
 

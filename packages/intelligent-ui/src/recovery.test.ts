@@ -107,6 +107,8 @@ const PRESENTATIONAL: Partial<Record<UiComponentName, readonly string[]>> = {
     Switch: ['value'],
     Slider: ['value', 'min', 'max', 'step', 'unit'],
     Segmented: ['value'],
+    Select: ['value'],
+    TextField: ['value', 'maxLength', 'placeholder'],
     Option: ['value'],
     Show: ['when'],
     Each: ['items', 'as']

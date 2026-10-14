@@ -141,7 +141,22 @@ export const UI_CATALOG = {
         binding: 'value'
     },
     Segmented: { group: 'inputs', description: 'Choose one local value.', schema: z.strictObject({ value: scalar }), children: ['Option'], binding: 'value' },
-    Option: { group: 'inputs', description: 'One local alternative.', schema: z.strictObject({ value: scalar }), parent: 'Segmented' },
+    Select: {
+        group: 'inputs',
+        description: 'Choose one local value from a dropdown; for more or longer options than Segmented holds.',
+        schema: z.strictObject({ value: scalar }),
+        children: ['Option'],
+        binding: 'value'
+    },
+    Option: { group: 'inputs', description: 'One local alternative.', schema: z.strictObject({ value: scalar }), parent: ['Segmented', 'Select'] },
+    TextField: {
+        group: 'inputs',
+        description: 'A line of local text up to maxLength characters (256 without one, at most 1024); children are the label.',
+        schema: z
+            .strictObject({ value: text, maxLength: z.number().int().min(1).max(1024).optional(), placeholder: text.max(128).optional() })
+            .refine((props) => props.value.length <= (props.maxLength ?? 256), 'Value must not be longer than maxLength.'),
+        binding: 'value'
+    },
     Button: {
         group: 'inputs',
         description: 'Run one local state action when pressed; children are the label.',

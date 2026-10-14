@@ -98,7 +98,8 @@ const EXAMPLES = [
     '$rows = [{name: "Core"}, {name: "Client"}]\n<EntityList><Each items={$rows} as="row"><Entry label={row.name}>Ready</Entry></Each></EntityList>',
     '<Image generated="latest" alt="A rabbit"/><Steps><Step state="done">Built</Step><Step state="pending">Review</Step></Steps>',
     '<Timeline><Event at="14:02" tone="warning" detail="p95 above 2 s">Alert fired</Event><Event at="2026-10-14T14:09:00Z">Rolled back</Event></Timeline>',
-    '<Gallery><Image attachment="a1" alt="Login">Before</Image><Image attachment="a2" alt="Home"/></Gallery><Compare before="a1" after="a2" beforeLabel="Old">Header</Compare>'
+    '<Gallery><Image attachment="a1" alt="Login">Before</Image><Image attachment="a2" alt="Home"/></Gallery><Compare before="a1" after="a2" beforeLabel="Old">Header</Compare>',
+    '$q = "ada"\n$kind = "bug"\n<TextField value={$q} maxLength={32} placeholder="Name">Who</TextField><Select value={$kind}><Option value="bug">Bug</Option><Option value="idea">Idea</Option></Select>'
 ];
 
 describe('streaming compiler', () => {
@@ -111,7 +112,7 @@ describe('streaming compiler', () => {
             expect(evaluated.nodes.length).toBeGreaterThan(0);
             expect(compiled.fallback).not.toBe('');
         }
-        expect(Object.keys(UI_CATALOG)).toHaveLength(40);
+        expect(Object.keys(UI_CATALOG)).toHaveLength(42);
         expect(uiCatalogText()).toContain('Image(attachment?, generated?, alt?)');
         expect(uiCatalogText()).toContain('Button(action, disabled?)');
     });

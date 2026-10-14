@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { compileUiBlock } from './compiler.ts';
-import { evaluateUiBlock } from './runtime.ts';
+import { evaluateUiBlock, resolveUiChoice, UiState } from './runtime.ts';
+import { UI_CATALOG } from './catalog.ts';
 
 function block(source: string, final = true) {
     return compileUiBlock(source, { id: 'chat:item:block', final, limits: { milliseconds: 5000 } });
@@ -116,5 +117,60 @@ describe('Gallery and Compare', () => {
         );
         expect(block('<Compare before="a1" after="a2">Header color</Compare>').fallback).toBe('[Compare: Before a1, After a2] Header color');
         expect(block('<Compare before="a1" after="a2" beforeLabel="Old" afterLabel="New"/>').fallback).toBe('[Compare: Old a1, New a2]');
+    });
+});
+
+describe('TextField and Select', () => {
+    const FORM =
+        '$name = "Ada"\n$kind = "bug"\n<TextField value={$name} maxLength={8} placeholder="Your name">Name</TextField>' +
+        '<Select value={$kind}><Option value="bug">Bug</Option><Option value="idea">Idea</Option></Select>' +
+        '<Choices><Choice context={"Report " + $kind + " from " + $name}>Send</Choice></Choices>';
+
+    test('compiles with bindings, and Option stands in either parent', () => {
+        const compiled = block(FORM);
+        expect(compiled.diagnostics).toEqual([]);
+        expect(compiled.nodes[0].bindings).toEqual({ value: '$name' });
+        expect(compiled.nodes[1].bindings).toEqual({ value: '$kind' });
+        expect(UI_CATALOG.Option.parent).toEqual(['Segmented', 'Select']);
+        expect(block('<Segmented value="a"><Option value="a">A</Option></Segmented>').diagnostics).toEqual([]);
+        expect(problems('<Option value="a">A</Option>').errors).toEqual(['Option:invalid_parent']);
+        expect(problems('<Tabs><Tab title="x"><Option value="a">A</Option></Tab></Tabs>').errors).toContain('Option:invalid_parent');
+        expect(problems('<Select value="a"><Tag>x</Tag></Select>').errors).toEqual(['Tag:invalid_child']);
+    });
+
+    test('a text field holds up to maxLength characters, 256 without one', () => {
+        expect(problems(`$q = "${'x'.repeat(256)}"\n<TextField value={$q}>Query</TextField>`)).toEqual({ diagnostics: [], errors: [] });
+        expect(problems(`$q = "${'x'.repeat(257)}"\n<TextField value={$q}>Query</TextField>`).errors).toEqual(['TextField:invalid_props']);
+        expect(problems('$q = "abcdef"\n<TextField value={$q} maxLength={5}>Query</TextField>').errors).toEqual(['TextField:invalid_props']);
+        expect(problems(`$q = "${'x'.repeat(1024)}"\n<TextField value={$q} maxLength={1024}>Query</TextField>`).errors).toEqual([]);
+        expect(problems('$q = ""\n<TextField value={$q} maxLength={1025}>Query</TextField>').errors).toEqual(['TextField:invalid_props']);
+        expect(problems('$q = ""\n<TextField value={$q} maxLength={0}>Query</TextField>').errors).toEqual(['TextField:invalid_props']);
+        expect(problems(`$q = ""\n<TextField value={$q} placeholder="${'x'.repeat(129)}">Query</TextField>`).errors).toEqual(['TextField:invalid_props']);
+    });
+
+    test('a typed value past the limit is refused by the binding and by a Choice that carries it', () => {
+        const compiled = block(FORM);
+        const state = new UiState(compiled);
+        const field = evaluateUiBlock(compiled, state).nodes[0];
+        field.bindings.value.onValueChange('Grace');
+        expect(state.scope().$name).toBe('Grace');
+        field.bindings.value.onValueChange('Grace Hopper');
+        expect(state.scope().$name).toBe('Grace');
+        const choice = evaluateUiBlock(compiled, state).nodes[2].children[0];
+        expect(resolveUiChoice(compiled, choice.id, { $name: 'Grace' }).context).toBe('Report bug from Grace');
+        expect(() => resolveUiChoice(compiled, choice.id, { $name: 'Grace Hopper' })).toThrow('does not match its control');
+        expect(() => resolveUiChoice(compiled, choice.id, { $name: 42 })).toThrow();
+    });
+
+    test('a select offers only its own options to a Choice', () => {
+        const compiled = block(FORM);
+        const choice = evaluateUiBlock(compiled).nodes[2].children[0];
+        expect(resolveUiChoice(compiled, choice.id, { $kind: 'idea' }).context).toBe('Report idea from Ada');
+        expect(() => resolveUiChoice(compiled, choice.id, { $kind: 'question' })).toThrow('outside the visible control');
+        expect(() => resolveUiChoice(compiled, choice.id, { $kind: 'idea' })).not.toThrow();
+    });
+
+    test('falls back to the label and the options, never the typed value', () => {
+        expect(block(FORM).fallback).toBe('Name\nBug\nIdea\nSend\nReport bug from Ada');
     });
 });

@@ -1,8 +1,9 @@
-import { createContext, useContext, type MouseEvent, type ReactNode } from 'react';
+import { createContext, useContext, useId, type MouseEvent, type ReactNode } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import type { UiBinding, UiProps, UiViewNode } from '@adecore/intelligent-ui';
-import { Button, Checkbox, Segmented, Slider, Switch, Tooltip } from '@adecore/ui';
+import { Button, Checkbox, Input, Segmented, Select, Slider, Switch, Tooltip } from '@adecore/ui';
+import { formatNumber } from '@adecore/ui/format';
 import { uiChildrenOf, uiNodeLabel, uiWithUnit } from '../node-text';
 import type { UiRenderContext, UiRendererProps } from '../render-context';
 import { useTruncated } from '../use-truncated';
@@ -125,6 +126,69 @@ export function SegmentedRenderer({ node, context }: UiRendererProps<UiProps<'Se
                 label={t('blocks.options')}
                 orientation={options.some((option) => option.label.length > SIDE_BY_SIDE_LABEL) ? 'vertical' : 'horizontal'}
                 disabled={binding === null}
+                onValueChange={(id) => {
+                    const option = options[Number(id)];
+                    if (option !== undefined) {
+                        binding?.onValueChange(option.value);
+                    }
+                }}
+            />
+        </div>
+    );
+}
+
+/* The longest a text field takes when its agent names none; the schema allows up to 1024. */
+const DEFAULT_MAX_LENGTH = 256;
+
+/* The count under a field appears once the field is this full, and never nags before. */
+const COUNT_FROM = 0.8;
+
+/*
+ * A line of text: the label above the field, which stops taking characters at its limit. Nothing here binds
+ * a key or submits on Enter, so the value reaches the agent only through a Choice.
+ */
+export function TextFieldRenderer({ node, children, context }: UiRendererProps<UiProps<'TextField'>>) {
+    const { t } = useTranslation('agent-chat');
+    const id = useId();
+    const binding = bindingOf(node, context);
+    const { maxLength = DEFAULT_MAX_LENGTH, placeholder } = node.props;
+    const value = binding?.value ?? node.props.value;
+    return (
+        <div className={clsx('flex flex-col gap-1 px-2', !node.complete && PENDING)}>
+            <label htmlFor={id} className="text-sm text-text-muted">
+                {children}
+            </label>
+            <Input
+                id={id}
+                value={value}
+                maxLength={maxLength}
+                placeholder={placeholder}
+                disabled={binding === null}
+                className="max-w-96"
+                onChange={(event) => binding?.onValueChange(event.target.value)}
+            />
+            {value.length >= maxLength * COUNT_FROM && (
+                <span className="text-xs text-text-faint tabular-nums">
+                    {t('blocks.textField.count', { used: formatNumber(value.length), max: formatNumber(maxLength) })}
+                </span>
+            )}
+        </div>
+    );
+}
+
+/* Left aligned, never the full width. Like Segmented, each Option is an item by its place, since a value may be any scalar. */
+export function SelectRenderer({ node, context }: UiRendererProps<UiProps<'Select'>>) {
+    const { t } = useTranslation('agent-chat');
+    const binding = bindingOf(node, context);
+    const current = binding?.value ?? node.props.value;
+    const options = uiChildrenOf(node, 'Option').map((option, index) => ({ id: String(index), label: uiNodeLabel(option), value: option.props.value }));
+    return (
+        <div className={clsx('flex px-2', !node.complete && PENDING)}>
+            <Select
+                value={options.find((option) => option.value === current)?.id ?? null}
+                items={options.map((option) => ({ value: option.id, label: option.label }))}
+                label={t('blocks.options')}
+                disabled={binding === null || options.length === 0}
                 onValueChange={(id) => {
                     const option = options[Number(id)];
                     if (option !== undefined) {

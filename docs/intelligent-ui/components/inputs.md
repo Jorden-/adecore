@@ -9,6 +9,8 @@ $selected = ["links"]
 $notify = false
 $limit = 20
 $scope = "failed"
+$name = "Ada"
+$kind = "bug"
 <Checklist value={$selected}>
 <Item value="links">Fix the link parser</Item>
 <Item value="preload">Make the bridge method optional</Item>
@@ -19,6 +21,12 @@ $scope = "failed"
 <Option value="failed">Failed</Option>
 <Option value="all">All</Option>
 </Segmented>
+<TextField value={$name} maxLength={40} placeholder="Your name">Name</TextField>
+<Select value={$kind}>
+<Option value="bug">Bug</Option>
+<Option value="idea">Idea</Option>
+<Option value="question">Question</Option>
+</Select>
 <Button action={@Reset()}>Reset</Button>
 ```
 
@@ -58,7 +66,7 @@ A local number in a range. Its children are the label.
 
 ## Segmented and Option
 
-Choose one value. `Segmented` holds only `Option`, and binds the chosen option's value. An `Option` stands only inside `Segmented`; its children are its label. Option draws nothing itself: Segmented reads its options. Keep labels to a few words; an option longer than that makes the renderer of agents-react stand the options in a column.
+Choose one value. `Segmented` holds only `Option`, and binds the chosen option's value. An `Option` stands inside `Segmented` or [`Select`](#select); its children are its label. Option draws nothing itself: Segmented reads its options. Keep labels to a few words; an option longer than that makes the renderer of agents-react stand the options in a column.
 
 | Prop    | Type   | Required | Notes    |
 | ------- | ------ | -------- | -------- |
@@ -67,6 +75,26 @@ Choose one value. `Segmented` holds only `Option`, and binds the chosen option's
 | Option prop | Type   | Required | Notes |
 | ----------- | ------ | -------- | ----- |
 | `value`     | scalar | Yes      |       |
+
+## Select
+
+Choose one value from a dropdown, for more or longer options than a `Segmented` holds. `Select` holds only `Option` and binds the chosen option's value, as `Segmented` does; see [Segmented and Option](#segmented-and-option) for the option. A person can only pick one of its options, and a Choice refuses a value no option offers. It carries no label of its own, so put a line of prose or a `Summary` before it that says what the choice is for.
+
+| Prop    | Type   | Required | Notes    |
+| ------- | ------ | -------- | -------- |
+| `value` | scalar | Yes      | Bindable |
+
+## TextField
+
+A line of text. Its children are the label. The field takes characters up to `maxLength` and no more. It does not submit: the text reaches the agent only when a person picks a Choice, and it starts again from its default when the page reloads.
+
+| Prop          | Type   | Required | Notes                                                              |
+| ------------- | ------ | -------- | ------------------------------------------------------------------ |
+| `value`       | string | Yes      | Bindable; at most `maxLength` characters, or the field fails       |
+| `maxLength`   | number | No       | A whole number from 1 to 1,024; 256 without it                      |
+| `placeholder` | string | No       | At most 128 characters; shown while the field is empty             |
+
+A count (`7 of 8 characters`) appears under the field once it is 80% full. A default longer than its limit makes the `TextField` fail alone, and it draws as its label.
 
 ## Button
 

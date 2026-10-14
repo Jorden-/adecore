@@ -3,7 +3,16 @@ import { ChartRenderer } from './renderers/chart';
 import { ChoiceRenderer, ChoicesRenderer } from './renderers/choices';
 import { CodeBlockRenderer, CompareRenderer, GalleryRenderer, ImageRenderer, SourceRenderer, SourcesRenderer } from './renderers/content';
 import { EntityListRenderer, EntryRenderer, StatRenderer, StatsRenderer, TableRenderer } from './renderers/data';
-import { ButtonRenderer, ChecklistRenderer, ItemRenderer, SegmentedRenderer, SliderRenderer, SwitchRenderer } from './renderers/inputs';
+import {
+    ButtonRenderer,
+    ChecklistRenderer,
+    ItemRenderer,
+    SegmentedRenderer,
+    SelectRenderer,
+    SliderRenderer,
+    SwitchRenderer,
+    TextFieldRenderer
+} from './renderers/inputs';
 import { CommitRenderer, DiffRenderer, FileRenderer, NodeRenderer } from './renderers/links';
 import { SectionRenderer, SectionsRenderer, TabRenderer, TabsRenderer } from './renderers/structure';
 import {
@@ -20,7 +29,7 @@ import {
 /*
  * A renderer for every component of the catalog; a name missing here fails the typecheck. Null draws
  * nothing for the node itself: the runtime resolves Show and Each before rendering, and Column and
- * Option are metadata their parent reads from its node (a table its columns, Segmented its segments).
+ * Option are metadata their parent reads from its node (a table its columns, Segmented and Select their options).
  */
 export const UI_RENDERERS: UiRenderers = {
     Summary: SummaryRenderer,
@@ -57,7 +66,9 @@ export const UI_RENDERERS: UiRenderers = {
     Switch: SwitchRenderer,
     Slider: SliderRenderer,
     Segmented: SegmentedRenderer,
+    Select: SelectRenderer,
     Option: null,
+    TextField: TextFieldRenderer,
     Button: ButtonRenderer,
     Show: null,
     Each: null,

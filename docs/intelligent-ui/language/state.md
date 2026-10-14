@@ -22,7 +22,7 @@ $limit = 20
 
 ## Bindings
 
-Four inputs take a `value`. Write `value={$name}` and the control is bound: a person's change writes the variable. Write anything else and the control only shows the value and is disabled.
+Six inputs take a `value`. Write `value={$name}` and the control is bound: a person's change writes the variable. Write anything else and the control only shows the value and is disabled.
 
 | Component   | Binds `value` as          |
 | ----------- | ------------------------- |
@@ -30,8 +30,12 @@ Four inputs take a `value`. Write `value={$name}` and the control is bound: a pe
 | `Switch`    | A boolean                 |
 | `Slider`    | A number between `min` and `max` |
 | `Segmented` | The value of the chosen `Option` |
+| `Select`    | The value of the chosen `Option` |
+| `TextField` | A string of at most `maxLength` characters |
 
 A binding takes effect only when the prop is a bare reference to a declared variable that is not a query. `value={$limit + 1}` shows a number and binds nothing. A control changes state only after its tag closed, and only with a value its schema accepts. [Inputs](/intelligent-ui/components/inputs) lists their props.
+
+A `TextField` is state like any other: what a person types lives in the page, never reaches the agent until a Choice carries it, and returns to its default when the page reloads. A text longer than its limit is never written, so a variable always fits the field that binds it. A query that reads `$q` reads again once the text rests, like a slider that stopped moving.
 
 Everything else reads state through expressions. A Summary that counts the checked items redraws when the checklist changes.
 
