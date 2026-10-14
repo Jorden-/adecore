@@ -23,10 +23,6 @@ onChatStorageConfiguration(() => {
     USAGE_PREFERENCES_KEY = storageKey();
 });
 
-export function usagePreferencesKey(): string {
-    return storageKey();
-}
-
 interface Preferences {
     period: UsagePeriod;
     metric: UsageMetric;

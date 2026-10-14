@@ -46,7 +46,7 @@ The demo above runs under such a pool. Without one the diffs highlight on the pa
 
 ## Changes of a turn
 
-`ChatActions.turnDiff(chatId, turnId)` reads what the working tree holds against the checkpoint a turn started from, or `null` without one. The helpers in `@adecore/agents-react/chat` read changes out of tool calls: `fileChanges(name, input)` for an edit's before and after, `unifiedChanges(tool)` for a patch, `approvalChanges(input)` for the copy an approval carries, and `hasFileChanges(tool)`.
+`ChatActions.turnDiff(chatId, turnId)` reads what the working tree holds against the checkpoint a turn started from, or `null` without one. The timeline reads the changes out of the tool calls itself: an edit's before and after, a patch, and the copy an approval carries.
 
 ## Editor source tokens
 

@@ -59,10 +59,10 @@ The stores are Zustand stores shared by every scope.
 
 - `useChats` holds a `ChatState` per key: the chat's `info`, its `items` by id, its `order`, `history` when only the newest page is held, `waitingBefore` for requests older than that page, `bookmarks`, and `visuals`, the pages agents published in it. Bookmarks and visuals come with the attach and with their own events, and a fresh thread from the host keeps them. `statusByKey` holds only the info, and changes only when the info does.
 - `useChatRow(chatId, select)` reads one chat of the scope in context. Select the field you draw: a streamed word replaces `items`.
-- `structure` is `items` minus the growth of a streaming reply, thought or tool output. Derive rows from it, and read the live item with `useCurrentItem(chatId, item)`; that keeps a word from redrawing the whole thread.
+- `structure` is `items` minus the growth of a streaming reply, thought or tool output. Derive rows from it; that keeps a word from redrawing the whole thread.
 - `waitingRequestsOf(chat)` lists every approval and question that waits, also those before the loaded page.
 - `useProviders(select)` and `useProviderAccounts(select)` read the CLIs and accounts of the scope in context; `providersOf(scopeId)` and `providerAccountsOf(scopeId)` do the same outside React. `knownAccounts(row)` is `undefined` until the host answered and `null` for a host without accounts.
-- `applyEvent(state, event)` and `prependPage(state, cursor, page)` are the pure steps the store takes, for a store of your own.
+- `applyEvent(state, event)` is the pure step the store takes for an event, for a store of your own.
 
 ```tsx
 function Title({ chatId }: { chatId: string }) {

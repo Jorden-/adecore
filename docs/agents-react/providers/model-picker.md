@@ -28,13 +28,13 @@ A trigger with the CLI's mark and the model's short name, and a popup with a sea
 
 ### A model the CLI is too old for
 
-A model whose catalog entry carries `minCliVersion` is a row that cannot be picked while the CLI's version is lower. Its second line reads "Requires Claude Code 2.1 or later on &lt;machine&gt;", with a button to the provider settings. `modelRequirementOf(model, provider, reported)` answers the requirement, or `null` when none applies: no minimum, a version that is not a readable x.y.z, a new enough CLI, or a model a chat of that CLI reported running. `useReportedModels(provider)` collects those reported names from the chats of the scope in context, and the host names the machine with `useMachineLabel`. `pickerEntriesOf(providers, query, legacyOpen)` builds the rows and keeps a blocked model in them, so a search for it still finds the explanation; `PickerEntry` is a row.
+A model whose catalog entry carries `minCliVersion` is a row that cannot be picked while the CLI's version is lower. Its second line reads "Requires Claude Code 2.1 or later on &lt;machine&gt;", with a button to the provider settings. No requirement applies when there is no minimum, the version is not a readable x.y.z, the CLI is new enough, or a chat of that CLI reported the model running. The host names the machine with `useMachineLabel`. `pickerEntriesOf(providers, query, legacyOpen)` builds the rows and keeps a blocked model in them, so a search for it still finds the explanation; `PickerEntry` is a row.
 
 ## ModelOptionControl
 
 One of a model's own options, such as effort, drawn from its `ModelOptionDescriptor`: a `Switch` for a boolean, a `Segmented` for up to three choices in the `row` layout, a `Select` otherwise. It reads `options[option.id]` and calls `onChange` with the new value. With `defaultLabel` a choice gets an item that leaves it to the model, answered as `undefined`.
 
-`optionValue(option, options)` answers the value an option runs at: the one picked when it still fits, else the model's default. `carryOptions(options, model)` keeps the options the next model also offers, for a switch between models.
+An option runs at the value picked when it still fits, else the model's default. `carryOptions(options, model)` keeps the options the next model also offers, for a switch between models.
 
 ## Names
 

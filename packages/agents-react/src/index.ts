@@ -33,18 +33,7 @@ export {
     isConnectionError
 } from './transport';
 export { portTransport, type PortTransport } from './port-transport';
-export {
-    onChatStorageConfiguration,
-    configureChatStorage,
-    chatStorageKey,
-    chatStorageLegacyKeys,
-    chatStorageAdapter,
-    hydrateChatStorage,
-    createChatStore,
-    type ChatStorageRecord,
-    type ChatStorageAdapter,
-    type ChatStorageOptions
-} from './storage';
+export { configureChatStorage, type ChatStorageRecord, type ChatStorageAdapter, type ChatStorageOptions } from './storage';
 export { setLazyPrefetch, onLazyOpenError } from './lazy';
 export { type MountedEntry, MountedRegistry } from './mounted-registry';
 export { type AgentsSettingsSection, PROVIDERS_SECTION, USAGE_SECTION, settingsSection } from './settings/sections';

@@ -143,10 +143,6 @@ onChatStorageConfiguration(() => {
     CHAT_PREFERENCES_KEY = storageKey();
 });
 
-export function chatPreferencesKey(): string {
-    return storageKey();
-}
-
 /* Reads the remembered default again, once another window of the same origin wrote it. */
 export function reloadChatPreferences(): void {
     useChatPreferences.setState(storage.read(), true);

@@ -29,7 +29,7 @@ While it is mounted, the page sends `usage.subscribe`, which keeps the host scan
 | Currency | `USD`, `EUR` at the rate the summary carries            | Yes, `USD` |
 | Account  | All, or one account once a CLI has several              | No        |
 
-The period runs in the viewer's own calendar days and time zone, which travel with the request. `windowFor(period)` and `summaryPayload(period, account)` make that request.
+The period runs in the viewer's own calendar days and time zone, which travel with the request. `windowFor(period)` makes that window.
 
 ## Props
 
@@ -50,4 +50,4 @@ The section of the settings dialog for usage: the currency, and a button to the 
 
 ## State
 
-`useUsageStore` keeps the three choices, kept in [storage](/agents-react/guide/persistence), and per scope the summary, the question it answers, whether it loads or failed, and the plan limits. `useUsage(select)` reads it for the scope in context. `askedKey(payload)` is the key a summary is kept under.
+`useUsageStore` keeps the three choices, kept in [storage](/agents-react/guide/persistence), and per scope the summary, the question it answers, whether it loads or failed, and the plan limits. `askedKey(payload)` is the key a summary is kept under.

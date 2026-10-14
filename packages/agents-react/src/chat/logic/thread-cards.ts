@@ -92,8 +92,3 @@ export function withTimedRows(rows: TimelineRow[], timed: readonly TimedRow[]): 
 export function timedRowsOf(cards: readonly ThreadCard[], visuals: readonly ChatVisual[] | null, heldFrom: number | null = null): TimedRow[] {
     return [...(visuals === null ? [] : visualRows(visuals, heldFrom)), ...cardRows(cards)];
 }
-
-/* The thread's rows with an app's cards among them, the way `withTimedRows` places them. */
-export function withThreadCards(rows: TimelineRow[], cards: readonly ThreadCard[]): TimelineRow[] {
-    return withTimedRows(rows, cardRows(cards));
-}

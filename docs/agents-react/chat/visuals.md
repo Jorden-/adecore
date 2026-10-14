@@ -14,7 +14,7 @@ import { timedRowsOf, withTimedRows } from '@adecore/agents-react/chat';
 const rows = withTimedRows(threadRows, timedRowsOf(cards, visuals, heldFrom));
 ```
 
-`withTimedRows(rows, timed)` puts `TimedRow`s (`{ at, row }`) among the rows and answers the same array when there are none. `cardRows(cards)` and `visualRows(visuals, heldFrom?)` make them; `timedRowsOf(cards, visuals, heldFrom)` makes both, with `null` for a host that draws no visuals. `withThreadCards(rows, cards)` is the same merge for cards alone. A visual row is `{ kind: 'visual', id, visual }`, a block in the rhythm of the thread, and its turn is the one that published it.
+`withTimedRows(rows, timed)` puts `TimedRow`s (`{ at, row }`) among the rows and answers the same array when there are none. `timedRowsOf(cards, visuals, heldFrom)` makes them from an app's cards and the visuals, with `null` for a host that draws no visuals. A visual row is `{ kind: 'visual', id, visual }`, a block in the rhythm of the thread, and its turn is the one that published it.
 
 ## The row
 

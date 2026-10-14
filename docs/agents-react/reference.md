@@ -14,7 +14,7 @@ Wiring the views into an app: the host adapters, the scope, the transport, stora
 | [`scope`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/scope.ts) | `ChatScope`, `ChatScopeContext`, `useChatScope` |
 | [`transport`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/transport.ts) | `ChatRequestMap`, `ChatEventMap`, `ChatTransportStatus`, `ChatTransport`, `ChatTransportError`, `errorCode`, `isConnectionError` |
 | [`port-transport`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/port-transport.ts) | `portTransport`, `PortTransport` |
-| [`storage`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/storage.ts) | `onChatStorageConfiguration`, `configureChatStorage`, `chatStorageKey`, `chatStorageLegacyKeys`, `chatStorageAdapter`, `hydrateChatStorage`, `createChatStore`, `ChatStorageRecord`, `ChatStorageAdapter`, `ChatStorageOptions` |
+| [`storage`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/storage.ts) | `configureChatStorage`, `ChatStorageRecord`, `ChatStorageAdapter`, `ChatStorageOptions` |
 | [`lazy`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/lazy.tsx) | `setLazyPrefetch`, `onLazyOpenError` |
 | [`mounted-registry`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/mounted-registry.ts) | `MountedEntry`, `MountedRegistry` |
 | [`settings/sections`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/settings/sections.ts) | `AgentsSettingsSection`, `PROVIDERS_SECTION`, `USAGE_SECTION`, `settingsSection` |
@@ -27,8 +27,6 @@ A chat outside its views: the client, actions, drafts, preferences, mentions, fo
 | --- | --- |
 | [`chat/account-choice`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/account-choice.ts) | `AccountChoice`, `useAccountChoice` |
 | [`chat/actions`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/actions.ts) | `transportActions`, `actionsOf`, `useChatActions` |
-| [`chat/activity`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/activity.ts) | `backgroundCounts` |
-| [`chat/attachments`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/attachments.ts) | `isImageAttachment`, `fileBadge`, `formatBytes`, `checkAttachmentLimits`, `filesOf`, `readAttachments`, `readStoredAttachments`, `uploadPreviewUrl`, `uploadBytes` |
 | [`chat/chat-client`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/chat-client.ts) | `ChatSendExtras`, `ChatClient` |
 | [`chat/chat-references`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/chat-references.ts) | `ProjectChat` |
 | [`chat/composer-send`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/composer-send.ts) | `sendFromComposer`, `ComposerSend` |
@@ -38,12 +36,12 @@ A chat outside its views: the client, actions, drafts, preferences, mentions, fo
 | [`chat/logic/handback`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/handback.ts) | `handbackReportOf` |
 | [`chat/logic/limit`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/limit.ts) | `limitView`, `LimitView` |
 | [`chat/logic/scrubber`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/scrubber.ts) | `TickKind`, `ScrubberTick` |
-| [`chat/logic/thread-cards`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/thread-cards.ts) | `TimedRow`, `cardRows`, `visualRows`, `withTimedRows`, `timedRowsOf`, `withThreadCards` |
-| [`chat/logic/timeline-target`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/timeline-target.ts) | `EMPTY_TARGET`, `readTimelineTarget`, `TimelineTarget` |
+| [`chat/logic/thread-cards`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/thread-cards.ts) | `TimedRow`, `withTimedRows`, `timedRowsOf` |
+| [`chat/logic/timeline-target`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/timeline-target.ts) | `TimelineTarget` |
 | [`chat/logic/timeline`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/timeline.ts) | `TimelineRow`, `summarizeGroup`, `deriveTimelineRows`, `SubagentBranch`, `BaseMoved` |
-| [`chat/logic/tools`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/tools.ts) | `toolSummary`, `fileChanges`, `unifiedChanges`, `approvalChanges`, `hasFileChanges`, `FileChange` |
-| [`chat/mentions`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/mentions.ts) | `MENTION_DRAG_TYPE`, `LEGACY_MENTION_DRAG_TYPE`, `MENTION_DRAG_TYPES`, `carriesMentions`, `droppedMentions`, `writeMentionDrag`, `findMentionQuery`, `findSkillQuery`, `insertMention`, `insertSkill`, `presentMentions`, `chipText`, `tokenizeChips`, `MentionQuery`, `ChipSegment` |
-| [`chat/preferences`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/preferences.ts) | `defaultProvider`, `selectionFor`, `startingSelection`, `accountFor`, `chatPreferencesPayload`, `useChatPreferences`, `readChatPreferences`, `CHAT_PREFERENCES_KEY`, `chatPreferencesKey`, `reloadChatPreferences`, `rememberChatPreferences`, `rememberReadingWidth`, `rememberSendKey`, `rememberChatSelection`, `ChatPreferences` |
+| [`chat/logic/tools`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/tools.ts) | `toolSummary`, `FileChange` |
+| [`chat/mentions`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/mentions.ts) | `MENTION_DRAG_TYPE`, `LEGACY_MENTION_DRAG_TYPE`, `carriesMentions`, `droppedMentions`, `writeMentionDrag`, `chipText`, `MentionQuery`, `ChipSegment` |
+| [`chat/preferences`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/preferences.ts) | `defaultProvider`, `selectionFor`, `startingSelection`, `accountFor`, `chatPreferencesPayload`, `useChatPreferences`, `readChatPreferences`, `CHAT_PREFERENCES_KEY`, `reloadChatPreferences`, `rememberChatPreferences`, `rememberReadingWidth`, `rememberSendKey`, `rememberChatSelection`, `ChatPreferences` |
 | [`chat/prompt-hold`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/prompt-hold.ts) | `HoldRelease` |
 | [`chat/reading-width`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/reading-width.ts) | `CHAT_READING_WIDTHS`, `readingWidthLabel`, `readingWidthHint`, `ChatReadingWidth` |
 | [`chat/recent-messages`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/recent-messages.ts) | `recentChatMessages`, `recentSubagentMessages`, `RecentChatMessage`, `RecentChatMessages` |
@@ -53,7 +51,6 @@ A chat outside its views: the client, actions, drafts, preferences, mentions, fo
 | [`chat/subagent-list`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/subagent-list.ts) | `subagentTitle`, `summaryWordOf`, `stopOf`, `SubagentStop` |
 | [`chat/subagent-support`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/subagent-support.ts) | `useSubagentSupport` |
 | [`chat/subagent-view`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/subagent-view.ts) | `crumbOf`, `openFromMain`, `composerWrites`, `canOpenSubagent`, `useSubagentView`, `useSubagentTrail`, `useSubagentItem`, `SubagentStep`, `SubagentTrail` |
-| [`chat/thumbnails`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/thumbnails.ts) | `THUMBNAIL_PX`, `useUploadThumbnail` |
 | [`chat/timeline-scroll`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/timeline-scroll.ts) | `stepTimelineMessage`, `jumpToTimelineItem`, `TurnTarget`, `registerTurnJumper`, `jumpToTimelineTurn`, `ItemJumpOptions` |
 | [`agents/status-look`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/agents/status-look.ts) | `StatusWord`, `statusLookOf`, `taskStatusWord`, `StatusLook`, `TaskState` |
 
@@ -137,17 +134,15 @@ Approvals and questions: the prompt view, and the parts and logic to build one o
 
 | Module | Exports |
 | --- | --- |
-| [`prompts/logic/focus`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/prompts/logic/focus.ts) | `focusPromptStart`, `focusPromptHeading` |
+| [`prompts/logic/focus`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/prompts/logic/focus.ts) | `focusPromptStart` |
 | [`prompts/logic/keys`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/prompts/logic/keys.ts) | `PROMPT_SHORTCUTS`, `pageKey`, `PromptKeyEvent` |
-| [`prompts/logic/prompts`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/prompts/logic/prompts.ts) | `PendingPrompt`, `PromptAction`, `emptyPromptDraft`, `answerValue`, `questionAnswer`, `pickPromptChoice`, `isBlockingPrompt`, `orderPrompts`, `nextPrompt`, `promptAnswers`, `PromptAnswer`, `PromptDraft` |
+| [`prompts/logic/prompts`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/prompts/logic/prompts.ts) | `PendingPrompt`, `PromptAction`, `emptyPromptDraft`, `orderPrompts`, `PromptAnswer`, `PromptDraft` |
 | [`prompts/logic/subjects`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/prompts/logic/subjects.ts) | `HostPrompt`, `PromptSubject`, `ChatPromptClients`, `PromptViewProps`, `ApprovalButtonSpec`, `promptIdOf`, `promptCreatedAt`, `isBlockingSubject`, `answerPrompt` |
 | [`prompts/logic/useFocusAfterAnswer`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/prompts/logic/useFocusAfterAnswer.ts) | `useFocusAfterAnswer`, `FocusAfterAnswer` |
 | [`prompts/logic/usePromptSession`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/prompts/logic/usePromptSession.ts) | `usePromptSession`, `PromptSession` |
-| [`prompts/ui/ApprovalBody`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/prompts/ui/ApprovalBody.tsx) | `CommandBox`, `ApprovalBody` |
-| [`prompts/ui/PromptActions`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/prompts/ui/PromptActions.tsx) | `PromptPrimary`, `ApprovalActions`, `QuestionActions`, `ApprovalButton` |
+| [`prompts/ui/PromptActions`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/prompts/ui/PromptActions.tsx) | `PromptPrimary`, `ApprovalActions`, `ApprovalButton` |
 | [`prompts/ui/PromptCard`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/prompts/ui/PromptCard.tsx) | `PROMPT_SURFACE`, `PromptCard`, `PromptCardKind` |
 | [`prompts/ui/PromptView`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/prompts/ui/PromptView.tsx) | `PromptView` |
-| [`prompts/ui/QuestionBody`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/prompts/ui/QuestionBody.tsx) | `QuestionBody` |
 
 ## `@adecore/agents-react/providers`
 
@@ -159,17 +154,11 @@ The CLIs and their accounts: marks, model names, the providers pane and its part
 | [`agents/AgentIcon`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/agents/AgentIcon.tsx) | `AgentIcon` |
 | [`agents/ModelOptionControl`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/agents/ModelOptionControl.tsx) | `ModelOptionControl` |
 | [`agents/ProviderLogo`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/agents/ProviderLogo.tsx) | `ProviderLogo` |
-| [`agents/accounts`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/agents/accounts.ts) | `AccountEntry`, `accountsOfKind`, `accountName`, `ACCOUNT_TONE_CLASSES`, `accountStatusLine`, `canContinueOn`, `AccountTone` |
+| [`agents/accounts`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/agents/accounts.ts) | `AccountEntry`, `accountsOfKind`, `ACCOUNT_TONE_CLASSES`, `accountStatusLine`, `canContinueOn`, `AccountTone` |
 | [`agents/model-name`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/agents/model-name.ts) | `modelName`, `useModelName`, `shortModelName` |
-| [`agents/model-options`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/agents/model-options.ts) | `optionValue`, `carryOptions` |
-| [`agents/model-requirement`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/agents/model-requirement.ts) | `modelRequirementOf`, `ModelRequirement` |
-| [`providers/AccountColors`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/providers/AccountColors.tsx) | `AccountColors` |
-| [`providers/AccountDetail`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/providers/AccountDetail.tsx) | `AccountDetail` |
-| [`providers/AccountVariables`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/providers/AccountVariables.tsx) | `AccountVariables` |
-| [`providers/AddAccountForm`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/providers/AddAccountForm.tsx) | `AddAccountForm` |
-| [`providers/CliDetail`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/providers/CliDetail.tsx) | `CliDetail` |
+| [`agents/model-options`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/agents/model-options.ts) | `carryOptions` |
+| [`agents/model-requirement`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/agents/model-requirement.ts) | `ModelRequirement` |
 | [`providers/ProvidersPane`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/providers/ProvidersPane.tsx) | `ProvidersPane` |
-| [`providers/account-actions`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/providers/account-actions.ts) | `saveAccounts`, `saveAccount`, `removeAccount`, `createAccount`, `linkAccount` |
 | [`providers/parts`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/providers/parts.tsx) | `CliMark`, `CliTile` |
 
 ## `@adecore/agents-react/state`
@@ -178,10 +167,10 @@ The stores the views read: chats, providers, accounts and usage.
 
 | Module | Exports |
 | --- | --- |
-| [`state/chats`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/state/chats.ts) | `ChatState`, `ChatsById`, `ChatStatuses`, `ChatSink`, `prependPage`, `waitingRequestsOf`, `applyEvent`, `useChats`, `chatSink`, `useChatRow`, `useReportedModels`, `useCurrentItem`, `ChatHistoryPage`, `ChatPage` |
+| [`state/chats`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/state/chats.ts) | `ChatState`, `ChatsById`, `ChatStatuses`, `ChatSink`, `waitingRequestsOf`, `applyEvent`, `useChats`, `chatSink`, `useChatRow`, `ChatHistoryPage`, `ChatPage` |
 | [`state/provider-accounts`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/state/provider-accounts.ts) | `useProviderAccountsStore`, `useProviderAccounts`, `providerAccountsOf`, `knownAccounts`, `watchProviderAccounts`, `ProviderAccountsRow` |
 | [`state/providers`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/state/providers.ts) | `useProvidersStore`, `useProviders`, `providersOf`, `providerSinkFor`, `ProvidersRow` |
-| [`state/usage`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/state/usage.ts) | `UsageMetric`, `USAGE_PREFERENCES_KEY`, `usagePreferencesKey`, `dayOf`, `windowFor`, `summaryPayload`, `reloadUsagePreferences`, `useUsageStore`, `useUsage`, `UsagePeriod`, `UsageView` |
+| [`state/usage`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/state/usage.ts) | `UsageMetric`, `USAGE_PREFERENCES_KEY`, `dayOf`, `windowFor`, `reloadUsagePreferences`, `useUsageStore`, `UsagePeriod`, `UsageView` |
 
 ## `@adecore/agents-react/usage`
 

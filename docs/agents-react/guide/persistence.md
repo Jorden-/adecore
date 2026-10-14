@@ -19,7 +19,7 @@ Call it before the first render, outside React, since the stores are shared by e
 | `stash`       | `<namespace>.chat.stash`       |
 | `usage`       | `<namespace>.usage`            |
 
-The namespace is `adecore` unless you set one. `keys` names a record's whole key and wins over the namespace. `chatStorageKey(record)` and `chatStorageLegacyKeys(record)` answer the keys in use without reading anything.
+The namespace is `adecore` unless you set one. `keys` names a record's whole key and wins over the namespace.
 
 ## Where it is kept
 
@@ -62,21 +62,17 @@ For each record the current key wins when it holds anything, even something that
 A `storage` event from another window of the same origin is how a change arrives there. Reload the preferences when their key changes:
 
 ```ts
-import { chatPreferencesKey, reloadChatPreferences } from '@adecore/agents-react/chat';
-import { reloadUsagePreferences, usagePreferencesKey } from '@adecore/agents-react/state';
+import { CHAT_PREFERENCES_KEY, reloadChatPreferences } from '@adecore/agents-react/chat';
+import { reloadUsagePreferences, USAGE_PREFERENCES_KEY } from '@adecore/agents-react/state';
 
 window.addEventListener('storage', (event) => {
-    if (event.key === chatPreferencesKey()) {
+    if (event.key === CHAT_PREFERENCES_KEY) {
         reloadChatPreferences();
     }
-    if (event.key === usagePreferencesKey()) {
+    if (event.key === USAGE_PREFERENCES_KEY) {
         reloadUsagePreferences();
     }
 });
 ```
 
-`CHAT_PREFERENCES_KEY` and `USAGE_PREFERENCES_KEY` hold the same keys and follow the configuration. Drafts and the stash have no reload.
-
-## Lower down
-
-`createChatStore(initial, hydrate)` is the Zustand `create` the persisted stores are made with: it reads its record on first use. `hydrateChatStorage()` reads every such store at once, `chatStorageAdapter()` answers the adapter in use, and `onChatStorageConfiguration(listener)` runs when the configuration changes; it cannot be removed. `persistedJson(key, parse, fallback)` is one record with the fallback to memory described above.
+`CHAT_PREFERENCES_KEY` and `USAGE_PREFERENCES_KEY` are live bindings: they follow the configuration. Drafts and the stash have no reload.

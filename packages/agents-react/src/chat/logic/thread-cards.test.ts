@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { ChatItem, ChatToolItem, ChatVisual } from '@adecore/agent-contracts';
 import type { ThreadCard } from '../../host';
-import { timedRowsOf, withThreadCards, withTimedRows } from './thread-cards';
+import { cardRows, timedRowsOf, withTimedRows } from './thread-cards';
 import { deriveTimelineRows, type TimelineRow } from './timeline';
 
 function tool(id: string, createdAt: number, turnId: string, state: ChatToolItem['state'] = 'done'): ChatToolItem {
@@ -41,6 +41,8 @@ function visual(id: string, at: number): ChatVisual {
 function shape(rows: readonly TimelineRow[]): string[] {
     return rows.map((row) => (row.kind === 'app-card' || row.kind === 'visual' ? row.id : row.kind));
 }
+
+const withThreadCards = (rows: TimelineRow[], cards: readonly ThreadCard[]): TimelineRow[] => withTimedRows(rows, cardRows(cards));
 
 describe('withThreadCards', () => {
     test('without cards the thread keeps the very rows it derived', () => {

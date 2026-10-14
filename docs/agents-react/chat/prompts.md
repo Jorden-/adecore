@@ -60,7 +60,7 @@ A `PromptSubject` is `{ kind: 'chat', nodeId, item }` for a chat's pending appro
 
 ## Keys
 
-Arrows, Home and End move through the choices and Space picks; Enter on a single choice picks and answers. Mod+Enter is the card's main action and Mod+Shift+Left and Right page through a stack (`PROMPT_SHORTCUTS`). A key typed for something else never answers a card: when a request arrives while a person types, the keyboard goes to its heading. `focusPromptStart`, `focusPromptHeading` and `useFocusAfterAnswer` are those moves, for a stack of your own.
+Arrows, Home and End move through the choices and Space picks; Enter on a single choice picks and answers. Mod+Enter is the card's main action and Mod+Shift+Left and Right page through a stack (`PROMPT_SHORTCUTS`). A key typed for something else never answers a card: when a request arrives while a person types, the keyboard goes to its heading. `focusPromptStart` and `useFocusAfterAnswer` are those moves, for a stack of your own.
 
 ## Prompts of your own
 
@@ -76,8 +76,8 @@ const CHAT_HOST: Partial<ChatHost> = {
 };
 ```
 
-A `HostPrompt` is `{ id, createdAt, blocking, asks, data }`: a stable id, whether it holds anything up, `approval` or `question` for its mark, and whatever your app needs in `data`. Return the same objects from `useExtra` while nothing changed. `PromptCard`, `PromptPrimary`, `ApprovalActions` and `QuestionActions` build a card that looks like the others, and a `choose` action answers with one of your own choices.
+A `HostPrompt` is `{ id, createdAt, blocking, asks, data }`: a stable id, whether it holds anything up, `approval` or `question` for its mark, and whatever your app needs in `data`. Return the same objects from `useExtra` while nothing changed. `PromptCard`, `PromptPrimary` and `ApprovalActions` build a card that looks like the others, and a `choose` action answers with one of your own choices.
 
 ## Parts
 
-`PromptView` is made of `PromptCard` (the frame, with heading, meta, notice and error), `ApprovalBody` with `CommandBox` for a command, `QuestionBody`, and the action rows. `PROMPT_SURFACE` is the surface class of the card for a frame that matches it. The logic in `@adecore/agents-react/prompts` is pure: `emptyPromptDraft`, `questionAnswer`, `answerValue`, `pickPromptChoice`, `promptAnswers`, `isBlockingPrompt`, `orderPrompts` and `nextPrompt`.
+`PromptView` is made of `PromptCard` (the frame, with heading, meta, notice and error), the bodies for an approval and a question, and the action rows. `PROMPT_SURFACE` is the surface class of the card for a frame that matches it. The logic in `@adecore/agents-react/prompts` that a stack of your own needs is pure: `emptyPromptDraft` and `orderPrompts`.

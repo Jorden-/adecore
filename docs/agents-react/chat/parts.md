@@ -14,4 +14,4 @@ The smaller pieces the thread and the composer are made of, exported for a heade
 | `ImageThumb(props: ImageThumbProps)` | `@adecore/agents-react/chat/ui` | An image that opens large in a lightbox. `source` is a `ResourceUrl`; without a URL it shows its `failure`. `aspect` (width over height) makes it fill its container's width at that ratio before the bytes arrive, `actions` go in the lightbox's header before Close, and `open` with `onOpenChange` open it from a control of your own. |
 | `WelcomeGreeting({ chatId, now? })`    | `@adecore/agents-react/chat/ui` | The greeting over an empty chat, by the part of the day.                                              |
 
-`statusLookOf(word)` answers the icon and tone of a `StatusWord`, and `taskStatusWord(task)` the word of a task, `paused` for an open task waiting out a limit. `backgroundCounts(tasks)` counts the shells and monitors of `info.background`. `useUploadThumbnail(upload)` makes the thumbnail `UploadThumb` draws, at most `THUMBNAIL_PX` (256) pixels.
+`statusLookOf(word)` answers the icon and tone of a `StatusWord`, and `taskStatusWord(task)` the word of a task, `paused` for an open task waiting out a limit.

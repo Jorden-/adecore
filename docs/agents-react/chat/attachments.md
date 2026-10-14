@@ -1,23 +1,10 @@
 # Attachments and mentions
 
-The composer reads files, checks them against the limits and turns `@` picks and dragged paths into mentions. The helpers are exported for a drop target or a file list of your own.
+The composer reads files, checks them against the limits and turns `@` picks and dragged paths into mentions. The parts it does that with are internal; a host supplies the sink for a stored file (below) and the drag types.
 
 ## Reading files
 
-```ts
-import { checkAttachmentLimits, readAttachments, uploadBytes } from '@adecore/agents-react/chat';
-
-const { accepted, rejected } = checkAttachmentLimits(
-    held.length,
-    files.map((file) => ({ file, name: file.name, mime: file.type, bytes: file.size })),
-    held.reduce((bytes, upload) => bytes + uploadBytes(upload), 0)
-);
-const uploads = await readAttachments(accepted.map((entry) => entry.file));
-```
-
-`checkAttachmentLimits(count, incoming, bytes)` sorts files into `accepted` and `rejected`, each rejection with a reason a person can read: empty, larger than 10 MiB, one too many, or past 10 MiB for the message. The limits are those of [the contract](/agent-contracts/conversation#attachments), which the host checks again. `readAttachments(files)` reads them as uploads, names a pasted picture that has none, and takes the image type from the name when the browser gave none. `readStoredAttachments(read, stored)` turns attachments the host keeps back into uploads, which is how a queued message comes back into the draft.
-
-`isImageAttachment(mime)`, `fileBadge(name)`, `formatBytes(bytes)`, `filesOf(dataTransfer)`, `uploadBytes(upload)` and `uploadPreviewUrl(upload)` are the small parts.
+The composer sorts the files a person drops, pastes or picks into accepted and rejected ones, each rejection with a reason a person can read: empty, larger than 10 MiB, one too many, or past 10 MiB for the message. The limits are those of [the contract](/agent-contracts/conversation#attachments), which the host checks again. It names a pasted picture that has none and takes the image type from the name when the browser gave none. An attachment the host keeps comes back as an upload when a queued message returns to the draft.
 
 ## Stored files
 
@@ -43,7 +30,7 @@ Leave either out and its button is not drawn.
 
 ## Mentions
 
-A path picked with `@` sits in the text and in `mentions`; a skill picked with `$` in the text and in `skills`. `findMentionQuery`, `findSkillQuery`, `insertMention`, `insertSkill`, `presentMentions` and `tokenizeChips` are the parsing and inserting the composer does.
+A path picked with `@` sits in the text and in `mentions`; a skill picked with `$` in the text and in `skills`. The composer does the parsing and inserting itself.
 
 A file list can hand paths to the composer by drag. The payload is the paths joined by spaces under `MENTION_DRAG_TYPE` (`application/x-adecore-mention`):
 
@@ -60,4 +47,4 @@ target.addEventListener('dragover', (event) => {
 target.addEventListener('drop', (event) => insert(droppedMentions(event.dataTransfer!)));
 ```
 
-`writeMentionDrag` also writes the older type `LEGACY_MENTION_DRAG_TYPE` unless its third argument is `false`, and `carriesMentions` and `droppedMentions` read both (`MENTION_DRAG_TYPES`). Stop writing the older type once every receiver reads the new one. The paths are split on whitespace, so a path with a space in it does not survive a drag.
+`writeMentionDrag` also writes the older type `LEGACY_MENTION_DRAG_TYPE` unless its third argument is `false`, and `carriesMentions` and `droppedMentions` read both. Stop writing the older type once every receiver reads the new one. The paths are split on whitespace, so a path with a space in it does not survive a drag.
