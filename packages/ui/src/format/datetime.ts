@@ -30,10 +30,14 @@ const DAY: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
 const DAY_WITH_YEAR: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
 const WEEKDAY_DAY: Intl.DateTimeFormatOptions = { weekday: 'short', month: 'short', day: 'numeric' };
 const DAY_CLOCK: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+const DAY_CLOCK_WITH_YEAR: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' };
 const NUMERIC_DATE: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'numeric', day: 'numeric' };
 
-/* `08:05`, or `08:05 AM` in a region that counts to twelve. */
-export const formatClock = (at: Date | number): string => formatDateTime(at, CLOCK);
+/*
+ * `08:05`, or `08:05 AM` in a region that counts to twelve. The clock functions below take the `timeZone`
+ * to write in, such as `UTC` for a moment whose parts are given and mean the same wall clock anywhere.
+ */
+export const formatClock = (at: Date | number, timeZone?: string): string => formatDateTime(at, timeZone === undefined ? CLOCK : { ...CLOCK, timeZone });
 
 /* A time far enough off that its day is part of the answer: `Sat 08:05`. */
 export const formatWeekdayClock = (at: Date | number): string => formatDateTime(at, WEEKDAY_CLOCK);
@@ -42,16 +46,22 @@ export const formatWeekdayClock = (at: Date | number): string => formatDateTime(
 export const formatHour = (at: Date | number): string => formatDateTime(at, HOUR);
 
 /* `19 Sep`, the short date a row falls back to once "days ago" stops meaning anything. */
-export const formatDay = (at: Date | number): string => formatDateTime(at, DAY);
+export const formatDay = (at: Date | number, timeZone?: string): string => formatDateTime(at, timeZone === undefined ? DAY : { ...DAY, timeZone });
 
 /* The same date with the year, for anything older than the one we are in. */
-export const formatDayWithYear = (at: Date | number): string => formatDateTime(at, DAY_WITH_YEAR);
+export const formatDayWithYear = (at: Date | number, timeZone?: string): string =>
+    formatDateTime(at, timeZone === undefined ? DAY_WITH_YEAR : { ...DAY_WITH_YEAR, timeZone });
 
 /* `Sat 19 Sep`. */
 export const formatWeekdayDay = (at: Date | number): string => formatDateTime(at, WEEKDAY_DAY);
 
 /* `19 Sep, 08:05`: a moment that is not today, to the minute. */
-export const formatDayClock = (at: Date | number): string => formatDateTime(at, DAY_CLOCK);
+export const formatDayClock = (at: Date | number, timeZone?: string): string =>
+    formatDateTime(at, timeZone === undefined ? DAY_CLOCK : { ...DAY_CLOCK, timeZone });
+
+/* `19 Sep 2026, 08:05`: the same moment with the year, for one that is not in the year we are in. */
+export const formatDayClockWithYear = (at: Date | number, timeZone?: string): string =>
+    formatDateTime(at, timeZone === undefined ? DAY_CLOCK_WITH_YEAR : { ...DAY_CLOCK_WITH_YEAR, timeZone });
 
 /* All numbers, as a form would print it: `19-9-2026` here, `9/19/2026` in the United States. */
 export const formatNumericDate = (at: Date | number): string => formatDateTime(at, NUMERIC_DATE);

@@ -19,11 +19,14 @@ Every function takes a `Date` or epoch milliseconds, so a time in epoch seconds,
 | `formatDayWithYear(at)` | The same with the year, for anything older than this year. |
 | `formatWeekdayDay(at)` | `Sat 19 Sep`. |
 | `formatDayClock(at)` | A moment that is not today, to the minute: `19 Sep, 08:05`. |
+| `formatDayClockWithYear(at)` | The same with the year, for a moment that is not in this year: `19 Sep 2026, 08:05`. |
 | `formatNumericDate(at)` | All numbers, as a form prints it: `19-9-2026` or `9/19/2026`. |
 | `formatMoment(at, now?)` | The clock when `at` is today, and the day and the clock when it is not. |
 | `formatAge(at, now?)` | How old a row is: `3d ago` for the first week, then `19 Sep`, and `19 Sep 2025` once the year is another. An `at` ahead of `now` reads `now`. |
 | `formatDateTime(at, options)` | Any `Intl.DateTimeFormatOptions`, with the same split between words and notation. |
 | `isSameDay(a, b)` | Whether two instants fall on the same day, in the reader's time zone. |
+
+`formatClock`, `formatDay`, `formatDayWithYear`, `formatDayClock` and `formatDayClockWithYear` take a time zone as a second argument. Give `'UTC'` for a moment whose parts were only written, such as `2026-03-29T02:30`: it then reads `02:30` in every zone, also one where the clocks skipped that hour.
 
 ## How the words get in
 

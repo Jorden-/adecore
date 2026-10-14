@@ -4,6 +4,7 @@ import {
     formatClock,
     formatDay,
     formatDayClock,
+    formatDayClockWithYear,
     formatDayWithYear,
     formatHour,
     formatMoment,
@@ -66,6 +67,17 @@ describe('a date', () => {
         expect(formatDayWithYear(AT)).toBe('19 Sep 2026');
         expect(formatWeekdayDay(AT)).toBe('Sat 19 Sep');
         expect(formatDayClock(AT)).toBe('19 Sep, 08:05');
+        expect(formatDayClockWithYear(AT)).toBe('19 Sep 2026, 08:05');
+    });
+
+    test('writes in the zone it is given, so a wall clock that is only written reads the same anywhere', () => {
+        inRegion('nl-NL');
+        const written = new Date(Date.UTC(2026, 2, 29, 2, 30));
+        expect(formatClock(written, 'UTC')).toBe('02:30');
+        expect(formatDay(written, 'UTC')).toBe('29 Mar');
+        expect(formatDayWithYear(written, 'UTC')).toBe('29 Mar 2026');
+        expect(formatDayClock(written, 'UTC')).toBe('29 Mar, 02:30');
+        expect(formatDayClockWithYear(written, 'UTC')).toBe('29 Mar 2026, 02:30');
     });
 
     test('keeps the American order where that is the region', () => {

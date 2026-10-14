@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, setSystemTime, test } from 'bun:test';
 import { createElement, Fragment, type ComponentType, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { compileUiBlock, evaluateUiBlock, UI_CATALOG, UiState, type UiComponentName, type UiViewNode } from '@adecore/intelligent-ui';
@@ -6,7 +6,7 @@ import { ChatHostProvider, type ChatHost } from '../../../host';
 import { UiPageMemory } from './block-local';
 import { uiChartAxis, uiChartCharacter, uiChartData, uiChartRange, uiChartText, uiChartTextWidth, niceCeiling, UI_CHART_SERIES } from './chart-data';
 import i18next from 'i18next';
-import { formatClock, formatDay, formatDayClock, setFormatSource, type FormatSource } from '@adecore/ui/format';
+import { formatClock, formatDay, formatDayClock, formatDayClockWithYear, formatDayWithYear, setFormatSource, type FormatSource } from '@adecore/ui/format';
 import { fakeFormatSource } from '@adecore/ui/testing';
 import { uiBlockHead, uiEventTime, uiLiveChoiceReason, uiNodeLabel, uiNodeText, uiReasonText, uiUrlDomain, uiWithUnit } from './node-text';
 import { UI_RENDERERS } from './registry';
@@ -15,6 +15,8 @@ import { UiSourceCitation } from './renderers/content';
 import { ChecklistRenderer } from './renderers/inputs';
 import { uiTableCell, uiTableColumns } from './table-data';
 import { UiBlockFrame, type UiBlockFrameProps } from './UiBlockFrame';
+
+afterEach(() => setSystemTime());
 
 /* A component whose children go in as the children of `createElement`, as JSX would pass them. */
 type Drawable<Props> = ComponentType<Omit<Props, 'children'>>;
@@ -315,6 +317,7 @@ describe('text and status', () => {
     });
 
     test('a timeline writes each time the way the region writes it, and reads a time without an offset as written', () => {
+        setSystemTime(new Date(2026, 9, 14, 12));
         const source =
             '<Timeline><Event at="14:02" tone="warning" detail="p95 above 2 s">Alert fired</Event>' +
             '<Event at="2026-10-14" tone="info">Rolled back</Event>' +
@@ -324,7 +327,9 @@ describe('text and status', () => {
         expect(html).toContain('<ol class="chat-ui-nodes');
         expect(html).toContain('<time dateTime="14:02"');
         expect(html).toContain('p95 above 2 s');
-        expect(html).toContain('aria-label="02:02 PM, Alert fired, Warning"');
+        expect(html).toContain('aria-label="02:02 PM, Alert fired, Warning, p95 above 2 s"');
+        expect(html).toContain('aria-label="Oct 14, Rolled back, Info"'.replace('Oct 14', formatDay(new Date(2026, 9, 14))));
+        expect(html).toContain('aria-label="' + formatDayClock(new Date(2026, 9, 14, 14, 14)) + ', Recovered"');
         expect(html).toContain(`>${formatDay(new Date(2026, 9, 14))}</time>`);
         expect(html).toContain(`>${formatDayClock(new Date(2026, 9, 14, 14, 14))}</time>`);
         expect(html).toContain(`>${formatDayClock(new Date(Date.UTC(2026, 9, 14, 12, 20)))}</time>`);
@@ -337,6 +342,29 @@ describe('text and status', () => {
         } finally {
             setFormatSource(previous);
         }
+    });
+
+    test('an event writes the year once it is not this one, and a time inside a clock change as written', () => {
+        setSystemTime(new Date(2026, 9, 14, 12));
+        expect(uiEventTime('2026-03-02')).toBe(formatDay(new Date(2026, 2, 2)));
+        expect(uiEventTime('2025-03-02')).toBe(formatDayWithYear(new Date(2025, 2, 2)));
+        expect(uiEventTime('2025-03-02T09:30')).toBe(formatDayClockWithYear(new Date(2025, 2, 2, 9, 30)));
+        expect(uiEventTime('2027-06-01T12:00:00Z')).toBe(formatDayClockWithYear(new Date(Date.UTC(2027, 5, 1, 12))));
+        expect(uiEventTime('14:02', new Date(2031, 0, 1))).toBe(formatClock(new Date(2000, 0, 1, 14, 2)));
+        const zone = process.env.TZ ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+        process.env.TZ = 'Europe/Amsterdam';
+        try {
+            expect(uiEventTime('2026-03-29T02:30')).toBe(formatDayClock(new Date(Date.UTC(2026, 2, 29, 2, 30)), 'UTC'));
+            expect(uiEventTime('2026-03-29T02:30')).toContain('02:30');
+        } finally {
+            process.env.TZ = zone;
+        }
+    });
+
+    test('an event row leaves a neutral tone out of what it says', () => {
+        const html = markup('<Timeline><Event at="14:02">Plain</Event><Event at="14:03" tone="danger" detail="Down">Alert</Event></Timeline>');
+        expect(html).toContain('aria-label="02:02 PM, Plain"');
+        expect(html).toContain('aria-label="02:03 PM, Alert, Danger, Down"');
     });
 
     test('a stat says how it changed without coloring it unless it has a tone', () => {

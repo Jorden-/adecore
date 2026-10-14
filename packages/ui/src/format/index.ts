@@ -6,6 +6,7 @@ export {
     formatDateTime,
     formatDay,
     formatDayClock,
+    formatDayClockWithYear,
     formatDayWithYear,
     formatHour,
     formatMoment,

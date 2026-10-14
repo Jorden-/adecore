@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
 import { parseUiEventTime, type UiComponentName, type UiProps, type UiViewNode } from '@adecore/intelligent-ui';
-import { formatClock, formatDay, formatDayClock } from '@adecore/ui/format';
+import { formatClock, formatDay, formatDayClock, formatDayClockWithYear, formatDayWithYear } from '@adecore/ui/format';
 import type { UiLiveStatus } from './render-context';
 
 /* The text a node holds, every `$text` below it joined as written, such as the code of a CodeBlock. */
@@ -11,6 +11,16 @@ export function uiNodeText(node: UiViewNode): string {
 /* The same text on one line, for a name a control or a screen reader needs as a string. */
 export function uiNodeLabel(node: UiViewNode): string {
     return uiNodeText(node).replace(/\s+/g, ' ').trim();
+}
+
+/* The text written directly in a node, beside its component children: the label of a Select, whose children are mostly its options. */
+export function uiOwnLabel(node: UiViewNode): string {
+    return node.children
+        .filter((child) => child.type === '$text')
+        .map((child) => String(child.props.text ?? ''))
+        .join('')
+        .replace(/\s+/g, ' ')
+        .trim();
 }
 
 /* The valid children of one kind, which a parent reads as metadata: the columns of a table, the tabs of a strip. */
@@ -119,11 +129,24 @@ export function uiUrlDomain(url: string): string {
     }
 }
 
-/* An event's `at` the way the person's language and region write it; a text the catalog would not accept stays as written. */
-export function uiEventTime(at: string): string {
+/*
+ * An event's `at` the way the person's language and region write it. The year is written once it is not the
+ * one we are in; a text without an offset reads as written, whatever zone or clock change the reader is in.
+ * A text the catalog would not accept stays as written.
+ */
+export function uiEventTime(at: string, now: Date | number = Date.now()): string {
     const moment = parseUiEventTime(at);
     if (moment === null) {
         return at;
     }
-    return moment.kind === 'time' ? formatClock(moment.date) : moment.kind === 'date' ? formatDay(moment.date) : formatDayClock(moment.date);
+    const zone = moment.written ? 'UTC' : undefined;
+    const year = moment.written ? moment.date.getUTCFullYear() : moment.date.getFullYear();
+    const withYear = year !== new Date(now).getFullYear();
+    if (moment.kind === 'time') {
+        return formatClock(moment.date, zone);
+    }
+    if (moment.kind === 'date') {
+        return withYear ? formatDayWithYear(moment.date, zone) : formatDay(moment.date, zone);
+    }
+    return withYear ? formatDayClockWithYear(moment.date, zone) : formatDayClock(moment.date, zone);
 }

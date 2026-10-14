@@ -556,7 +556,6 @@ export default {
             skipped: 'Skipped'
         },
         event: {
-            label: '{{time}}, {{title}}, {{tone}}',
             tone: {
                 neutral: 'Neutral',
                 info: 'Info',

@@ -319,6 +319,7 @@ exports[`the public API ./format exports these names 1`] = `
   "formatDateTime",
   "formatDay",
   "formatDayClock",
+  "formatDayClockWithYear",
   "formatDayWithYear",
   "formatDecimal",
   "formatDuration",

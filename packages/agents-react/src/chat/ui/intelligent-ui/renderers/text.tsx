@@ -143,11 +143,10 @@ export function EventRenderer({ node, children }: UiRendererProps<UiProps<'Event
     const { at, detail } = node.props;
     const tone = node.props.tone ?? 'neutral';
     const time = uiEventTime(at);
+    // A neutral dot says nothing the title does not, and a detail is part of what the row says.
+    const label = [time, uiNodeLabel(node), tone === 'neutral' ? '' : t(`blocks.event.tone.${tone}`), detail ?? ''].filter((part) => part !== '').join(', ');
     return (
-        <li
-            aria-label={t('blocks.event.label', { time, title: uiNodeLabel(node), tone: t(`blocks.event.tone.${tone}`) })}
-            className="group/event relative flex min-h-7 gap-3 pb-3 last:pb-0"
-        >
+        <li aria-label={label} className="group/event relative flex min-h-7 gap-3 pb-3 last:pb-0">
             <span aria-hidden className={clsx('mt-1 size-2 shrink-0 rounded-full bg-current', UI_TONE_TEXT[tone])} />
             <span aria-hidden className="absolute top-3.5 bottom-0 left-0.75 w-px bg-border group-last/event:hidden" />
             <div className="flex min-w-0 grow flex-col gap-0.5">

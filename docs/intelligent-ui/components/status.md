@@ -77,6 +77,10 @@ Events in time order. `Timeline` has no props and holds only `Event`; a complete
 | `tone`   | `UiTone` | No       | The color of the dot; the tone is also spoken to a screen reader   |
 | `detail` | string   | No       | Faint text under the title                                         |
 
-The host writes the time the way the person's language and region ask for it. A time or date-time without an offset reads as written; one with an offset (`Z` or `+02:00`) shows in the reader's own time zone. An `Event` whose `at` is none of these fails alone: it is drawn as its text, `at title (tone): detail`, and the other events still draw. The order is the order written, so the agent sorts.
+The host writes the time the way the person's language and region ask for it, and the year as well once it is not the current one. A time, date or date-time without an offset reads as written, in every time zone, also when it names an hour that the reader's clocks skip. One with an offset (`Z`, `+02:00`) is an instant and shows in the reader's own time zone. An offset runs from `-12:00` to `+14:00`; any other is refused. An `Event` whose `at` is none of these fails alone: it is drawn as its text, `at title (tone): detail`, and the other events still draw. The order is the order written, so the agent sorts.
 
-A host that draws an `Event` itself reads `at` with `parseUiEventTime(at)` from `@adecore/intelligent-ui/event-time`. It gives a `UiEventTime`, a `kind` (`time`, `date` or `datetime`) and a `date` that a formatter writes as is, or `null` for a text that is none of the three.
+A row is read to a screen reader as its time, its title, its tone unless it is neutral, and its detail.
+
+A `Timeline` holds one `Event` at least, also after an `Each` or a `Show` drew its children: one that draws none fails as a whole and shows as text. A `Timeline` has no upper limit.
+
+A host that draws an `Event` itself reads `at` with `parseUiEventTime(at)` from `@adecore/intelligent-ui/event-time`. It gives a `UiEventTime`, or `null` for a text that is none of the three. `kind` is `time`, `date` or `datetime`, and `date` is a `Date`. When `written` is true there was no offset, and `date` holds the parts as written in UTC: write it in `UTC` (the `timeZone` argument of the formatters of `@adecore/ui/format`) and it reads as written. When it is false `date` is the instant, to be written in the reader's zone.
