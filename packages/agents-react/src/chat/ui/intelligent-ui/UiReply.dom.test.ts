@@ -8,7 +8,8 @@ const files = [
     'Timeline.host.test.ts',
     'intelligent-ui/UiReply.queries.test.ts',
     'intelligent-ui/UiReply.choices.test.ts',
-    'intelligent-ui/UiReply.media.test.ts'
+    'intelligent-ui/UiReply.media.test.ts',
+    'intelligent-ui/UiReply.fields.test.ts'
 ];
 
 // React and Base UI must first load with a DOM; isolate these from the server-rendered suite.
