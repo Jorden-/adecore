@@ -239,6 +239,29 @@ export function evaluateUiBlock(block: UiBlock, state = new UiState(block), limi
                 };
             }
             view.children = children(node.children, variables, depth + 1, suffix);
+            if ('count' in entry) {
+                const limit = entry.count as { min: number; max?: number };
+                const kinds = entry.children as readonly string[];
+                const counted = view.children.filter((child) => kinds.includes(child.type)).length;
+                // What an Each or a Show drew is only known now, so the count the compiler checked on the source is checked again.
+                if (node.complete && counted < limit.min) {
+                    throw new UiFailure('invalid_props', `${node.type} needs at least ${limit.min} of ${kinds.join(' or ')}.`);
+                }
+                if (limit.max !== undefined && counted > limit.max) {
+                    let kept = 0;
+                    view.children = view.children.filter((child) => !kinds.includes(child.type) || ++kept <= limit.max!);
+                    if (result.diagnostics.length < budget.limits.diagnostics) {
+                        result.diagnostics.push(
+                            uiDiagnostic(
+                                new UiFailure('too_many_children', `${node.type} shows its first ${limit.max} of ${kinds.join(' or ')}.`),
+                                node.start,
+                                node.end,
+                                node.id
+                            )
+                        );
+                    }
+                }
+            }
             return [view];
         } catch (error) {
             if (error instanceof UiFailure && error.code === 'budget_exceeded') {

@@ -16,7 +16,7 @@ $picked = ""
 
 ## Map
 
-One to 50 places, with a numbered list of them under the map. A complete `Map` without a `Place` or with more than 50 is refused. The list is the accessible form of the map and the form a page shows when it has no tiles, so every place appears in it, also one the map could not place.
+One to 50 places, with a numbered list of them under the map. A complete `Map` without a `Place` or with more than 50 written is refused. An `Each` or a `Show` inside it is counted again once it drew: a `Map` that draws none fails as a whole, and one that draws more than 50 shows the first 50 with the diagnostic `too_many_children`. The list is the accessible form of the map and the form a page shows when it has no tiles, so every place appears in it, also one the map could not place.
 
 | Prop    | Type   | Required | Notes                                                |
 | ------- | ------ | -------- | ---------------------------------------------------- |
