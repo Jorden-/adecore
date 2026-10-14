@@ -28,6 +28,22 @@ export function uiMayReferenceHost(text: string): boolean {
     return new RegExp(`<(?:${links.join('|')})\\b`).test(text) || ADDRESSED_PLACE.test(text);
 }
 
+/* The children of a Map as its fallback numbers them: each Place that drew, also inside a Show or an Each, in order, and anything else as it is. */
+function numberedPlaces(children: readonly UiNode[]): string {
+    let number = 0;
+    const visit = (nodes: readonly UiNode[]): string =>
+        nodes
+            .map((child) =>
+                child.type === 'Place' && !child.error
+                    ? `${++number}. ${child.fallback}`
+                    : child.type === 'Show' || child.type === 'Each'
+                      ? visit(child.children)
+                      : child.fallback
+            )
+            .join('');
+    return visit(children);
+}
+
 export interface UiNode {
     id: string;
     type: string;
@@ -337,15 +353,18 @@ export function compileUiBlock(source: string, options: UiCompileOptions): UiBlo
         node.children = syntax.children.map((child) => compile(child, depth + 1, effectiveParent));
         // A reader of the fallback has no control to look at, so the option a dropdown or a segmented control starts on says it is chosen.
         const chosen = syntax.type === 'Select' || syntax.type === 'Segmented' ? fallbackProps.value : undefined;
-        const childText = node.children
-            .map((child) =>
-                syntax.type === 'Select' && child.type === '$text' && child.fallback.trim() !== ''
-                    ? `${child.fallback.trim()}\n`
-                    : chosen !== undefined && child.type === 'Option' && !child.error && sameUiValue(child.props.value, chosen)
-                      ? `${child.fallback.trimEnd()} (chosen)\n`
-                      : child.fallback
-            )
-            .join('');
+        const childText =
+            syntax.type === 'Map'
+                ? numberedPlaces(node.children)
+                : node.children
+                      .map((child) =>
+                          syntax.type === 'Select' && child.type === '$text' && child.fallback.trim() !== ''
+                              ? `${child.fallback.trim()}\n`
+                              : chosen !== undefined && child.type === 'Option' && !child.error && sameUiValue(child.props.value, chosen)
+                                ? `${child.fallback.trimEnd()} (chosen)\n`
+                                : child.fallback
+                      )
+                      .join('');
         node.fallback = uiNodeFallback(syntax.type, fallbackProps, childText);
         // A part drawn as its text keeps the words written inside it, also where its kind reads only props.
         if (node.error !== undefined && childText.trim() !== '' && !node.fallback.includes(childText.trim())) {

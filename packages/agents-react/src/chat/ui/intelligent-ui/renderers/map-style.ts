@@ -19,7 +19,7 @@ export interface MapPoint {
 }
 
 /* How far a map zooms to fit its points: street level with tiles, and only a country or two on the outline, which has nothing finer. */
-export const MAP_MAX_ZOOM = { tiles: 16, outline: 5 } as const;
+export const MAP_MAX_ZOOM = { tiles: 16, outline: 6 } as const;
 
 /* The map a page draws without tiles: land over water, from the outline of the world that ships with the package. */
 export function baseMapStyle({ land, water }: MapColors): MapStyle {
@@ -67,15 +67,30 @@ export function localizedTextField(original: unknown, field: string): unknown {
     return ['coalesce', ['get', field], fallback];
 }
 
-/* The bounds that hold every point, or null for none. */
+/*
+ * The bounds that hold every point, or null for none. Longitudes go round the globe, so the bounds leave out
+ * the widest gap between two neighbors: points on both sides of the date line span a few degrees, not 360.
+ * The east edge may then pass 180, which the map takes.
+ */
 export function boundsOf(points: readonly MapPoint[]): LngLatBoundsLike | null {
     if (points.length === 0) {
         return null;
     }
-    const lons = points.map((point) => point.lon);
+    const lons = points.map((point) => point.lon).sort((a, b) => a - b);
+    let widest = lons[0]! + 360 - lons[lons.length - 1]!;
+    let west = lons[0]!;
+    let east = lons[lons.length - 1]!;
+    for (let i = 1; i < lons.length; i++) {
+        const gap = lons[i]! - lons[i - 1]!;
+        if (gap > widest) {
+            widest = gap;
+            west = lons[i]!;
+            east = lons[i - 1]! + 360;
+        }
+    }
     const lats = points.map((point) => point.lat);
     return [
-        [Math.min(...lons), Math.min(...lats)],
-        [Math.max(...lons), Math.max(...lats)]
+        [west, Math.min(...lats)],
+        [east, Math.max(...lats)]
     ];
 }

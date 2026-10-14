@@ -19,6 +19,9 @@ describe('the number of children after an Each or a Show drew them', () => {
         expect(evaluated.diagnostics.map((item) => item.code)).toEqual(['too_many_children']);
         const map = block(`<Map><Each items={${ids(80)}} as="name"><Place address={name}>{name}</Place></Each></Map>`);
         expect(evaluateUiBlock(map).nodes[0].children).toHaveLength(50);
+        expect(evaluateUiBlock(map).nodes[0].omitted).toBe(30);
+        expect(evaluated.nodes[0].omitted).toBe(36);
+        expect(evaluateUiBlock(block('<Gallery><Image attachment="a"/></Gallery>')).nodes[0].omitted).toBeUndefined();
     });
 
     test('a gallery or a timeline that an Each or a Show leaves empty fails alone', () => {

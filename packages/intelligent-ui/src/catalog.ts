@@ -122,7 +122,8 @@ export const UI_CATALOG = {
     },
     Place: {
         group: 'places',
-        description: 'One place by lat and lon, or by an address the host looks up; children are the name.',
+        description:
+            'One place by lat and lon, or by an address the host looks up; with both, the point the host finds for the address wins and lat and lon stand when it finds none. Children are the name.',
         schema: z
             .strictObject({
                 lat: number.min(-90).max(90).optional(),

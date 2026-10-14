@@ -590,6 +590,8 @@ export default {
         map: {
             label_one: 'Kaart met {{count}} plek',
             label_other: 'Kaart met {{count}} plekken',
+            omitted_one: '{{count}} plek meer wordt niet getoond',
+            omitted_other: '{{count}} plekken meer worden niet getoond',
             lookingUp: 'Wordt opgezocht',
             notFound: 'Niet op de kaart',
             zoomIn: 'Inzoomen',

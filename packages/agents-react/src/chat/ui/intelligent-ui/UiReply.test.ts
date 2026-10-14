@@ -198,7 +198,7 @@ const UTRECHT =
     '<Place address="Oudegracht 245, Utrecht">Oudegracht</Place><Place address="Nowhere 1">Lost</Place></Map>';
 
 test('draws a map as a numbered list and says which places are still being looked up', () => {
-    const markup = drawn(UTRECHT);
+    const markup = drawn(UTRECHT, { phase: 'streaming' });
     expect(markup).toContain('aria-label="Map of 3 places"');
     expect(markup.match(/<li>/g)).toHaveLength(3);
     expect(markup).toContain('Climb the tower');
@@ -219,7 +219,7 @@ test('a map takes the points its machine froze and keeps a place without one in 
                 revision: 'r1',
                 readings: {},
                 fallback: '',
-                places: { [ids[1]]: { state: 'found' as const, lat: 52.0849, lon: 5.1181, label: 'Oudegracht' } }
+                places: { [ids[1]]: { state: 'found' as const, address: 'Oudegracht 245, Utrecht', lat: 52.0849, lon: 5.1181, label: 'Oudegracht' } }
             }
         }
     };
@@ -233,4 +233,58 @@ test('a place the catalog refused is drawn as its text under the list', () => {
     const markup = drawn('<Map><Place lat={52} lon={5}>Good</Place><Place lat={200} lon={5}>Bad</Place></Map>');
     expect(markup.match(/<li>/g)).toHaveLength(1);
     expect(markup).toContain('Bad');
+});
+
+test('a frozen point belongs to the address it was looked up for, not to the node that held it', () => {
+    const source = '<Map><Each items={["Domplein 1", "Oudegracht 245"]} as="street"><Place address={street}>{street}</Place></Each></Map>';
+    const reordered = '<Map><Each items={["Oudegracht 245", "Domplein 1"]} as="street"><Place address={street}>{street}</Place></Each></Map>';
+    const frozen = (text: string) => {
+        const blocks = compileUi('```ui\n' + text + '\n```', { id: 'item', final: true }).map((block) => ({ ...block, revision: 'r1' }));
+        return { blocks, ids: evaluateUiBlock(blocks[0]).nodes[0].children.map((place) => place.id) };
+    };
+    const first = frozen(source);
+    const queries = {
+        authorChatId: 'chat',
+        blocks: {
+            [first.blocks[0].id]: {
+                revision: 'r1',
+                readings: {},
+                fallback: '',
+                places: {
+                    [first.ids[0]]: { state: 'found' as const, address: 'Domplein 1', lat: 52.0907, lon: 5.1214 },
+                    [first.ids[1]]: { state: 'found' as const, address: 'Oudegracht 245', lat: 52.0849, lon: 5.1181 }
+                }
+            }
+        }
+    };
+    const text = (body: string) => '```ui\n' + body + '\n```';
+    const same = renderToStaticMarkup(createElement(UiReply, { text: text(source), blocks: first.blocks, context, queries }));
+    expect(same).not.toContain('Not on the map');
+    // The same nodes now hold the other addresses: the readings stay with their addresses, so nothing borrows another place's point.
+    const moved = frozen(reordered);
+    const swapped = renderToStaticMarkup(
+        createElement(UiReply, {
+            text: text(reordered),
+            blocks: moved.blocks,
+            context,
+            queries: { ...queries, blocks: { [moved.blocks[0].id]: queries.blocks[first.blocks[0].id] } }
+        })
+    );
+    expect(swapped.match(/Not on the map/g)).toHaveLength(2);
+});
+
+test('a finished reply the machine keeps no readings for reads its addresses as not found, and one it has not frozen yet as being looked up', () => {
+    const text = '```ui\n<Map><Place address="Domplein 1">Dom</Place></Map>\n```';
+    const blocks = compileUi(text, { id: 'item', final: true }).map((block) => ({ ...block, revision: 'r1' }));
+    expect(renderToStaticMarkup(createElement(UiReply, { text, blocks, context }))).toContain('Not on the map');
+    const waiting = renderToStaticMarkup(createElement(UiReply, { text, blocks, context, queries: { authorChatId: 'chat', blocks: {} } }));
+    expect(waiting).toContain('Looking up');
+    expect(renderToStaticMarkup(createElement(UiReply, { text, blocks, context: { ...context, phase: 'streaming' } }))).toContain('Looking up');
+});
+
+test('a map that left places out says so', () => {
+    const stops = JSON.stringify(Array.from({ length: 53 }, (_, i) => `Stop ${i}`));
+    const markup = drawn(`<Map><Each items={${stops}} as="stop"><Place lat={1} lon={5}>{stop}</Place></Each></Map>`);
+    expect(markup.match(/<li>/g)).toHaveLength(50);
+    expect(markup).toContain('3 more places are not shown');
 });

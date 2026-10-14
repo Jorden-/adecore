@@ -203,7 +203,7 @@ test.skipIf(typeof document === 'undefined')('draws the outline of the world whe
     const [map] = FakeMap.made;
     expect(typeof map.options.style).toBe('object');
     expect(map.options.style.layers.map((layer: { id: string }) => layer.id)).toEqual(['water', 'land']);
-    expect(map.fitted[0][1]).toMatchObject({ maxZoom: 5 });
+    expect(map.fitted[0][1]).toMatchObject({ maxZoom: 6 });
     expect(statuses).toEqual(['base']);
     await act(async () => map.emit('load'));
     expect(statuses).toEqual(['base']);

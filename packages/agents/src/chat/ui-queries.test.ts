@@ -382,8 +382,8 @@ describe('places looked up beside a block', () => {
         await r.frozen;
         expect(asked).toEqual(['Dom|Domplein 1, Utrecht', 'Lost|Nowhere 1']);
         expect(r.stored()!.places).toEqual({
-            [r.ids[1]!]: { state: 'found', lat: 52.0907, lon: 5.1214, label: 'Domplein, Utrecht' },
-            [r.ids[2]!]: { state: 'missing', code: 'no-match' }
+            [r.ids[1]!]: { state: 'found', address: 'Domplein 1, Utrecht', lat: 52.0907, lon: 5.1214, label: 'Domplein, Utrecht' },
+            [r.ids[2]!]: { state: 'missing', address: 'Nowhere 1', code: 'no-match' }
         });
         expect(r.stored()!.fallback).toContain('Places: Dom: 52.0907, 5.1214');
     });
@@ -398,7 +398,12 @@ describe('places looked up beside a block', () => {
         const r = placesRig(async () => (await answers.shift()!()) as ChatUiPlaceReading);
         r.queries.observe(r.session, r.item, true);
         await r.frozen;
-        expect(r.stored()!.places![r.ids[1]!]).toEqual({ state: 'missing', code: 'rate-limited', reason: 'The service asked to wait.' });
+        expect(r.stored()!.places![r.ids[1]!]).toEqual({
+            state: 'missing',
+            address: 'Domplein 1, Utrecht',
+            code: 'rate-limited',
+            reason: 'The service asked to wait.'
+        });
         expect(r.stored()!.places![r.ids[2]!]!.state).toBe('missing');
         expect(r.stored()!.places![r.ids[2]!]!.lat).toBeUndefined();
     });
@@ -425,7 +430,7 @@ describe('places looked up beside a block', () => {
 
     test('a reply whose block changed while it was looked up drops the write', async () => {
         const called = Promise.withResolvers<void>();
-        const release = Promise.withResolvers<ChatUiPlaceReading>();
+        const release = Promise.withResolvers<Omit<ChatUiPlaceReading, 'address'>>();
         const r = placesRig(async () => {
             called.resolve();
             return release.promise;

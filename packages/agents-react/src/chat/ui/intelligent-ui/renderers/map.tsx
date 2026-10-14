@@ -8,7 +8,8 @@ import { useChatHost, type UiMapSource } from '../../../../host';
 import { lazyNamed } from '../../../../lazy';
 import { DiffFallbackBoundary } from '../../diff/DiffFallbackBoundary';
 import { uiChildrenOf, uiNodeLabel } from '../node-text';
-import type { UiPlacePoint, UiRenderContext, UiRendererProps } from '../render-context';
+import type { UiPlacePoint, UiRendererProps } from '../render-context';
+import { placePoint } from './place-point';
 import { useLater } from '../use-later';
 import { bindingOf, PENDING } from './binding';
 import type { MapMarker, MapViewStatus } from './map-view';
@@ -23,15 +24,6 @@ interface ListedPlace {
     node: UiViewNode<UiProps<'Place'>>;
     name: string;
     point: UiPlacePoint | null | undefined;
-}
-
-/* Coordinates the agent wrote win over a lookup; an address alone waits for the host's reading of it. */
-function pointOf(place: UiViewNode<UiProps<'Place'>>, context: UiRenderContext): UiPlacePoint | null | undefined {
-    const { lat, lon } = place.props;
-    if (lat !== undefined && lon !== undefined) {
-        return { lat, lon };
-    }
-    return context.place === undefined ? null : context.place(place.id);
 }
 
 /* The number that ties a row to its marker. The list numbers itself for a screen reader, so the chip is only for the eye. */
@@ -151,7 +143,11 @@ export function MapRenderer({ node, children, context }: UiRendererProps<UiProps
     const binding = bindingOf(node, context);
     const current = binding?.value ?? node.props.value;
     const maps = useChatHost().maps;
-    const places: ListedPlace[] = uiChildrenOf(node, 'Place').map((place) => ({ node: place, name: uiNodeLabel(place), point: pointOf(place, context) }));
+    const places: ListedPlace[] = uiChildrenOf(node, 'Place').map((place) => ({
+        node: place,
+        name: uiNodeLabel(place),
+        point: placePoint(place.props, place.id, context)
+    }));
     const markers = places.flatMap((listed, index) =>
         listed.point ? [{ id: listed.node.id, number: index + 1, lat: listed.point.lat, lon: listed.point.lon }] : []
     );
@@ -185,6 +181,9 @@ export function MapRenderer({ node, children, context }: UiRendererProps<UiProps
                     );
                 })}
             </ol>
+            {node.omitted !== undefined && node.omitted > 0 && (
+                <p className="px-2 text-xs text-text-faint">{t('blocks.map.omitted', { count: node.omitted })}</p>
+            )}
             {/* A place the catalog refused draws as its text, which is all its node renders. */}
             <div className="chat-ui-nodes flex flex-col gap-1.5 empty:hidden">{children}</div>
         </div>

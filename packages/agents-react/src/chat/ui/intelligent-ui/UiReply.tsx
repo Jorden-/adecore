@@ -367,15 +367,16 @@ function UiNodeBody({
 
 /*
  * The points the machine froze beside a block, as a renderer asks for them. Until the block is frozen
- * nothing is looked up yet; once it is, a place with no reading is one the machine did not look up.
+ * nothing is looked up yet, unless the machine keeps no readings for this reply at all; once it is, a place
+ * with no reading for its current address is one the machine did not look up.
  */
-function placeReader(frozen: ChatUiQueryState['blocks'][string] | undefined, revision: string | undefined): UiRenderContext['place'] {
+function placeReader(frozen: ChatUiQueryState['blocks'][string] | undefined, revision: string | undefined, unrecorded: boolean): UiRenderContext['place'] {
     if (frozen === undefined || frozen.revision !== revision) {
-        return () => undefined;
+        return () => (unrecorded ? null : undefined);
     }
-    return (nodeId) => {
+    return (nodeId, address) => {
         const reading = Object.hasOwn(frozen.places ?? {}, nodeId) ? frozen.places![nodeId] : undefined;
-        return reading?.state === 'found' && reading.lat !== undefined && reading.lon !== undefined
+        return reading?.address === address.trim() && reading.state === 'found' && reading.lat !== undefined && reading.lon !== undefined
             ? { lat: reading.lat, lon: reading.lon, label: reading.label }
             : null;
     };
@@ -388,12 +389,15 @@ function UiBlockBody({
     block,
     context,
     answered,
-    frozen
+    frozen,
+    unrecorded
 }: {
     block: UiBlock;
     context: UiBlockIdentity;
     answered?: ChatUiAnswer;
     frozen?: ChatUiQueryState['blocks'][string];
+    /* Set for a finished reply the machine keeps no readings for, which nothing will ever look up. */
+    unrecorded: boolean;
 }): ReactNode {
     const host = useChatHost();
     const { t } = useTranslation('agent-chat');
@@ -446,7 +450,7 @@ function UiBlockBody({
     );
     const liveValue = useUiLiveValues(block, evaluation.nodes, queries.currentReadings);
     const sendChoice = host.intelligentUi?.sendChoice;
-    const place = useMemo(() => placeReader(frozen, block.revision), [frozen, block.revision]);
+    const place = useMemo(() => placeReader(frozen, block.revision, unrecorded), [frozen, block.revision, unrecorded]);
     const rendering: UiRenderContext = {
         ...context,
         ...links,
@@ -549,6 +553,7 @@ export function UiReply({
                         <UiBlockBody
                             block={part.block}
                             frozen={queries?.blocks[part.block.id]}
+                            unrecorded={context.phase === 'final' && queries === undefined}
                             answered={answers?.[part.block.id]}
                             context={{ scopeId: context.scopeId, chatId: context.chatId, itemId: context.itemId, phase: context.phase, blockId: part.block.id }}
                         />

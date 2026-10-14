@@ -71,8 +71,12 @@ export interface UiRenderContext {
     onChoose?(nodeId: string): void;
     /* Why the choices are closed while `onChoose` is absent, such as live data still being read; without it they say they are not available. */
     choiceReason?: string | null;
-    /* Where the Place of `nodeId` stands: undefined while it is not looked up yet, null when no point was found. */
-    place?(nodeId: string): UiPlacePoint | null | undefined;
+    /*
+     * The point the host found for the `address` of the Place `nodeId`: undefined while it is not looked up
+     * yet, null when none was found. A reading counts only for the address it was made for, so a place that
+     * moved to another node, or whose address changed, does not wear another place's point.
+     */
+    place?(nodeId: string, address: string): UiPlacePoint | null | undefined;
     /* Table cells use the evaluated rows index and column key. */
     liveValue?(nodeId: string, prop: string, path?: readonly [row: number, key: string]): UiLiveValue | undefined;
 }

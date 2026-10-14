@@ -36,7 +36,7 @@ export interface ChatUiHost {
      * frozen beside the block for every client. `signal` aborts after five seconds. A host without it
      * freezes nothing, and such a place reads as not found.
      */
-    place?(info: ChatInfo, query: UiPlaceQuery, signal: AbortSignal): Promise<ChatUiPlaceReading>;
+    place?(info: ChatInfo, query: UiPlaceQuery, signal: AbortSignal): Promise<Omit<ChatUiPlaceReading, 'address'>>;
 }
 
 interface CachedReading {
@@ -192,16 +192,17 @@ export class ChatUiQueries {
                         );
                         if (frozen.places) {
                             frozen.places = Object.fromEntries(
-                                Object.keys(places).map((id) => [
+                                Object.entries(places).map(([id, reading]) => [
                                     id,
-                                    { state: 'missing', code: 'snapshot-too-large', reason: 'The frozen places are too large.' }
+                                    { state: 'missing', address: reading.address, code: 'snapshot-too-large', reason: 'The frozen places are too large.' }
                                 ])
                             );
                         }
                         frozen.fallback = `${block.fallback.slice(0, 2048)}\nSources: ${names}\nThe frozen query values are too large.`;
                     }
                     if (Buffer.byteLength(JSON.stringify(blocks)) > MAX_SNAPSHOT_BYTES) {
-                        delete blocks[block.id];
+                        // The block stays marked as frozen with nothing in it, so a reader stops waiting for readings that will not come.
+                        blocks[block.id] = { revision: block.revision!, readings: {}, fallback: '' };
                     }
                     session.updateUiQueries(item.id, { ...latest.uiQueries, blocks });
                 }
@@ -224,12 +225,12 @@ export class ChatUiQueries {
                     })
                 )
             ]);
-            const parsed = ChatUiPlaceReadingSchema.parse(copyUiValue(reading, new UiBudget()));
+            const parsed = ChatUiPlaceReadingSchema.parse({ ...(copyUiValue(reading, new UiBudget()) as object), address: query.address });
             return parsed.state === 'found' && (parsed.lat === undefined || parsed.lon === undefined)
-                ? { state: 'missing', code: 'place-unreadable', reason: 'The host found no point for this address.' }
+                ? { state: 'missing', address: query.address, code: 'place-unreadable', reason: 'The host found no point for this address.' }
                 : parsed;
         } catch (error) {
-            return { state: 'missing', ...this.failure(error) };
+            return { state: 'missing', address: query.address, ...this.failure(error) };
         } finally {
             clearTimeout(timeout);
         }

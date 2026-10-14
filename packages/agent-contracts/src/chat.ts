@@ -359,6 +359,8 @@ export type ChatUiLinkReading = z.infer<typeof ChatUiLinkReadingSchema>;
 // `state` is a frozen set, like a link's: native clients validate these payloads whole.
 export const ChatUiPlaceReadingSchema = z.object({
     state: z.enum(['found', 'missing']),
+    // The address as it was looked up (trimmed), which a reader compares with the address a node has now: a node id alone moves with a reordered Each.
+    address: z.string(),
     lat: z.number().min(-90).max(90).optional(),
     lon: z.number().min(-180).max(180).optional(),
     // What the host called the point it found, such as the street and town.

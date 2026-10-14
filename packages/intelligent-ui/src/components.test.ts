@@ -256,6 +256,13 @@ describe('Map and Place', () => {
                 'Plan around'
         );
         expect(block('<Map><Place lat={1} lon={2}>First\nline</Place></Map>').fallback).toBe('1. First line (1, 2)');
+        const failed = block('<Map><Place lat={1} lon={2}>One</Place><Place lat={200} lon={2}>Bad</Place><Place lat={3} lon={4}>Two</Place></Map>');
+        expect(failed.fallback).toBe('1. One (1, 2)\nBad (200, 2)\n2. Two (3, 4)');
+        const each = block(
+            '$names = ["A 1", "B 2"]\n<Map><Place lat={1} lon={2}>First</Place><Each items={$names} as="n"><Place address={n}>{n}</Place></Each></Map>'
+        );
+        expect(each.fallback).toContain('1. First (1, 2)');
+        expect(each.fallback).toContain('2. ');
     });
 
     test('a Choice carries the picked place only when a place offers its value', () => {
@@ -268,17 +275,18 @@ describe('Map and Place', () => {
 });
 
 describe('the places a host looks up', () => {
-    test('names each place that gives an address and no coordinates, with its name', () => {
+    test('names each place that gives an address, also one with coordinates, with its name', () => {
         const compiled = block(
             '<Map><Place lat={52} lon={5} address="Utrecht">Known</Place><Place address="  Domplein 1, Utrecht ">Dom   <Tag>tower</Tag></Place>' +
                 '<Place address="Oudegracht 245">Gracht</Place></Map>'
         );
         const [known, dom, gracht] = evaluateUiBlock(compiled).nodes[0].children;
         expect(uiPlaceQueries(compiled)).toEqual({
+            [known.id]: { address: 'Utrecht', name: 'Known' },
             [dom.id]: { address: 'Domplein 1, Utrecht', name: 'Dom tower' },
             [gracht.id]: { address: 'Oudegracht 245', name: 'Gracht' }
         });
-        expect(uiPlaceQueries(compiled)[known.id]).toBeUndefined();
+        expect(uiPlaceQueries(block('<Map><Place lat={52} lon={5}>Known</Place></Map>'))).toEqual({});
     });
 
     test('follows an Each, and skips a place that failed, and refuses a block that is still being written', () => {

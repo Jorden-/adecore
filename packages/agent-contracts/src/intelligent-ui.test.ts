@@ -28,11 +28,12 @@ test('a frozen block reads with or without the places looked up beside it', () =
     const older = { authorChatId: 'chat', blocks: { block: { revision: 'r1', readings: {}, fallback: 'Text' } } };
     expect(ChatUiQueryStateSchema.parse(older) as unknown).toEqual(older);
     const places = {
-        found: { state: 'found', lat: 52.0907, lon: 5.1214, label: 'Domplein, Utrecht' },
-        missing: { state: 'missing', code: 'place-not-found', reason: 'No match for this address.' }
+        found: { state: 'found', address: 'Domplein 1, Utrecht', lat: 52.0907, lon: 5.1214, label: 'Domplein, Utrecht' },
+        missing: { state: 'missing', address: 'Nowhere 1', code: 'place-not-found', reason: 'No match for this address.' }
     };
     const newer = { authorChatId: 'chat', blocks: { block: { revision: 'r1', readings: {}, fallback: 'Text', places } } };
     expect(ChatUiQueryStateSchema.parse(newer) as unknown).toEqual(newer);
-    expect(ChatUiPlaceReadingSchema.safeParse({ state: 'found', lat: 91, lon: 5 }).success).toBe(false);
-    expect(ChatUiPlaceReadingSchema.safeParse({ state: 'later' }).success).toBe(false);
+    expect(ChatUiPlaceReadingSchema.safeParse({ state: 'found', address: 'x', lat: 91, lon: 5 }).success).toBe(false);
+    expect(ChatUiPlaceReadingSchema.safeParse({ state: 'later', address: 'x' }).success).toBe(false);
+    expect(ChatUiPlaceReadingSchema.safeParse({ state: 'missing' }).success).toBe(false);
 });

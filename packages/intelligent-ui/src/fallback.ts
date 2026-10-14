@@ -52,12 +52,8 @@ export function uiNodeFallback(type: string, props: Readonly<Record<string, unkn
             return `${children.trim()}${point}${address}${detail}`.replace(/\s+/g, ' ').trim() + '\n';
         }
         case 'Map':
-            return children
-                .split('\n')
-                .filter((line) => line.trim() !== '')
-                .map((line, index) => `${index + 1}. ${line}`)
-                .join('\n')
-                .concat('\n');
+            // The places are numbered where the compiler joins them, since only it knows which of the children drew.
+            return children;
         case 'Image':
             return `[Image: ${uiPlainText(props.alt ?? props.attachment ?? props.generated ?? 'unavailable')}]${children}\n`;
     }

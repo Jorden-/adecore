@@ -590,6 +590,8 @@ export default {
         map: {
             label_one: 'Map of {{count}} place',
             label_other: 'Map of {{count}} places',
+            omitted_one: '{{count}} more place is not shown',
+            omitted_other: '{{count}} more places are not shown',
             lookingUp: 'Looking up',
             notFound: 'Not on the map',
             zoomIn: 'Zoom in',

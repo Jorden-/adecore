@@ -43,3 +43,29 @@ test('the bounds hold every point, and none for no points', () => {
         [11, 52]
     ]);
 });
+
+test('points on both sides of the date line span a few degrees, not the globe', () => {
+    expect(
+        boundsOf([
+            { id: 'a', lat: -17, lon: 179.5 },
+            { id: 'b', lat: -18, lon: -179 }
+        ])
+    ).toEqual([
+        [179.5, -18],
+        [181, -17]
+    ]);
+    expect(
+        boundsOf([
+            { id: 'a', lat: 0, lon: -170 },
+            { id: 'b', lat: 0, lon: 170 },
+            { id: 'c', lat: 0, lon: 178 }
+        ])
+    ).toEqual([
+        [170, 0],
+        [190, 0]
+    ]);
+    expect(boundsOf([{ id: 'a', lat: 1, lon: 5 }])).toEqual([
+        [5, 1],
+        [5, 1]
+    ]);
+});

@@ -21,6 +21,8 @@ export interface UiViewNode<Props = Record<string, unknown>> {
     complete: boolean;
     fallback: string;
     error?: string;
+    // How many children a container left out because it holds at most so many of its kind; absent when it left none out.
+    omitted?: number;
     // Runs the node's state action; present only on a component that has one.
     onAction?(): void;
 }
@@ -250,6 +252,7 @@ export function evaluateUiBlock(block: UiBlock, state = new UiState(block), limi
                 if (limit.max !== undefined && counted > limit.max) {
                     let kept = 0;
                     view.children = view.children.filter((child) => !kinds.includes(child.type) || ++kept <= limit.max!);
+                    view.omitted = counted - limit.max;
                     if (result.diagnostics.length < budget.limits.diagnostics) {
                         result.diagnostics.push(
                             uiDiagnostic(
