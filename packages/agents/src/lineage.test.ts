@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AgentLineageStore } from './lineage.ts';
@@ -100,6 +100,36 @@ test('a fork keeps the depth of its original and lives on its own: no child, no 
     expect(restarted.descendants('chat-a')).toEqual([]);
     await restarted.prune('p1', new Set(['chat-a']));
     expect(restarted.projectOf('chat-b')).toBeNull();
+});
+
+test('a rehomed fork leaves the old project, and keeps its dates, its original and its place after a reload', async () => {
+    await mkdir(join(home, 'lineage'), { recursive: true });
+    await writeFile(
+        join(home, 'lineage', 'chat-b.json'),
+        '{"projectId":"a","nodeId":"chat-b","openedBy":"chat-a","depth":1,"agent":true,"relation":"fork","createdAt":1000,"endedAt":2000}'
+    );
+    await store.load();
+    expect(store.forksLeaving('a', new Set())).toEqual(['chat-b']);
+
+    expect(await store.rehome('chat-b', 'b')).toBe(true);
+
+    expect(store.forksLeaving('a', new Set())).toEqual([]);
+    await store.prune('a', new Set());
+    expect(store.projectOf('chat-b')).toBe('b');
+    expect(store.forkedFrom('chat-b')).toBe('chat-a');
+    expect(store.endedAt('chat-b')).toBe(2000);
+    expect(JSON.parse(await readFile(join(home, 'lineage', 'chat-b.json'), 'utf8'))).toMatchObject({ projectId: 'b', createdAt: 1000, endedAt: 2000 });
+
+    const restarted = new AgentLineageStore(home);
+    await restarted.load();
+    expect(restarted.projectOf('chat-b')).toBe('b');
+    expect(restarted.forkedFrom('chat-b')).toBe('chat-a');
+    expect(restarted.forksLeaving('b', new Set())).toEqual(['chat-b']);
+});
+
+test('rehoming a node nobody wrote down changes nothing', async () => {
+    expect(await store.rehome('nobody', 'b')).toBe(false);
+    expect(store.projectOf('nobody')).toBeNull();
 });
 
 // A record exactly as a Ruimte daemon before lineage moved into @adecore/agents wrote it, so one updated in place reads it.

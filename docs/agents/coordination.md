@@ -108,6 +108,8 @@ export async function openTaskServices(dataDir: string, chats: ChatCore, placedI
 
 `endChildren` ends the chats a chat opened, and theirs. Add `EndChildrenWorkSchema` to the outbox; `owe(target)` writes the obligation first, and its handler marks the lineage ended, removes work that would start them again, cancels their tasks, and stops them deepest first through your `stop(nodeId, reason)`. List every kind of work of your own that would start a chat again in `reviving`.
 
+`rehome(nodeId, projectId)` moves one node's record to another project with its dates as they were, for a chat your app moved; `prune` and `forksLeaving` of the old project no longer find it, and it answers false when no record exists.
+
 ## Messages
 
 `NoticeStore` keeps the messages waiting for a chat under `notices/`, at most ten per chat and for six hours. `take` hands them to the model once; `show` marks them seen by a person, independently.
