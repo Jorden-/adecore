@@ -592,7 +592,15 @@ export default {
             label_one: 'Map of {{count}} place',
             label_other: 'Map of {{count}} places',
             lookingUp: 'Looking up',
-            notFound: 'Not on the map'
+            notFound: 'Not on the map',
+            zoomIn: 'Zoom in',
+            zoomOut: 'Zoom out',
+            scrollHint: 'Hold ⌘ or Ctrl and scroll to zoom',
+            touchHint: 'Use two fingers to move the map',
+            offline: 'Map tiles are not available offline. The places stay listed.',
+            disabled: 'Map tiles are off.',
+            signedOut: 'Sign in to show map tiles.',
+            unavailable: 'Map tiles are not available right now.'
         },
         compare: {
             label: 'Compare {{before}} and {{after}}',

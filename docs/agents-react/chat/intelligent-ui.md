@@ -35,7 +35,20 @@ A renderer never sends a message, never reads a path and never opens an address 
 | `openUrl(scopeId, url)` | A source cannot be opened. |
 | `subscribe(scopeId, chatId, changed)` | Visible blocks only refresh on their own interval. |
 
-A `Map` asks one more thing of the host, outside `intelligentUi`: `ChatHost.maps.useSource(scopeId)` returns a `UiMapSource`. It is either `{ state: 'tiles', styleUrl(theme), transformRequest? }`, where the host names the style of each theme and may rewrite every address the map requests, or `{ state: 'off', reason }` with `disabled`, `signed-out` or `unavailable`. A chat never learns who serves the tiles or what admits a request to them. Without `maps` a map shows its list of places only. See [Places](/intelligent-ui/components/places).
+## Maps
+
+A `Map` asks one more thing of the host, outside `intelligentUi`: `ChatHost.maps.useSource(scopeId)` returns a `UiMapSource`. A chat never learns who serves the tiles, what key pays for them or what admits a request: the host owns all three.
+
+| Source | Fields |
+| --- | --- |
+| `{ state: 'tiles' }` | `styleUrl(theme)` names the style document of `light` or `dark`. `transformRequest(url)` may rewrite every address the map requests, such as to add a ticket. `labelField(language)` names the feature property that holds a label in that language; without it labels stay as the style writes them. `attribution` is the credit the tiles ask for, drawn under the map. |
+| `{ state: 'off' }` | `reason` is `disabled`, `signed-out` or `unavailable`, and the map says so under the picture. |
+
+Without `maps` a map draws the built-in outline of the world and its list of places, and says nothing about tiles. The outline is also what a map falls back to when its style does not arrive and when the page is offline, and the line under the picture then says why. The list of places is drawn in every case, so it is the form a screen reader and a map that failed to start both rely on.
+
+The map is drawn by MapLibre GL JS (BSD-3-Clause, `maplibre-gl` 6). It loads as a chunk of its own with the first map a page shows: about 1.1 MB minified and 300 kB gzipped, with a worker file of 500 kB beside it and a stylesheet. Nothing of it is in the first load of a chat, and `lazyNamed` hands the chunk to the app's prefetcher. The app's bundler has to serve the worker: the package points MapLibre to `maplibre-gl/dist/maplibre-gl-worker.mjs` with `new URL(..., import.meta.url)`, which Vite and bundlers with the same asset rule emit with a hashed name. A Content Security Policy needs `worker-src` for the page's own origin (and `blob:` for a worker from another origin), `img-src` and `connect-src` for the host's service and `data:` images; MapLibre does not evaluate strings, and nothing here needs `'unsafe-eval'`.
+
+Markers are numbered like the list, the picked one is drawn in the accent, and clicking a marker picks its place the way a row of the list does. The map holds back the wheel and a single finger until Ctrl or Command is held, or two fingers are used, and says so. The tokens `--map-land` and `--map-water` paint the outline, `--map-marker` and `--map-marker-text` the numbers; see [Places](/intelligent-ui/components/places).
 
 A visible block reads its live data at most once every ten seconds, and once more 300 ms after a person changes an input. Choices stay closed until the reading matches the inputs a person sees. [Live queries](/intelligent-ui/host/queries) and [links](/intelligent-ui/host/links) describe the backend side.
 

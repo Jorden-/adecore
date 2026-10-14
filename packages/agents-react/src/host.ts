@@ -208,6 +208,10 @@ export type UiMapSource =
           styleUrl(theme: 'light' | 'dark'): string;
           /* Called for every address the map requests, such as to add a ticket to those of the host's service. */
           transformRequest?(url: string): { url: string };
+          /* The feature property that holds a label in `language` (such as `nl`); without it a label stays as the style writes it. */
+          labelField?(language: string): string;
+          /* The credit the tiles ask for, drawn under the map. */
+          attribution?: string;
       }
     | { state: 'off'; reason: 'disabled' | 'signed-out' | 'unavailable' };
 

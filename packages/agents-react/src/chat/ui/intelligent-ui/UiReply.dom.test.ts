@@ -10,7 +10,8 @@ const files = [
     'intelligent-ui/UiReply.choices.test.ts',
     'intelligent-ui/UiReply.media.test.ts',
     'intelligent-ui/UiReply.fields.test.ts',
-    'intelligent-ui/UiReply.map.test.ts'
+    'intelligent-ui/UiReply.map.test.ts',
+    'intelligent-ui/renderers/map-view.test.ts'
 ];
 
 // React and Base UI must first load with a DOM; isolate these from the server-rendered suite.

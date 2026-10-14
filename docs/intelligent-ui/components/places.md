@@ -42,6 +42,10 @@ A `Place` that gives `lat` without `lon` (or the other way round), or neither co
 
 A renderer does not look anything up. `UiRenderContext.place(nodeId)` hands it the point the host read, which is `undefined` until the block is frozen, and `null` for a place with no point. The list says `Looking up` for the first and `Not on the map` for the second; a place without a point has no marker. [Queries](/intelligent-ui/host/queries) says how the machine freezes the points.
 
+## What the host draws
+
+The host chooses the map, so a block cannot name tiles, a style or a vendor. A renderer that draws the picture has the host's tiles when it has them, and otherwise an outline of the world with the same numbered markers, always with the list under it. The picture is not part of the block: it is not saved, and the same block reads on a page without tiles. A point drawn at street level on the outline would be a blank patch, so the outline never zooms closer than a country. The outline is the 110m land of Natural Earth, which is in the public domain.
+
 ## Fallback
 
 A `Map` falls back to a numbered list, one line per place: `1. Domtoren (52.0907, 5.1214): Climb the tower`. The coordinates, the address and the detail are all in it, so another agent reading the reply sees where the places are.

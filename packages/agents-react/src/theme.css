@@ -27,6 +27,9 @@
     --chart-4: #eda100;
     --chart-5: #e87ba4;
     --chart-6: #008300;
+    /* The two grounds of the map a page draws without tiles. */
+    --map-land: #f2f1ed;
+    --map-water: #d3dde5;
 }
 
 [data-theme="dark"] {
@@ -46,6 +49,8 @@
     --chart-4: #c98500;
     --chart-5: #d55181;
     --chart-6: #008300;
+    --map-land: #2c3135;
+    --map-water: #1a2026;
 }
 
 /* Output and diffs take the terminal's colors when the app loads `@adecore/terminal/terminal.css`,

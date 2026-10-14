@@ -592,7 +592,15 @@ export default {
             label_one: 'Kaart met {{count}} plek',
             label_other: 'Kaart met {{count}} plekken',
             lookingUp: 'Wordt opgezocht',
-            notFound: 'Niet op de kaart'
+            notFound: 'Niet op de kaart',
+            zoomIn: 'Inzoomen',
+            zoomOut: 'Uitzoomen',
+            scrollHint: 'Houd ⌘ of Ctrl ingedrukt en scrol om te zoomen',
+            touchHint: 'Gebruik twee vingers om de kaart te bewegen',
+            offline: 'Kaarttegels zijn offline niet beschikbaar. De plekken blijven in de lijst.',
+            disabled: 'Kaarttegels staan uit.',
+            signedOut: 'Log in om kaarttegels te tonen.',
+            unavailable: 'Kaarttegels zijn nu niet beschikbaar.'
         },
         compare: {
             label: 'Vergelijk {{before}} en {{after}}',
