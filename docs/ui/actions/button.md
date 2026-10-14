@@ -18,6 +18,12 @@ import { Button } from '@adecore/ui';
 
 <Demo src="actions/button-sizes" />
 
+## Pill
+
+`shape="pill"` is 36 pixels tall and fully rounded, with text at the base size. It is for a button that sits in a round row of controls and takes the place of `size`, so `size` has no effect on it.
+
+<Demo src="actions/button-pill" />
+
 ## Props
 
 `Button` takes every prop of a `<button>`, plus:
@@ -26,11 +32,12 @@ import { Button } from '@adecore/ui';
 | --- | --- | --- | --- |
 | `variant` | `ButtonVariant` | `'ghost'` | `'primary' \| 'secondary' \| 'ghost' \| 'danger' \| 'danger-outline' \| 'positive' \| 'inverse'` |
 | `size` | `ButtonSize` | `'md'` | `'xs' \| 'sm' \| 'md'` |
+| `shape` | `ButtonShape` | `'default'` | `'default' \| 'pill'` |
 | `href` | `string` | | Renders an anchor with `target="_blank"` and `rel="noreferrer"`. |
 | `type` | `string` | `'button'` | Set `'submit'` inside a form. |
 | `ref` | `Ref<HTMLButtonElement>` | | |
 
-`ButtonProps`, `ButtonVariant` and `ButtonSize` are exported types.
+`ButtonProps`, `ButtonVariant`, `ButtonSize` and `ButtonShape` are exported types.
 
 ## Accessibility
 

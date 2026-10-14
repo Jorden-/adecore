@@ -119,6 +119,7 @@ exports[`the public API . exports these names 1`] = `
   "type BannerTone",
   "type ButtonGroupProps",
   "type ButtonProps",
+  "type ButtonShape",
   "type ButtonSize",
   "type ButtonVariant",
   "type CheckboxProps",

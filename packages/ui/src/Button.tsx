@@ -3,6 +3,7 @@ import clsx from 'clsx';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-outline' | 'positive' | 'inverse';
 export type ButtonSize = 'xs' | 'sm' | 'md';
+export type ButtonShape = 'default' | 'pill';
 
 const VARIANT: Record<ButtonVariant, string> = {
     // A filled button darkens under the pointer. Its color is the meaning, so no token of its own for hover.
@@ -24,19 +25,28 @@ const SIZE: Record<ButtonSize, string> = {
     md: 'h-8 px-3'
 };
 
+/* A pill is one size of its own, for a control that sits in a round row, so it takes the place of `size`. */
+const SHAPE: Record<ButtonShape, string> = {
+    default: 'rounded-md text-xs',
+    pill: 'h-9 rounded-full px-3.5 text-sm'
+};
+
 export interface ButtonProps extends ComponentProps<'button'> {
     variant?: ButtonVariant;
     size?: ButtonSize;
+    /* `pill` is 36 pixels tall and fully rounded, and ignores `size`. */
+    shape?: ButtonShape;
     /* Makes it a link that looks like a button, a real anchor, so it opens the way links open. */
     href?: string;
 }
 
 /* Every button with a word in it. A button that is only an icon is an `IconButton`, which is a square, not a label. */
-export function Button({ variant = 'ghost', size = 'md', className, href, type = 'button', ref, ...rest }: ButtonProps) {
+export function Button({ variant = 'ghost', size = 'md', shape = 'default', className, href, type = 'button', ref, ...rest }: ButtonProps) {
     const classes = clsx(
-        'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md text-xs font-medium disabled:opacity-50',
+        'inline-flex shrink-0 items-center justify-center gap-1.5 font-medium disabled:opacity-50',
+        SHAPE[shape],
         VARIANT[variant],
-        SIZE[size],
+        shape === 'default' && SIZE[size],
         className
     );
     if (href) {
