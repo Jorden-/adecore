@@ -32,6 +32,12 @@ const spec: MenuSpec<ShellAction> = {
 | `separator` | A line. |
 | `submenu` | A nested menu, which `enabled: false` greys out. |
 
+A menu in the bar may take a role from `MENU_BAR_ROLES`. On macOS the system lists the open windows in the menu with `role: 'window'` and puts its search field in the one with `role: 'help'`; without a role neither appears. The shell leaves out a role it does not know.
+
+```ts
+{ id: 'window', label: 'Window', role: 'window', items: [{ kind: 'role', role: 'minimize', label: 'Minimize' }] }
+```
+
 ## Drawing it
 
 `menuTemplateOf` turns a spec into a template for `Menu.buildFromTemplate`, or returns `null` for anything that is no spec. `shellItem` draws the app's own actions; return `null` to leave one out.

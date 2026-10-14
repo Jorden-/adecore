@@ -27,6 +27,12 @@ export const MENU_ROLES = [
 
 export type MenuRole = (typeof MENU_ROLES)[number];
 
+/* The roles a whole menu in the bar can take. On macOS `window` is where the system lists the open
+   windows and `help` gets the system's search field. */
+export const MENU_BAR_ROLES = ['window', 'help'] as const;
+
+export type MenuBarRole = (typeof MENU_BAR_ROLES)[number];
+
 /* `Action` names what only the shell can carry out; an app lists its own. */
 export type MenuNode<Action extends string = string> =
     | {
@@ -48,5 +54,5 @@ export type MenuNode<Action extends string = string> =
     | { kind: 'submenu'; id: string; label: string; items: MenuNode<Action>[]; enabled?: boolean };
 
 export interface MenuSpec<Action extends string = string> {
-    menus: { id: string; label: string; items: MenuNode<Action>[] }[];
+    menus: { id: string; label: string; role?: MenuBarRole; items: MenuNode<Action>[] }[];
 }

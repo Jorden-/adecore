@@ -3,7 +3,7 @@
  * a preload and a page read them as well as the main process.
  */
 
-export { MENU_ROLES, type MenuNode, type MenuRole, type MenuSpec } from './menu.ts';
+export { MENU_BAR_ROLES, MENU_ROLES, type MenuBarRole, type MenuNode, type MenuRole, type MenuSpec } from './menu.ts';
 export type { ThemeState } from './theme.ts';
 export type { UpdateErrorCode, UpdateState } from './update.ts';
 export { compareVersions, isVersion } from './versions.ts';

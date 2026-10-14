@@ -1,5 +1,5 @@
 import type { MenuItemConstructorOptions } from 'electron';
-import { MENU_ROLES, type MenuNode, type MenuSpec } from './bridge/menu.ts';
+import { MENU_BAR_ROLES, MENU_ROLES, type MenuNode, type MenuSpec } from './bridge/menu.ts';
 import type { PageKeys } from './page-keys.ts';
 
 /* Named instead of the role: that one follows the focused web contents, which is a guest page as soon as one has the keyboard. */
@@ -44,7 +44,11 @@ export const menuTemplateOf = <Action extends string>(spec: MenuSpec<Action>, op
     };
     const itemsOf = (nodes: readonly MenuNode<Action>[]): MenuItemConstructorOptions[] =>
         nodes.map(itemOf).filter((item): item is MenuItemConstructorOptions => item !== null);
-    return spec.menus.map((menu) => ({ label: menu.label, submenu: itemsOf(menu.items) }));
+    return spec.menus.map((menu) => ({
+        label: menu.label,
+        ...(menu.role !== undefined && MENU_BAR_ROLES.includes(menu.role) ? { role: menu.role } : {}),
+        submenu: itemsOf(menu.items)
+    }));
 };
 
 export interface StaticMenuOptions {

@@ -67,6 +67,21 @@ describe('menuTemplateOf', () => {
         expect(submenuOf(menuTemplateOf(unknownRole, { run: () => {}, shellItem: () => null })![0])).toEqual([]);
     });
 
+    test('passes a role of the menu bar on, so macOS lists its windows and help there', () => {
+        const withRoles = {
+            menus: [
+                { id: 'window', label: 'Window', role: 'window', items: [{ kind: 'role', role: 'minimize', label: 'Minimize' }] },
+                { id: 'help', label: 'Help', role: 'help', items: [] },
+                { id: 'odd', label: 'Odd', role: 'fileMenu', items: [] }
+            ]
+        } as unknown as MenuSpec;
+        const template = menuTemplateOf(withRoles, { run: () => {}, shellItem: () => null })!;
+        expect(template[0]).toMatchObject({ label: 'Window', role: 'window' });
+        expect(submenuOf(template[0])).toEqual([{ role: 'minimize', label: 'Minimize' }]);
+        expect(template[1]).toMatchObject({ label: 'Help', role: 'help' });
+        expect(template[2]).toEqual({ label: 'Odd', submenu: [] });
+    });
+
     test('a spec without menus is no menu', () => {
         expect(menuTemplateOf({} as MenuSpec, { run: () => {}, shellItem: () => null })).toBeNull();
         expect(menuTemplateOf(null as unknown as MenuSpec, { run: () => {}, shellItem: () => null })).toBeNull();
