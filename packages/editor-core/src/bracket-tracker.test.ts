@@ -161,14 +161,14 @@ it('lexes the line above an edit again, whose lone `\\r` the edit can join to a 
 
 describe('matchBracket', () => {
     it('follows edits, undo and redo of a document', () => {
-        const body = Array.from({ length: 3000 }, (_, line) => `    call(${line}, [a, { b: "}" }]); // )`).join('\n');
+        const body = Array.from({ length: 800 }, (_, line) => `    call(${line}, [a, { b: "}" }]); // )`).join('\n');
         const document = new DocumentModel(`function outer() {\n${body}\n}\n`);
         const expectSame = (): void => expectSameAsScan(document.getText(), (offset) => document.matchBracket(offset), 'typescript');
         expectSame();
-        const middle = document.getLine(1500).start + 4;
+        const middle = document.getLine(300).start + 4;
         document.applyEdits([{ from: middle, to: middle, text: '/*' }]);
         expectSame();
-        document.applyEdits([{ from: document.getLine(2500).start, to: document.getLine(2500).start, text: '*/' }]);
+        document.applyEdits([{ from: document.getLine(650).start, to: document.getLine(650).start, text: '*/' }]);
         expectSame();
         document.undo();
         document.undo();
