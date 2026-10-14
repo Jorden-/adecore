@@ -549,6 +549,16 @@ export default {
             failed: 'Mislukt',
             skipped: 'Overgeslagen'
         },
+        event: {
+            label: '{{time}}, {{title}}, {{tone}}',
+            tone: {
+                neutral: 'Neutraal',
+                info: 'Info',
+                success: 'Gelukt',
+                warning: 'Waarschuwing',
+                danger: 'Gevaar'
+            }
+        },
         stat: {
             change: '{{change}} vanaf {{previous}}',
             from: 'vanaf {{previous}}'

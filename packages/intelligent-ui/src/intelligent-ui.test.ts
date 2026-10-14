@@ -96,7 +96,8 @@ const EXAMPLES = [
     '<CodeBlock language="ts">const markup = "<b>{text}</b>";</CodeBlock><Sources><Source title="Docs" url="https://adecore.dev/"/></Sources>',
     '$count = 4\n$mode = "all"\n<Slider value={$count} min={1} max={16}/><Segmented value={$mode}><Option value="all">All</Option><Option value="failed">Failed</Option></Segmented><Button action={@Set($mode, "failed")}>Failed only</Button><Button action={@Reset()} disabled={$mode == "all"}>Reset</Button>',
     '$rows = [{name: "Core"}, {name: "Client"}]\n<EntityList><Each items={$rows} as="row"><Entry label={row.name}>Ready</Entry></Each></EntityList>',
-    '<Image generated="latest" alt="A rabbit"/><Steps><Step state="done">Built</Step><Step state="pending">Review</Step></Steps>'
+    '<Image generated="latest" alt="A rabbit"/><Steps><Step state="done">Built</Step><Step state="pending">Review</Step></Steps>',
+    '<Timeline><Event at="14:02" tone="warning" detail="p95 above 2 s">Alert fired</Event><Event at="2026-10-14T14:09:00Z">Rolled back</Event></Timeline>'
 ];
 
 describe('streaming compiler', () => {
@@ -109,7 +110,7 @@ describe('streaming compiler', () => {
             expect(evaluated.nodes.length).toBeGreaterThan(0);
             expect(compiled.fallback).not.toBe('');
         }
-        expect(Object.keys(UI_CATALOG)).toHaveLength(36);
+        expect(Object.keys(UI_CATALOG)).toHaveLength(38);
         expect(uiCatalogText()).toContain('Image(attachment?, generated?, alt?)');
         expect(uiCatalogText()).toContain('Button(action, disabled?)');
     });

@@ -118,6 +118,7 @@ const MARKED: Partial<Record<UiComponentName, string>> = {
     Callout: '<Callout tone="info" title="mark-title">mark-body</Callout>',
     Progress: '<Progress value={37} max={91}>mark-label</Progress>',
     Steps: '<Steps><Step state="failed" detail="mark-detail">mark-step</Step></Steps>',
+    Timeline: '<Timeline><Event at="14:02" tone="warning" detail="mark-detail">mark-title</Event></Timeline>',
     Stats: '<Stats><Stat label="mark-label" value={37} previous={91} unit="mark-unit"/></Stats>',
     EntityList: '<EntityList><Entry label="mark-label">mark-value</Entry></EntityList>',
     Table: '<Table rows={[{mark: 37}]}><Column key="mark" title="mark-title" unit="mark-unit"/></Table>',
@@ -157,7 +158,7 @@ describe('the text fallback', () => {
         for (const source of Object.values(MARKED)) {
             const compiled = block(source!);
             expect(compiled.diagnostics).toEqual([]);
-            for (const marker of source!.match(/mark[\w./-]*|\b(?:37|91|abcdef1|failed)\b/g) ?? []) {
+            for (const marker of source!.match(/mark[\w./-]*|\b(?:37|91|abcdef1|failed|14:02|warning)\b/g) ?? []) {
                 expect(compiled.fallback).toContain(marker.replace(/^https?:\/\//, ''));
             }
         }

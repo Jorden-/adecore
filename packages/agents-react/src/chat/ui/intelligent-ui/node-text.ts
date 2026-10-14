@@ -1,5 +1,6 @@
 import type { TFunction } from 'i18next';
-import type { UiComponentName, UiProps, UiViewNode } from '@adecore/intelligent-ui';
+import { parseUiEventTime, type UiComponentName, type UiProps, type UiViewNode } from '@adecore/intelligent-ui';
+import { formatClock, formatDay, formatDayClock } from '@adecore/ui/format';
 import type { UiLiveStatus } from './render-context';
 
 /* The text a node holds, every `$text` below it joined as written, such as the code of a CodeBlock. */
@@ -116,4 +117,13 @@ export function uiUrlDomain(url: string): string {
     } catch {
         return url;
     }
+}
+
+/* An event's `at` the way the person's language and region write it; a text the catalog would not accept stays as written. */
+export function uiEventTime(at: string): string {
+    const moment = parseUiEventTime(at);
+    if (moment === null) {
+        return at;
+    }
+    return moment.kind === 'time' ? formatClock(moment.date) : moment.kind === 'date' ? formatDay(moment.date) : formatDayClock(moment.date);
 }

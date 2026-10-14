@@ -6,7 +6,7 @@ import type { UiProps } from '@adecore/intelligent-ui';
 import { Icon, Meter, Pill, Spinner } from '@adecore/ui';
 import { formatNumber, formatPercent } from '@adecore/ui/format';
 import { UiHeadContext, type UiRenderContext, type UiRendererProps } from '../render-context';
-import { uiNodeLabel } from '../node-text';
+import { uiEventTime, uiNodeLabel } from '../node-text';
 import { UI_TONE_ICONS, UI_TONE_PILL, UI_TONE_SURFACE, UI_TONE_TEXT } from '../tones';
 
 type StepState = UiProps<'Step'>['state'];
@@ -129,6 +129,34 @@ export function StepRenderer({ node, children, context }: UiRendererProps<UiProp
                 <span className={clsx('max-w-full min-w-0 grow basis-48 wrap-break-word', quiet ? 'text-text-faint' : 'text-text')}>{children}</span>
                 {detail !== undefined && detail !== '' && <span className="max-w-full text-xs wrap-anywhere text-text-faint tabular-nums">{detail}</span>}
             </span>
+        </li>
+    );
+}
+
+export function TimelineRenderer({ children }: UiRendererProps<UiProps<'Timeline'>>) {
+    return <ol className="chat-ui-nodes flex flex-col px-2">{children}</ol>;
+}
+
+/* Each row draws its own stretch of the line, down to the next dot, so a row that failed to draw leaves the others whole. */
+export function EventRenderer({ node, children }: UiRendererProps<UiProps<'Event'>>) {
+    const { t } = useTranslation('agent-chat');
+    const { at, detail } = node.props;
+    const tone = node.props.tone ?? 'neutral';
+    const time = uiEventTime(at);
+    return (
+        <li
+            aria-label={t('blocks.event.label', { time, title: uiNodeLabel(node), tone: t(`blocks.event.tone.${tone}`) })}
+            className="group/event relative flex min-h-7 gap-3 pb-3 last:pb-0"
+        >
+            <span aria-hidden className={clsx('mt-1 size-2 shrink-0 rounded-full bg-current', UI_TONE_TEXT[tone])} />
+            <span aria-hidden className="absolute top-3.5 bottom-0 left-0.75 w-px bg-border group-last/event:hidden" />
+            <div className="flex min-w-0 grow flex-col gap-0.5">
+                <time dateTime={at} className="text-xs text-text-faint tabular-nums">
+                    {time}
+                </time>
+                <div className="text-sm wrap-break-word text-text">{children}</div>
+                {detail !== undefined && detail !== '' && <div className="text-xs wrap-anywhere text-text-faint">{detail}</div>}
+            </div>
         </li>
     );
 }

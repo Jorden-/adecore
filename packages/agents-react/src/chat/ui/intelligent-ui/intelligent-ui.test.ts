@@ -6,7 +6,9 @@ import { ChatHostProvider, type ChatHost } from '../../../host';
 import { UiPageMemory } from './block-local';
 import { uiChartAxis, uiChartCharacter, uiChartData, uiChartRange, uiChartText, uiChartTextWidth, niceCeiling, UI_CHART_SERIES } from './chart-data';
 import i18next from 'i18next';
-import { uiBlockHead, uiLiveChoiceReason, uiNodeLabel, uiNodeText, uiReasonText, uiUrlDomain, uiWithUnit } from './node-text';
+import { formatClock, formatDay, formatDayClock, setFormatSource, type FormatSource } from '@adecore/ui/format';
+import { fakeFormatSource } from '@adecore/ui/testing';
+import { uiBlockHead, uiEventTime, uiLiveChoiceReason, uiNodeLabel, uiNodeText, uiReasonText, uiUrlDomain, uiWithUnit } from './node-text';
 import { UI_RENDERERS } from './registry';
 import type { UiRenderContext, UiRenderer, UiRendererProps } from './render-context';
 import { UiSourceCitation } from './renderers/content';
@@ -61,7 +63,7 @@ const REVIEW =
 describe('the registry of intelligent UI renderers', () => {
     test('accounts for every catalog name, and only those', () => {
         expect(Object.keys(UI_RENDERERS).sort()).toEqual(Object.keys(UI_CATALOG).sort());
-        expect(Object.keys(UI_RENDERERS)).toHaveLength(36);
+        expect(Object.keys(UI_RENDERERS)).toHaveLength(38);
         const empty = Object.entries(UI_RENDERERS)
             .filter(([, renderer]) => renderer === null)
             .map(([name]) => name)
@@ -282,6 +284,31 @@ describe('text and status', () => {
         expect(markup(source)).toContain('lucide-circle-dot');
         expect(markup(source, { phase: 'streaming' }, false)).not.toContain('lucide-circle-dot');
         expect(markup(source)).toContain('42 s');
+    });
+
+    test('a timeline writes each time the way the region writes it, and reads a time without an offset as written', () => {
+        const source =
+            '<Timeline><Event at="14:02" tone="warning" detail="p95 above 2 s">Alert fired</Event>' +
+            '<Event at="2026-10-14" tone="info">Rolled back</Event>' +
+            '<Event at="2026-10-14T14:14:00">Recovered</Event>' +
+            '<Event at="2026-10-14T14:20:00+02:00" tone="success">Checked</Event></Timeline>';
+        const html = markup(source);
+        expect(html).toContain('<ol class="chat-ui-nodes');
+        expect(html).toContain('<time dateTime="14:02"');
+        expect(html).toContain('p95 above 2 s');
+        expect(html).toContain('aria-label="02:02 PM, Alert fired, Warning"');
+        expect(html).toContain(`>${formatDay(new Date(2026, 9, 14))}</time>`);
+        expect(html).toContain(`>${formatDayClock(new Date(2026, 9, 14, 14, 14))}</time>`);
+        expect(html).toContain(`>${formatDayClock(new Date(Date.UTC(2026, 9, 14, 12, 20)))}</time>`);
+        expect(html).toContain('text-status-needs-you');
+        expect(html).toContain('group-last/event:hidden');
+        const previous = setFormatSource(Object.assign(fakeFormatSource(), { region: () => 'nl-NL' }) as FormatSource);
+        try {
+            expect(uiEventTime('14:02')).toBe('14:02');
+            expect(uiEventTime('14:02')).toBe(formatClock(new Date(2000, 0, 1, 14, 2)));
+        } finally {
+            setFormatSource(previous);
+        }
     });
 
     test('a stat says how it changed without coloring it unless it has a tone', () => {

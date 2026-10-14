@@ -549,6 +549,16 @@ export default {
             failed: 'Failed',
             skipped: 'Skipped'
         },
+        event: {
+            label: '{{time}}, {{title}}, {{tone}}',
+            tone: {
+                neutral: 'Neutral',
+                info: 'Info',
+                success: 'Success',
+                warning: 'Warning',
+                danger: 'Danger'
+            }
+        },
         stat: {
             change: '{{change}} from {{previous}}',
             from: 'from {{previous}}'

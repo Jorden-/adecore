@@ -20,6 +20,8 @@ export function uiNodeFallback(type: string, props: Readonly<Record<string, unkn
             return `${children.trimEnd()}${given(props.badge) ? ` (${uiPlainText(props.badge)})` : ''}\n`;
         case 'Step':
             return `${children.trimEnd()}${given(props.state) ? ` (${uiPlainText(props.state)})` : ''}${given(props.detail) ? `: ${uiPlainText(props.detail)}` : ''}\n`;
+        case 'Event':
+            return `${uiPlainText(props.at)} ${children.trimEnd()}${given(props.tone) ? ` (${uiPlainText(props.tone)})` : ''}${given(props.detail) ? `: ${uiPlainText(props.detail)}` : ''}\n`;
         case 'Progress':
             return given(props.value) ? `${children.trimEnd()}: ${uiPlainText(props.value)} of ${uiPlainText(props.max ?? 100)}\n` : `${children.trimEnd()}\n`;
         case 'Stat': {

@@ -42,6 +42,11 @@
             "types": "./dist/catalog.d.ts",
             "default": "./dist/catalog.js"
         },
+        "./event-time": {
+            "source": "./src/event-time.ts",
+            "types": "./dist/event-time.d.ts",
+            "default": "./dist/event-time.js"
+        },
         "./budget": {
             "source": "./src/budget.ts",
             "types": "./dist/budget.d.ts",

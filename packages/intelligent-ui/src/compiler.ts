@@ -140,6 +140,15 @@ function isConstant(expression: UiExpression): boolean {
 
 const CHART_SERIES = 6;
 
+/* How many of its children's kind a container holds, the ones an Each or a Show will draw not counted. */
+function countChildren(children: readonly UiSyntaxNode[], kinds: readonly string[]): number {
+    return children.reduce(
+        (count, child) =>
+            count + (kinds.includes(child.type) ? 1 : 0) + (child.type === 'Show' || child.type === 'Each' ? countChildren(child.children, kinds) : 0),
+        0
+    );
+}
+
 /* The keys besides `label` that hold a finite number in some row of a chart's data. */
 function chartSeries(data: unknown): number {
     const keys = new Set<string>();
@@ -292,6 +301,18 @@ export function compileUiBlock(source: string, options: UiCompileOptions): UiBlo
                     syntax.end,
                     syntax.id
                 );
+            }
+            if (syntax.complete && 'count' in entry) {
+                const counted = countChildren(syntax.children, entry.children);
+                const limit = entry.count as { min: number; max?: number };
+                if (counted < limit.min || (limit.max !== undefined && counted > limit.max)) {
+                    throw new UiFailure(
+                        'invalid_props',
+                        limit.max === undefined
+                            ? `${syntax.type} needs at least ${limit.min} of ${entry.children.join(' or ')}.`
+                            : `${syntax.type} takes ${limit.min} to ${limit.max} of ${entry.children.join(' or ')}.`
+                    );
+                }
             }
             // A Choice sends its label, so one without a label can never send; whether it closed is only known once final.
             if (syntax.type === 'Choice' && syntax.complete && !syntax.children.some(isLabelSource)) {

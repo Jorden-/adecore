@@ -176,3 +176,19 @@ test('a primary choice comes first in the document, not only on screen', () => {
     expect(markup.indexOf('Fix it')).toBeLessThan(markup.indexOf('Leave it'));
     expect(markup).not.toContain('order-first');
 });
+
+test('an event with a time nobody can read is drawn as text beside the events that draw, and an older client keeps a newer component per node', () => {
+    const markup = drawn(
+        '<Timeline><Event at="14:02">Alert fired</Event><Event at="soon" tone="info" detail="later">Rolled back</Event></Timeline><Summary>After</Summary>'
+    );
+    expect(markup).toContain('dateTime="14:02"');
+    expect(markup).toContain('Could not draw this part');
+    expect(markup).toContain('soon Rolled back (info): later');
+    expect(markup).toContain('After');
+    const text = '```ui\n<Summary>Before</Summary><FutureTimeline><FutureEvent at="14:02">Alert</FutureEvent></FutureTimeline><Summary>After</Summary>\n```';
+    const blocks = compileUi(text, { id: 'item', final: true });
+    const future = renderToStaticMarkup(createElement(UiReply, { text, blocks, context }));
+    expect(future).toContain('Before');
+    expect(future).toContain('After');
+    expect(future).toContain('Unknown component FutureTimeline.');
+});

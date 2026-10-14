@@ -10,6 +10,7 @@ export {
     type UiProps,
     type UiTone
 } from './catalog.ts';
+export { parseUiEventTime, type UiEventTime } from './event-time.ts';
 export { UI_LIMITS, UiBudget, UiFailure, safeKey, type UiLimits } from './budget.ts';
 export { copyUiValue, evaluateUiExpression, parseUiExpression, sameUiValue, type UiExpression, type UiValue } from './expression.ts';
 export { parseUiSyntax, uiDiagnostic, type UiDiagnostic, type UiSyntax, type UiSyntaxNode } from './syntax.ts';

@@ -6,7 +6,16 @@ import { EntityListRenderer, EntryRenderer, StatRenderer, StatsRenderer, TableRe
 import { ButtonRenderer, ChecklistRenderer, ItemRenderer, SegmentedRenderer, SliderRenderer, SwitchRenderer } from './renderers/inputs';
 import { CommitRenderer, DiffRenderer, FileRenderer, NodeRenderer } from './renderers/links';
 import { SectionRenderer, SectionsRenderer, TabRenderer, TabsRenderer } from './renderers/structure';
-import { CalloutRenderer, ProgressRenderer, StepRenderer, StepsRenderer, SummaryRenderer, TagRenderer } from './renderers/text';
+import {
+    CalloutRenderer,
+    EventRenderer,
+    ProgressRenderer,
+    StepRenderer,
+    StepsRenderer,
+    SummaryRenderer,
+    TagRenderer,
+    TimelineRenderer
+} from './renderers/text';
 
 /*
  * A renderer for every component of the catalog; a name missing here fails the typecheck. Null draws
@@ -20,6 +29,8 @@ export const UI_RENDERERS: UiRenderers = {
     Progress: ProgressRenderer,
     Steps: StepsRenderer,
     Step: StepRenderer,
+    Timeline: TimelineRenderer,
+    Event: EventRenderer,
     Stats: StatsRenderer,
     Stat: StatRenderer,
     EntityList: EntityListRenderer,
