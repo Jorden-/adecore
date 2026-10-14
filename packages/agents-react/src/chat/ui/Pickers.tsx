@@ -273,6 +273,7 @@ export function StashPicker({ onRestore }: { onRestore(prompt: StashedPrompt): v
                                 {prompt.attachments.length > 0 && (
                                     <span className="text-text-faint">{t('pickers.stash.files', { count: prompt.attachments.length })}</span>
                                 )}
+                                {prompt.chats.length > 0 && <span className="text-text-faint">{t('pickers.stash.chats', { count: prompt.chats.length })}</span>}
                             </Popover.Close>
                             <IconButton
                                 icon={Trash2}

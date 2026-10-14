@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useChatHost } from '../../../host';
 import { useChatScope } from '../../../scope';
 import { checkAttachmentLimits, uploadBytes } from '../../attachments';
@@ -8,7 +9,7 @@ import { isEmptyDraft } from '../../drafts';
 import type { PromptGuard } from '../../guards';
 import { presentMentions, presentSkills } from '../../mentions';
 import { withQuote } from '../../quote';
-import { stashDraft, useStash, type StashedPrompt } from '../../stash';
+import { restorableChats, stashDraft, useStash, type StashedPrompt } from '../../stash';
 import { scrollTimelineToEnd } from '../../timeline-scroll';
 import type { ComposerInputHandle } from '../ComposerInput';
 import type { ChatControls } from './use-chat-controls';
@@ -51,9 +52,11 @@ export function useComposerSubmit({
     setNotice,
     onSend
 }: SubmitInput) {
+    const { t } = useTranslation('agent-chat');
     const host = useChatHost();
     const scope = useChatScope();
     const { draft, setDraft } = box;
+    const referable = host.useReferableChats();
 
     /* Opens the host's new chat once the host took the message; a host that answers nothing took it. */
     const afterSend = (sent: void | Promise<boolean>, andNew: boolean): void => {
@@ -127,19 +130,25 @@ export function useComposerSubmit({
     useEffect(() => registerComposerSender(scope.keyOf(chatId), (how) => submitRef.current(how)), [scope, chatId]);
 
     /*
-     * A stashed prompt comes back as text, mentions and skills; its files were never kept. Its quote
-     * keeps leading to its reply in the chat it came from, and is plain text in any other.
+     * A stashed prompt comes back as text, mentions, skills and the chats this project still has; its
+     * files were never kept. Its quote keeps leading to its reply in the chat it came from, and is plain
+     * text in any other.
      */
     const restoreStashed = (prompt: StashedPrompt): void => {
         const stashedQuote = prompt.quote;
         const here = stashedQuote !== undefined && stashedQuote.chatId === chatId;
+        const { chats, dropped } = restorableChats(prompt.chats, new Set(referable.map((chat) => chat.id)), chatId);
         setDraft((current) => ({
             ...current,
             text: stashedQuote === undefined || here ? prompt.text : withQuote(stashedQuote.text, prompt.text),
             mentions: [...prompt.mentions],
             skills: [...prompt.skills],
+            chats,
             ...(here ? { quote: stashedQuote.text, quoteSource: stashedQuote.itemId } : {})
         }));
+        if (dropped > 0) {
+            setNotice(t('composer.notice.stashChatsDropped', { count: dropped }));
+        }
         history.forget();
         inputRef.current?.focus();
     };

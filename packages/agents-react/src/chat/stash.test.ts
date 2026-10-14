@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { STASH_LIMIT, parseStash, stashedFrom, withStashed, type StashedPrompt } from './stash.ts';
+import { STASH_CHATS_LIMIT, STASH_LIMIT, parseStash, restorableChats, stashedFrom, withStashed, type StashedPrompt } from './stash.ts';
 import { EMPTY_DRAFT } from './drafts.ts';
 
 function prompt(id: string): StashedPrompt {
-    return { id, text: id, mentions: [], skills: [], attachments: [], createdAt: 1 };
+    return { id, text: id, mentions: [], skills: [], chats: [], attachments: [], createdAt: 1 };
 }
 
 describe('parseStash', () => {
@@ -19,10 +19,16 @@ describe('parseStash', () => {
                 text: 'hello',
                 mentions: ['src/a.ts'],
                 skills: ['unslop'],
+                chats: [],
                 attachments: [{ name: 'a.png', mime: 'image/png', size: 12 }],
                 createdAt: 0
             }
         ]);
+    });
+
+    test('an entry written before attached chats existed has none', () => {
+        expect(parseStash(JSON.stringify([{ id: 'a', text: 'x' }]))[0]?.chats).toEqual([]);
+        expect(parseStash(JSON.stringify([{ id: 'a', text: 'x', chats: ['chat-b', 3] }]))[0]?.chats).toEqual(['chat-b']);
     });
 
     test('an empty, a broken or a non-list value is no stash at all', () => {
@@ -48,7 +54,7 @@ describe('stashedFrom', () => {
             text: 'look at @src/a.ts',
             mentions: ['src/a.ts'],
             skills: ['unslop'],
-            chats: [],
+            chats: ['chat-b'],
             attachments: [{ name: 'shot.png', mime: 'image/png', data: 'AAAA' }],
             quote: '',
             quoteSource: null
@@ -58,6 +64,7 @@ describe('stashedFrom', () => {
             text: 'look at @src/a.ts',
             mentions: ['src/a.ts'],
             skills: ['unslop'],
+            chats: ['chat-b'],
             attachments: [{ name: 'shot.png', mime: 'image/png', size: 3 }],
             createdAt: 5
         });
@@ -85,5 +92,26 @@ describe('stashedFrom', () => {
     test('a draft with nothing in it is not worth a slot', () => {
         expect(stashedFrom(EMPTY_DRAFT, 'id-1', 5, 'chat-a')).toBeNull();
         expect(stashedFrom({ ...EMPTY_DRAFT, text: '   ' }, 'id-1', 5, 'chat-a')).toBeNull();
+    });
+});
+
+describe('restorableChats', () => {
+    test('keeps the chats the project still has, in the order they were picked', () => {
+        expect(restorableChats(['c', 'a', 'b'], new Set(['a', 'b', 'c']), 'own')).toEqual({ chats: ['c', 'a', 'b'], dropped: 0 });
+    });
+
+    test('drops a chat the project no longer has and counts it', () => {
+        expect(restorableChats(['a', 'gone', 'b'], new Set(['a', 'b']), 'own')).toEqual({ chats: ['a', 'b'], dropped: 1 });
+    });
+
+    test('drops the own chat without counting it', () => {
+        expect(restorableChats(['own', 'a'], new Set(['own', 'a']), 'own')).toEqual({ chats: ['a'], dropped: 0 });
+    });
+
+    test('stops at the limit of a send', () => {
+        const ids = Array.from({ length: STASH_CHATS_LIMIT + 4 }, (_unused, index) => `chat-${index}`);
+        const { chats, dropped } = restorableChats(ids, new Set(ids), 'own');
+        expect(chats).toEqual(ids.slice(0, STASH_CHATS_LIMIT));
+        expect(dropped).toBe(0);
     });
 });

@@ -301,6 +301,8 @@ export default {
         },
         notice: {
             clearFailed: 'De thread kon niet worden gewist',
+            stashChatsDropped_one: '1 bijgevoegde chat hoort niet bij dit project en is weggelaten',
+            stashChatsDropped_other: '{{count}} bijgevoegde chats horen niet bij dit project en zijn weggelaten',
             compactFailed: 'De context kon niet worden gecomprimeerd',
             noAttachments: '{{agent}} neemt geen bijlagen aan',
             thisAgent: 'Deze agent',
@@ -437,7 +439,9 @@ export default {
             title: 'Stashed prompts',
             noText: 'Geen tekst',
             files_one: '{{count}} bestand, niet bewaard',
-            files_other: '{{count}} bestanden, niet bewaard'
+            files_other: '{{count}} bestanden, niet bewaard',
+            chats_one: '{{count}} chat bijgevoegd',
+            chats_other: '{{count}} chats bijgevoegd'
         },
         mode: {
             label: 'Rechten',

@@ -11,6 +11,7 @@ import { useProvidersStore } from '../../state/providers';
 import { ChatTransportError } from '../../transport';
 import type { ChatSendExtras } from '../chat-client';
 import { EMPTY_DRAFT, readDraft, writeDraft } from '../drafts';
+import { useStash, type StashedPrompt } from '../stash';
 import { Composer } from './Composer';
 
 const SCOPE_ID = 'composer-test';
@@ -80,6 +81,8 @@ interface Options {
 interface Modifiers {
     altKey?: boolean;
     shiftKey?: boolean;
+    metaKey?: boolean;
+    code?: string;
 }
 
 interface Mounted {
@@ -516,6 +519,33 @@ describe('drafts and history', () => {
         expect(composer.text()).toBe('Second prompt');
         await composer.press('Escape');
         expect(composer.text()).toBe('');
+    });
+});
+
+describe('the stash', () => {
+    /* Hydrates the shelf first, since it reads storage on its first use and would put its own list over this one. */
+    const shelve = (prompt: StashedPrompt): void => {
+        useStash.getState();
+        useStash.setState({ prompts: [prompt] });
+        cleanups.push(() => useStash.setState({ prompts: [] }));
+    };
+
+    test('a restored prompt keeps the chats the project has and says it left the others out', async () => {
+        shelve({ id: 'stash-1', text: 'See there', mentions: [], skills: [], chats: ['other', 'foreign'], attachments: [], createdAt: 1 });
+        const composer = await mount({ host: { useReferableChats: () => [{ id: 'other', title: 'Other chat' }] } });
+        await composer.press('s', { metaKey: true, code: 'KeyS' });
+        expect(composer.text()).toBe('See there');
+        expect(readDraft(CHAT).chats).toEqual(['other']);
+        expect(composer.page.host.textContent).toContain('Other chat');
+        expect(composer.page.host.querySelector('[role="alert"]')?.textContent).toBe('1 attached chat is not in this project and was left out');
+    });
+
+    test('a restored prompt whose chats all remain says nothing', async () => {
+        shelve({ id: 'stash-1', text: 'See there', mentions: [], skills: [], chats: ['other'], attachments: [], createdAt: 1 });
+        const composer = await mount({ host: { useReferableChats: () => [{ id: 'other', title: 'Other chat' }] } });
+        await composer.press('s', { metaKey: true, code: 'KeyS' });
+        expect(readDraft(CHAT).chats).toEqual(['other']);
+        expect(composer.page.host.querySelector('[role="alert"]')).toBeNull();
     });
 });
 

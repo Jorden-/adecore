@@ -26,6 +26,8 @@ export interface StashedPrompt {
     text: string;
     mentions: string[];
     skills: string[];
+    /* Chats of the project picked with `@`; an entry from before this field has none. */
+    chats: string[];
     attachments: StashedAttachment[];
     /* A quote that knew its reply, kept apart from the text so it can lead back to it in the chat it came from. */
     quote?: StashedQuote;
@@ -83,6 +85,7 @@ export function parseStash(raw: string | null): StashedPrompt[] {
                 text: entry.text as string,
                 mentions: strings(entry.mentions),
                 skills: strings(entry.skills),
+                chats: strings(entry.chats),
                 attachments: attachments(entry.attachments),
                 ...stashedQuoteField(entry.quote),
                 createdAt: typeof entry.createdAt === 'number' ? entry.createdAt : 0
@@ -113,9 +116,23 @@ export function stashedFrom(draft: ChatDraft, id: string, now: number, chatId: s
         ...(kept ? { quote: { text: draft.quote, chatId, itemId: draft.quoteSource! } } : {}),
         mentions: [...draft.mentions],
         skills: [...draft.skills],
+        chats: [...draft.chats],
         attachments: draft.attachments.map((attachment) => ({ name: attachment.name, mime: attachment.mime, size: uploadBytes(attachment) })),
         createdAt: now
     };
+}
+
+/* The limit of `chats` in a send. */
+export const STASH_CHATS_LIMIT = 16;
+
+/*
+ * The attached chats a composer may take back: the ones it can still reference, never its own chat, in the
+ * order they were picked. `dropped` counts the chats left out because the project no longer has them.
+ */
+export function restorableChats(stashed: readonly string[], referable: ReadonlySet<string>, chatId: string): { chats: string[]; dropped: number } {
+    const others = stashed.filter((id) => id !== chatId);
+    const chats = others.filter((id) => referable.has(id));
+    return { chats: chats.slice(0, STASH_CHATS_LIMIT), dropped: others.length - chats.length };
 }
 
 const storage = persistedJson<StashedPrompt[]>(storageKey, parseStash, [], () => chatStorageLegacyKeys('stash'));

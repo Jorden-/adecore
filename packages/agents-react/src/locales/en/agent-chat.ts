@@ -301,6 +301,8 @@ export default {
         },
         notice: {
             clearFailed: 'The thread could not be cleared',
+            stashChatsDropped_one: '1 attached chat is not in this project and was left out',
+            stashChatsDropped_other: '{{count}} attached chats are not in this project and were left out',
             compactFailed: 'The context could not be compacted',
             noAttachments: '{{agent}} takes no attachments',
             thisAgent: 'This agent',
@@ -437,7 +439,9 @@ export default {
             title: 'Stashed prompts',
             noText: 'No text',
             files_one: '{{count}} file, not kept',
-            files_other: '{{count}} files, not kept'
+            files_other: '{{count}} files, not kept',
+            chats_one: '{{count}} chat attached',
+            chats_other: '{{count}} chats attached'
         },
         mode: {
             label: 'Permissions',
