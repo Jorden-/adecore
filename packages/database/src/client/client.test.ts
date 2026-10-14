@@ -278,6 +278,8 @@ describe('unknown-session', () => {
                 first = false;
                 return err(request.id, 'unknown-session');
             }
+
+            return undefined;
         });
         const session = createDatabaseClient(transport).session(connection);
         const run = {
@@ -324,6 +326,8 @@ describe('unknown-session', () => {
                     first = false;
                     return err(request.id, 'unknown-session', 'gone');
                 }
+
+                return undefined;
             });
             const session = createDatabaseClient(transport).session(connection);
             const run = () =>

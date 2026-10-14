@@ -13,7 +13,7 @@ interface State {
 
 /* A failed view or lazy chunk must leave the containing review card usable. */
 export class DiffFallbackBoundary extends Component<Props, State> {
-    state: State = { failed: false, resetKeys: this.props.resetKeys };
+    override state: State = { failed: false, resetKeys: this.props.resetKeys };
 
     static getDerivedStateFromError(): Partial<State> {
         return { failed: true };
@@ -26,7 +26,7 @@ export class DiffFallbackBoundary extends Component<Props, State> {
         return null;
     }
 
-    render(): ReactNode {
+    override render(): ReactNode {
         return this.state.failed ? this.props.fallback : this.props.children;
     }
 }

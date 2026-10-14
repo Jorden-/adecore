@@ -314,7 +314,7 @@ interface UiNodeBoundaryState {
 }
 
 class UiNodeBoundary extends Component<UiNodeBoundaryProps, UiNodeBoundaryState> {
-    state = { failed: false, node: this.props.node };
+    override state = { failed: false, node: this.props.node };
 
     static getDerivedStateFromError(): { failed: boolean } {
         return { failed: true };
@@ -324,7 +324,7 @@ class UiNodeBoundary extends Component<UiNodeBoundaryProps, UiNodeBoundaryState>
         return props.node === state.node ? null : { failed: false, node: props.node };
     }
 
-    render(): ReactNode {
+    override render(): ReactNode {
         return this.state.failed ? <UiFallbackPart fallback={this.props.node.fallback} problem={{ kind: 'failed' }} /> : this.props.children;
     }
 }

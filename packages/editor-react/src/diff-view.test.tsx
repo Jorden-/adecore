@@ -337,13 +337,13 @@ test('split unfolds both sides without remounting and falls back to unified for 
 });
 
 class TestBoundary extends Component<{ children?: ReactNode }, { failed: boolean }> {
-    state = { failed: false };
+    override state = { failed: false };
 
     static getDerivedStateFromError() {
         return { failed: true };
     }
 
-    render() {
+    override render() {
         return this.state.failed ? createElement('div', { 'data-fallback': true }, 'Legacy diff') : this.props.children;
     }
 }

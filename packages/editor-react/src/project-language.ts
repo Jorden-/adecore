@@ -254,9 +254,10 @@ export class ProjectLanguage {
             void holder.sync.ready
                 .catch(() => undefined)
                 .then(() => {
-                    if (!this.holders.has(uri)) {
-                        return this.service.closeDocument(uri);
+                    if (this.holders.has(uri)) {
+                        return undefined;
                     }
+                    return this.service.closeDocument(uri);
                 })
                 .catch(() => undefined);
         } else if (holder.sync.editor === editor) {

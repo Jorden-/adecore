@@ -75,18 +75,18 @@ function ErrorFallback({ label, error, componentStack, compact, reload, classNam
  * resets only while it holds an error: `resetKeys` for what the children draw from.
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-    state: ErrorBoundaryState = CLEAR;
+    override state: ErrorBoundaryState = CLEAR;
 
     static getDerivedStateFromError(error: unknown): Partial<ErrorBoundaryState> {
         return { error, failed: true };
     }
 
-    componentDidCatch(error: unknown, info: ErrorInfo): void {
+    override componentDidCatch(error: unknown, info: ErrorInfo): void {
         console.error(`${this.props.label}:`, error, info.componentStack);
         this.setState({ componentStack: info.componentStack ?? null });
     }
 
-    componentDidUpdate(previous: ErrorBoundaryProps): void {
+    override componentDidUpdate(previous: ErrorBoundaryProps): void {
         if (shouldReset(this.state.failed, previous.resetKeys ?? [], this.props.resetKeys ?? [])) {
             this.reset();
         }
@@ -96,7 +96,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         this.setState(CLEAR);
     }
 
-    render(): ReactNode {
+    override render(): ReactNode {
         if (!this.state.failed) {
             return this.props.children;
         }
