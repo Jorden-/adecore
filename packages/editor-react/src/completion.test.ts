@@ -105,3 +105,14 @@ test('only a resolve the server calls stale asks for the list again, and every r
     expect(JSON.stringify(language.popups.getState().completion?.docs)).toContain('Prints the value.');
     dispose();
 });
+
+test('a character that ends a word drops the list the letter before it asked for', async () => {
+    const { service, editor, timers, language, dispose } = await open('const total = coun', [{ label: 'count' }, { label: 'counter' }]);
+    editor.type('const total = count');
+    editor.type('const total = count;');
+    timers.advance(1_000);
+    await settle();
+    expect(service.calls.filter((call) => call.method === 'textDocument/completion')).toHaveLength(0);
+    expect(language.completion.isOpen).toBe(false);
+    dispose();
+});

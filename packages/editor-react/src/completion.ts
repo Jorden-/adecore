@@ -596,6 +596,9 @@ export class CompletionFeature {
             }
         } else if (text.length === 1 && typedIdentifier && isEmptyRange(range)) {
             this.beginRequest({ triggerKind: 1 }, START_DELAY_MS);
+        } else if (text !== '') {
+            // A request the last letter started, still waiting or out, would open the list after a character that ends the word.
+            this.close();
         }
     }
 
