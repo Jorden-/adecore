@@ -14,6 +14,9 @@ export const UI_REPLY_LIMITS = { blocks: 16, characters: 262144, nodes: 2048, mi
 // What a host reads for one block: its queries, its link targets and how often a visible block reads again.
 export const UI_HOST_LIMITS = { queries: 8, links: 64, refreshMilliseconds: 10_000 } as const;
 
+/* A Place that names an address, whose tag may hold quoted text with a `>` before it. */
+const ADDRESSED_PLACE = /<Place\b(?:[^>"']|"[^"]*"|'[^']*')*?\baddress\s*=/;
+
 /* A cheap test for whether `text` may declare a query or name a link target, before anything is read for it. */
 export function uiMayReferenceHost(text: string): boolean {
     if (text.includes('@Query')) {
@@ -22,7 +25,7 @@ export function uiMayReferenceHost(text: string): boolean {
     const links = Object.entries(UI_CATALOG)
         .filter(([, entry]) => entry.group === 'links')
         .map(([name]) => name);
-    return new RegExp(`<(?:${links.join('|')})\\b`).test(text);
+    return new RegExp(`<(?:${links.join('|')})\\b`).test(text) || ADDRESSED_PLACE.test(text);
 }
 
 export interface UiNode {

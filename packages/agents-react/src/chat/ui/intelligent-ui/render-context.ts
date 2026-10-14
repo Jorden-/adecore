@@ -15,6 +15,14 @@ export interface UiLink {
     code?: string;
 }
 
+/* The point a Place stands at, in decimal degrees. */
+export interface UiPlacePoint {
+    lat: number;
+    lon: number;
+    /* What the host called the point it found, such as the street and town. */
+    label?: string;
+}
+
 /* The Choice that answered a block. `sending` already reads as sent, so a second click does nothing. */
 export interface UiAnswer {
     choiceId: string;
@@ -63,6 +71,8 @@ export interface UiRenderContext {
     onChoose?(nodeId: string): void;
     /* Why the choices are closed while `onChoose` is absent, such as live data still being read; without it they say they are not available. */
     choiceReason?: string | null;
+    /* Where the Place of `nodeId` stands: undefined while it is not looked up yet, null when no point was found. */
+    place?(nodeId: string): UiPlacePoint | null | undefined;
     /* Table cells use the evaluated rows index and column key. */
     liveValue?(nodeId: string, prop: string, path?: readonly [row: number, key: string]): UiLiveValue | undefined;
 }

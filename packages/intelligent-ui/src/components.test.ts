@@ -174,3 +174,77 @@ describe('TextField and Select', () => {
         expect(block(FORM).fallback).toBe('Name\nBug\nIdea\nSend\nReport bug from Ada');
     });
 });
+
+describe('Map and Place', () => {
+    const places = (count: number) => Array.from({ length: count }, (_, i) => `<Place lat={52} lon={5}>Stop ${i}</Place>`).join('');
+    const UTRECHT =
+        '$picked = ""\n<Summary>Three stops in Utrecht</Summary>' +
+        '<Map value={$picked}><Place lat={52.0907} lon={5.1214} value="dom" detail="Climb the tower">Domtoren</Place>' +
+        '<Place address="Oudegracht 245, Utrecht" value="gracht">Oudegracht</Place>' +
+        '<Place lat={52.0894} lon={5.1103} address="Utrecht Centraal">Station</Place></Map>' +
+        '<Choices><Choice context={"Plan around " + $picked}>Plan</Choice></Choices>';
+
+    test('compiles a map of both forms without diagnostics and binds its value', () => {
+        const compiled = block(UTRECHT);
+        expect(compiled.diagnostics).toEqual([]);
+        expect(compiled.nodes[1].bindings).toEqual({ value: '$picked' });
+        const map = evaluateUiBlock(compiled).nodes[1];
+        expect(map.children.map((child) => child.type)).toEqual(['Place', 'Place', 'Place']);
+        expect(map.children[1].props).toEqual({ address: 'Oudegracht 245, Utrecht', value: 'gracht' });
+    });
+
+    test('a place needs lat with lon, or an address', () => {
+        expect(problems('<Map><Place lat={52}>Half</Place></Map>').errors).toEqual(['Place:invalid_props']);
+        expect(problems('<Map><Place lon={5}>Half</Place></Map>').errors).toEqual(['Place:invalid_props']);
+        expect(problems('<Map><Place detail="Nowhere">Nothing</Place></Map>').errors).toEqual(['Place:invalid_props']);
+        expect(problems('<Map><Place lat={0} lon={0}>Null Island</Place></Map>')).toEqual({ diagnostics: [], errors: [] });
+        expect(problems('<Map><Place lat={90} lon={-180}>Edge</Place></Map>').errors).toEqual([]);
+        expect(problems('<Map><Place lat={91} lon={5}>Past the pole</Place></Map>').errors).toEqual(['Place:invalid_props']);
+        expect(problems('<Map><Place lat={52} lon={181}>Past the line</Place></Map>').errors).toEqual(['Place:invalid_props']);
+        expect(problems(`<Map><Place address="${'x'.repeat(513)}">Long</Place></Map>`).errors).toEqual(['Place:invalid_props']);
+    });
+
+    test('a map holds one to 50 places, counting what an Each or a Show will draw', () => {
+        expect(problems(`<Map>${places(50)}</Map>`)).toEqual({ diagnostics: [], errors: [] });
+        expect(problems(`<Map>${places(51)}</Map>`).errors).toEqual(['Map:invalid_props']);
+        expect(problems('<Map></Map>').errors).toEqual(['Map:invalid_props']);
+        expect(block('<Map>', false).nodes[0].error).toBeUndefined();
+        const each = '$rows = [{name: "Dom"}]\n<Map><Each items={$rows} as="row"><Place address="Domplein 1, Utrecht">{row.name}</Place></Each></Map>';
+        expect(problems(each)).toEqual({ diagnostics: [], errors: [] });
+    });
+
+    test('a place stands only in a map, which holds only places, and no prop takes a map address', () => {
+        expect(problems('<Place lat={52} lon={5}>Alone</Place>').errors).toEqual(['Place:invalid_parent']);
+        expect(problems('<Map><Place lat={52} lon={5}>One</Place><Tag>x</Tag></Map>').errors).toEqual(['Tag:invalid_child']);
+        expect(problems('<Map tiles="https://tiles.example/{z}/{x}/{y}"><Place lat={52} lon={5}>One</Place></Map>').diagnostics).toEqual(['refused_prop']);
+    });
+
+    test('one bad place fails alone and shows as text', () => {
+        const compiled = block('<Map><Place lat={52} lon={5}>Good</Place><Place lat={200} lon={5}>Bad</Place></Map>');
+        expect(compiled.diagnostics.map((item) => item.code)).toEqual(['invalid_props']);
+        const [good, bad] = compiled.nodes[0].children;
+        expect(good.error).toBeUndefined();
+        expect(bad.error).toBe('invalid_props');
+        expect(compiled.nodes[0].error).toBeUndefined();
+    });
+
+    test('falls back to a numbered list with the coordinates, the address and the detail', () => {
+        expect(block(UTRECHT).fallback).toBe(
+            'Three stops in Utrecht\n' +
+                '1. Domtoren (52.0907, 5.1214): Climb the tower\n' +
+                '2. Oudegracht, Oudegracht 245, Utrecht\n' +
+                '3. Station (52.0894, 5.1103), Utrecht Centraal\n' +
+                'Plan\n' +
+                'Plan around'
+        );
+        expect(block('<Map><Place lat={1} lon={2}>First\nline</Place></Map>').fallback).toBe('1. First line (1, 2)');
+    });
+
+    test('a Choice carries the picked place only when a place offers its value', () => {
+        const compiled = block(UTRECHT);
+        const choice = evaluateUiBlock(compiled).nodes[2].children[0];
+        expect(resolveUiChoice(compiled, choice.id, { $picked: 'dom' }).context).toBe('Plan around dom');
+        expect(resolveUiChoice(compiled, choice.id, { $picked: '' }).context).toBe('Plan around ');
+        expect(() => resolveUiChoice(compiled, choice.id, { $picked: 'elsewhere' })).toThrow('outside the visible control');
+    });
+});

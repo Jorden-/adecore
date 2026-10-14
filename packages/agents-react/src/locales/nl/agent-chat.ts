@@ -588,6 +588,12 @@ export default {
             label_one: '{{count}} afbeelding',
             label_other: '{{count}} afbeeldingen'
         },
+        map: {
+            label_one: 'Kaart met {{count}} plek',
+            label_other: 'Kaart met {{count}} plekken',
+            lookingUp: 'Wordt opgezocht',
+            notFound: 'Niet op de kaart'
+        },
         compare: {
             label: 'Vergelijk {{before}} en {{after}}',
             before: 'Voor',

@@ -10,7 +10,7 @@ Wiring the views into an app: the host adapters, the scope, the transport, stora
 
 | Module | Exports |
 | --- | --- |
-| [`host`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/host.ts) | `ChatActions`, `FileRef`, `ShellCodeBlockContext`, `ChatPlace`, `SubagentTask`, `TimelineFindOptions`, `TimelineFind`, `ComposerDictationProps`, `ComposerSlotProps`, `SubagentSlotProps`, `ThreadCard`, `VisualHost`, `ReplyAuthor`, `ChatHost`, `ChatHostProvider`, `useChatHost`, `AccentChoice`, `ChatToast`, `TextareaProps`, `ResourceUrl` |
+| [`host`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/host.ts) | `ChatActions`, `FileRef`, `ShellCodeBlockContext`, `ChatPlace`, `SubagentTask`, `TimelineFindOptions`, `TimelineFind`, `ComposerDictationProps`, `ComposerSlotProps`, `SubagentSlotProps`, `ThreadCard`, `VisualHost`, `ReplyAuthor`, `ChatHost`, `UiMapSource`, `ChatHostProvider`, `useChatHost`, `AccentChoice`, `ChatToast`, `TextareaProps`, `ResourceUrl` |
 | [`scope`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/scope.ts) | `ChatScope`, `ChatScopeContext`, `useChatScope` |
 | [`transport`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/transport.ts) | `ChatRequestMap`, `ChatEventMap`, `ChatTransportStatus`, `ChatTransport`, `ChatTransportError`, `errorCode`, `isConnectionError` |
 | [`port-transport`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/port-transport.ts) | `portTransport`, `PortTransport` |
@@ -115,7 +115,7 @@ The views of a chat: the thread, the composer, messages, diffs, subagents, limit
 | [`chat/ui/intelligent-ui/chart-data`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/chart-data.ts) | `uiChartData`, `UiChartSeries`, `UiChartValues`, `UiChartData` |
 | [`chat/ui/intelligent-ui/node-text`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/node-text.ts) | `uiNodeLabel` |
 | [`chat/ui/intelligent-ui/registry`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/registry.ts) | `UI_RENDERERS` |
-| [`chat/ui/intelligent-ui/render-context`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/render-context.ts) | `UiRenderContext`, `UiRendererProps`, `UiLinkTarget`, `UiLink`, `UiAnswer`, `UiLiveStatus`, `UiLiveValue`, `UiRenderer`, `UiRenderers` |
+| [`chat/ui/intelligent-ui/render-context`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/render-context.ts) | `UiRenderContext`, `UiRendererProps`, `UiLinkTarget`, `UiLink`, `UiPlacePoint`, `UiAnswer`, `UiLiveStatus`, `UiLiveValue`, `UiRenderer`, `UiRenderers` |
 | [`chat/ui/intelligent-ui/table-data`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/table-data.ts) | `uiTableColumns`, `UiColumnKind`, `UiTableColumn` |
 | [`chat/ui/quote-selection`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/quote-selection.ts) | `QuoteTaker` |
 | [`chat/ui/reply-context`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/reply-context.ts) | `ReplyContext` |

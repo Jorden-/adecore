@@ -1,12 +1,13 @@
 import { createContext, useContext, useId, type MouseEvent, type ReactNode } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
-import type { UiBinding, UiProps, UiViewNode } from '@adecore/intelligent-ui';
+import type { UiProps } from '@adecore/intelligent-ui';
 import { Button, Checkbox, Input, Segmented, Select, Slider, Switch, Tooltip } from '@adecore/ui';
 import { formatNumber } from '@adecore/ui/format';
 import { uiChildrenOf, uiNodeLabel, uiWithUnit } from '../node-text';
-import type { UiRenderContext, UiRendererProps } from '../render-context';
+import type { UiRendererProps } from '../render-context';
 import { useTruncated } from '../use-truncated';
+import { bindingOf, PENDING } from './binding';
 
 type Scalar = UiProps<'Item'>['value'];
 
@@ -17,18 +18,6 @@ interface ChecklistState {
 }
 
 const ChecklistContext = createContext<ChecklistState>({ values: [], enabled: false, toggle: () => undefined });
-
-/*
- * The binding of an input, or null for a read-only node. An input works once its own node closed and
- * only through its binding, so the value never leaves the block until a Choice carries it.
- */
-function bindingOf<Value>(node: UiViewNode<{ value: Value }>, context: UiRenderContext): UiBinding<Value> | null {
-    const binding = node.bindings.value as UiBinding<Value> | undefined;
-    return binding === undefined || !node.complete || context.answer !== null ? null : binding;
-}
-
-/* An input whose node has not closed yet stands at 60% and takes no pointer. */
-const PENDING = 'pointer-events-none opacity-60';
 
 /* The rows of a checklist as one named group. */
 function ChecklistGroup({ pending, children }: { pending: boolean; children: ReactNode }) {

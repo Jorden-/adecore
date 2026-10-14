@@ -14,6 +14,7 @@ import {
     TextFieldRenderer
 } from './renderers/inputs';
 import { CommitRenderer, DiffRenderer, FileRenderer, NodeRenderer } from './renderers/links';
+import { MapRenderer } from './renderers/map';
 import { SectionRenderer, SectionsRenderer, TabRenderer, TabsRenderer } from './renderers/structure';
 import {
     CalloutRenderer,
@@ -28,8 +29,9 @@ import {
 
 /*
  * A renderer for every component of the catalog; a name missing here fails the typecheck. Null draws
- * nothing for the node itself: the runtime resolves Show and Each before rendering, and Column and
- * Option are metadata their parent reads from its node (a table its columns, Segmented and Select their options).
+ * nothing for the node itself: the runtime resolves Show and Each before rendering, and Column,
+ * Option and Place are metadata their parent reads from its node (a table its columns, Segmented and
+ * Select their options, a map its places).
  */
 export const UI_RENDERERS: UiRenderers = {
     Summary: SummaryRenderer,
@@ -55,6 +57,8 @@ export const UI_RENDERERS: UiRenderers = {
     Image: ImageRenderer,
     Gallery: GalleryRenderer,
     Compare: CompareRenderer,
+    Map: MapRenderer,
+    Place: null,
     Sources: SourcesRenderer,
     Source: SourceRenderer,
     File: FileRenderer,

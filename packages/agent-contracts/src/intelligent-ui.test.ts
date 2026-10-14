@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { z } from 'zod';
 import { compileUi } from '@adecore/intelligent-ui';
-import { ChatAssistantItemSchema, ChatEventSchema } from './chat.ts';
+import { ChatAssistantItemSchema, ChatEventSchema, ChatUiPlaceReadingSchema, ChatUiQueryStateSchema } from './chat.ts';
 
 test('future UI components stay open on the chat wire and legacy decoders retain the reply', () => {
     const text = '```ui\n<Summary>Readable</Summary>\n```';
@@ -22,4 +22,17 @@ test('future UI components stay open on the chat wire and legacy decoders retain
     expect(ChatEventSchema.parse(event) as unknown).toEqual(event);
     const oldDelta = z.object({ type: z.literal('delta'), itemId: z.string(), text: z.string() }).parse(event);
     expect(oldDelta).toEqual({ type: 'delta', itemId: 'reply', text: '' });
+});
+
+test('a frozen block reads with or without the places looked up beside it', () => {
+    const older = { authorChatId: 'chat', blocks: { block: { revision: 'r1', readings: {}, fallback: 'Text' } } };
+    expect(ChatUiQueryStateSchema.parse(older) as unknown).toEqual(older);
+    const places = {
+        found: { state: 'found', lat: 52.0907, lon: 5.1214, label: 'Domplein, Utrecht' },
+        missing: { state: 'missing', code: 'place-not-found', reason: 'No match for this address.' }
+    };
+    const newer = { authorChatId: 'chat', blocks: { block: { revision: 'r1', readings: {}, fallback: 'Text', places } } };
+    expect(ChatUiQueryStateSchema.parse(newer) as unknown).toEqual(newer);
+    expect(ChatUiPlaceReadingSchema.safeParse({ state: 'found', lat: 91, lon: 5 }).success).toBe(false);
+    expect(ChatUiPlaceReadingSchema.safeParse({ state: 'later' }).success).toBe(false);
 });

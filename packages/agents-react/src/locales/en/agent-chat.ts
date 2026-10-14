@@ -588,6 +588,12 @@ export default {
             label_one: '{{count}} image',
             label_other: '{{count}} images'
         },
+        map: {
+            label_one: 'Map of {{count}} place',
+            label_other: 'Map of {{count}} places',
+            lookingUp: 'Looking up',
+            notFound: 'Not on the map'
+        },
         compare: {
             label: 'Compare {{before}} and {{after}}',
             before: 'Before',

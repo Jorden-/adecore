@@ -196,6 +196,22 @@ export interface ReplyAuthor {
 }
 
 /*
+ * Where the tiles of a Map come from. The host owns the service and whatever admits a request to it, so
+ * a chat never knows an address, a key or a vendor: it asks for the style of the theme and lets the host
+ * rewrite every address the map requests. `off` says why there are no tiles, and the map then draws its
+ * built-in outline beside the list of places.
+ */
+export type UiMapSource =
+    | {
+          state: 'tiles';
+          /* The style document of one theme. */
+          styleUrl(theme: 'light' | 'dark'): string;
+          /* Called for every address the map requests, such as to add a ticket to those of the host's service. */
+          transformRequest?(url: string): { url: string };
+      }
+    | { state: 'off'; reason: 'disabled' | 'signed-out' | 'unavailable' };
+
+/*
  * What the app around the chat decides and the chat cannot, handed to the views by a `ChatHostProvider`.
  * Whatever an app leaves out keeps the default here, which is the chat without that part. One host may
  * serve several scopes, so a function that is about one host of chats is told its scope id.
@@ -208,6 +224,10 @@ export interface ChatHost {
         openUrl?(scopeId: string, url: string): void;
         query?(scopeId: string, payload: ChatUiQueryPayload): Promise<ChatUiQueryReading>;
         sendChoice(scopeId: string, payload: ChatUiChoicePayload): Promise<'sent' | 'queued'>;
+    };
+    /* The map tiles of a Map block; left out, a map draws its outline and its list of places only. */
+    maps?: {
+        useSource(scopeId: string): UiMapSource;
     };
     /* The colors an account may wear in the order a picker offers them, the few it shows first, and their names. */
     accents: {

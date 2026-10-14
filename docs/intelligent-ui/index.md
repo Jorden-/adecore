@@ -63,6 +63,6 @@ The package depends on zod and nothing else, and runs in Bun, Node and a browser
 - [Getting started](/intelligent-ui/guide/getting-started) wires a host end to end.
 - [Security model](/intelligent-ui/guide/security) lists what agent text can and cannot do.
 - [Syntax](/intelligent-ui/language/syntax), [expressions](/intelligent-ui/language/expressions) and [state and inputs](/intelligent-ui/language/state) describe the language.
-- The component pages list every prop: [status](/intelligent-ui/components/status), [data](/intelligent-ui/components/data), [structure](/intelligent-ui/components/structure), [content](/intelligent-ui/components/content), [host links](/intelligent-ui/components/links), [inputs](/intelligent-ui/components/inputs) and [choices](/intelligent-ui/components/choices).
+- The component pages list every prop: [status](/intelligent-ui/components/status), [data](/intelligent-ui/components/data), [structure](/intelligent-ui/components/structure), [content](/intelligent-ui/components/content), [places](/intelligent-ui/components/places), [host links](/intelligent-ui/components/links), [inputs](/intelligent-ui/components/inputs) and [choices](/intelligent-ui/components/choices).
 - The host pages cover [live queries](/intelligent-ui/host/queries), [choices](/intelligent-ui/host/choices), [links](/intelligent-ui/host/links), [compilation and streaming](/intelligent-ui/host/compilation) and [performance](/intelligent-ui/performance).
 - [Exports](/intelligent-ui/reference) lists every public name by entry point.

@@ -365,6 +365,22 @@ function UiNodeBody({
     );
 }
 
+/*
+ * The points the machine froze beside a block, as a renderer asks for them. Until the block is frozen
+ * nothing is looked up yet; once it is, a place with no reading is one the machine did not look up.
+ */
+function placeReader(frozen: ChatUiQueryState['blocks'][string] | undefined, revision: string | undefined): UiRenderContext['place'] {
+    if (frozen === undefined || frozen.revision !== revision) {
+        return () => undefined;
+    }
+    return (nodeId) => {
+        const reading = Object.hasOwn(frozen.places ?? {}, nodeId) ? frozen.places![nodeId] : undefined;
+        return reading?.state === 'found' && reading.lat !== undefined && reading.lon !== undefined
+            ? { lat: reading.lat, lon: reading.lon, label: reading.label }
+            : null;
+    };
+}
+
 /* What names a block and whether it still streams; the rest of its render context the block works out itself. */
 type UiBlockIdentity = Pick<UiRenderContext, 'scopeId' | 'chatId' | 'itemId' | 'blockId' | 'phase'>;
 
@@ -430,9 +446,11 @@ function UiBlockBody({
     );
     const liveValue = useUiLiveValues(block, evaluation.nodes, queries.currentReadings);
     const sendChoice = host.intelligentUi?.sendChoice;
+    const place = useMemo(() => placeReader(frozen, block.revision), [frozen, block.revision]);
     const rendering: UiRenderContext = {
         ...context,
         ...links,
+        place,
         answer,
         failedChoiceId,
         live: queries.live,

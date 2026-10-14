@@ -44,6 +44,20 @@ export function uiNodeFallback(type: string, props: Readonly<Record<string, unkn
             return `${uiPlainText(props.data ?? [])}${given(props.unit) ? ` (${uiPlainText(props.unit)})` : ''}\n`;
         case 'Compare':
             return `[Compare: ${uiPlainText(props.beforeLabel || 'Before')} ${uiPlainText(props.before)}, ${uiPlainText(props.afterLabel || 'After')} ${uiPlainText(props.after)}]${children.trim() ? ` ${children.trim()}` : ''}\n`;
+        case 'Place': {
+            const point = given(props.lat) && given(props.lon) ? ` (${uiPlainText(props.lat)}, ${uiPlainText(props.lon)})` : '';
+            const address = given(props.address) ? `, ${uiPlainText(props.address)}` : '';
+            const detail = given(props.detail) ? `: ${uiPlainText(props.detail)}` : '';
+            // One line per place, so the numbering of its map counts places and not the lines of a name.
+            return `${children.trim()}${point}${address}${detail}`.replace(/\s+/g, ' ').trim() + '\n';
+        }
+        case 'Map':
+            return children
+                .split('\n')
+                .filter((line) => line.trim() !== '')
+                .map((line, index) => `${index + 1}. ${line}`)
+                .join('\n')
+                .concat('\n');
         case 'Image':
             return `[Image: ${uiPlainText(props.alt ?? props.attachment ?? props.generated ?? 'unavailable')}]${children}\n`;
     }

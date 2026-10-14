@@ -356,6 +356,19 @@ export type ChatUiQueryReading = z.infer<typeof ChatUiQueryReadingSchema>;
 export const ChatUiLinkReadingSchema = UiLinkResolutionSchema;
 export type ChatUiLinkReading = z.infer<typeof ChatUiLinkReadingSchema>;
 
+// `state` is a frozen set, like a link's: native clients validate these payloads whole.
+export const ChatUiPlaceReadingSchema = z.object({
+    state: z.enum(['found', 'missing']),
+    lat: z.number().min(-90).max(90).optional(),
+    lon: z.number().min(-180).max(180).optional(),
+    // What the host called the point it found, such as the street and town.
+    label: z.string().optional(),
+    // A code that names the reason across versions; open, so a new one fails nobody.
+    code: z.string().optional(),
+    reason: z.string().optional()
+});
+export type ChatUiPlaceReading = z.infer<typeof ChatUiPlaceReadingSchema>;
+
 // The writer's captured access stays on the daemon; a record from before that still parses and drops it.
 export const ChatUiQueryStateSchema = z.object({
     authorChatId: z.string(),
@@ -365,7 +378,9 @@ export const ChatUiQueryStateSchema = z.object({
             revision: z.string(),
             readings: z.record(z.string(), ChatUiQueryReadingSchema),
             fallback: z.string(),
-            links: z.record(z.string(), ChatUiLinkReadingSchema).optional()
+            links: z.record(z.string(), ChatUiLinkReadingSchema).optional(),
+            // The points looked up for the places of a block that named an address, by node id.
+            places: z.record(z.string(), ChatUiPlaceReadingSchema).optional()
         })
     )
 });

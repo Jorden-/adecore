@@ -14,6 +14,7 @@ export {
     type VisualHost,
     type ReplyAuthor,
     type ChatHost,
+    type UiMapSource,
     ChatHostProvider,
     useChatHost,
     type AccentChoice,

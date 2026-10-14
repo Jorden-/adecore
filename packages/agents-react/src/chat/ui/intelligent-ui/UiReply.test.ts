@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { compileUi } from '@adecore/intelligent-ui';
+import { compileUi, evaluateUiBlock } from '@adecore/intelligent-ui';
 import { parseHTML } from 'linkedom';
 import { ChatHostProvider, type ChatHost } from '../../../host';
 import { UiReplyNavigationContext } from '../reply-context';
@@ -191,4 +191,46 @@ test('an event with a time nobody can read is drawn as text beside the events th
     expect(future).toContain('Before');
     expect(future).toContain('After');
     expect(future).toContain('Unknown component FutureTimeline.');
+});
+
+const UTRECHT =
+    '<Map><Place lat={52.0907} lon={5.1214} detail="Climb the tower">Domtoren</Place>' +
+    '<Place address="Oudegracht 245, Utrecht">Oudegracht</Place><Place address="Nowhere 1">Lost</Place></Map>';
+
+test('draws a map as a numbered list and says which places are still being looked up', () => {
+    const markup = drawn(UTRECHT);
+    expect(markup).toContain('aria-label="Map of 3 places"');
+    expect(markup.match(/<li>/g)).toHaveLength(3);
+    expect(markup).toContain('Climb the tower');
+    expect(markup).toContain('Oudegracht 245, Utrecht');
+    expect(markup.match(/Looking up/g)).toHaveLength(2);
+    expect(markup).not.toContain('Not on the map');
+    expect(markup).not.toContain('<button');
+});
+
+test('a map takes the points its machine froze and keeps a place without one in the list', () => {
+    const text = '```ui\n' + UTRECHT + '\n```';
+    const blocks = compileUi(text, { id: 'item', final: true }).map((block) => ({ ...block, revision: 'r1' }));
+    const ids = evaluateUiBlock(blocks[0]).nodes[0].children.map((place) => place.id);
+    const queries = {
+        authorChatId: 'chat',
+        blocks: {
+            [blocks[0].id]: {
+                revision: 'r1',
+                readings: {},
+                fallback: '',
+                places: { [ids[1]]: { state: 'found' as const, lat: 52.0849, lon: 5.1181, label: 'Oudegracht' } }
+            }
+        }
+    };
+    const markup = renderToStaticMarkup(createElement(UiReply, { text, blocks, context, queries }));
+    expect(markup).not.toContain('Looking up');
+    expect(markup.match(/Not on the map/g)).toHaveLength(1);
+    expect(markup.match(/<li>/g)).toHaveLength(3);
+});
+
+test('a place the catalog refused is drawn as its text under the list', () => {
+    const markup = drawn('<Map><Place lat={52} lon={5}>Good</Place><Place lat={200} lon={5}>Bad</Place></Map>');
+    expect(markup.match(/<li>/g)).toHaveLength(1);
+    expect(markup).toContain('Bad');
 });

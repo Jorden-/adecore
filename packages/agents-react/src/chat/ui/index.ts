@@ -75,6 +75,7 @@ export type {
     UiRendererProps,
     UiLinkTarget,
     UiLink,
+    UiPlacePoint,
     UiAnswer,
     UiLiveStatus,
     UiLiveValue,

@@ -112,7 +112,7 @@ describe('streaming compiler', () => {
             expect(evaluated.nodes.length).toBeGreaterThan(0);
             expect(compiled.fallback).not.toBe('');
         }
-        expect(Object.keys(UI_CATALOG)).toHaveLength(42);
+        expect(Object.keys(UI_CATALOG)).toHaveLength(44);
         expect(uiCatalogText()).toContain('Image(attachment?, generated?, alt?)');
         expect(uiCatalogText()).toContain('Button(action, disabled?)');
     });
@@ -158,6 +158,10 @@ describe('streaming compiler', () => {
         expect(uiMayReferenceHost('$rows = @Query("rows", {})')).toBe(true);
         expect(uiMayReferenceHost('<Diff path="a.ts"/>')).toBe(true);
         expect(uiMayReferenceHost('<Nodes/>')).toBe(false);
+        expect(uiMayReferenceHost('<Map><Place lat={52} lon={5}>Utrecht</Place></Map>')).toBe(false);
+        expect(uiMayReferenceHost('<Place address="Domplein 1, Utrecht">Dom</Place>')).toBe(true);
+        expect(uiMayReferenceHost('<Place detail="a > b" address="Domplein 1">Dom</Place>')).toBe(true);
+        expect(uiMayReferenceHost('<Place lat={52} lon={5} detail="address=">Dom</Place>')).toBe(false);
     });
 
     test('reads only the fence language the host names', () => {

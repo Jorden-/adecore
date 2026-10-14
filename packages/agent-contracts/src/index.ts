@@ -84,6 +84,8 @@ export {
     type ChatUiQueryReading,
     ChatUiLinkReadingSchema,
     type ChatUiLinkReading,
+    ChatUiPlaceReadingSchema,
+    type ChatUiPlaceReading,
     ChatUiQueryStateSchema,
     type ChatUiQueryState,
     ChatAssistantItemSchema,

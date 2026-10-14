@@ -35,6 +35,8 @@ A renderer never sends a message, never reads a path and never opens an address 
 | `openUrl(scopeId, url)` | A source cannot be opened. |
 | `subscribe(scopeId, chatId, changed)` | Visible blocks only refresh on their own interval. |
 
+A `Map` asks one more thing of the host, outside `intelligentUi`: `ChatHost.maps.useSource(scopeId)` returns a `UiMapSource`. It is either `{ state: 'tiles', styleUrl(theme), transformRequest? }`, where the host names the style of each theme and may rewrite every address the map requests, or `{ state: 'off', reason }` with `disabled`, `signed-out` or `unavailable`. A chat never learns who serves the tiles or what admits a request to them. Without `maps` a map shows its list of places only. See [Places](/intelligent-ui/components/places).
+
 A visible block reads its live data at most once every ten seconds, and once more 300 ms after a person changes an input. Choices stay closed until the reading matches the inputs a person sees. [Live queries](/intelligent-ui/host/queries) and [links](/intelligent-ui/host/links) describe the backend side.
 
 ## Custom renderers

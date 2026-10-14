@@ -213,6 +213,7 @@ export const sidebar: DefaultTheme.SidebarMulti = {
             ['Data', '/intelligent-ui/components/data'],
             ['Structure', '/intelligent-ui/components/structure'],
             ['Content', '/intelligent-ui/components/content'],
+            ['Places', '/intelligent-ui/components/places'],
             ['Host links', '/intelligent-ui/components/links'],
             ['Inputs', '/intelligent-ui/components/inputs'],
             ['Choices', '/intelligent-ui/components/choices']

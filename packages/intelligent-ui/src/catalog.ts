@@ -22,6 +22,10 @@ export const UI_GROUPS = {
         description: 'Include code, attachments and sources.',
         rules: 'Image accepts a chat attachment or generated="latest", never a URL or a local path. Gallery and Compare take chat attachments too. The host says how to attach a file of your own.'
     },
+    places: {
+        description: 'Show places on a map the host draws.',
+        rules: 'Give lat and lon in decimal degrees, or an address the host looks up. Never a tile or map URL. The host chooses the map.'
+    },
     links: { description: 'Refer to a host-owned resource.', rules: 'Targets are checked by the host. No arbitrary navigation or file reads.' },
     inputs: {
         description: 'Change local block state.',
@@ -107,6 +111,31 @@ export const UI_CATALOG = {
         group: 'content',
         description: 'Two chat attachments in one frame with a handle to wipe between them; children are the caption.',
         schema: z.strictObject({ before: name, after: name, beforeLabel: text.optional(), afterLabel: text.optional() })
+    },
+    Map: {
+        group: 'places',
+        description: 'One to 50 places on a map the host draws, with a numbered list under it; bind value to let a person pick a place.',
+        schema: z.strictObject({ value: scalar.optional() }),
+        children: ['Place'],
+        binding: 'value',
+        count: { min: 1, max: 50 }
+    },
+    Place: {
+        group: 'places',
+        description: 'One place by lat and lon, or by an address the host looks up; children are the name.',
+        schema: z
+            .strictObject({
+                lat: number.min(-90).max(90).optional(),
+                lon: number.min(-180).max(180).optional(),
+                address: text.max(512).optional(),
+                detail: text.optional(),
+                value: scalar.optional()
+            })
+            .refine(
+                (props) => (props.lat === undefined) === (props.lon === undefined) && (props.lat !== undefined || props.address !== undefined),
+                'Give lat with lon, or an address.'
+            ),
+        parent: 'Map'
     },
     Sources: { group: 'content', description: 'Numbered sources without preloading.', schema: empty, children: ['Source'] },
     Source: {

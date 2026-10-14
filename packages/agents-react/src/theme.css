@@ -56,6 +56,9 @@
     --chat-added: var(--term-ansi-green, var(--positive));
     --chat-removed: var(--term-ansi-red, var(--status-error));
     --chart-1: var(--accent);
+    /* The number of a place on a map and in its list: the ink on the ground, so it reads on either. */
+    --map-marker: var(--text);
+    --map-marker-text: var(--surface);
 }
 
 @theme inline {
@@ -73,6 +76,8 @@
     --color-chat-output: var(--chat-output);
     --color-chat-added: var(--chat-added);
     --color-chat-removed: var(--chat-removed);
+    --color-map-marker: var(--map-marker);
+    --color-map-marker-text: var(--map-marker-text);
 }
 
 @layer components {

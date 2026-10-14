@@ -16,6 +16,9 @@ function offered(node: UiViewNode): boolean {
     if (node.type === 'Segmented' || node.type === 'Select') {
         return node.children.some((option) => option.type === 'Option' && !option.error && option.props.value === node.props.value);
     }
+    if (node.type === 'Map') {
+        return node.children.some((place) => place.type === 'Place' && !place.error && place.props.value === node.props.value);
+    }
     if (node.type === 'Checklist') {
         const options = node.children.filter((item) => item.type === 'Item' && !item.error).map((item) => item.props.value);
         return (node.props.value as unknown[]).every((value) => options.includes(value));

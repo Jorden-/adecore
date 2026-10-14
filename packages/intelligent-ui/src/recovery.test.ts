@@ -110,6 +110,8 @@ const PRESENTATIONAL: Partial<Record<UiComponentName, readonly string[]>> = {
     Select: ['value'],
     TextField: ['value', 'maxLength', 'placeholder'],
     Option: ['value'],
+    Map: ['value'],
+    Place: ['value'],
     Show: ['when'],
     Each: ['items', 'as']
 };
@@ -130,6 +132,7 @@ const MARKED: Partial<Record<UiComponentName, string>> = {
     Image: '<Image attachment="a1" alt="mark-alt"/>',
     Gallery: '<Gallery><Image attachment="a1" alt="mark-alt">mark-caption</Image></Gallery>',
     Compare: '<Compare before="mark-before" after="mark-after" beforeLabel="mark-old" afterLabel="mark-new">mark-caption</Compare>',
+    Map: '<Map><Place lat={37} lon={91} address="mark-address" detail="mark-detail">mark-name</Place></Map>',
     Sources: '<Sources><Source title="mark-title" url="https://mark.example/"/></Sources>',
     File: '<File path="mark/path.ts" line={37}>mark-body</File>',
     Diff: '<Diff path="mark/path.ts"/>',
