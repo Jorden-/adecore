@@ -1,10 +1,10 @@
 import { useEffect, useImperativeHandle, useRef, type KeyboardEvent } from 'react';
 import clsx from 'clsx';
-import { isApplePlatform, matchesShortcut, TextArea } from '@adecore/ui';
+import { isApplePlatform, TextArea } from '@adecore/ui';
 import { CODE_TEXT } from '../code-text.ts';
 import { applyEdit, indentEdit, newlineEdit, outdentEdit, type TextEdit } from './editing.ts';
 import type { QueryConsoleEditorProps } from './editor-slot.ts';
-import { RUN_ALL_SHORTCUT, RUN_SHORTCUT } from './shortcuts.ts';
+import { runScopeOf } from './shortcuts.ts';
 
 /*
  * Where the SQL is typed when the app brings no editor of its own: a plain text area that fills the
@@ -46,15 +46,10 @@ export function SqlEditor({ ref, value, onValueChange, run, label, placeholder, 
     };
 
     const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
-        const apple = isApplePlatform();
-        if (matchesShortcut(RUN_ALL_SHORTCUT, event, apple)) {
+        const scope = runScopeOf(event, isApplePlatform());
+        if (scope !== null) {
             event.preventDefault();
-            run('all');
-            return;
-        }
-        if (matchesShortcut(RUN_SHORTCUT, event, apple)) {
-            event.preventDefault();
-            run('selection-or-statement');
+            run(scope);
             return;
         }
         if (event.nativeEvent.isComposing || event.metaKey || event.ctrlKey || event.altKey) {

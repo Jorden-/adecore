@@ -73,6 +73,8 @@ describe('the public API', () => {
             'DatabaseRequestError',
             'DatabaseWorkbench',
             'QueryConsole',
+            'RUN_ALL_SHORTCUT',
+            'RUN_SHORTCUT',
             'StructureView',
             'TableDesigner',
             'TableView',
@@ -83,6 +85,7 @@ describe('the public API', () => {
             'createDatabaseClient',
             'isMysqlContainer',
             'isValidConfig',
+            'runScopeOf',
             'useDatabaseClient',
             'withContainer'
         ]);
