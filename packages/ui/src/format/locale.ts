@@ -151,3 +151,14 @@ export const labelCollator = (): Intl.Collator => {
     collators.set(locale, collator);
     return collator;
 };
+
+let nameCollators: { loose: Intl.Collator; exact: Intl.Collator } | null = null;
+
+/*
+ * The order of names that are no words, such as files: the runtime's own locale, numbers by value and
+ * case only to break a tie. It is what `localeCompare` did, which built a collator on every call.
+ */
+export const nameOrder = (left: string, right: string): number => {
+    nameCollators ??= { loose: new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }), exact: new Intl.Collator() };
+    return nameCollators.loose.compare(left, right) || nameCollators.exact.compare(left, right);
+};

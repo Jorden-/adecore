@@ -1,4 +1,5 @@
 import type { FileTree, FileTreeDirectoryHandle, FileTreeVisibleRow } from '@pierre/trees';
+import { nameOrder } from '../format/locale.ts';
 
 // Expanded folders can reveal more flattened rows; cap custom-key cycles.
 const EXPANSION_PASSES = 32;
@@ -152,8 +153,7 @@ export function compareRows(left: SortRow, right: SortRow): number {
         if (leftIsDirectory !== rightIsDirectory) {
             return leftIsDirectory ? -1 : 1;
         }
-        // Case is not a reason to split two names apart; the raw compare only breaks a tie.
-        return leftSegment.localeCompare(rightSegment, undefined, { numeric: true, sensitivity: 'base' }) || leftSegment.localeCompare(rightSegment);
+        return nameOrder(leftSegment, rightSegment);
     }
     // One path is the head of the other, so the shorter one is the directory the longer one sits in.
     return left.segments.length - right.segments.length;
