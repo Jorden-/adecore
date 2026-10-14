@@ -74,7 +74,7 @@ A step with sub-steps has no state of its own. `stepState(step)` derives it from
 | One active, done, warning or info  | `active`                                    |
 | Otherwise                          | `open`                                      |
 
-A skipped step next to open ones leaves the parent open, since nothing ran. `isFinishedOutcome(state)` is true for done, skipped, warning and info.
+A skipped step next to open ones leaves the parent open, since nothing ran. A step with the state done, skipped, warning or info counts as finished.
 
 ## Who checks a step
 
@@ -136,6 +136,6 @@ On `@adecore/plan/protocol`:
 | `PlanActorSchema`     | `PlanActor`     |                      |                |
 | `PlanKindSchema`      | `PlanKind`      |                      |                |
 
-On `@adecore/plan`, the strict drafts: `PlanDraftSchema`, `PlanDraftMetaSchema`, `PlanDraftItemSchema`, `PlanDraftSectionSchema`, `PlanDraftTextSchema` and `PlanDraftStepSchema`, with the types `PlanDraft`, `PlanDraftMeta`, `PlanDraftItem`, `PlanDraftSection`, `PlanDraftText` and `PlanDraftStep`.
+On `@adecore/plan`, the strict drafts: `PlanDraftMetaSchema`, `PlanDraftSectionSchema`, `PlanDraftTextSchema` and `PlanDraftStepSchema`, with the types `PlanDraft`, `PlanDraftItem`, `PlanDraftSection`, `PlanDraftText` and `PlanDraftStep`. `parsePlanDraft` checks a whole draft.
 
 A stored plan has no format version. The protocol schemas drop keys they do not know, so a later optional field does not break an older reader.

@@ -101,7 +101,7 @@ With `files` on the provider, a result with rows has Export result, as CSV, TSV,
 
 `QueryConsoleRunScope` is `'selection-or-statement'`, the selection or the statement at the caret when nothing is selected, or `'all'`, the whole text. `QueryConsoleEditorHandle` has one method, `selection()`, which returns `{ start, end }` as offsets into the text, with `start` equal to `end` for a caret. Without a handle, a run of the selection or the statement runs the whole text.
 
-The editor owns its keys. It binds the two the toolbar's tooltips name: `RUN_SHORTCUT` (Cmd or Ctrl and Enter) runs the selection or the statement, `RUN_ALL_SHORTCUT` (with Shift) runs everything. Both are a `Shortcut` of `@adecore/ui`. `runScopeOf(event, apple)` turns a key event into the `QueryConsoleRunScope` it asks for, or `null` for any other key, matching the way `matchesShortcut` does; the console's own text area calls it too, so an editor that binds through it follows a change to the keys. The toolbar sits above the editor, as a table view's toolbar sits above its grid, and the editor fills the space under it, edge to edge.
+The editor owns its keys. It binds the two the toolbar's tooltips name: Cmd or Ctrl and Enter runs the selection or the statement, with Shift it runs everything. `runScopeOf(event, apple)` turns a key event into the `QueryConsoleRunScope` it asks for, or `null` for any other key, matching the way `matchesShortcut` does; the console's own text area calls it too, so an editor that binds through it follows a change to the keys. The toolbar sits above the editor, as a table view's toolbar sits above its grid, and the editor fills the space under it, edge to edge.
 
 ```tsx
 import { runScopeOf } from '@adecore/database';

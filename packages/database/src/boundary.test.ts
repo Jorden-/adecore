@@ -73,21 +73,16 @@ describe('the public API', () => {
             'DatabaseRequestError',
             'DatabaseWorkbench',
             'QueryConsole',
-            'RUN_ALL_SHORTCUT',
-            'RUN_SHORTCUT',
             'StructureView',
             'TableDesigner',
             'TableView',
-            'addDatabaseResources',
-            'configProblems',
             'connectionFromContainer',
             'containerTitle',
             'createDatabaseClient',
             'isMysqlContainer',
             'isValidConfig',
             'runScopeOf',
-            'useDatabaseClient',
-            'withContainer'
+            'useDatabaseClient'
         ]);
     });
 

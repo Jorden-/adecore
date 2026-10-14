@@ -2,7 +2,6 @@
 
 exports[`the public API . exports these names 1`] = `
 [
-  "DEFAULT_DIAGRAM_MARGIN",
   "DEFAULT_EDGE_TONE",
   "DEFAULT_GROUP_TONE",
   "DEFAULT_NODE_TONE",

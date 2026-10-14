@@ -326,7 +326,7 @@ Without the second `@source` the views render unstyled.
 
 ## Words and languages
 
-The package's words live in the `database` namespace (`DATABASE_NAMESPACE`), in English and Dutch. `DatabaseProvider` adds them with `addDatabaseResources`, which skips a language that already has a `database` bundle. An app that wires i18next itself calls `addDatabaseResources(i18next)` before the first view mounts.
+The package's words live in the `database` namespace (`DATABASE_NAMESPACE`), in English and Dutch. `DatabaseProvider` adds them, and skips a language that already has a `database` bundle.
 
 To add a language, add its bundle before the provider mounts. `DATABASE_RESOURCES`, keyed by language code, holds the English source to translate from:
 

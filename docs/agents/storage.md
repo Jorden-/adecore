@@ -16,7 +16,7 @@ Everything a host keeps lives in its data folder. Give each host a folder of its
 | `usage/index.json`, `prices.json`, `exchange-rate.json` | The usage index, and the prices and rate last fetched.                       |
 | `outbox/`, `tasks/`, `lineage/`, `notices/`        | The [coordination](/agents/coordination) stores, when a host uses them.           |
 
-An id becomes a file name with `encodeURIComponent` (`recordFileName`). A host's extras sit at the top level of a chat's record, next to `info` and `items`, which they cannot replace. `ChatStoreOptions.isSidecar` keeps JSON files of your own in `chats/` out of the list of chats.
+An id becomes a file name with `encodeURIComponent`. A host's extras sit at the top level of a chat's record, next to `info` and `items`, which they cannot replace. `ChatStoreOptions.isSidecar` keeps JSON files of your own in `chats/` out of the list of chats.
 
 A record this version cannot read is left as it is and refused with `chat-unreadable`; creating the chat again does not write over it. A log can rebuild a record that is missing, when it holds a start to rebuild from.
 

@@ -16,7 +16,7 @@ const svg = toSvg(diagram, { layout, background: '#ffffff' });
 | `palette`           | `DEFAULT_PALETTE` of the drawing package | The color of every palette name: outlines, edges and text.        |
 | `paper`             | `DEFAULT_PAPER` of the drawing package   | The pale fill of a node, by its tone.                             |
 | `background`        | None                                     | A rect behind everything, also used as a halo behind edge labels. |
-| `margin`            | `DEFAULT_DIAGRAM_MARGIN`, 32             | World units around the bounds.                                    |
+| `margin`            | 32             | World units around the bounds.                                    |
 | `font`              | The `sans` stack of the drawing package  | The font family of the whole SVG.                                 |
 | `layout`            | `layoutOf(content)`                      | A layout you already computed, so it is not computed twice.       |
 

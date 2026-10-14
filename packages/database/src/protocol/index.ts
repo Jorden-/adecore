@@ -23,7 +23,6 @@ export {
     type DatabaseResult,
     type ExportSource,
     type FileFormat,
-    type HelperReady,
     type RowChange,
     type RowKey,
     type RowsResult,

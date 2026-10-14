@@ -14,7 +14,7 @@ Every fake comes from `@adecore/agents/testing`, except `memoryPortPair()`, whic
 | `memoryPortPair()`              | Two ends of a `FramePort` in one process; a frame arrives as a copy, a moment later. |
 | `ManualClock`                   | Time for the outbox that moves when you say.                                         |
 | `FakeWatch`, `EventLog`         | File changes you raise yourself, and a log of events to wait on.                     |
-| `testAccounts`, `memorySecrets` | An account service with fake checks and secrets in a `Map`.                          |
+| `testAccounts` | An account service with fake checks and secrets in memory.                                   |
 
 A test that needs real pipes and a real exit code runs a fake as a process: resolve `@adecore/agents/testing/bin/fake-claude` or `@adecore/agents/testing/bin/fake-codex` and start it with `bun` where the CLI's command would go. `runOverStdio(cli)` does the same for a fake of your own. The captures the fakes follow are JSON under `@adecore/agents/testing/fixtures/`.
 

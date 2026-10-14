@@ -49,17 +49,12 @@ document.matchBracket(4); // { mate: 13 }
 document.matchBracket(13); // { mate: 4 }
 ```
 
-## Words
-
-`isWordBoundary(text, offset, camel, isStart)` says whether a word starts or ends at an offset, where a run of punctuation counts as a word. `isHumpBoundary(text, offset, isStart)` says whether the offset splits a camel hump, a digit run or an underscore from the word around it. `wordBoundary(text, offset, direction, camel?)` returns the next stop in a direction, never inside a surrogate pair or between `\r` and `\n`. `text` is a string or any `WordText`: an object with `length` and `charAt`.
-
 ## Search helpers
 
 `findMatches`, `iterateMatches`, `findMatchFrom` and `replacementText` work with an immutable string and revision instead of a model. See [Search and folding](/editor-core/search-folding) for iteration, direction and replacement semantics.
 
 ## Other helpers
 
-- `replaceWithCaseRespect(replacement, found)` gives `replacement` the case of `found`: `'bar'` for `'FOO'` becomes `'BAR'`.
 - `indentationColumn(text, tabSize)` is the width of the leading whitespace of `text`, with tabs expanded.
 
 ## Types
@@ -72,7 +67,7 @@ document.matchBracket(13); // { mate: 4 }
 | `EditorCommand`, `CommandOptions`, `TypeTextOptions`                                         | Commands and their options                                              |
 | `FindOptions`, `FindNextOptions`, `FindMatch`, `ReplaceOptions`, `ReplaceAllOptions`         | Search                                                                  |
 | `FoldingOptions`, `FoldingRange`, `FoldRole`, `FoldHints`, `FoldSymbolHint`, `FoldRangeHint` | Folding                                                                 |
-| `TextSpan`, `BracketIndex`, `BracketMatch`, `WordText`                                       | Helper results and inputs                                               |
+| `TextSpan`, `BracketIndex`, `BracketMatch`                                     | Helper results and inputs                                               |
 
 Large dense edit batches rebuild the rope in one pass and emit one `contentEdits` stretch covering the changed region. Small or sparse batches retain separate content edits and share unchanged rope branches. In both cases the snapshot keeps the individual offset changes for annotations, maps selections with their existing affinity, and records one undo step.
 

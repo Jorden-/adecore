@@ -123,7 +123,6 @@ function RunningDatabases({ onAdd }: { onAdd(connection: Connection): void }) {
 | `isMysqlContainer(container)`            | Whether a MySQL or MariaDB connection can point at the container: every one `discover` found except a file engine, which no container serves.                          |
 | `containerTitle(container)`              | What names the container to a person: its Compose `project/service`, else its own name.                                                                                |
 | `connectionFromContainer(id, container)` | A new `Connection` with that id, named by `containerTitle`, in Docker mode on the container's MySQL port (or the first port it lists), with its suggested credentials. |
-| `withContainer(config, container)`       | Points an existing MySQL config at the container. The user, the password and the database come from the container only where the config has none.                      |
 
 ## Which modes to offer
 

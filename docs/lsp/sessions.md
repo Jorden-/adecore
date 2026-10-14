@@ -8,7 +8,7 @@ An `LspTransport` sends and receives whole JSON-RPC messages: `send(message)`, `
 | ------------------------------------------ | --------------------------------------------------------------------------------------------- |
 | `createStreamTransport(stream, options?)`  | A `ByteStream`, such as the stdin and stdout of a server process, with `Content-Length` framing |
 | `connectWebSocket(url, options?)`          | A WebSocket, one JSON text frame per message; resolves once the socket is open                |
-| `createMemoryTransportPair()`              | Two ends in memory, for tests; each message is JSON-copied and delivered on a microtask       |
+| `createMemoryTransportPair()`              | From `@adecore/lsp/testing`: two ends in memory, each message JSON-copied and delivered on a microtask |
 
 A `ByteStream` is the app's adapter over a process: `write(chunk)`, `onData`, `onClose` and `close`. Wire the server's stdout to `onData` and keep its stderr apart, since a log line in stdout breaks the framing. The decoder takes messages of up to 32 MiB (`maxMessageBytes`) and closes the stream on a frame it cannot read.
 
@@ -38,7 +38,6 @@ child.stderr.on('data', (chunk) => log(String(chunk)));
 
 `connectWebSocket` takes `protocols`, a `signal` to cancel the opening, `timeoutMs` (10 seconds by default) and a `createWebSocket` factory for a runtime without a global `WebSocket`. A binary frame or a frame that is no JSON closes the socket. While the socket buffers more than 8 MiB, a send waits for it to drain, and fails after `timeoutMs`. There is no reconnect and no authentication; those are the app's.
 
-`encodeMessage` and `ContentLengthDecoder` are the framing on their own.
 
 ## LspSession
 

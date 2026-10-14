@@ -30,7 +30,7 @@ export { type ChatRecordExtras, type ChatRecord, ChatStore, type ChatSeq, type C
 export { suggestChatTitle, type ChatTitleInput } from './chat-title.ts';
 export type { ClaudeBackendOptions } from './claude-backend.ts';
 export { ClaudeTitleReader } from './claude-title.ts';
-export { spokenText, claudeProjectSlug, findClaudeSession } from './claude-transcript.ts';
+export { claudeProjectSlug, findClaudeSession } from './claude-transcript.ts';
 export type { CodexBackendOptions } from './codex-backend.ts';
 export { forkThreadOnce, type ThreadItemsParams, type CodexProcessSpec, type ThreadForkParams } from './codex-thread.ts';
 export type { CodexClientInfo } from './codex-transport.ts';
@@ -46,4 +46,4 @@ export { ChatThread } from './thread.ts';
 export { type ChatUiSource, type ChatUiHost, ChatUiRefusal } from './ui-queries.ts';
 export { visualFileName, VisualStore, type VisualInput, type VisualStoreOptions, type VisualListener } from './visual-store.ts';
 export { type WakeChat, chatOpener, type ChatOpenerDeps } from './wake-chat.ts';
-export { type SkillRootOptions, SkillIndex } from '../skills.ts';
+export { type SkillRootOptions } from '../skills.ts';

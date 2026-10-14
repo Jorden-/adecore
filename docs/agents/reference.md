@@ -16,7 +16,7 @@ Files, processes, watching, serialization and errors, shared by the other entrie
 | [`coded-error`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/coded-error.ts) | `CodedError` |
 | [`error-text`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/error-text.ts) | `describeError`, `setErrorStacks`, `errorText` |
 | [`fs`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/fs.ts) | `tempNameFor`, `writeAtomic`, `replaceSync`, `writeAtomicSync`, `isNotFound`, `fileExists`, `WriteAtomicOptions` |
-| [`record-directory`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/record-directory.ts) | `recordFileName`, `RecordDirectory`, `RecordDirectoryOptions` |
+| [`record-directory`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/record-directory.ts) | `RecordDirectory`, `RecordDirectoryOptions` |
 | [`run-process`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/run-process.ts) | `runProcess`, `ProcessResult`, `RunProcessOptions` |
 | [`serializer`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/serializer.ts) | `Serializer`, `KeyedSerializer` |
 | [`title-file`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/title-file.ts) | `cleanTitle`, `readLines` |
@@ -54,7 +54,7 @@ The core, a session per chat, the thread and what is written of it, and the two 
 | [`chat/chat-title`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/chat-title.ts) | `suggestChatTitle`, `ChatTitleInput` |
 | [`chat/claude-backend`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/claude-backend.ts) | `ClaudeBackendOptions` |
 | [`chat/claude-title`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/claude-title.ts) | `ClaudeTitleReader` |
-| [`chat/claude-transcript`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/claude-transcript.ts) | `spokenText`, `claudeProjectSlug`, `findClaudeSession` |
+| [`chat/claude-transcript`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/claude-transcript.ts) | `claudeProjectSlug`, `findClaudeSession` |
 | [`chat/codex-backend`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/codex-backend.ts) | `CodexBackendOptions` |
 | [`chat/codex-thread`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/codex-thread.ts) | `forkThreadOnce`, `ThreadItemsParams`, `CodexProcessSpec`, `ThreadForkParams` |
 | [`chat/codex-transport`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/codex-transport.ts) | `CodexClientInfo` |
@@ -70,7 +70,7 @@ The core, a session per chat, the thread and what is written of it, and the two 
 | [`chat/ui-queries`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/ui-queries.ts) | `ChatUiSource`, `ChatUiHost`, `ChatUiRefusal` |
 | [`chat/visual-store`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/visual-store.ts) | `visualFileName`, `VisualStore`, `VisualInput`, `VisualStoreOptions`, `VisualListener` |
 | [`chat/wake-chat`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/wake-chat.ts) | `WakeChat`, `chatOpener`, `ChatOpenerDeps` |
-| [`skills`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/skills.ts) | `SkillRootOptions`, `SkillIndex` |
+| [`skills`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/skills.ts) | `SkillRootOptions` |
 
 ## `@adecore/agents/providers`
 
@@ -149,6 +149,6 @@ CLIs, a clock, a watcher and accounts for tests. Two more entries run a fake as 
 | [`testing/fake-cli`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/testing/fake-cli.ts) | `FakeIo`, `FakeProgram`, `FakeCli`, `StartedFake`, `InProcessCli`, `inProcess`, `runOverStdio` |
 | [`testing/fake-claude`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/testing/fake-claude.ts) | `fakeClaude`, `claudeStoppingOnResume` |
 | [`testing/fake-codex`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/testing/fake-codex.ts) | `FAKE_CHILD_STEPS`, `fakeCodexForks`, `FakeCodexOptions`, `fakeCodexWith`, `fakeCodex` |
-| [`testing/accounts`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/testing/accounts.ts) | `memorySecrets`, `testAccounts` |
+| [`testing/accounts`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/testing/accounts.ts) | `testAccounts` |
 | [`testing/manual-clock`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/testing/manual-clock.ts) | `ManualClock` |
-| [`testing/watch`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/testing/watch.ts) | `FakeDirectoryWatcher`, `FakeWatch`, `EventLog` |
+| [`testing/watch`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/testing/watch.ts) | `FakeWatch`, `EventLog` |

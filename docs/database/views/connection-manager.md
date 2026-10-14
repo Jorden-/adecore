@@ -65,7 +65,7 @@ function onValueChange(next: readonly Connection[]): void {
 }
 ```
 
-`configProblems(config)` says what is wrong, as a `ConfigProblems` object with a `ConfigProblem` code per field. It is empty for a connection with nothing to fix, and the form shows the same codes as sentences.
+The form shows what is wrong as a `ConfigProblems` object with a `ConfigProblem` code per field, empty for a connection with nothing to fix.
 
 | Field           | Codes                            |
 | --------------- | -------------------------------- |

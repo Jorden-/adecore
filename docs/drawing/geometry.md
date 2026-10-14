@@ -9,7 +9,7 @@ The demo maps the pointer onto the viewBox of the exported SVG, asks `elementAt`
 ## Bounds
 
 - `boundsOf(element)` is the stored box of one element. `boundsOfElements(elements)` is the box around all of them, or `null` for none. A resize works in this box.
-- `drawnBoundsOf(element)` is the stored box turned by the element's angle, so it holds a turned element as it is drawn. `drawnBoundsOfElements(elements)` is the box around all of them, or `null` for none. `toSvg` and `elementsIn` use these.
+- `toSvg` and `elementsIn` work on the stored box turned by the element's angle, so a turned element counts as it is drawn.
 - `unionOf(rects)` is the box around any rects, also when one has a negative width or height, or `null` for an empty list.
 - `centerOf(rect)` is its middle. `roundPoint(point)` rounds both coordinates to whole units.
 - `rectFromPoints(from, to)` is the box of a drag in either direction, always with a positive size.
@@ -19,7 +19,7 @@ A box is the stored `x`, `y`, `w` and `h`, and a drawn box adds only the rotatio
 
 ## Rotation
 
-`angle` turns an element around the center of its box, in radians. `rotatePoint(point, around, angle)` turns a point; turned back by the element's angle around `centerOf(boundsOf(element))`, a point lands in the element's own frame, still in world units. `absolutePoints(element)` is the points of a line or freehand stroke in world units, without the rotation, and `[]` for any other kind.
+`angle` turns an element around the center of its box, in radians. `rotatePoint(point, around, angle)` turns a point; turned back by the element's angle around `centerOf(boundsOf(element))`, a point lands in the element's own frame, still in world units.
 
 ## Hit tests
 

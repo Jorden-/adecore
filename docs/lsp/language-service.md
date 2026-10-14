@@ -38,4 +38,4 @@ await typescript.initialize();
 await vue.initialize();
 ```
 
-`vueServerOrder(method, text, params)` says which of the two to ask first for a request, the other being the fallback when the first does not support the method: TypeScript first inside a `<script>` block, an interpolation or a `v-`, `:` or `@` attribute, and for inlay hints; Vue first everywhere else. `isVueExpression(text, offset)` is the lexical test behind it. Neither is a Vue parser.
+`vueServerOrder(method, text, params)` says which of the two to ask first for a request, the other being the fallback when the first does not support the method: TypeScript first inside a `<script>` block, an interpolation or a `v-`, `:` or `@` attribute, and for inlay hints; Vue first everywhere else. The test behind it is lexical, not a Vue parser.

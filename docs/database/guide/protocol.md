@@ -175,7 +175,7 @@ A `DatabaseError` has a `code` (a `DatabaseErrorCode`), a `message`, the five ch
 
 The host talks to the helper over its standard streams, one JSON message per line. Anything else can speak the same wire, such as a test that starts the binary by hand.
 
-- Before it reads a request, the helper writes a ready line (`HelperReady`): `{"event":"ready","protocol":5,"version":"0.1.0"}`. `protocol` is its `PROTOCOL_VERSION` and `version` its own release.
+- Before it reads a request, the helper writes a ready line: `{"event":"ready","protocol":5,"version":"0.1.0"}`. `protocol` is its `PROTOCOL_VERSION` and `version` its own release.
 - The host stops a helper whose `protocol` differs from its own, or that writes no ready line within `readyTimeoutMs` (10000 by default). The request that started it fails with `helper-unavailable`.
 - Then one request per line on stdin and one response per line on stdout. An empty line is ignored, and a line that is not a valid request gets `invalid-request`, with its id when one could be read.
 - Requests run concurrently, so responses can arrive in another order; the `id` matches them. Requests on one session queue up in the order they arrived, on its single connection.
