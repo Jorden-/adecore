@@ -3,7 +3,7 @@
 Counts, decimals, percentages, money, sizes and token counts, each in the notation of the region. The examples are in an English region; a Dutch one swaps the separators.
 
 ```ts
-import { formatBytes, formatDecimal, formatFixed, formatMoney, formatNumber, formatNumeral, formatPercent, formatRounded, formatTokens, formatUsdSignificant } from '@adecore/ui/format';
+import { formatBytes, formatDecimal, formatMoney, formatNumber, formatNumeral, formatPercent, formatRounded, formatTokens, formatUsdSignificant } from '@adecore/ui/format';
 ```
 
 <Demo src="formatting/numbers" />
@@ -12,7 +12,6 @@ import { formatBytes, formatDecimal, formatFixed, formatMoney, formatNumber, for
 | --- | --- |
 | `formatNumber(value)` | A whole number, grouped the way the region groups one: `1,234,568` or `1.234.568`. It rounds first. |
 | `formatDecimal(value)` | The same with at most one decimal, where the fraction is the part that means something. |
-| `formatFixed(value, decimals)` | Always `decimals` places, so values in a column keep one width: `1.0` and `1.5`, never `1` and `1.5`. |
 | `formatRounded(value, decimals)` | At most `decimals` places with trailing zeros dropped, for a total or an average: `39`, `1.95`. |
 | `formatNumeral(numeral)` | A numeral as a database writes it, a number or text such as `9007199254740993` or `-0.50`, in the region's notation with every digit and the decimals it was written with. Text that is no plain numeral comes back as it is. |
 | `formatPercent(value)` | A percentage of a value that is already a percent: one decimal under ten, where the difference still shows, and whole above. `4.3%`, `43%`. |

@@ -32,7 +32,7 @@ const spec: MenuSpec<ShellAction> = {
 | `separator` | A line. |
 | `submenu` | A nested menu, which `enabled: false` greys out. |
 
-A menu in the bar may take a role from `MENU_BAR_ROLES`. On macOS the system lists the open windows in the menu with `role: 'window'` and puts its search field in the one with `role: 'help'`; without a role neither appears. The shell leaves out a role it does not know.
+A menu in the bar may take a `MenuBarRole`. On macOS the system lists the open windows in the menu with `role: 'window'` and puts its search field in the one with `role: 'help'`; without a role neither appears. The shell leaves out a role it does not know.
 
 ```ts
 { id: 'window', label: 'Window', role: 'window', items: [{ kind: 'role', role: 'minimize', label: 'Minimize' }] }
@@ -67,7 +67,7 @@ Off macOS an accelerator is only shown, never registered: a registered one would
 
 ## A key the page already had
 
-On macOS the menu fires its accelerator even when the page answered the key itself. `createMenuCommands` drops a command Electron says its accelerator fired when the page had a key with Cmd or Ctrl in the last `PAGE_KEY_MS`, as `createPageKeys` saw it. A mouse pick always runs. Electron reports a pick through accessibility or with the keyboard inside the open menu as fired by its accelerator too, so those run unless the page had such a key in that time.
+On macOS the menu fires its accelerator even when the page answered the key itself. `createMenuCommands` drops a command Electron says its accelerator fired when the page had a key with Cmd or Ctrl in the last second, as `createPageKeys` saw it. A mouse pick always runs. Electron reports a pick through accessibility or with the keyboard inside the open menu as fired by its accelerator too, so those run unless the page had such a key in that time.
 
 `keyBypassesPage` covers a page inside the app that never hands a key on, such as a `<webview>`: while it has the keyboard, the menu answers every key. A command reaches the page as `menu:run` with its id. Only a minimized window is shown first, so a pick from behind other work leaves the app where it is.
 

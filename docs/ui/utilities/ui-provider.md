@@ -26,13 +26,11 @@ It adds the words and sets the source during render, so the first child already 
 
 An app that wires things up itself can call each piece directly.
 
-`addUiResources(i18n)` adds the `ui` namespace in every language the library ships to an i18next instance. A language that already has a `ui` bundle keeps it. `UI_NAMESPACE` is the name of the namespace, `'ui'`, and `UI_RESOURCES` holds the words by language code (`en` and `nl`), which is the source to translate from for a third language.
+`UIProvider` adds the `ui` namespace in every language the library ships to the i18next instance. A language that already has a `ui` bundle keeps it. `UI_NAMESPACE` is the name of the namespace, `'ui'`, and `UI_RESOURCES` holds the words by language code (`en` and `nl`), which is the source to translate from for a third language.
 
 `setFormatSource(source)` from `@adecore/ui/format` hands the formatters their source. See [Format source](/ui/formatting/).
 
-`TooltipProvider` holds the shared tooltip delay. See [Tooltip](/ui/overlays/tooltip#tooltipprovider).
-
-`startInputModality()` starts writing `data-modality="keyboard"` or `"pointer"` on `<html>` from the last real input event. It runs once per page; a second call does nothing. See [input modality](/ui/guide/principles#input-modality).
+`UIProvider` also holds the shared tooltip delay, see [Tooltip](/ui/overlays/tooltip#delay), and writes `data-modality="keyboard"` or `"pointer"` on `<html>` from the last real input event, see [input modality](/ui/guide/principles#input-modality).
 
 ## Words
 

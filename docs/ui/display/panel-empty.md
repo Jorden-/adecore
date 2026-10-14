@@ -18,7 +18,6 @@ A panel is one track of a flex column, so by default the empty state grows into 
 | `header` | `ReactNode` | | |
 | `icon` | `LucideIcon` | | |
 | `busy` | `boolean` | `false` | A `Spinner` in place of the icon. |
-| `spin` | `boolean` | `false` | Deprecated: turns the icon. Use `busy`. |
 | `action` | `ReactNode` | | |
 | `sunken` | `boolean` | `false` | |
 | `fill` | `'grow' \| 'full'` | `'grow'` | |

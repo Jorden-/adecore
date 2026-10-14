@@ -51,7 +51,7 @@ Keyboard focus is a 2px outline in the accent color, never a ring or a colored b
 
 A browser keeps `:focus-visible` on for scripted focus as long as its own keyboard flag is up. Base UI moves focus to the menu row under the pointer, so after a single keystroke anywhere, the focus outline would follow the mouse through every menu.
 
-The library decides by the last real input instead. `startInputModality` (which `UIProvider` calls) writes `data-modality="keyboard"` or `data-modality="pointer"` on `<html>` from the last key or pointer event. Under the pointer, a highlighted menu row shows a lighter hover background and no outline. Under the keyboard it shows the stronger pressed background, a mark you can find. Style your own lists the same way with `.cursor-row[data-active='true']`, which follows the same two states.
+The library decides by the last real input instead. `UIProvider` writes `data-modality="keyboard"` or `data-modality="pointer"` on `<html>` from the last key or pointer event. Under the pointer, a highlighted menu row shows a lighter hover background and no outline. Under the keyboard it shows the stronger pressed background, a mark you can find. Style your own lists the same way with `.cursor-row[data-active='true']`, which follows the same two states.
 
 ## Numbers and dates
 

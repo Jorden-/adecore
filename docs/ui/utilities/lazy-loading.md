@@ -46,7 +46,7 @@ Every module loaded through `lazyNamed` or `lazyDialog` registers with `prefetch
 
 The prefetcher does nothing while the browser asks to save data. A failed prefetch is quiet; the first real use tries again. `prefetcher.busy` is true while a prefetch waits on its chunk, so a failure an app hears of elsewhere, such as the bundler's event for a chunk that did not load, may be the prefetch's while it is true. It may also be a person's open at the same moment, which `onLazyOpenError` tells apart.
 
-`Prefetcher` is the class behind it, for a test or a second queue: `new Prefetcher(whenIdle, allowed?)`. `WhenIdle` is a function that calls back once the main thread is free, and `Loader` is a function that loads a module.
+`WhenIdle` is a function that calls back once the main thread is free, and `Loader` is a function that loads a module.
 
 ## A failed open
 

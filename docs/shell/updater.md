@@ -38,7 +38,7 @@ onFromApp('update:install', () => updater.install());
 
 ## Who decides to download
 
-The page owns the preference. Nothing downloads and no timer runs until the page sends it with `configure`; from then on the updater checks once an hour (`UPDATE_INTERVAL_MS`). Pass `setInterval` to drive that timer from a test. Only `true` turns downloading on. A check is skipped while one runs, while a download runs and once a build is ready.
+The page owns the preference. Nothing downloads and no timer runs until the page sends it with `configure`; from then on the updater checks once an hour. Pass `setInterval` to drive that timer from a test. Only `true` turns downloading on. A check is skipped while one runs, while a download runs and once a build is ready.
 
 `beforeCheck` runs right before a check asks the feed, such as to refresh release notes along with it.
 
@@ -55,6 +55,6 @@ const updater = createUpdater({
 
 ## Errors
 
-electron-updater puts the whole HTTP exchange in the message of a failed check, cookies included. `describeUpdateError` returns `{ code, detail }`: `detail` is the first line only, cut at 200 characters, or `null` when the message is empty. The shell sends no sentence of its own, because the page speaks the person's language. `code` is an `UpdateErrorCode`. `no-feed` is a 404 on the feed: there is no published release yet, or the repository is private. Anything else is `failed`. The state carries the two as `errorCode` and `error`, so the page words the code and can show the line under it. A failed check, download or install also goes to `log`, which is `console.error` by default.
+electron-updater puts the whole HTTP exchange in the message of a failed check, cookies included. The updater turns a failure into `{ code, detail }`: `detail` is the first line only, cut at 200 characters, or `null` when the message is empty. The shell sends no sentence of its own, because the page speaks the person's language. `code` is an `UpdateErrorCode`. `no-feed` is a 404 on the feed: there is no published release yet, or the repository is private. Anything else is `failed`. The state carries the two as `errorCode` and `error`, so the page words the code and can show the line under it. A failed check, download or install also goes to `log`, which is `console.error` by default.
 
 `UpdaterOptions`, `Updater`, `UpdateState` and `UpdateErrorCode` are exported types; the last two come from `@adecore/shell/bridge`, so the page reads them too.

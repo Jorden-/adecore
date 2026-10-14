@@ -63,8 +63,8 @@ describe('an icon button', () => {
     });
 
     test('hands its icon the classes meant for the icon, at the size of the button', () => {
-        const markup = render(<IconButton icon={X} size="xs" label="Play" spin iconClassName="fill-current" />);
-        expect(classesIn(markup)).toContainEqual(expect.arrayContaining(['lucide-x', 'animate-spin', 'fill-current']));
+        const markup = render(<IconButton icon={X} size="xs" label="Play" iconClassName="fill-current" />);
+        expect(classesIn(markup)).toContainEqual(expect.arrayContaining(['lucide-x', 'fill-current']));
         expect(markup).toContain('width="12"');
         expect(classesIn(markup)).toContainEqual(expect.arrayContaining(['icon-btn', 'icon-btn-xs']));
     });

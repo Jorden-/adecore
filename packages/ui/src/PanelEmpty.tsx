@@ -9,8 +9,6 @@ export interface PanelEmptyProps {
     icon?: LucideIcon;
     /* A `Spinner` in place of the icon, for a panel that is still loading. */
     busy?: boolean;
-    /** @deprecated Turns the icon; use `busy`, which draws a `Spinner` in its place. */
-    spin?: boolean;
     action?: ReactNode;
     /* The sunken ground, for a box that has none behind it yet (a card on a canvas) rather than a panel that does. */
     sunken?: boolean;
@@ -25,11 +23,11 @@ export interface PanelEmptyProps {
 }
 
 /* What a panel or a card shows while it holds nothing: a sentence, one icon, at most one button. */
-export function PanelEmpty({ header, icon, busy = false, spin = false, action, sunken = false, fill = 'grow', children, className, ref }: PanelEmptyProps) {
+export function PanelEmpty({ header, icon, busy = false, action, sunken = false, fill = 'grow', children, className, ref }: PanelEmptyProps) {
     return (
         <div ref={ref} className={clsx('grid min-h-0 place-items-center', fill === 'full' ? 'h-full' : 'grow', sunken && 'bg-surface-sunken', className)}>
             {header}
-            <EmptyState icon={icon} busy={busy} spin={spin} action={action}>
+            <EmptyState icon={icon} busy={busy} action={action}>
                 {children}
             </EmptyState>
         </div>

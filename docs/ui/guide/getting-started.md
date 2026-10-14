@@ -55,13 +55,13 @@ createRoot(document.getElementById('root')!).render(
 
 It adds the library's words to your i18next instance and hands the formatters your `formatSource`. It mounts the shared tooltip provider, so moving along a row of buttons shows each tooltip without a new delay. And it writes whether the keyboard or the pointer was used last, as `data-modality` on `<html>`.
 
-Each of these is also exported on its own (`addUiResources`, `setFormatSource`, `TooltipProvider`, `startInputModality`) for an app that wants to wire them itself. See [UIProvider](/ui/utilities/ui-provider).
+An app that wires the format source itself calls `setFormatSource`. See [UIProvider](/ui/utilities/ui-provider).
 
 ## Words and languages
 
 The library's own words, such as "Cancel", "Dismiss" and "Zoom in", live in the `ui` namespace (`UI_NAMESPACE`). English and Dutch ship with it. `UIProvider` adds both to the i18next instance you pass it, next to your own namespaces, and a component reads them through `useTranslation('ui')` on that instance. Switch the language the way you already do, with `i18n.changeLanguage('nl')`.
 
-A language you filled yourself keeps its words, since `addUiResources` skips a language that already has a `ui` bundle. To translate the library into a third language, add a `ui` bundle for it before the provider mounts. `UI_RESOURCES` holds the English source to translate from.
+A language you filled yourself keeps its words, since `UIProvider` skips a language that already has a `ui` bundle. To translate the library into a third language, add a `ui` bundle for it before the provider mounts. `UI_RESOURCES` holds the English source to translate from.
 
 ## The format source
 

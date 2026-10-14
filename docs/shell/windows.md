@@ -29,9 +29,9 @@ app.whenReady().then(() => windows.restore());
 
 `attach` answers what every app with a set of windows does with its app's events: a second instance raises the window in front, a click on the dock icon with no window open opens the last session again, a quit that goes ahead keeps its windows in the session, pending bounds are written at quit, and off macOS the app quits with its last window while that window stays in the session. [Quitting](#quitting) covers an app that asks first.
 
-`create` builds and loads the window; the package passes the bounds to construct it with and follows the window from then on, so `create` never calls `windowState.track` itself. A new window whose key has no bounds of its own sits a little beside the one in front (`CASCADE`).
+`create` builds and loads the window; the package passes the bounds to construct it with and follows the window from then on, so `create` never calls `windowState.track` itself. A new window whose key has no bounds of its own sits a little beside the one in front.
 
-An app that kept its one window under a key of its own before it had several passes that key as `formerKey`: the first window after the change opens where that window stood. A window without a key keeps its bounds under `UNKEYED_STATE` (`'start'`).
+An app that kept its one window under a key of its own before it had several passes that key as `formerKey`: the first window after the change opens where that window stood. A window without a key keeps its bounds under the key `'start'`.
 
 `origin` says why the window opens: `session` for one that was open at the last quit, `first` for the one window of a start without a session, `opened` for one something asked for. These are the `WindowOrigin` type. A page can then tell a cold start, which may open what a person had last, from a new window, which starts empty. `onFront` runs once a window came to the front, when `focused()` already answers it.
 

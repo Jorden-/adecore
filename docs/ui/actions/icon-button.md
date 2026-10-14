@@ -47,7 +47,6 @@ The size decides the square, the radius and the icon inside: a 16 pixel icon in 
 | `size` | `IconButtonSize` | `'md'` | `'md' \| 'sm' \| 'xs' \| '2xs'` |
 | `active` | `boolean` | `false` | Draws a pressed key. |
 | `busy` | `boolean` | `false` | A `Spinner` in place of the icon. |
-| `spin` | `boolean` | `false` | Deprecated: turns the icon. Use `busy`. |
 | `iconClassName` | `string` | | Classes for the icon. |
 | `children` | `ReactNode` | | Drawn after the icon: a count, or a word with `w-auto`. |
 | `render` | `RenderProp` | `<button type="button" />` | Another element to be the button. |

@@ -24,8 +24,6 @@ export interface IconButtonProps extends Omit<ComponentProps<'button'>, 'childre
     active?: boolean;
     /* A `Spinner` in place of the icon, for a step that is running. */
     busy?: boolean;
-    /** @deprecated Turns the icon; use `busy`, which draws a `Spinner` in its place. */
-    spin?: boolean;
     /* Classes for the icon rather than the button: a tone of its own, a turn, a fill. The size stays the button's. */
     iconClassName?: string;
     /* Drawn after the icon: a count, or a word beside it together with `w-auto`. */
@@ -44,7 +42,6 @@ export function IconButton({
     size = 'md',
     active = false,
     busy = false,
-    spin = false,
     iconClassName,
     render,
     className,
@@ -65,7 +62,7 @@ export function IconButton({
                     {busy ? (
                         <Spinner size={ICON_BUTTON_ICON_SIZE[size]} className={iconClassName} />
                     ) : (
-                        icon !== undefined && <Icon icon={icon} size={ICON_BUTTON_ICON_SIZE[size]} className={clsx(spin && 'animate-spin', iconClassName)} />
+                        icon !== undefined && <Icon icon={icon} size={ICON_BUTTON_ICON_SIZE[size]} className={iconClassName} />
                     )}
                     {children}
                 </>

@@ -56,7 +56,7 @@ It compares without regard to case or accents and reads numbers inside a label a
 
 ## Fallbacks
 
-`systemLocale()` returns the operating system's locale: the source's `systemLocale` when it hands one over and `Intl` accepts it, then the browser's first language, then `FALLBACK_LOCALE`, which is `en-US`. A test that must not depend on the machine it runs on sets a region explicitly, as the [fake source](/ui/utilities/testing) does.
+`systemLocale()` returns the operating system's locale: the source's `systemLocale` when it hands one over and `Intl` accepts it, then the browser's first language, then `en-US`. A test that must not depend on the machine it runs on sets a region explicitly, as the [fake source](/ui/utilities/testing) does.
 
 ## Cost
 

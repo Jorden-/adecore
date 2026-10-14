@@ -31,7 +31,7 @@ Half a second (`delayMs`) after a window stops moving or resizing, at once when 
 
 ## Displays that changed
 
-A display that was unplugged or rearranged would leave saved bounds off screen. `fitBounds` keeps them only while a display still shows enough of the window to grab its title bar (`VISIBLE_EDGE`), moves it fully onto that display and shrinks it to the display's work area. Otherwise the window opens at its default size, which Electron centers.
+A display that was unplugged or rearranged would leave saved bounds off screen. The window state keeps them only while a display still shows enough of the window to grab its title bar, moves it fully onto that display and shrinks it to the display's work area. Otherwise the window opens at its default size, which Electron centers.
 
 ## Storage
 

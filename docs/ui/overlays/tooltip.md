@@ -3,7 +3,7 @@
 A hint on hover and on keyboard focus. Every hint in an app is one of these, never a `title` attribute.
 
 ```tsx
-import { Tooltip, TooltipProvider } from '@adecore/ui';
+import { Tooltip } from '@adecore/ui';
 ```
 
 <Demo src="overlays/tooltip" />
@@ -29,9 +29,9 @@ For a link drawn inside a terminal or a canvas, pass `open`, `onOpenChange` and 
 />
 ```
 
-## TooltipProvider
+## Delay
 
-Tooltips share one delay, 150 milliseconds to open and none to close, so moving along a row of buttons feels instant after the first. `TooltipProvider` holds that delay. [`UIProvider`](/ui/utilities/ui-provider) mounts it, so you only need it on its own without `UIProvider`.
+Tooltips share one delay, 150 milliseconds to open and none to close, so moving along a row of buttons feels instant after the first. [`UIProvider`](/ui/utilities/ui-provider) holds that delay for every tooltip below it.
 
 ## Motion
 

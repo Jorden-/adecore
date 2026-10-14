@@ -71,7 +71,7 @@ export { Switch, type SwitchProps } from './Switch.tsx';
 export { TextMenu, type TextMenuProps } from './TextMenu.tsx';
 export { Tile, type TileProps } from './Tile.tsx';
 export { Toasts, type ToastsProps } from './Toasts.tsx';
-export { Tooltip, TooltipProvider, type TooltipProps, type TooltipSide } from './Tooltip.tsx';
+export { Tooltip, type TooltipProps, type TooltipSide } from './Tooltip.tsx';
 export { UIProvider, type UIProviderProps } from './UIProvider.tsx';
 export { Waveform, type WaveformProps } from './Waveform.tsx';
 export { Wipe, type WipeProps } from './Wipe.tsx';
@@ -86,17 +86,14 @@ export { LoadedComponent, lazyDialog, lazyNamed, onLazyOpenError } from './lazy.
 export type { LazyComponent } from './lazy.tsx';
 export { LazyBoundary } from './LazyBoundary.tsx';
 export type { LazyBoundaryProps } from './LazyBoundary.tsx';
-export { UI_NAMESPACE, UI_RESOURCES, addUiResources } from './locales.ts';
-export { startInputModality } from './modality.ts';
+export { UI_NAMESPACE, UI_RESOURCES } from './locales.ts';
 export { isApplePlatform } from './platform.ts';
-export { Prefetcher, prefetcher, type Loader, type WhenIdle } from './prefetch.ts';
+export { prefetcher, type Loader, type WhenIdle } from './prefetch.ts';
 export { selectAllWithin, selectionWithin } from './selection.ts';
 export { EDIT_SHORTCUTS, KEY_SHORTCUTS, formatShortcut, isModHeld, matchesShortcut, shortcut, shortcutParts, type KeyLike, type Shortcut } from './shortcut.ts';
 export {
-    SUCCESS_MS,
     UNDO_MS,
     createToastStore,
-    elapsedOf,
     type Toast,
     type ToastAction,
     type ToastDeadline,
@@ -111,7 +108,6 @@ export { clampColumnSize, useColumnResize, type ColumnEdge, type ColumnResize, t
 export { useContentSize, type ContentSize } from './useContentSize.ts';
 export { useMeasuredWidth } from './useMeasuredWidth.ts';
 export { useNow, useTickingText } from './useNow.ts';
-export { ZOOM_PRESETS } from './zoom.ts';
 
 export { useFileTree, type FileTreeOptions } from './file-tree/use-file-tree.ts';
 export type { FileTreeRootProps } from './file-tree/parts.tsx';
@@ -133,10 +129,9 @@ export type { WorkspaceLayout } from './workspace/context.ts';
 export { DocumentTab, TabStrip, type DocumentTabProps, type TabStripProps, type TabStripItem } from './workspace/TabStrip.tsx';
 export { SplitView, type SplitViewProps, type SplitViewInfo, type SplitViewBounds, type SplitDropTarget, type SplitDrag } from './workspace/SplitView.tsx';
 export { DropPreview, type DropPreviewProps } from './workspace/DropPreview.tsx';
-export { dropPreviewPath, rectDropPreview, sameDropPreview, tabDropPreview, type DropPreviewShape, type TabDrop } from './workspace/preview.ts';
+export { rectDropPreview, sameDropPreview, tabDropPreview, type DropPreviewShape, type TabDrop } from './workspace/preview.ts';
 export {
     createSplitLayout,
-    normalizeSplitLayout,
     updateSplitLayout,
     splitPanes,
     type SplitAxis,

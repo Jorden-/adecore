@@ -47,7 +47,7 @@ A `SplitLayout` holds `root`, `focused` and `maximized`. A `SplitNode` is a `Spl
 
 Every node id is unique within a layout, and a view id sits in one pane at most. An app that opens the same document twice gives the two views different ids. A view can hold anything; the layout stores ids, never a document.
 
-`createSplitLayout(views?, paneId?)` makes a layout of one pane. `normalizeSplitLayout(unknown)` repairs a stored layout: it removes duplicate ids and broken branches, repairs the focus and the maximized pane, normalizes the sizes, and merges two branches in a row along the same axis. Call it when you load a layout, not on every render. Storing, versioning and migrating a layout from an older format are the app's. `splitPanes(root)` lists the panes in layout order.
+`createSplitLayout(views?, paneId?)` makes a layout of one pane. Storing, validating, versioning and migrating a layout are the app's. `splitPanes(root)` lists the panes in layout order.
 
 ## Commands
 

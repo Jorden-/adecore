@@ -12,8 +12,6 @@ export interface EmptyStateProps {
     icon?: LucideIcon | ReactElement<{ size?: number }>;
     /* A `Spinner` in place of the icon, for a state that is still loading. */
     busy?: boolean;
-    /** @deprecated Turns a Lucide icon; use `busy`, which draws a `Spinner` in its place. */
-    spin?: boolean;
     /* A heading above the sentence, for a state that is an outcome rather than a list with nothing in it. */
     title?: ReactNode;
     /* One sentence. What is missing, and what puts something there. */
@@ -25,7 +23,7 @@ export interface EmptyStateProps {
 }
 
 /* What a list, a canvas or a thread shows before it holds anything. */
-export function EmptyState({ icon, busy = false, spin = false, title, children, action, className, ref }: EmptyStateProps) {
+export function EmptyState({ icon, busy = false, title, children, action, className, ref }: EmptyStateProps) {
     return (
         <div ref={ref} className={clsx('flex flex-col items-center justify-center gap-2 px-6 py-8 text-center', className)}>
             {(busy || icon) && (
@@ -35,7 +33,7 @@ export function EmptyState({ icon, busy = false, spin = false, title, children, 
                     ) : isValidElement(icon) ? (
                         cloneElement(icon, { size: ICON_SIZE })
                     ) : (
-                        icon && <Icon icon={icon} size={ICON_SIZE} className={spin ? 'animate-spin' : undefined} />
+                        icon && <Icon icon={icon} size={ICON_SIZE} />
                     )}
                 </span>
             )}

@@ -1,14 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import {
-    createSplitLayout,
-    normalizeSplitLayout,
-    splitPanes,
-    updateSplitLayout,
-    type SplitBranch,
-    type SplitCommand,
-    type SplitLayout,
-    type SplitPane
-} from './model.ts';
+import { createSplitLayout, splitPanes, updateSplitLayout, type SplitBranch, type SplitCommand, type SplitLayout, type SplitPane } from './model.ts';
 import { paneRadius, resizeSplit, splitGeometry, tabGapAt, tabRevealScrollLeft } from './geometry.ts';
 
 const pane = (id: string, ...views: string[]): SplitPane => ({ type: 'pane', id, views, active: views[0] ?? null });
@@ -122,30 +113,6 @@ describe('split layout commands', () => {
         const next = updateSplitLayout(original, { type: 'closePane', paneId: 'two' });
         expect(next.root).toMatchObject({ id: 'row', children: [pane('one', 'a'), pane('three', 'c'), pane('four', 'd')], sizes: [0.4, 0.3, 0.3] });
         expect(next.focused).toBe('three');
-    });
-    test('normalizes saved same-axis branches before they are resized', () => {
-        const saved: SplitLayout = {
-            root: {
-                type: 'split',
-                id: 'row',
-                axis: 'horizontal',
-                sizes: [0.5, 0.5],
-                children: [
-                    pane('one', 'a'),
-                    { type: 'split', id: 'nested', axis: 'horizontal', sizes: [0.5, 0.5], children: [pane('two', 'b'), pane('three', 'c')] }
-                ]
-            },
-            focused: 'two',
-            maximized: 'three'
-        };
-        const next = normalizeSplitLayout(saved);
-        expect(next).toMatchObject({
-            root: { id: 'row', children: [pane('one', 'a'), pane('two', 'b'), pane('three', 'c')], sizes: [0.5, 0.25, 0.25] },
-            focused: 'two',
-            maximized: 'three'
-        });
-        expect(normalizeSplitLayout(next)).toEqual(next);
-        expect((saved.root as SplitBranch).children[1]!.type).toBe('split');
     });
     test.each(['horizontal', 'vertical'] as const)('distributes the entire %s axis across alternating nested splits', (axis) => {
         const side = axis === 'horizontal' ? 'right' : 'bottom';
@@ -291,34 +258,6 @@ describe('split layout commands', () => {
         }
         expect(state.root.type).toBe('pane');
         expect(new Set(splitPanes(state.root)[0]!.views).size).toBe(21);
-        expect(normalizeSplitLayout(JSON.parse(JSON.stringify(state)))).toEqual(state);
-    });
-    test('repairs persisted duplicates, invalid sizes, branches, and focus', () => {
-        const state = normalizeSplitLayout({
-            root: {
-                type: 'split',
-                id: 'one',
-                axis: 'horizontal',
-                sizes: [Infinity, -2],
-                children: [pane('one', 'a', 'a'), pane('one', 'a', 'b'), { type: 'split', children: [] }]
-            },
-            focused: 'missing',
-            maximized: 'missing'
-        });
-        const panes = splitPanes(state.root);
-        expect(panes.map((item) => item.views)).toEqual([['a'], ['b']]);
-        expect(new Set([state.root.id, ...panes.map((item) => item.id)]).size).toBe(3);
-        expect(state.focused).toBe(panes[0]!.id);
-        expect(state.maximized).toBeNull();
-        expect((state.root as SplitBranch).sizes).toEqual([0.5, 0.5]);
-    });
-    test('stops cyclic persisted input and normalizes enormous weights safely', () => {
-        const cyclic: Record<string, unknown> = { type: 'split', id: 'cycle', children: [] };
-        cyclic.children = [cyclic];
-        expect(normalizeSplitLayout({ root: cyclic })).toEqual(createSplitLayout());
-        const state = initial();
-        (state.root as SplitBranch).sizes = [Number.MAX_VALUE, Number.MAX_VALUE];
-        expect((normalizeSplitLayout(state).root as SplitBranch).sizes).toEqual([0.5, 0.5]);
     });
 });
 

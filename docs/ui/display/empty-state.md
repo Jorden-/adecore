@@ -17,7 +17,6 @@ The sentence says what is missing and what puts something there. A `title` above
 | `children` | `ReactNode` | | Required. One sentence. |
 | `icon` | `LucideIcon \| ReactElement<{ size?: number }>` | | |
 | `busy` | `boolean` | `false` | A `Spinner` in place of the icon, for a state that is still loading. |
-| `spin` | `boolean` | `false` | Deprecated: turns a Lucide icon. Use `busy`. |
 | `title` | `ReactNode` | | |
 | `action` | `ReactNode` | | One button. |
 | `className` | `string` | | |

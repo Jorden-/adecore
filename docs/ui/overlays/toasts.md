@@ -18,7 +18,7 @@ export const toasts = createToastStore();
 | Kind | Icon | Goes away |
 | --- | --- | --- |
 | `progress` | A spinner | When you update or dismiss it. |
-| `success` | A check | After 4 seconds (`SUCCESS_MS`), unless `persist` is set. |
+| `success` | A check | After 4 seconds, unless `persist` is set. |
 | `error` | An alert | When the person dismisses it. A failure waits to be read. |
 | `deleted` | A trash can | After 8 seconds (`UNDO_MS`). |
 
@@ -51,7 +51,7 @@ try {
 | `update(id, patch)` | Changes a toast that is up and restarts its timer. Takes a `ToastPatch<T>`. |
 | `dismiss(id)` | Takes a toast down. |
 
-A `Toast` is `{ id, title, kind, description?, action?, actions?, persist?, onClose?, deadline? }`. The store sets `deadline` (a `ToastDeadline` of `start` and `end` in epoch milliseconds) from the timer that takes the toast away. `elapsedOf(deadline, now)` says how far into its lifetime a toast is. A `ToastAction` is `{ label, run, shortcut? }`; the shortcut is only printed, so bind the key yourself. One action sits beside the title. With `actions`, drawn after `action` in order, two or more get a line of their own under the description, so the title keeps its width. An action does not take the toast away; dismiss it in `run` when that is what should happen. `ToastKind` is the union of the four kinds.
+A `Toast` is `{ id, title, kind, description?, action?, actions?, persist?, onClose?, deadline? }`. The store sets `deadline` (a `ToastDeadline` of `start` and `end` in epoch milliseconds) from the timer that takes the toast away. A `ToastAction` is `{ label, run, shortcut? }`; the shortcut is only printed, so bind the key yourself. One action sits beside the title. With `actions`, drawn after `action` in order, two or more get a line of their own under the description, so the title keeps its width. An action does not take the toast away; dismiss it in `run` when that is what should happen. `ToastKind` is the union of the four kinds.
 
 An app that carries more on a toast extends `Toast` and hands its type to the store, then draws the extra fields with `footer`:
 
