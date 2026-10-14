@@ -97,6 +97,10 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
     const files = useDraftFiles({ capabilities, providerName: provider?.name, writable, draft: box, inputRef, setNotice: notice.setNotice });
     const controls = useChatControls({ chatId, info, notice, onRetarget });
     const guard = promptGuard(withQuote(draft.quote, draft.text));
+    const continuable = useContinuableTurn(chatId, info);
+    // The stopped turn something went out for, since the chat takes a moment to answer and Continue must not stand there meanwhile.
+    const [sentFor, setSentFor] = useState<string | null>(null);
+    const extraPrompts = host.prompts.useExtra(scope.id, chatId);
     const { submit, continueTurn, restoreStashed, toggleStash } = useComposerSubmit({
         chatId,
         writable,
@@ -110,7 +114,23 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
         hold,
         inputRef,
         setNotice: notice.setNotice,
-        onSend
+        onSend: (text, extras) => {
+            setSentFor(continuable);
+            const sent = onSend(text, extras);
+            // A send the host did not take leaves Continue where it was; the original promise still reaches its caller.
+            void Promise.resolve(sent).then(
+                (taken) => {
+                    if (taken === false) {
+                        setSentFor(null);
+                    }
+                },
+                (error: unknown) => {
+                    setSentFor(null);
+                    throw error;
+                }
+            );
+            return sent;
+        }
     });
     const { takingBack, takeBack } = useTakeBack({
         chatId,
@@ -122,7 +142,6 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
         }
     });
     const pending = usePendingRequests(chatId);
-    const continuable = useContinuableTurn(chatId, info);
     const compactionOffer = useCompactionOffer(chatId, info, capabilities?.compaction);
     const placeholder = useHintedPlaceholder({ chatId, disabled, readOnly, mentionable: capabilities?.mentions !== false, hasSkills: menus.hasSkills });
     const editorExtensions = useMemo(
@@ -233,7 +252,7 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                                 quote={draft.quote}
                                 source={draft.quoteSource}
                                 onRemove={box.removeQuote}
-                                onSourceGone={() => notice.setNotice(t('rows.user.quoteGone'))}
+                                onSourceGone={() => notice.setNotice(t('rows.user.quoteGone'), 'info')}
                             />
                         )}
                         {draft.chats.length > 0 && <DraftChats chats={draft.chats} onRemove={box.removeChat} />}
@@ -265,7 +284,10 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                             onPaste={files.onPaste}
                         />
                         {notice.notice && (
-                            <div className="px-5 pb-1 text-xs text-status-error @max-md/composer:px-3.5" role="alert">
+                            <div
+                                className={clsx('px-5 pb-1 text-xs @max-md/composer:px-3.5', notice.tone === 'error' ? 'text-status-error' : 'text-text-muted')}
+                                role={notice.tone === 'error' ? 'alert' : 'status'}
+                            >
                                 {notice.notice}
                             </div>
                         )}
@@ -293,7 +315,10 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                                 label: t(sendLabelKey(busy, steerable, sendDelivery)),
                                 kbd: sendShortcut(sendKey, draft.text.includes('\n')),
                                 onSend: (alternate) => submit(alternate ? 'alternate' : 'default'),
-                                onContinue: continuable !== null && empty && writable ? continueTurn : null
+                                onContinue:
+                                    continuable !== null && continuable !== sentFor && empty && writable && pending.length === 0 && extraPrompts.length === 0
+                                        ? continueTurn
+                                        : null
                             }}
                             dictationToolbar={setDictationToolbar}
                             onFiles={(picked) => {

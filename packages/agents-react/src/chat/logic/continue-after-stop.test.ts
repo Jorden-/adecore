@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { notResumedNote, type ChatInfo, type ChatItem } from '@adecore/agent-contracts';
+import { ENDED_NOTE_PREFIX, notResumedNote, type ChatInfo, type ChatItem } from '@adecore/agent-contracts';
 import { continuableTurn } from './continue-after-stop';
 
 function info(patch: Partial<ChatInfo> = {}): ChatInfo {
@@ -58,6 +58,27 @@ describe('continuableTurn', () => {
     test('a turn the machine ended has its own resume', () => {
         const note = { id: 'note-1', kind: 'note', createdAt: 21, turnId: 'turn-1', level: 'warning', text: notResumedNote('the CLI is gone') } as ChatItem;
         expect(continuableTurn(info(), [...STOPPED, note])).toBeNull();
+    });
+
+    test('a turn ended along with its chat was not stopped by a person', () => {
+        const note = {
+            id: `${ENDED_NOTE_PREFIX}note-1`,
+            kind: 'note',
+            createdAt: 21,
+            turnId: 'turn-1',
+            level: 'warning',
+            text: 'Stopped with its children'
+        } as ChatItem;
+        expect(continuableTurn(info(), [...STOPPED, note])).toBeNull();
+    });
+
+    test('a request that waits on a person comes first', () => {
+        expect(continuableTurn(info({ status: 'needs-you' }), STOPPED)).toBeNull();
+    });
+
+    test('a paused goal is resumed from its own row', () => {
+        expect(continuableTurn(info({ goal: { objective: 'Ship it', status: 'paused' } as ChatInfo['goal'] }), STOPPED)).toBeNull();
+        expect(continuableTurn(info({ goal: { objective: 'Ship it', status: 'active' } as ChatInfo['goal'] }), STOPPED)).toBe('turn-1');
     });
 
     test('a message sent after the stop leaves nothing to continue', () => {

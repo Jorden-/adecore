@@ -14,6 +14,7 @@ import { restorableChats, stashDraft, useStash, type StashedPrompt } from '../..
 import { scrollTimelineToEnd } from '../../timeline-scroll';
 import type { ComposerInputHandle } from '../ComposerInput';
 import type { ChatControls } from './use-chat-controls';
+import type { NoticeTone } from './use-notice';
 import type { ComposerDraft } from './use-composer-draft';
 import type { ComposerMenus } from './use-composer-menus';
 import type { PromptHistory } from './use-prompt-history';
@@ -33,7 +34,7 @@ interface SubmitInput {
     history: PromptHistory;
     hold: ComposerPromptHold;
     inputRef: RefObject<ComposerInputHandle | null>;
-    setNotice(notice: string): void;
+    setNotice(notice: string, tone?: NoticeTone): void;
     onSend(text: string, extras: ChatSendExtras): void | Promise<boolean>;
 }
 
@@ -148,7 +149,7 @@ export function useComposerSubmit({
             ...(here ? { quote: stashedQuote.text, quoteSource: stashedQuote.itemId } : {})
         }));
         if (dropped > 0) {
-            setNotice(t('composer.notice.stashChatsDropped', { count: dropped }));
+            setNotice(t('composer.notice.stashChatsDropped', { count: dropped }), 'info');
         }
         history.forget();
         inputRef.current?.focus();

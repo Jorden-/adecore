@@ -76,6 +76,8 @@ interface Options {
     skills?: ChatSkill[];
     items?: ChatItem[];
     disabled?: boolean;
+    readOnly?: boolean;
+    onSend?: (text: string, extras: ChatSendExtras) => void | Promise<boolean>;
 }
 
 interface Modifiers {
@@ -250,9 +252,11 @@ async function mount(options: Options = {}): Promise<Mounted> {
                     info={info}
                     focused={false}
                     disabled={options.disabled ?? false}
+                    readOnly={options.readOnly ?? false}
                     providerFixed={false}
                     onSend={(text, extras) => {
                         sent.push({ text, extras });
+                        return options.onSend?.(text, extras);
                     }}
                     onRetarget={async () => undefined}
                 />
@@ -537,7 +541,7 @@ describe('the stash', () => {
         expect(composer.text()).toBe('See there');
         expect(readDraft(CHAT).chats).toEqual(['other']);
         expect(composer.page.host.textContent).toContain('Other chat');
-        expect(composer.page.host.querySelector('[role="alert"]')?.textContent).toBe('1 attached chat is not in this project and was left out');
+        expect(composer.page.host.querySelector('[role="status"]')?.textContent).toBe('1 attached chat is not in this project and was left out');
     });
 
     test('a restored prompt whose chats all remain says nothing', async () => {
@@ -545,7 +549,7 @@ describe('the stash', () => {
         const composer = await mount({ host: { useReferableChats: () => [{ id: 'other', title: 'Other chat' }] } });
         await composer.press('s', { metaKey: true, code: 'KeyS' });
         expect(readDraft(CHAT).chats).toEqual(['other']);
-        expect(composer.page.host.querySelector('[role="alert"]')).toBeNull();
+        expect(composer.page.host.querySelector('[role="status"], [role="alert"]')).toBeNull();
     });
 });
 
@@ -566,6 +570,58 @@ describe('continuing after a stop', () => {
         const button = [...composer.page.host.querySelectorAll('button')].find((candidate) => candidate.textContent === 'Continue')!;
         await composer.click(button);
         expect(composer.sent).toEqual([{ text: 'Continue.', extras: {} }]);
+    });
+
+    const continueButton = (composer: Mounted): HTMLButtonElement | undefined =>
+        [...composer.page.host.querySelectorAll('button')].find((candidate) => candidate.textContent === 'Continue');
+
+    test('one click is enough, even while the chat has not answered yet', async () => {
+        const composer = await mount({ items: stopped });
+        await composer.click(continueButton(composer)!);
+        expect(continueButton(composer)).toBeUndefined();
+        expect(composer.sent).toHaveLength(1);
+    });
+
+    test('a typed send after a stop never shows Continue in between', async () => {
+        const composer = await mount({ items: stopped });
+        await composer.type('Instead, do this');
+        await composer.press('Enter');
+        expect(composer.sent.map((entry) => entry.text)).toEqual(['Instead, do this']);
+        expect(continueButton(composer)).toBeUndefined();
+    });
+
+    test('a send the host did not take brings Continue back', async () => {
+        const composer = await mount({ items: stopped, onSend: async () => false });
+        await composer.click(continueButton(composer)!);
+        await settle();
+        expect(continueButton(composer)).toBeDefined();
+    });
+
+    test('a read-only composer offers no Continue', async () => {
+        expect(continueButton(await mount({ items: stopped, readOnly: true }))).toBeUndefined();
+    });
+
+    test('a disabled composer offers no Continue', async () => {
+        expect(continueButton(await mount({ items: stopped, disabled: true }))).toBeUndefined();
+    });
+
+    test('a request that waits on a person comes before Continue', async () => {
+        const composer = await mount({ items: stopped, info: infoOf({ status: 'needs-you' } as Partial<ChatInfo>) });
+        expect(continueButton(composer)).toBeUndefined();
+    });
+
+    test('Continue waits while a configuration change is on its way', async () => {
+        let finish: () => void = () => undefined;
+        const composer = await mount({
+            items: stopped,
+            actions: { configure: () => new Promise<void>((resolve) => (finish = resolve)) }
+        });
+        await act(async () => {
+            (composer.propsOf('RunSettings')!.onMode as (mode: string) => void)('auto');
+        });
+        expect(continueButton(composer)!.disabled).toBe(true);
+        await act(async () => finish());
+        expect(continueButton(composer)!.disabled).toBe(false);
     });
 
     test('typing brings the send button back, and clearing the box brings Continue back', async () => {

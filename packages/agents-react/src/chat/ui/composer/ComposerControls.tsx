@@ -134,7 +134,7 @@ export function ComposerControls({
                 )}
                 {send.onContinue !== null && (
                     <Tooltip label={t('composer.continueHint')}>
-                        <Button variant="primary" disabled={controls.configurationPending} onClick={send.onContinue}>
+                        <Button variant="primary" shape="pill" disabled={controls.configurationPending} onClick={send.onContinue}>
                             <Icon icon={Play} size={14} />
                             {t('composer.continue')}
                         </Button>
