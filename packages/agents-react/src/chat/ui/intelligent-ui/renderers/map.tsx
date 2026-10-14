@@ -1,17 +1,19 @@
-import { useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import type { UiProps, UiViewNode } from '@adecore/intelligent-ui';
-import { LazyBoundary, Spinner } from '@adecore/ui';
+import { Button, LazyBoundary, Spinner } from '@adecore/ui';
 import { useChatHost, type UiMapSource } from '../../../../host';
 import { lazyNamed } from '../../../../lazy';
 import { DiffFallbackBoundary } from '../../diff/DiffFallbackBoundary';
 import { uiChildrenOf, uiNodeLabel } from '../node-text';
 import type { UiPlacePoint, UiRendererProps } from '../render-context';
 import { placePoint } from './place-point';
+import { useInView } from '../use-in-view';
 import { useLater } from '../use-later';
 import { bindingOf, PENDING } from './binding';
+import { useMapSlot } from './map-slots';
 import type { MapMarker, MapViewStatus } from './map-view';
 
 // MapLibre and its stylesheet load with the first map that is drawn, never with the chat.
@@ -75,7 +77,7 @@ function noteFor(t: TFunction<'agent-chat'>, source: UiMapSource | null, status:
     if (status === 'offline') {
         return t('blocks.map.offline');
     }
-    if (status === 'unavailable' || status === 'failed') {
+    if (status === 'unavailable' || status === 'failed' || status === 'lost') {
         return t('blocks.map.unavailable');
     }
     if (source?.state === 'off') {
@@ -92,31 +94,64 @@ interface FrameProps {
     onPick: ((id: string) => void) | null;
 }
 
-/* The picture of the places and the line under it that says whose tiles these are, or why there are none. */
+/*
+ * The picture of the places and the line under it that says whose tiles these are, or why there are none.
+ * The map is only drawn while the frame is near the viewport and holds one of the page's few map slots
+ * (`MAX_LIVE_MAPS`); one that waits for a slot, or whose graphics context the browser took back, offers a button.
+ */
 function MapFrame({ markers, source, selected, onPick }: FrameProps) {
     const { t } = useTranslation('agent-chat');
+    const id = useId();
+    const [element, setElement] = useState<HTMLDivElement | null>(null);
     const [status, setStatus] = useState<MapViewStatus>('loading');
-    const waiting = useLater(status === 'loading', LOADING_SPINNER_MS);
+    const [attempt, setAttempt] = useState(0);
+    const inView = useInView(element);
+    const broken = status === 'failed' || status === 'lost';
+    const slot = useMapSlot(id, inView && !broken);
+    const drawn = slot.state === 'granted' && !broken;
+    const waiting = useLater(drawn && status === 'loading', LOADING_SPINNER_MS);
     const note = noteFor(t, source, status);
-    const unavailable = <p className="grid h-full place-items-center p-3 text-center text-xs text-text-faint">{t('blocks.map.unavailable')}</p>;
+    const quiet = (text: string, action?: { label: string; run(): void }) => (
+        <div className="grid h-full place-items-center content-center justify-items-center gap-2 p-3 text-center">
+            <p className="text-xs text-text-faint">{text}</p>
+            {action !== undefined && (
+                <Button size="sm" variant="secondary" onClick={action.run}>
+                    {action.label}
+                </Button>
+            )}
+        </div>
+    );
+    const retry = () => {
+        setStatus('loading');
+        setAttempt((previous) => previous + 1);
+    };
+    let body: ReactNode = null;
+    if (status === 'failed') {
+        body = quiet(t('blocks.map.unavailable'));
+    } else if (status === 'lost') {
+        body = quiet(t('blocks.map.contextLost'), { label: t('blocks.map.show'), run: retry });
+    } else if (slot.state === 'queued') {
+        body = quiet(t('blocks.map.waiting'), { label: t('blocks.map.show'), run: slot.take });
+    } else if (drawn) {
+        body = (
+            <DiffFallbackBoundary fallback={quiet(t('blocks.map.unavailable'))} resetKeys={[]}>
+                <LazyBoundary>
+                    <MapView
+                        key={attempt}
+                        markers={markers}
+                        source={source ?? { state: 'off', reason: 'unavailable' }}
+                        selected={selected}
+                        onPick={onPick}
+                        onStatus={setStatus}
+                    />
+                </LazyBoundary>
+            </DiffFallbackBoundary>
+        );
+    }
     return (
         <>
-            <div className="relative h-50 overflow-hidden rounded-lg border border-border bg-surface-sunken @min-[420px]:h-60">
-                {status === 'failed' ? (
-                    unavailable
-                ) : (
-                    <DiffFallbackBoundary fallback={unavailable} resetKeys={[]}>
-                        <LazyBoundary>
-                            <MapView
-                                markers={markers}
-                                source={source ?? { state: 'off', reason: 'unavailable' }}
-                                selected={selected}
-                                onPick={onPick}
-                                onStatus={setStatus}
-                            />
-                        </LazyBoundary>
-                    </DiffFallbackBoundary>
-                )}
+            <div ref={setElement} className="relative h-50 overflow-hidden rounded-lg border border-border bg-surface-sunken @min-[420px]:h-60">
+                {body}
                 {waiting && (
                     <div className="pointer-events-none absolute inset-0 grid place-items-center">
                         <Spinner size={16} />

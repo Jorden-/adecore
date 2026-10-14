@@ -7,8 +7,11 @@ import { ButtonGroup, IconButton } from '@adecore/ui';
 import { useChatHost, type UiMapSource } from '../../../../host';
 import { baseMapStyle, boundsOf, localizedTextField, MAP_MAX_ZOOM, type MapColors, type MapPoint } from './map-style';
 
-/* What the view is drawing: `base` by the source's choice, `offline` and `unavailable` as a fallback from tiles that cannot be had. */
-export type MapViewStatus = 'loading' | 'tiles' | 'base' | 'offline' | 'unavailable' | 'failed';
+/*
+ * What the view is drawing: `base` by the source's choice, `offline` and `unavailable` as a fallback from tiles that
+ * cannot be had. `failed` is a browser that cannot start the map, `lost` one that took its graphics context back.
+ */
+export type MapViewStatus = 'loading' | 'tiles' | 'base' | 'offline' | 'unavailable' | 'failed' | 'lost';
 
 export interface MapMarker extends MapPoint {
     number: number;
@@ -26,6 +29,9 @@ export interface MapViewProps {
 
 const MARKER = 'flex size-5 items-center justify-center rounded-full bg-map-marker text-xs text-map-marker-text tabular-nums shadow-raised';
 const PICKED = 'z-1 bg-accent text-accent-text outline-2 outline-surface';
+
+// A tile that fails this many times with none loading in between leaves the map empty, so the outline stands in.
+const TILE_ERRORS_IN_A_ROW = 4;
 
 let workerReady = false;
 
@@ -99,14 +105,53 @@ export function MapView({ markers, source, selected, onPick, onStatus }: MapView
             return;
         }
         created.touchZoomRotate.disableRotation();
-        created.getCanvas().tabIndex = -1;
+        const canvas = created.getCanvas();
+        canvas.tabIndex = -1;
+        const wantsTiles = current.state === 'tiles';
+        let drawing: 'tiles' | 'outline' = tiles ? 'tiles' : 'outline';
+        // Why the outline is drawn in place of tiles that were asked for; null while the tiles are.
+        let reason: 'offline' | 'unavailable' | null = wantsTiles && !tiles ? 'offline' : null;
         let styleLoaded = false;
-        let fellBack = false;
+        let restoring = false;
+        let tileErrors = 0;
         setOutline(!tiles);
-        latest.current.onStatus(tiles ? 'loading' : current.state === 'tiles' ? 'offline' : 'base');
+        latest.current.onStatus(tiles ? 'loading' : wantsTiles ? 'offline' : 'base');
+
+        const drawOutline = (why: 'offline' | 'unavailable'): void => {
+            if (drawing === 'outline' || !wantsTiles) {
+                return;
+            }
+            drawing = 'outline';
+            reason = why;
+            setOutline(true);
+            created.setStyle(baseMapStyle(colors));
+            latest.current.onStatus(why);
+        };
+        const drawTiles = (): void => {
+            if (current.state !== 'tiles') {
+                return;
+            }
+            drawing = 'tiles';
+            reason = null;
+            styleLoaded = false;
+            restoring = true;
+            tileErrors = 0;
+            setOutline(false);
+            created.setStyle(current.styleUrl(mode));
+            latest.current.onStatus('loading');
+        };
+        const unreachable = (): 'offline' | 'unavailable' => (typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'unavailable');
+
         created.on('style.load', () => {
+            if (drawing !== 'tiles') {
+                return;
+            }
             styleLoaded = true;
-            const field = tiles && !fellBack && current.state === 'tiles' ? current.labelField?.(language) : undefined;
+            if (restoring) {
+                restoring = false;
+                latest.current.onStatus('tiles');
+            }
+            const field = current.state === 'tiles' ? current.labelField?.(language) : undefined;
             if (field === undefined) {
                 return;
             }
@@ -118,22 +163,43 @@ export function MapView({ markers, source, selected, onPick, onStatus }: MapView
             }
         });
         created.on('load', () => {
-            if (tiles && !fellBack) {
+            if (drawing === 'tiles') {
                 latest.current.onStatus('tiles');
             }
         });
-        created.on('error', () => {
-            // A tile that fails later is retried by the map; only a style that never arrived leaves nothing to draw.
-            if (!tiles || styleLoaded || fellBack) {
+        created.on('sourcedata', (event) => {
+            if ('tile' in event) {
+                tileErrors = 0;
+            }
+        });
+        created.on('error', (event) => {
+            if (drawing !== 'tiles') {
                 return;
             }
-            fellBack = true;
-            setOutline(true);
-            created.setStyle(baseMapStyle(colors));
-            latest.current.onStatus('unavailable');
+            // Before the style is here there is nothing to draw. After it, a tile the host refuses (a ticket
+            // that ran out) or several in a row leave an empty map; a single one the map retries itself.
+            const status = (event.error as { status?: number } | undefined)?.status;
+            if (!styleLoaded || status === 401 || status === 403 || ++tileErrors >= TILE_ERRORS_IN_A_ROW) {
+                drawOutline(unreachable());
+            }
         });
+        const goOffline = (): void => drawOutline('offline');
+        const goOnline = (): void => {
+            if (reason === 'offline') {
+                drawTiles();
+            }
+        };
+        const contextLost = (): void => latest.current.onStatus('lost');
+        if (wantsTiles) {
+            window.addEventListener('offline', goOffline);
+            window.addEventListener('online', goOnline);
+        }
+        canvas.addEventListener('webglcontextlost', contextLost);
         setMap(created);
         return () => {
+            window.removeEventListener('offline', goOffline);
+            window.removeEventListener('online', goOnline);
+            canvas.removeEventListener('webglcontextlost', contextLost);
             setMap(null);
             created.remove();
         };

@@ -14,7 +14,7 @@ class FakeMap {
     styles: unknown[] = [];
     layout: Array<[string, string, unknown]> = [];
     removed = false;
-    canvas = { tabIndex: 0 };
+    canvas = document.createElement('canvas');
     touchZoomRotate = { disableRotation: () => undefined };
 
     readonly options: Record<string, any>;
@@ -31,9 +31,9 @@ class FakeMap {
         this.handlers.set(name, [...(this.handlers.get(name) ?? []), handler]);
     }
 
-    emit(name: string): void {
+    emit(name: string, event: unknown = {}): void {
         for (const handler of this.handlers.get(name) ?? []) {
-            handler();
+            handler(event);
         }
     }
 
@@ -222,13 +222,91 @@ test.skipIf(typeof document === 'undefined')('falls back to the outline when the
     expect(statuses).toEqual(['loading', 'unavailable']);
 });
 
-test.skipIf(typeof document === 'undefined')("an error after the style loaded is the map's to retry", async () => {
+test.skipIf(typeof document === 'undefined')("a tile that fails now and then after the style loaded is the map's to retry", async () => {
     await draw();
     const [map] = FakeMap.made;
     await act(async () => map.emit('style.load'));
-    await act(async () => map.emit('error'));
+    for (let attempt = 0; attempt < 6; attempt++) {
+        await act(async () => map.emit('error', { error: { status: 503 } }));
+        await act(async () => map.emit('error', { error: { status: 503 } }));
+        await act(async () => map.emit('sourcedata', { tile: {} }));
+    }
     expect(map.styles).toEqual([]);
     expect(statuses).toEqual(['loading']);
+});
+
+test.skipIf(typeof document === 'undefined')('tiles that keep failing, or that the host refuses, leave the outline with the reason', async () => {
+    await draw();
+    const [map] = FakeMap.made;
+    await act(async () => map.emit('style.load'));
+    for (let attempt = 0; attempt < 3; attempt++) {
+        await act(async () => map.emit('error', { error: { status: 500 } }));
+    }
+    expect(map.styles).toEqual([]);
+    await act(async () => map.emit('error', { error: { status: 500 } }));
+    expect(map.styles).toHaveLength(1);
+    expect(statuses).toEqual(['loading', 'unavailable']);
+
+    for (const status of [401, 403]) {
+        statuses.length = 0;
+        await act(async () => root.unmount());
+        root = createRoot(element);
+        await draw();
+        const refused = FakeMap.made.at(-1)!;
+        await act(async () => refused.emit('style.load'));
+        await act(async () => refused.emit('error', { error: { status } }));
+        expect(refused.styles).toHaveLength(1);
+        expect(statuses).toEqual(['loading', 'unavailable']);
+    }
+});
+
+test.skipIf(typeof document === 'undefined')('goes to the outline when the page goes offline and back to the tiles when it is online again', async () => {
+    await draw();
+    const [map] = FakeMap.made;
+    await act(async () => map.emit('style.load'));
+    await act(async () => map.emit('load'));
+    await act(async () => window.dispatchEvent(new Event('online')));
+    expect(map.styles).toEqual([]);
+    await act(async () => window.dispatchEvent(new Event('offline')));
+    expect(map.styles).toHaveLength(1);
+    expect(statuses).toEqual(['loading', 'tiles', 'offline']);
+    await act(async () => window.dispatchEvent(new Event('online')));
+    expect(map.styles).toHaveLength(2);
+    expect(map.styles[1]).toBe('https://maps.example/style/light');
+    expect(statuses.at(-1)).toBe('loading');
+    await act(async () => map.emit('style.load'));
+    expect(statuses.at(-1)).toBe('tiles');
+    // An outline the source asked for is not the page's connection to give back.
+    await act(async () => root.unmount());
+    root = createRoot(element);
+    await draw({ source: { state: 'off', reason: 'disabled' } });
+    await act(async () => window.dispatchEvent(new Event('offline')));
+    await act(async () => window.dispatchEvent(new Event('online')));
+    expect(FakeMap.made.at(-1)!.styles).toEqual([]);
+});
+
+test.skipIf(typeof document === 'undefined')('stops listening to the page when the map goes', async () => {
+    await draw();
+    const [map] = FakeMap.made;
+    await act(async () => root.unmount());
+    root = createRoot(element);
+    await act(async () => window.dispatchEvent(new Event('offline')));
+    expect(map.styles).toEqual([]);
+});
+
+test.skipIf(typeof document === 'undefined')('a browser that takes the graphics context back is reported as lost', async () => {
+    await draw();
+    await act(async () => FakeMap.made[0].canvas.dispatchEvent(new Event('webglcontextlost')));
+    expect(statuses).toEqual(['loading', 'lost']);
+});
+
+test.skipIf(typeof document === 'undefined')('hands the headers of the host on with its address', async () => {
+    const source: UiMapSource = { ...TILES, transformRequest: (url) => ({ url, headers: { 'X-Ticket': 't1' } }) };
+    await draw({ source });
+    expect(FakeMap.made[0].options.transformRequest('https://maps.example/tile/1')).toEqual({
+        url: 'https://maps.example/tile/1',
+        headers: { 'X-Ticket': 't1' }
+    });
 });
 
 test.skipIf(typeof document === 'undefined')('draws the outline while the page is offline and says so', async () => {

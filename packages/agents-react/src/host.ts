@@ -206,8 +206,12 @@ export type UiMapSource =
           state: 'tiles';
           /* The style document of one theme. */
           styleUrl(theme: 'light' | 'dark'): string;
-          /* Called for every address the map requests, such as to add a ticket to those of the host's service. */
-          transformRequest?(url: string): { url: string };
+          /*
+           * Called for every address the map requests, such as to add a ticket or a header to those of the host's
+           * service. Rewrite only the addresses of your own origin and hand every other back as it came: the style
+           * and the tiles name other hosts too, and a ticket must not travel to them.
+           */
+          transformRequest?(url: string): { url: string; headers?: Record<string, string> };
           /* The feature property that holds a label in `language` (such as `nl`); without it a label stays as the style writes it. */
           labelField?(language: string): string;
           /* The credit the tiles ask for, drawn under the map. */
