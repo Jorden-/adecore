@@ -2,11 +2,11 @@ import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 import { UiBudget } from './budget.ts';
 import { compileUi, compileUiBlock, uiHasFence, uiMayReferenceHost } from './compiler.ts';
-import { UI_CATALOG, uiCatalogText } from './catalog.ts';
+import { UI_CATALOG, UI_CATALOG_VERSION, UI_GROUPS, uiCatalogText } from './catalog.ts';
 import { copyUiValue, evaluateUiExpression, parseUiExpression, sameUiValue } from './expression.ts';
 import { evaluateUiBlock, UiState } from './runtime.ts';
 import { UiBlockSchema, UiNodeSchema } from './protocol.ts';
-import { uiCompactCatalog, uiFallbackText, uiReferenceText, uiSessionNote } from './text.ts';
+import { uiCompactCatalog, uiFallbackText, uiGroupReference, uiReferenceText, uiSessionNote } from './text.ts';
 
 function expression(source: string, variables = {}): unknown {
     return evaluateUiExpression(parseUiExpression(source, new UiBudget({ milliseconds: 5000 })), variables, new UiBudget({ milliseconds: 5000 }));
@@ -360,8 +360,38 @@ describe('open wire and agent text', () => {
         expect(uiSessionNote().length).toBeLessThan(2400);
     });
 
+    test('names the components per group in a shorter note that still carries the example', () => {
+        const names = uiSessionNote({ catalog: 'names', detailHint: '`tool help ui <group>` gives props' });
+        expect(names.length).toBeLessThan(uiSessionNote().length);
+        expect(names).toContain('```ui\n');
+        expect(names).toContain('(`tool help ui <group>` gives props)');
+        expect(names).toContain('status: Summary, Callout, Tag, Progress, Steps, Step');
+        expect(names).not.toContain('Slider: value');
+        expect(uiSessionNote({ catalog: 'names' })).toContain('Components by group:\n');
+        for (const group of Object.keys(UI_GROUPS)) {
+            expect(names).toContain(`\n${group}: `);
+        }
+        const example = /```ui\n([\s\S]*?)\n```/.exec(names)![0];
+        expect(compileUi(example, { id: 'names-example', final: true })[0].diagnostics).toEqual([]);
+        expect(uiSessionNote({ catalog: 'props' })).toBe(uiSessionNote());
+    });
+
+    test('gives one group with its rules and the props of each component', () => {
+        const data = uiGroupReference('data');
+        expect(data.split('\n')[0]).toBe(UI_GROUPS.data.description);
+        expect(data).toContain(UI_GROUPS.data.rules);
+        expect(data).toContain('Stat: A labeled value and optional previous value. Props: label, value, previous?, unit?, tone?.');
+        expect(data).not.toContain('Summary:');
+        expect(uiReferenceText()).toContain(data);
+    });
+
+    test('keeps the catalog at version 1', () => {
+        // A bump makes every block unreadable on an older native client.
+        expect(UI_CATALOG_VERSION).toBe(1);
+    });
+
     test('keeps a question the turn waits on out of Choices, naming no tool', () => {
-        for (const instruction of [uiSessionNote(), uiReferenceText()]) {
+        for (const instruction of [uiSessionNote(), uiSessionNote({ catalog: 'names' }), uiReferenceText()]) {
             expect(instruction).toContain('shortcuts after finished work that the person may ignore');
             expect(instruction).toContain('a go-ahead for work you would otherwise do');
             expect(instruction).toMatch(/ask (with|that with) your own question tool if you have one, otherwise in prose/);

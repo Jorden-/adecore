@@ -6,6 +6,7 @@ export {
     isUiComponent,
     uiCatalogText,
     type UiComponentName,
+    type UiGroupName,
     type UiProps,
     type UiTone
 } from './catalog.ts';
@@ -41,7 +42,7 @@ export {
 } from './runtime.ts';
 export { uiValidatedState, uiQueryArguments, uiQueryFallback } from './query.ts';
 export { UiNodeSchema, UiDiagnosticSchema, UiBlockSchema, UiBlocksSchema } from './protocol.ts';
-export { uiCompactCatalog, uiSessionNote, uiReferenceText, uiFallbackText, type UiTextOptions } from './text.ts';
+export { uiCompactCatalog, uiSessionNote, uiGroupReference, uiReferenceText, uiFallbackText, type UiTextOptions } from './text.ts';
 export { UI_STREAM_INTERVAL_MS, UiStream, type UiStreamClock, type UiStreamOptions, type UiStreamPreview } from './stream.ts';
 
 export { UiLinkTargetSchema, UiLinkResolutionSchema, uiLinkTargets, type UiLinkTarget, type UiLinkResolution } from './links.ts';

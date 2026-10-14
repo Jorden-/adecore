@@ -44,6 +44,13 @@ const core = (options) =>
 
 `uiReferenceText()` is the long form, with every component's description and every group's rules. Hand it out on request, through a command or a skill the agent reads, rather than in every session.
 
+A host that wants an even shorter note passes `catalog: 'names'`: the note then lists only the component names of each group, and `detailHint` says how the agent gets the props of one, such as a command the host runs. `uiGroupReference(group)` gives the text of that command: the group's description, its rules and every component with its props.
+
+```ts
+const note = uiSessionNote({ catalog: 'names', detailHint: '`tool help ui <group>` gives props' });
+const inputs = uiGroupReference('inputs');
+```
+
 ## Compile on the backend
 
 `ChatCore` compiles every assistant reply that opens a UI fence. Nothing else is needed:

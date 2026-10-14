@@ -219,8 +219,11 @@ export function compileUiBlock(source: string, options: UiCompileOptions): UiBlo
                 throw new UiFailure('unknown_component', `Unknown component ${syntax.type}.`);
             }
             const entry = UI_CATALOG[syntax.type];
-            if ('parent' in entry && entry.parent !== parent) {
-                throw new UiFailure('invalid_parent', `${syntax.type} belongs inside ${entry.parent}.`);
+            if ('parent' in entry) {
+                const parents: readonly string[] = [entry.parent].flat();
+                if (parent === undefined || !parents.includes(parent)) {
+                    throw new UiFailure('invalid_parent', `${syntax.type} belongs inside ${parents.join(' or ')}.`);
+                }
             }
             if (parent && isUiComponent(parent)) {
                 const container = UI_CATALOG[parent];

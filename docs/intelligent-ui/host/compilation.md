@@ -114,10 +114,18 @@ Text for an agent or a tool comes from the same schemas:
 | ------------------- | ------------------------------------------------------------------ |
 | `uiSessionNote(options?)`   | The short instructions for every session                   |
 | `uiReferenceText(options?)` | The full reference: syntax, example, groups, rules, components |
+| `uiGroupReference(group)`   | One group of that reference: description, rules, components with props |
 | `uiCompactCatalog()`        | `Name: prop,prop?` for every component, on one line        |
 | `uiCatalogText()`           | `Name(props): description`, one line per component         |
 
-The first two take `UiTextOptions` with the `fenceLanguage` the compiler uses.
+`uiSessionNote` and `uiReferenceText` take `UiTextOptions` with the `fenceLanguage` the compiler uses. The note takes two more:
+
+| Option       | What it does                                                                                              |
+| ------------ | --------------------------------------------------------------------------------------------------------- |
+| `catalog`    | `'props'` (the default) lists every component with its props; `'names'` lists only the names, per group   |
+| `detailHint` | With `'names'`, the host's own words for how the agent gets the props of a group, written after the heading |
+
+`UiGroupName` is the union of the keys of `UI_GROUPS`. A component's `parent` is one name or a list of names.
 
 ## The syntax tree
 

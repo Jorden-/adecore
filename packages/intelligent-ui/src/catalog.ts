@@ -145,6 +145,7 @@ export const UI_CATALOG = {
     }
 } as const;
 
+export type UiGroupName = keyof typeof UI_GROUPS;
 export type UiComponentName = keyof typeof UI_CATALOG;
 export type UiProps<Name extends UiComponentName> = z.infer<(typeof UI_CATALOG)[Name]['schema']>;
 
