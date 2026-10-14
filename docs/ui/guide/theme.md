@@ -137,7 +137,7 @@ The theme also carries a few classes for what a utility cannot express: the stat
 | `.dialog-popup`, `.dialog-backdrop`, `.lightbox-frame`, `.lightbox-backdrop` | A dialog's surface and dim, and a dialog that shows only a picture. |
 | `.tooltip-positioner`, `.tooltip-popup` | A tooltip that fades in from the side of its trigger. |
 | `.focus-ring`, `.focus-ring-within` | The keyboard focus outline on something that is not a button, or on a card around a focused field. |
-| `.scroll-fade-x`, `.scroll-fade-top` | A fade at an edge that still hides content, switched on by `data-fade-start` and `data-fade-end`. |
+| `.scroll-fade-x`, `.scroll-fade-top` | A fade at an edge that still hides content, switched on by `data-fade-start` and `data-fade-end`. `.scroll-fade-x` takes its width from `--fade-size`. |
 | `.file-icon` | A file icon outside the tree: the hue the sprite gives its file type, or the muted text color. |
 
 Every class sits in Tailwind's `components` layer, so a utility on the same element still wins.

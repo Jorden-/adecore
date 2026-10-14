@@ -188,3 +188,29 @@ export function tabGapAt(rects: readonly { left: number; right: number }[], x: n
     const index = rects.findIndex((rect) => x < (rect.left + rect.right) / 2);
     return index < 0 ? rects.length : index;
 }
+
+export interface TabScrollView {
+    scrollLeft: number;
+    clientWidth: number;
+    scrollWidth: number;
+}
+
+/**
+ * The scrollLeft that brings a tab fully into view and clear of the edge fades, or the current one
+ * when it already is. The strip only fades an edge it can still scroll toward, so a fade is counted
+ * only where the scroll position leaves one. A tab wider than the room between the fades shows its start.
+ */
+export function tabRevealScrollLeft(view: TabScrollView, start: number, width: number, fade: number): number {
+    const max = Math.max(0, view.scrollWidth - view.clientWidth);
+    const end = start + width;
+    const visibleStart = (left: number): number => left + (left > 0 ? fade : 0);
+    const visibleEnd = (left: number): number => left + view.clientWidth - (left < max - 1 ? fade : 0);
+    const clamp = (left: number): number => Math.round(Math.min(max, Math.max(0, left)));
+    if (start >= visibleStart(view.scrollLeft) && end <= visibleEnd(view.scrollLeft)) {
+        return view.scrollLeft;
+    }
+    if (start < visibleStart(view.scrollLeft) || width > view.clientWidth - 2 * fade) {
+        return clamp(start - fade);
+    }
+    return clamp(end + fade - view.clientWidth);
+}

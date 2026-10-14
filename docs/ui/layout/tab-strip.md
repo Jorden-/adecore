@@ -6,6 +6,8 @@ The tabs of the open documents. The strip scrolls sideways, keeps the active tab
 
 `TabStripProps` requires `items`, `value` and `onValueChange`. A `TabStripItem` has an `id` and a `label`, and optionally a `hint`, `icon`, `detail`, `attention`, `unsaved`, `pinned` and `closable`. `tabId` and `panelId` tie a tab to a panel the app draws; the strip draws no panels and keeps no state of theirs.
 
+When the active tab changes, the strip scrolls only itself until the whole tab is in view and clear of the edge fades, and it keeps doing so while the tab's width settles, such as when a label renders later. A tab that is already in view stays where it is. Once a person scrolls the strip with a wheel, a trackpad, a touch or its scrollbar, it leaves the scroll position to them until the active tab changes again.
+
 `focused`, true by default, draws the active tab's underline in the accent. The active tab always shows its close button, the others on hover or focus. `closable: false` leaves the button out. `onClose(id)`, `onDoubleClick(id, event)` and `onContextMenu(id, event)` are where the app acts.
 
 `onDragStart(id, event)` makes the tabs draggable, and `onDragEnd(event)` is where the app clears its drag state. `onTabDragOver(index, event)` and `onTabDrop(index, event)` report the gap nearest the pointer, measured between the middles of the tabs. The index counts the tabs in their order before the drag, the dragged tab included. Call `preventDefault()` in dragover to accept a drop. `insertAt` draws a 2 pixel line at a gap, for a strip used without the pane preview of a `SplitView`.

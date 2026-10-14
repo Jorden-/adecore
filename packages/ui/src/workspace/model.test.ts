@@ -9,7 +9,7 @@ import {
     type SplitLayout,
     type SplitPane
 } from './model.ts';
-import { paneRadius, resizeSplit, splitGeometry, tabGapAt } from './geometry.ts';
+import { paneRadius, resizeSplit, splitGeometry, tabGapAt, tabRevealScrollLeft } from './geometry.ts';
 
 const pane = (id: string, ...views: string[]): SplitPane => ({ type: 'pane', id, views, active: views[0] ?? null });
 const initial = (): SplitLayout => ({
@@ -421,5 +421,28 @@ describe('layout geometry and resizing', () => {
             { left: 50, right: 150 }
         ];
         expect([tabGapAt(rects, -1), tabGapAt(rects, 0), tabGapAt(rects, 100), tabGapAt([], 10)]).toEqual([0, 1, 2, 0]);
+    });
+    test('reveals a tab past the end clear of the fade, or flush with the end of the strip', () => {
+        const view = { scrollLeft: 0, clientWidth: 300, scrollWidth: 1000 };
+        expect(tabRevealScrollLeft(view, 400, 100, 24)).toBe(224);
+        expect(tabRevealScrollLeft(view, 900, 100, 24)).toBe(700);
+        expect(tabRevealScrollLeft(view, 250, 100, 24)).toBe(74);
+    });
+    test('reveals a tab before the start clear of the fade, or flush with the start of the strip', () => {
+        const view = { scrollLeft: 500, clientWidth: 300, scrollWidth: 1000 };
+        expect(tabRevealScrollLeft(view, 300, 100, 24)).toBe(276);
+        expect(tabRevealScrollLeft(view, 510, 100, 24)).toBe(486);
+        expect(tabRevealScrollLeft(view, 10, 100, 24)).toBe(0);
+    });
+    test('leaves a tab that is fully in view where it is, counting only the fades the strip shows', () => {
+        expect(tabRevealScrollLeft({ scrollLeft: 100, clientWidth: 300, scrollWidth: 1000 }, 124, 252, 24)).toBe(100);
+        expect(tabRevealScrollLeft({ scrollLeft: 0, clientWidth: 300, scrollWidth: 1000 }, 0, 276, 24)).toBe(0);
+        expect(tabRevealScrollLeft({ scrollLeft: 700, clientWidth: 300, scrollWidth: 1000 }, 900, 100, 24)).toBe(700);
+        expect(tabRevealScrollLeft({ scrollLeft: 0, clientWidth: 300, scrollWidth: 300 }, 200, 100, 24)).toBe(0);
+    });
+    test('shows the start of a tab wider than the room between the fades', () => {
+        const view = { scrollLeft: 0, clientWidth: 300, scrollWidth: 1000 };
+        expect(tabRevealScrollLeft(view, 400, 400, 24)).toBe(376);
+        expect(tabRevealScrollLeft({ ...view, scrollLeft: 376 }, 400, 400, 24)).toBe(376);
     });
 });

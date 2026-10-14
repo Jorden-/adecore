@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { act, useEffect, useState, type ReactNode } from 'react';
+import { act, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { UIProvider } from '../UIProvider.tsx';
 import { SplitView } from './SplitView.tsx';
@@ -377,5 +377,114 @@ describe.skipIf(typeof document === 'undefined')('workspace interaction', () => 
         expect(roots[1]!.querySelector('[aria-selected="true"]')?.textContent).toBe('a');
         const ids = Array.from(container.querySelectorAll('[role="tabpanel"]'), (node) => node.id);
         expect(new Set(ids).size).toBe(ids.length);
+    });
+});
+
+describe.skipIf(typeof document === 'undefined')('tab strip reveal', () => {
+    const STRIP_WIDTH = 200;
+    const names = ['clientWidth', 'scrollWidth', 'scrollLeft', 'getBoundingClientRect'] as const;
+    const scrolls = new WeakMap<HTMLElement, number>();
+    let widths: Record<string, number>;
+    let descriptors: Partial<Record<(typeof names)[number], PropertyDescriptor>>;
+    let container: HTMLDivElement;
+    let root: Root;
+    const isStrip = (element: HTMLElement): boolean => element.classList.contains('ade-tab-strip');
+    const tabsOf = (element: HTMLElement): HTMLElement[] => Array.from(element.querySelectorAll<HTMLElement>('[data-document-tab]'));
+    const rect = (left: number, width: number): DOMRect =>
+        ({ left, width, right: left + width, x: left, y: 0, top: 0, bottom: 0, height: 0, toJSON: () => ({}) }) as DOMRect;
+    beforeEach(() => {
+        widths = { a: 100, b: 100, c: 100, d: 100, e: 100 };
+        descriptors = Object.fromEntries(names.map((name) => [name, Object.getOwnPropertyDescriptor(HTMLElement.prototype, name)]));
+        Object.defineProperties(HTMLElement.prototype, {
+            clientWidth: {
+                configurable: true,
+                get(this: HTMLElement) {
+                    return isStrip(this) ? STRIP_WIDTH : 0;
+                }
+            },
+            scrollWidth: {
+                configurable: true,
+                get(this: HTMLElement) {
+                    return isStrip(this) ? tabsOf(this).reduce((sum, tab) => sum + widths[tab.dataset.documentTab!]!, 0) : 0;
+                }
+            },
+            scrollLeft: {
+                configurable: true,
+                get(this: HTMLElement) {
+                    return scrolls.get(this) ?? 0;
+                },
+                set(this: HTMLElement, value: number) {
+                    scrolls.set(this, isStrip(this) ? Math.max(0, Math.min(value, this.scrollWidth - this.clientWidth)) : value);
+                }
+            },
+            getBoundingClientRect: {
+                configurable: true,
+                value(this: HTMLElement) {
+                    const strip = this.closest<HTMLElement>('.ade-tab-strip');
+                    if (!strip || this === strip) {
+                        return rect(0, strip ? STRIP_WIDTH : 0);
+                    }
+                    const tabs = tabsOf(strip);
+                    const index = tabs.indexOf(this.closest<HTMLElement>('[data-document-tab]')!);
+                    const start = tabs.slice(0, index).reduce((sum, tab) => sum + widths[tab.dataset.documentTab!]!, 0);
+                    return rect(start - strip.scrollLeft, widths[tabs[index]!.dataset.documentTab!]!);
+                }
+            }
+        });
+        container = document.createElement('div');
+        document.body.append(container);
+        root = createRoot(container);
+    });
+    afterEach(async () => {
+        await act(async () => {
+            root.unmount();
+        });
+        container.remove();
+        names.forEach((name) => {
+            const descriptor = descriptors[name];
+            if (descriptor) {
+                Object.defineProperty(HTMLElement.prototype, name, descriptor);
+            } else {
+                Reflect.deleteProperty(HTMLElement.prototype, name);
+            }
+        });
+    });
+    const show = async (value: string): Promise<HTMLElement> => {
+        await act(async () => {
+            root.render(
+                <UIProvider i18n={i18n}>
+                    <TabStrip
+                        items={Object.keys(widths).map((id) => ({ id, label: `${id} ${widths[id]}` }))}
+                        value={value}
+                        onValueChange={() => {}}
+                        style={{ '--fade-size': '24px' } as CSSProperties}
+                    />
+                </UIProvider>
+            );
+        });
+        return container.querySelector<HTMLElement>('.ade-tab-strip')!;
+    };
+    test('scrolls the active tab clear of the fades and leaves a tab in view alone', async () => {
+        expect((await show('a')).scrollLeft).toBe(0);
+        expect((await show('e')).scrollLeft).toBe(300);
+        expect((await show('c')).scrollLeft).toBe(176);
+        const strip = await show('a');
+        expect(strip.scrollLeft).toBe(0);
+        strip.scrollLeft = 50;
+        expect((await show('b')).scrollLeft).toBe(50);
+    });
+    test('follows a tab whose width settles later, until a person scrolls the strip', async () => {
+        widths.f = 40;
+        expect((await show('f')).scrollLeft).toBe(340);
+        widths.f = 120;
+        expect((await show('f')).scrollLeft).toBe(420);
+        const strip = container.querySelector<HTMLElement>('.ade-tab-strip')!;
+        await act(async () => {
+            strip.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true }));
+        });
+        expect(strip.scrollLeft).toBe(320);
+        widths.f = 160;
+        expect((await show('f')).scrollLeft).toBe(320);
+        expect((await show('a')).scrollLeft).toBe(0);
     });
 });

@@ -8,6 +8,7 @@ import {
     useState,
     type DragEvent,
     type MouseEvent,
+    type PointerEvent,
     type ReactNode,
     type UIEvent,
     type WheelEvent
@@ -19,7 +20,7 @@ import { useTranslation } from 'react-i18next';
 import { Icon } from '../Icon.tsx';
 import { IconButton, type IconButtonProps } from '../IconButton.tsx';
 import { Tooltip } from '../Tooltip.tsx';
-import { tabGapAt } from './geometry.ts';
+import { tabGapAt, tabRevealScrollLeft } from './geometry.ts';
 
 /* Where an arrow, Home or End moves the selection from `index`, wrapping at either end; null for any other key. */
 function tabIndexForKey(key: string, index: number, count: number): number | null {
@@ -123,20 +124,44 @@ export function TabStrip({
             setInsertion(after?.offsetLeft ?? (last ? last.offsetLeft + last.offsetWidth : 0));
         }
     }, [insertAt]);
-    useLayoutEffect(measure);
+    // Stays set after the active tab changes, as its width can settle frames later; a person's own scroll ends it.
+    const revealing = useRef(false);
+    const reveal = (): void => {
+        const element = strip.current;
+        const selected = element?.querySelector<HTMLElement>('[aria-selected="true"]');
+        if (!revealing.current || !element || !selected) {
+            return;
+        }
+        const container = selected.closest<HTMLElement>('[data-document-tab]');
+        const tab = container && element.contains(container) ? container : selected;
+        const fade = parseFloat(getComputedStyle(element).getPropertyValue('--fade-size')) || 0;
+        const bounds = element.getBoundingClientRect();
+        const rect = tab.getBoundingClientRect();
+        const left = tabRevealScrollLeft(element, rect.left - bounds.left - element.clientLeft + element.scrollLeft, rect.width, fade);
+        if (left !== element.scrollLeft) {
+            element.scrollLeft = left;
+        }
+    };
+    useLayoutEffect(() => {
+        revealing.current = true;
+    }, [value]);
+    useLayoutEffect(() => {
+        reveal();
+        measure();
+    });
     useEffect(() => {
         const element = strip.current;
         if (!element || typeof ResizeObserver === 'undefined') {
             return;
         }
-        const observer = new ResizeObserver(measure);
+        const observer = new ResizeObserver(() => {
+            reveal();
+            measure();
+        });
         observer.observe(element);
         element.querySelectorAll('[data-document-tab]').forEach((tab) => observer.observe(tab));
         return () => observer.disconnect();
     });
-    useEffect(() => {
-        strip.current?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
-    }, [value]);
     const gap = (event: DragEvent<HTMLDivElement>): number => {
         const rects = Array.from(event.currentTarget.querySelectorAll('[data-document-tab]'), (tab) => tab.getBoundingClientRect());
         return tabGapAt(rects, event.clientX);
@@ -171,8 +196,19 @@ export function TabStrip({
             },
             onWheel: (event: WheelEvent<HTMLDivElement>) => {
                 props.onWheel?.(event);
-                if (!event.defaultPrevented && !event.deltaX && event.deltaY) {
+                if (event.defaultPrevented) {
+                    return;
+                }
+                revealing.current = false;
+                if (!event.deltaX && event.deltaY) {
                     event.currentTarget.scrollLeft += event.deltaY;
+                }
+            },
+            onPointerDown: (event: PointerEvent<HTMLDivElement>) => {
+                props.onPointerDown?.(event);
+                // A press on the strip itself grabs its scrollbar, and a touch may pan it.
+                if (event.target === event.currentTarget || event.pointerType === 'touch') {
+                    revealing.current = false;
                 }
             },
             onDragOver: (event: DragEvent<HTMLDivElement>) => {
