@@ -473,18 +473,16 @@
     }
     /* A picture holds the eye better against a heavier dim than a dialog of controls needs. */
     .lightbox-backdrop { background: color-mix(in srgb, var(--bg) 80%, transparent); }
-    /* Tooltips. The positioner animates its position, so a tooltip slides to the next button
-       instead of blinking; the popup fades and scales from its anchor side. Both drop the motion
-       while Base UI says the tooltip is instant. */
+    /* Tooltips. The popup fades and scales from its anchor side, and drops the motion while Base UI
+       says the tooltip is instant. The positioner does not animate its place: Base UI parks it at the
+       window's origin until it is measured, so it would slide in from the corner. */
     /* As wide as its label up to the viewport's max width, so a short label near the edge of the
        window does not wrap to the room left of it before the positioner moves it back in. */
     .tooltip-positioner {
         width: max-content;
         z-index: var(--z-tooltip);
         pointer-events: none;
-        transition: top 150ms ease, left 150ms ease, right 150ms ease, bottom 150ms ease;
     }
-    .tooltip-positioner[data-instant] { transition: none; }
     .tooltip-popup {
         display: flex;
         border-radius: 7px;

@@ -53,10 +53,10 @@ export function Tooltip({ label, open, onOpenChange, anchor, kbd, side = 'top', 
             <BaseTooltip.Portal>
                 <BaseTooltip.Positioner anchor={anchor} side={side} sideOffset={sideOffset} className="tooltip-positioner">
                     <BaseTooltip.Popup role="tooltip" className="tooltip-popup">
-                        <BaseTooltip.Viewport className="max-w-72 px-[9px] py-[5px] text-pretty">
+                        {/* Not Base UI's Viewport: that one morphs between the triggers of one popup and
+                            measures and clones its content to do so, while every hint here has a root of its own. */}
+                        <div className="max-w-72 px-[9px] py-[5px] text-pretty">
                             <span className="wrap-anywhere">{label}</span>
-                            {/* The viewport wraps its children in a div of its own, so the 8px
-                                between the label and the shortcut has to sit on the shortcut itself. */}
                             {kbd !== undefined &&
                                 (typeof kbd === 'string' ? (
                                     <Kbd variant="inline" className="ml-2">
@@ -65,7 +65,7 @@ export function Tooltip({ label, open, onOpenChange, anchor, kbd, side = 'top', 
                                 ) : (
                                     <Kbd shortcut={kbd} variant="inline" className="ml-2" />
                                 ))}
-                        </BaseTooltip.Viewport>
+                        </div>
                     </BaseTooltip.Popup>
                 </BaseTooltip.Positioner>
             </BaseTooltip.Portal>

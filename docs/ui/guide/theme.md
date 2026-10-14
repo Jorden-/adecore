@@ -135,7 +135,7 @@ The theme also carries a few classes for what a utility cannot express: the stat
 | `.menu-popup`, `.picker-popup`, `.menu-item` | A menu's surface and a row in it, with its highlighted and disabled states. |
 | `.cursor-row` | A row of a list the arrow keys walk that is not a Base UI menu, with `data-active="true"` on the current one. |
 | `.dialog-popup`, `.dialog-backdrop`, `.lightbox-frame`, `.lightbox-backdrop` | A dialog's surface and dim, and a dialog that shows only a picture. |
-| `.tooltip-positioner`, `.tooltip-popup` | A tooltip that slides from one button to the next. |
+| `.tooltip-positioner`, `.tooltip-popup` | A tooltip that fades in from the side of its trigger. |
 | `.focus-ring`, `.focus-ring-within` | The keyboard focus outline on something that is not a button, or on a card around a focused field. |
 | `.scroll-fade-x`, `.scroll-fade-top` | A fade at an edge that still hides content, switched on by `data-fade-start` and `data-fade-end`. |
 | `.file-icon` | A file icon outside the tree: the hue the sprite gives its file type, or the muted text color. |
