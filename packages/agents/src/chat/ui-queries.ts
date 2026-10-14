@@ -74,13 +74,19 @@ const MAX_QUERY_BYTES = 64 * 1024;
 const MAX_SNAPSHOT_BYTES = 128 * 1024;
 const READ_TIMEOUT_MS = 8_000;
 const PLACE_TIMEOUT_MS = 5_000;
+// Lookups run a few at a time, share one budget per block, and stop trying once the host keeps timing out.
+const PLACE_PARALLEL = 4;
+const PLACE_BLOCK_BUDGET_MS = 15_000;
+const PLACE_TIMEOUTS_IN_A_ROW = 3;
 // A changed input reads at once, but a query never reads more often than this across its inputs.
 const INPUT_READ_MS = 250;
 
 export class ChatUiQueries {
     readonly schemas: Record<string, z.ZodType>;
     private readonly captures = new Map<string, Promise<unknown>>();
-    private readonly freezing = new Set<string>();
+    private readonly freezing = new Map<string, Promise<void>>();
+    // Ends with the chat, so a lookup that is under way stops when its chat does.
+    private readonly lives = new Map<string, AbortController>();
     private readonly cache = new Map<string, CachedReading>();
     // The read id of the newest reading per cache key, which a remount or a second client is answered with.
     private readonly latest = new Map<string, string>();
@@ -112,8 +118,7 @@ export class ChatUiQueries {
         if (this.freezing.has(key)) {
             return;
         }
-        this.freezing.add(key);
-        void capture
+        const frozen = capture
             .then(async () => {
                 for (const block of (item.ui ?? []).slice(0, 16)) {
                     const current = session.thread.get(item.id);
@@ -150,16 +155,9 @@ export class ChatUiQueries {
                             }
                         }
                     }
-                    const places: Record<string, ChatUiPlaceReading> = Object.create(null);
-                    const found: string[] = [];
-                    if (this.host.place) {
-                        for (const [id, query] of Object.entries(uiPlaceQueries(block, {}, values)).slice(0, UI_HOST_LIMITS.places)) {
-                            const reading = await this.placeReading(session.info, query);
-                            places[id] = reading;
-                            if (reading.state === 'found') {
-                                found.push(`${query.name || query.address}: ${reading.lat}, ${reading.lon}`);
-                            }
-                        }
+                    const { places, found, ended } = await this.lookUpPlaces(session, item.id, block, values);
+                    if (ended) {
+                        return;
                     }
                     const latest = session.thread.get(item.id);
                     if (latest?.kind !== 'assistant' || !latest.uiQueries || latest.ui?.find((entry) => entry.id === block.id)?.revision !== block.revision) {
@@ -209,18 +207,106 @@ export class ChatUiQueries {
             })
             .catch(() => {})
             .finally(() => this.freezing.delete(key));
+        this.freezing.set(key, frozen);
     }
 
-    /* One lookup, cut off after five seconds; whatever goes wrong is a reading that says the place is missing and why. */
-    private async placeReading(info: ChatInfo, query: UiPlaceQuery): Promise<ChatUiPlaceReading> {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), PLACE_TIMEOUT_MS);
-        timeout.unref?.();
+    /* Settles once the reply's readings, links and places are frozen, or at once where nothing is being frozen. */
+    async whenFrozen(session: ChatSession, itemId: string): Promise<void> {
+        await this.freezing.get(`${session.id}:${itemId}`);
+    }
+
+    /*
+     * The places of a block that name an address, looked up four at a time within one budget for the block.
+     * Past the budget, or after the host timed out three times in a row, the rest freeze as missing without
+     * asking. Nothing is asked once the chat ended, the reply is gone or the block changed; the caller then
+     * drops the write.
+     */
+    private async lookUpPlaces(
+        session: ChatSession,
+        itemId: string,
+        block: UiBlock,
+        values: Record<string, unknown>
+    ): Promise<{ places: Record<string, ChatUiPlaceReading>; found: string[]; ended: boolean }> {
+        const places: Record<string, ChatUiPlaceReading> = Object.create(null);
+        const found: string[] = [];
+        if (!this.host.place) {
+            return { places, found, ended: false };
+        }
+        let queries: Array<[string, UiPlaceQuery]>;
+        try {
+            queries = Object.entries(uiPlaceQueries(block, {}, values)).slice(0, UI_HOST_LIMITS.places);
+        } catch {
+            return { places, found, ended: false };
+        }
+        const life = this.lifeOf(session.id).signal;
+        const budget = new AbortController();
+        const timer = setTimeout(() => budget.abort(), PLACE_BLOCK_BUDGET_MS);
+        timer.unref?.();
+        const signal = AbortSignal.any([life, budget.signal]);
+        const readings = new Map<string, ChatUiPlaceReading>();
+        let timeouts = 0;
+        let next = 0;
+        const stillThere = (): boolean => {
+            const current = session.thread.get(itemId);
+            return !life.aborted && current?.kind === 'assistant' && current.ui?.find((entry) => entry.id === block.id)?.revision === block.revision;
+        };
+        const worker = async (): Promise<void> => {
+            for (let index = next++; index < queries.length; index = next++) {
+                const [id, query] = queries[index]!;
+                if (!stillThere()) {
+                    return;
+                }
+                if (budget.signal.aborted || timeouts >= PLACE_TIMEOUTS_IN_A_ROW) {
+                    readings.set(id, { state: 'missing', address: query.address, code: 'timed-out', reason: 'The place lookup timed out.' });
+                    continue;
+                }
+                const reading = await this.placeReading(session.info, query, signal);
+                timeouts = reading.code === 'timed-out' ? timeouts + 1 : 0;
+                readings.set(id, reading);
+            }
+        };
+        try {
+            await Promise.all(Array.from({ length: Math.min(PLACE_PARALLEL, queries.length) }, worker));
+        } finally {
+            clearTimeout(timer);
+        }
+        for (const [id, query] of queries) {
+            const reading = readings.get(id);
+            if (reading === undefined) {
+                continue;
+            }
+            places[id] = reading;
+            if (reading.state === 'found') {
+                found.push(`${query.name || query.address}: ${reading.lat}, ${reading.lon}`);
+            }
+        }
+        return { places, found, ended: life.aborted };
+    }
+
+    private lifeOf(chatId: string): AbortController {
+        let life = this.lives.get(chatId);
+        if (life === undefined) {
+            life = new AbortController();
+            this.lives.set(chatId, life);
+        }
+        return life;
+    }
+
+    /*
+     * One lookup, cut off after five seconds or when `outer` aborts. Whatever goes wrong is a reading that says
+     * the place is missing. Only a refusal the host chose its words for (`ChatUiRefusal`) carries them: any
+     * other error stays out of the shared record, which every client reads.
+     */
+    private async placeReading(info: ChatInfo, query: UiPlaceQuery, outer: AbortSignal): Promise<ChatUiPlaceReading> {
+        const timeout = new AbortController();
+        const timer = setTimeout(() => timeout.abort(), PLACE_TIMEOUT_MS);
+        timer.unref?.();
+        const signal = AbortSignal.any([timeout.signal, outer]);
         try {
             const reading = await Promise.race([
-                this.host.place!(info, query, controller.signal),
+                this.host.place!(info, query, signal),
                 new Promise<never>((_, reject) =>
-                    controller.signal.addEventListener('abort', () => reject(new UiQueryError('refused-query', 'timed-out', 'The place lookup timed out.')), {
+                    signal.addEventListener('abort', () => reject(new UiQueryError('refused-query', 'timed-out', 'The place lookup timed out.')), {
                         once: true
                     })
                 )
@@ -230,9 +316,11 @@ export class ChatUiQueries {
                 ? { state: 'missing', address: query.address, code: 'place-unreadable', reason: 'The host found no point for this address.' }
                 : parsed;
         } catch (error) {
-            return { state: 'missing', address: query.address, ...this.failure(error) };
+            return error instanceof UiQueryError
+                ? { state: 'missing', address: query.address, ...this.failure(error) }
+                : { state: 'missing', address: query.address, code: 'lookup-failed', reason: 'The place could not be looked up.' };
         } finally {
-            clearTimeout(timeout);
+            clearTimeout(timer);
         }
     }
 
@@ -465,6 +553,8 @@ export class ChatUiQueries {
     }
 
     forget(chatId: string): void {
+        this.lives.get(chatId)?.abort();
+        this.lives.delete(chatId);
         for (const [id, cached] of this.cache) {
             if (cached.chatId === chatId) {
                 this.evict(id);
@@ -508,7 +598,7 @@ export class ChatUiQueries {
     }
 
     private failure(error: unknown): { reason: string; code?: string } {
-        const reason = (error instanceof Error ? error.message : 'This query could not be read.').slice(0, 240);
-        return error instanceof UiQueryError ? { reason, code: error.reason } : { reason };
+        // The reason is frozen into a record every client reads, so a message the host did not choose for that stays out of it.
+        return error instanceof UiQueryError ? { reason: error.message.slice(0, 240), code: error.reason } : { reason: 'This query could not be read.' };
     }
 }

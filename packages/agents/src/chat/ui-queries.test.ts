@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, jest, setSystemTime, test } from 'bun:test';
 import { z } from 'zod';
 import type { ChatAssistantItem, ChatEvent, ChatInfo, ChatUiPlaceReading } from '@adecore/agent-contracts';
-import { compileUiBlock, resolveUiChoice, uiQueryArguments } from '@adecore/intelligent-ui';
+import { compileUiBlock, evaluateUiBlock, resolveUiChoice, uiQueryArguments } from '@adecore/intelligent-ui';
 import { claudeProvider } from '../providers/claude-provider.ts';
 import { ChatSession } from './chat-session.ts';
 import { ChatUiQueries, ChatUiRefusal, type ChatUiHost } from './ui-queries.ts';
@@ -217,7 +217,7 @@ test('opening a stored link resolves its node again and refuses stale or invente
     const payload = { ...r.payload, nodeId: block.nodes[0]!.id };
     expect(await queries.link(r.session, payload)).toMatchObject({ state: 'chip', target: { type: 'File', path: 'readme.md' } });
     allowed = false;
-    expect(await queries.link(r.session, payload)).toMatchObject({ state: 'plain', reason: 'Removed' });
+    expect(await queries.link(r.session, payload)).toMatchObject({ state: 'plain', reason: 'This query could not be read.' });
     expect((await queries.link(r.session, { ...payload, nodeId: 'other' })).state).toBe('plain');
     expect((await queries.link(r.session, { ...payload, revision: 'old' })).state).toBe('plain');
 });
@@ -356,31 +356,47 @@ test('a choice from options a query read is refreshed and sent against the readi
 
 describe('places looked up beside a block', () => {
     const SOURCE = '<Map><Place lat={52} lon={5}>Known</Place><Place address="Domplein 1, Utrecht">Dom</Place><Place address="Nowhere 1">Lost</Place></Map>';
+    type Place = NonNullable<ChatUiHost['place']>;
+    type Reading = Omit<ChatUiPlaceReading, 'address'>;
 
-    function placesRig(place?: ChatUiHost['place']) {
+    /* A reply whose map holds the places of `source`, with `place` as the host's lookup. */
+    function placesRig(place?: Place, source = SOURCE) {
         const r = rig();
-        const block = { ...compileUiBlock(SOURCE, { id: 'places', final: true }), revision: 'rev' };
-        const item: ChatAssistantItem = { ...r.item, text: '```ui\n' + SOURCE + '\n```', ui: [block], uiQueries: { authorChatId: 'chat', blocks: {} } };
+        const block = { ...compileUiBlock(source, { id: 'places', final: true }), revision: 'rev' };
+        const item: ChatAssistantItem = { ...r.item, text: '```ui\n' + source + '\n```', ui: [block], uiQueries: { authorChatId: 'chat', blocks: {} } };
         r.session.thread.upsert(item);
         const queries = new ChatUiQueries({ capture: async () => ({}), sources: {}, place });
-        const ids = block.nodes[0]!.children.map((child) => child.id);
+        const ids = evaluateUiBlock(block).nodes[0]!.children.map((child) => child.id);
         const stored = () => (r.session.thread.get('reply') as ChatAssistantItem).uiQueries!.blocks.places;
-        return { ...r, queries, block, item, ids, stored };
+        const observe = async () => {
+            queries.observe(r.session, item, true);
+            await queries.whenFrozen(r.session, 'reply');
+        };
+        return { ...r, queries, block, item, ids, stored, observe };
     }
+
+    /* Lets the promise chains of the freeze run as far as they can without a timer firing. */
+    async function flush(): Promise<void> {
+        for (let turn = 0; turn < 50; turn++) {
+            await Promise.resolve();
+        }
+    }
+
+    const streets = (count: number) =>
+        `<Map><Each items={${JSON.stringify(Array.from({ length: count }, (_, i) => `Street ${i}`))}} as="street"><Place address={street}>{street}</Place></Each></Map>`;
 
     afterEach(() => {
         jest.useRealTimers();
     });
 
-    test('freezes the point of each place that names an address, and none for a place with coordinates', async () => {
+    test('freezes the point of each place that names an address, and none for a place with coordinates alone', async () => {
         const asked: string[] = [];
         const r = placesRig(async (_info, query) => {
             asked.push(`${query.name}|${query.address}`);
             return query.name === 'Dom' ? { state: 'found', lat: 52.0907, lon: 5.1214, label: 'Domplein, Utrecht' } : { state: 'missing', code: 'no-match' };
         });
-        r.queries.observe(r.session, r.item, true);
-        await r.frozen;
-        expect(asked).toEqual(['Dom|Domplein 1, Utrecht', 'Lost|Nowhere 1']);
+        await r.observe();
+        expect(asked.sort()).toEqual(['Dom|Domplein 1, Utrecht', 'Lost|Nowhere 1']);
         expect(r.stored()!.places).toEqual({
             [r.ids[1]!]: { state: 'found', address: 'Domplein 1, Utrecht', lat: 52.0907, lon: 5.1214, label: 'Domplein, Utrecht' },
             [r.ids[2]!]: { state: 'missing', address: 'Nowhere 1', code: 'no-match' }
@@ -388,78 +404,198 @@ describe('places looked up beside a block', () => {
         expect(r.stored()!.fallback).toContain('Places: Dom: 52.0907, 5.1214');
     });
 
-    test('a host that throws, answers with something else or finds no point freezes the place as missing', async () => {
+    test('a place with coordinates and an address is looked up too, and the reading names the address it was made for', async () => {
+        const r = placesRig(async () => ({ state: 'found', lat: 1, lon: 2 }), '<Map><Place lat={52} lon={5} address="  Domplein 1  ">Dom</Place></Map>');
+        await r.observe();
+        expect(r.stored()!.places![r.ids[0]!]).toMatchObject({ state: 'found', address: 'Domplein 1', lat: 1, lon: 2 });
+    });
+
+    test('a refusal the host worded is kept, any other error leaves only a fixed reason in the shared record', async () => {
         const answers: Array<() => Promise<unknown>> = [
             async () => {
                 throw new ChatUiRefusal('rate-limited', 'The service asked to wait.');
             },
-            async () => ({ state: 'found', lat: 120, lon: 5 })
+            async () => {
+                throw new Error('connect ECONNREFUSED 10.0.0.7:443 with key sk-secret');
+            }
         ];
-        const r = placesRig(async () => (await answers.shift()!()) as ChatUiPlaceReading);
-        r.queries.observe(r.session, r.item, true);
-        await r.frozen;
+        const r = placesRig(async () => (await answers.shift()!()) as Reading);
+        await r.observe();
         expect(r.stored()!.places![r.ids[1]!]).toEqual({
             state: 'missing',
             address: 'Domplein 1, Utrecht',
             code: 'rate-limited',
             reason: 'The service asked to wait.'
         });
-        expect(r.stored()!.places![r.ids[2]!]!.state).toBe('missing');
-        expect(r.stored()!.places![r.ids[2]!]!.lat).toBeUndefined();
+        expect(r.stored()!.places![r.ids[2]!]).toEqual({
+            state: 'missing',
+            address: 'Nowhere 1',
+            code: 'lookup-failed',
+            reason: 'The place could not be looked up.'
+        });
+        expect(JSON.stringify(r.stored())).not.toContain('sk-secret');
     });
 
-    test('a lookup that takes longer than five seconds is frozen as missing', async () => {
+    test('an answer the schema refuses, or a found place without a point, is frozen as missing', async () => {
+        const answers: unknown[] = [{ state: 'found', lat: 120, lon: 5 }, { state: 'found' }];
+        const r = placesRig(async () => answers.shift() as Reading);
+        await r.observe();
+        for (const id of [r.ids[1]!, r.ids[2]!]) {
+            expect(r.stored()!.places![id]!.state).toBe('missing');
+            expect(r.stored()!.places![id]!.lat).toBeUndefined();
+        }
+    });
+
+    test('a lookup that takes longer than five seconds is aborted and frozen as missing', async () => {
         jest.useFakeTimers();
-        const called = Promise.withResolvers<void>();
-        let aborted = 0;
+        const signals: AbortSignal[] = [];
         const r = placesRig((_info, _query, signal) => {
-            signal.addEventListener('abort', () => aborted++);
-            called.resolve();
-            return new Promise<ChatUiPlaceReading>(() => undefined);
+            signals.push(signal);
+            return new Promise<Reading>(() => undefined);
         });
         r.queries.observe(r.session, r.item, true);
-        await called.promise;
+        await flush();
+        expect(signals).toHaveLength(2);
         jest.advanceTimersByTime(5_000);
-        await new Promise<void>((resolve) => setImmediate(resolve));
-        jest.advanceTimersByTime(5_000);
-        await r.frozen;
-        expect(aborted).toBe(2);
+        await r.queries.whenFrozen(r.session, 'reply');
+        expect(signals.every((signal) => signal.aborted)).toBe(true);
         expect(r.stored()!.places![r.ids[1]!]).toMatchObject({ state: 'missing', code: 'timed-out' });
-        expect(r.stored()!.places![r.ids[2]!]).toMatchObject({ state: 'missing', code: 'timed-out' });
     });
 
-    test('a reply whose block changed while it was looked up drops the write', async () => {
+    test('runs four lookups at a time', async () => {
+        jest.useFakeTimers();
+        const open: Array<() => void> = [];
+        let running = 0;
+        let peak = 0;
+        const r = placesRig(
+            () =>
+                new Promise<Reading>((resolve) => {
+                    peak = Math.max(peak, ++running);
+                    open.push(() => {
+                        running--;
+                        resolve({ state: 'found', lat: 1, lon: 2 });
+                    });
+                }),
+            streets(10)
+        );
+        r.queries.observe(r.session, r.item, true);
+        await flush();
+        expect(running).toBe(4);
+        while (open.length > 0) {
+            open.shift()!();
+            await flush();
+        }
+        await r.queries.whenFrozen(r.session, 'reply');
+        expect(peak).toBe(4);
+        expect(Object.keys(r.stored()!.places!)).toHaveLength(10);
+    });
+
+    test('a block has fifteen seconds for its lookups, after which the rest are frozen as missing without being asked', async () => {
+        jest.useFakeTimers();
+        let asked = 0;
+        const r = placesRig((_info, _query, signal) => {
+            asked++;
+            return new Promise<Reading>((resolve) => {
+                // Each takes four seconds, which is fine alone and too slow for twenty of them four at a time.
+                const timer = setTimeout(() => resolve({ state: 'found', lat: 1, lon: 2 }), 4_000);
+                signal.addEventListener('abort', () => clearTimeout(timer));
+            });
+        }, streets(20));
+        r.queries.observe(r.session, r.item, true);
+        for (let second = 0; second < 16; second++) {
+            await flush();
+            jest.advanceTimersByTime(1_000);
+        }
+        await r.queries.whenFrozen(r.session, 'reply');
+        const readings = Object.values(r.stored()!.places!);
+        expect(readings).toHaveLength(20);
+        expect(readings.filter((reading) => reading.state === 'found')).toHaveLength(12);
+        expect(readings.filter((reading) => reading.code === 'timed-out')).toHaveLength(8);
+        expect(asked).toBe(16);
+    });
+
+    test('stops asking after three timeouts in a row', async () => {
+        jest.useFakeTimers();
+        let asked = 0;
+        const r = placesRig(() => {
+            asked++;
+            return new Promise<Reading>(() => undefined);
+        }, streets(12));
+        r.queries.observe(r.session, r.item, true);
+        await flush();
+        jest.advanceTimersByTime(5_000);
+        await flush();
+        // The four that timed out together each see the others' count only as they finish, so two more may start.
+        jest.advanceTimersByTime(5_000);
+        await r.queries.whenFrozen(r.session, 'reply');
+        expect(asked).toBeLessThanOrEqual(6);
+        const readings = Object.values(r.stored()!.places!);
+        expect(readings).toHaveLength(12);
+        expect(readings.every((reading) => reading.state === 'missing' && reading.code === 'timed-out')).toBe(true);
+    });
+
+    test('a reply whose block changed while it was looked up drops the write and asks no further', async () => {
         const called = Promise.withResolvers<void>();
-        const release = Promise.withResolvers<Omit<ChatUiPlaceReading, 'address'>>();
+        const release = Promise.withResolvers<Reading>();
+        let asked = 0;
         const r = placesRig(async () => {
+            asked++;
             called.resolve();
             return release.promise;
-        });
+        }, streets(8));
         r.queries.observe(r.session, r.item, true);
         await called.promise;
         r.session.thread.upsert({ ...r.item, ui: [{ ...r.block, revision: 'other' }] });
         release.resolve({ state: 'found', lat: 1, lon: 2 });
-        await new Promise<void>((resolve) => setImmediate(resolve));
-        await new Promise<void>((resolve) => setImmediate(resolve));
+        await r.queries.whenFrozen(r.session, 'reply');
+        expect(r.stored()).toBeUndefined();
+        expect(asked).toBeLessThanOrEqual(4);
+    });
+
+    test('a chat that ends aborts the lookups under way and writes nothing', async () => {
+        const signals: AbortSignal[] = [];
+        const called = Promise.withResolvers<void>();
+        const r = placesRig((_info, _query, signal) => {
+            signals.push(signal);
+            called.resolve();
+            return new Promise<Reading>(() => undefined);
+        });
+        r.queries.observe(r.session, r.item, true);
+        await called.promise;
+        r.queries.forget('chat');
+        await r.queries.whenFrozen(r.session, 'reply');
+        expect(signals.every((signal) => signal.aborted)).toBe(true);
         expect(r.stored()).toBeUndefined();
     });
 
     test('a host without a lookup freezes nothing, and a block without addresses asks for none', async () => {
         const r = placesRig();
-        r.queries.observe(r.session, r.item, true);
-        await r.frozen;
+        await r.observe();
         expect(r.stored()!.places).toBeUndefined();
         let asked = 0;
         const known = placesRig(async () => {
             asked++;
             return { state: 'missing' };
-        });
-        const source = '<Map><Place lat={52} lon={5}>Known</Place></Map>';
-        const block = { ...compileUiBlock(source, { id: 'places', final: true }), revision: 'rev' };
-        const item = { ...known.item, text: '```ui\n' + source + '\n```', ui: [block] };
-        known.session.thread.upsert(item);
-        known.queries.observe(known.session, item, true);
-        await new Promise<void>((resolve) => setImmediate(resolve));
+        }, '<Map><Place lat={52} lon={5}>Known</Place></Map>');
+        await known.observe();
         expect(asked).toBe(0);
+    });
+
+    test('places too large to keep are frozen as missing with the reason', async () => {
+        const r = placesRig(async () => ({ state: 'found', lat: 1, lon: 2, label: 'x'.repeat(4_000) }), streets(50));
+        await r.observe();
+        const readings = Object.values(r.stored()!.places!);
+        expect(readings).toHaveLength(50);
+        expect(readings.every((reading) => reading.state === 'missing' && reading.code === 'snapshot-too-large' && reading.address.startsWith('Street '))).toBe(
+            true
+        );
+    });
+
+    test('a block that cannot be kept at all stays in the record with nothing in it, so a reader stops waiting', async () => {
+        const r = placesRig(async () => ({ state: 'found', lat: 1, lon: 2 }));
+        const crowded = { revision: 'x', readings: {}, fallback: 'y'.repeat(140_000) };
+        r.session.updateUiQueries('reply', { authorChatId: 'chat', blocks: { crowded } });
+        await r.observe();
+        expect(r.stored()).toEqual({ revision: 'rev', readings: {}, fallback: '' });
     });
 });
