@@ -306,6 +306,7 @@ exports[`the public API ./format exports these names 1`] = `
   "FORMAT_REGIONS",
   "FORMAT_REGION_CHOICES",
   "FORMAT_SYSTEM",
+  "formatAge",
   "formatAgo",
   "formatBytes",
   "formatClock",

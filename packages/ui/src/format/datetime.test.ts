@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test';
 import {
+    formatAge,
     formatClock,
     formatDay,
     formatDayClock,
@@ -123,5 +124,30 @@ describe('a moment', () => {
     test('counts a day by the calendar and not by the hours in between', () => {
         expect(isSameDay(new Date(2026, 8, 19, 23, 59), new Date(2026, 8, 19, 0, 1))).toBe(true);
         expect(isSameDay(new Date(2026, 8, 19, 23, 59), new Date(2026, 8, 20, 0, 1))).toBe(false);
+    });
+});
+
+describe('an age', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+
+    test('is how long ago for the first week', () => {
+        expect(formatAge(AT, AT.getTime() + 3 * DAY)).toBe('3d ago');
+        expect(formatAge(AT, AT.getTime() + 7 * DAY - 1000)).toBe('6d ago');
+    });
+
+    test('is the day from exactly one week on', () => {
+        inRegion('nl-NL');
+        expect(formatAge(AT, AT.getTime() + 7 * DAY)).toBe('19 Sep');
+    });
+
+    test('carries the year once the day is in another one', () => {
+        inRegion('nl-NL');
+        expect(formatAge(AT, new Date(2026, 11, 31, 23, 59))).toBe('19 Sep');
+        expect(formatAge(AT, new Date(2027, 0, 2, 9, 0))).toBe('19 Sep 2026');
+    });
+
+    test('reads an instant ahead of now as now', () => {
+        expect(formatAge(AT.getTime() + 5000, AT)).toBe('now');
+        expect(formatAge(AT.getTime() + 30 * DAY, AT)).toBe('now');
     });
 });

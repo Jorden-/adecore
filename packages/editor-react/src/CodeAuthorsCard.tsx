@@ -2,12 +2,30 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GitCommitHorizontal, User, Users } from 'lucide-react';
 import { Button, Icon, Popover, Separator, Tooltip, useNow } from '@adecore/ui';
-import { formatNumber } from '@adecore/ui/format';
-import { relativeTime } from './relative-time.ts';
+import { formatAge, formatNumber } from '@adecore/ui/format';
 import type { EditorLanguage } from './editor-language.ts';
+import type { GitBlameCommit } from './host-types.ts';
 import type { AuthorsView } from './popups.ts';
 
 const MINUTE_MS = 60_000;
+
+/* The newest commit that touched the declaration. Its clock ticks here, so a minute redraws this block and not the card. */
+export function LatestCommit({ commit }: { commit: GitBlameCommit }) {
+    const { t } = useTranslation('editor');
+    const now = useNow(MINUTE_MS);
+
+    return (
+        <div className="flex flex-col gap-1">
+            <span className="text-text-muted">{t('language.codeVision.latest')}</span>
+            <span className="text-text select-text">{commit.summary}</span>
+            <span className="flex items-center gap-1.5 text-text-muted">
+                <span className="font-mono select-text">{commit.shortHash}</span>
+                <span className="min-w-0 truncate">{commit.author}</span>
+                <span className="shrink-0">{formatAge(commit.at * 1000, now)}</span>
+            </span>
+        </div>
+    );
+}
 
 /*
  * Who wrote a declaration, by lines, and the newest commit that touched it. It opens beside the entry that
@@ -15,7 +33,6 @@ const MINUTE_MS = 60_000;
  */
 export function CodeAuthorsCard({ language, view }: { language: EditorLanguage; view: AuthorsView }) {
     const { t } = useTranslation('editor');
-    const now = Math.floor(useNow(MINUTE_MS) / 1000);
     const { authors, uncommittedLines, latest } = view.authorship;
     const anchor = useMemo(() => {
         const { left, top, right, bottom } = view.anchor;
@@ -52,15 +69,7 @@ export function CodeAuthorsCard({ language, view }: { language: EditorLanguage; 
                 {latest !== null && (
                     <>
                         <Separator />
-                        <div className="flex flex-col gap-1">
-                            <span className="text-text-muted">{t('language.codeVision.latest')}</span>
-                            <span className="text-text select-text">{latest.summary}</span>
-                            <span className="flex items-center gap-1.5 text-text-muted">
-                                <span className="font-mono select-text">{latest.shortHash}</span>
-                                <span className="min-w-0 truncate">{latest.author}</span>
-                                <span className="shrink-0">{relativeTime(latest.at, now)}</span>
-                            </span>
-                        </div>
+                        <LatestCommit commit={latest} />
                         {view.openCommit !== null && (
                             <div className="flex justify-end">
                                 <Popover.Close

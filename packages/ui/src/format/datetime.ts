@@ -1,3 +1,4 @@
+import { formatAgo } from './duration.ts';
 import { dateFormatter, wordFormatter } from './locale.ts';
 
 /* The parts that are a word rather than a number, and so come from the language and not the region. */
@@ -63,3 +64,19 @@ export const isSameDay = (a: Date | number, b: Date | number): boolean => {
 };
 
 export const formatMoment = (at: Date | number, now: Date | number = Date.now()): string => (isSameDay(at, now) ? formatClock(at) : formatDayClock(at));
+
+const WEEK = 7 * 24 * 60 * 60 * 1000;
+
+/*
+ * How old a row is, for its right edge: `3d ago` for the first week, then the day, with the year once
+ * it is not this one. An `at` ahead of `now`, from a clock that runs ahead, reads as now.
+ */
+export const formatAge = (at: Date | number, now: Date | number = Date.now()): string => {
+    const date = toDate(at);
+    const today = toDate(now);
+    const past = today.getTime() - date.getTime();
+    if (past < WEEK) {
+        return formatAgo(past);
+    }
+    return date.getFullYear() === today.getFullYear() ? formatDay(date) : formatDayWithYear(date);
+};

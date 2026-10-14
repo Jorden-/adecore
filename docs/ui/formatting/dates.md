@@ -3,12 +3,12 @@
 Clocks, days and moments, each in the region's order and clock with the words of the language.
 
 ```ts
-import { formatClock, formatDay, formatDayClock, formatMoment } from '@adecore/ui/format';
+import { formatAge, formatClock, formatDay, formatDayClock, formatMoment } from '@adecore/ui/format';
 ```
 
 <Demo src="formatting/dates" />
 
-Every function takes a `Date` or epoch milliseconds. The examples are English words in a Dutch region; in `en-US` the same day reads `Sep 19 at 08:05 AM`.
+Every function takes a `Date` or epoch milliseconds, so a time in epoch seconds, such as a commit's, is multiplied by 1000 first. The examples are English words in a Dutch region; in `en-US` the same day reads `Sep 19 at 08:05 AM`.
 
 | Function | Writes |
 | --- | --- |
@@ -21,6 +21,7 @@ Every function takes a `Date` or epoch milliseconds. The examples are English wo
 | `formatDayClock(at)` | A moment that is not today, to the minute: `19 Sep, 08:05`. |
 | `formatNumericDate(at)` | All numbers, as a form prints it: `19-9-2026` or `9/19/2026`. |
 | `formatMoment(at, now?)` | The clock when `at` is today, and the day and the clock when it is not. |
+| `formatAge(at, now?)` | How old a row is: `3d ago` for the first week, then `19 Sep`, and `19 Sep 2025` once the year is another. An `at` ahead of `now` reads `now`. |
 | `formatDateTime(at, options)` | Any `Intl.DateTimeFormatOptions`, with the same split between words and notation. |
 | `isSameDay(a, b)` | Whether two instants fall on the same day, in the reader's time zone. |
 

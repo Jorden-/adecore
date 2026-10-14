@@ -1,4 +1,5 @@
 import {
+    formatAge,
     formatClock,
     formatDateTime,
     formatDay,
@@ -17,6 +18,7 @@ import { Values } from '../shared/values.tsx';
 
 const AT = new Date(2026, 8, 19, 8, 5);
 const LATER = new Date(2026, 8, 19, 17, 30);
+const DAYS_LATER = new Date(2026, 8, 22, 9, 0);
 const MONTH_YEAR: Intl.DateTimeFormatOptions = { month: 'long', year: 'numeric' };
 
 export default function DatesDemo() {
@@ -36,6 +38,7 @@ export default function DatesDemo() {
                     ['formatDayClock(at)', formatDayClock(AT)],
                     ['formatNumericDate(at)', formatNumericDate(AT)],
                     ['formatMoment(at, later)', formatMoment(AT, LATER)],
+                    ['formatAge(at, daysLater)', formatAge(AT, DAYS_LATER)],
                     ['formatDateTime(at, MONTH_YEAR)', formatDateTime(AT, MONTH_YEAR)],
                     ['isSameDay(at, later)', String(isSameDay(AT, LATER))]
                 ]}

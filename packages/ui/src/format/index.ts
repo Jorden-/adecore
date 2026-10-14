@@ -1,6 +1,7 @@
 /* Every number, date, time and duration a person reads, written the way the language and the region they set ask for. */
 
 export {
+    formatAge,
     formatClock,
     formatDateTime,
     formatDay,
