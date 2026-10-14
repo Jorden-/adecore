@@ -124,6 +124,32 @@ describe('staticMenuTemplate', () => {
         expect(staticMenuTemplate({ appName: 'App', platform: 'linux', toggleDevTools: () => {} })[0]).toEqual({ role: 'fileMenu' });
     });
 
+    test('on macOS the file items get a File menu of their own after the app menu', () => {
+        const template = staticMenuTemplate({ appName: 'App', platform: 'darwin', toggleDevTools: () => {}, fileItems: [{ label: 'New Window' }] });
+        expect(template.map((menu) => menu.label ?? menu.role)).toEqual(['App', 'File', 'editMenu', 'View', 'windowMenu']);
+        expect(submenuOf(template[1]).map((item) => item.label)).toEqual(['New Window']);
+    });
+
+    test('elsewhere the file items lead the File menu, above the quit items', () => {
+        const template = staticMenuTemplate({
+            appName: 'App',
+            platform: 'linux',
+            toggleDevTools: () => {},
+            fileItems: [{ label: 'New Window' }],
+            quitItems: [{ label: 'Stop and Quit' }]
+        });
+        expect(template.map((menu) => menu.label ?? menu.role)).toEqual(['File', 'editMenu', 'View', 'windowMenu']);
+        expect(submenuOf(template[0]).map((item) => item.label ?? item.role ?? item.type)).toEqual([
+            'New Window',
+            'separator',
+            'Stop and Quit',
+            'separator',
+            'quit'
+        ]);
+        const withoutQuit = staticMenuTemplate({ appName: 'App', platform: 'linux', toggleDevTools: () => {}, fileItems: [{ label: 'New Window' }] });
+        expect(submenuOf(withoutQuit[0]).map((item) => item.label ?? item.role ?? item.type)).toEqual(['New Window', 'separator', 'quit']);
+    });
+
     test('the View menu has no reload and no zoom, and opens the tools of the app itself', () => {
         let toggled = 0;
         const view = submenuOf(staticMenuTemplate({ appName: 'App', platform: 'darwin', toggleDevTools: () => toggled++ })[2]);

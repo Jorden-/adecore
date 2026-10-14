@@ -58,24 +58,29 @@ export interface StaticMenuOptions {
     appItems?: MenuItemConstructorOptions[];
     /* Right above Quit, on every platform. */
     quitItems?: MenuItemConstructorOptions[];
+    /* A File menu of their own, such as New Window, which a macOS app with no window open can only reach here. Above the quit items elsewhere. */
+    fileItems?: MenuItemConstructorOptions[];
     platform?: NodeJS.Platform;
 }
 
+const withSeparator = (items: MenuItemConstructorOptions[]): MenuItemConstructorOptions[] => (items.length > 0 ? [...items, { type: 'separator' }] : []);
+
 /*
- * The menu that stands until the page sends its own, and again after a reload or a crash, so Quit is
- * always there. The stock View menu without reload and the zoom roles: their accelerators are taken
+ * The menu that stands until the page sends its own, again after a reload or a crash, and while no
+ * window is open, so Quit is always there. The stock View menu without reload and the zoom roles: their accelerators are taken
  * before the page sees them, and a reload would drop the page's state without asking.
  */
 export const staticMenuTemplate = (options: StaticMenuOptions): MenuItemConstructorOptions[] => {
     const platform = options.platform ?? process.platform;
     const appItems = options.appItems ?? [];
     const quitItems = options.quitItems ?? [];
+    const fileItems = options.fileItems ?? [];
     const appMenu: MenuItemConstructorOptions =
         platform === 'darwin'
             ? {
                   label: options.appName,
                   submenu: [
-                      ...(appItems.length > 0 ? [...appItems, { type: 'separator' } as const] : []),
+                      ...withSeparator(appItems),
                       { role: 'services' },
                       { type: 'separator' },
                       { role: 'hide' },
@@ -86,9 +91,10 @@ export const staticMenuTemplate = (options: StaticMenuOptions): MenuItemConstruc
                       { role: 'quit' }
                   ]
               }
-            : quitItems.length > 0
-              ? { label: 'File', submenu: [...quitItems, { type: 'separator' }, { role: 'quit' }] }
+            : fileItems.length > 0 || quitItems.length > 0
+              ? { label: 'File', submenu: [...withSeparator(fileItems), ...withSeparator(quitItems), { role: 'quit' }] }
               : { role: 'fileMenu' };
+    const fileMenu: MenuItemConstructorOptions[] = platform === 'darwin' && fileItems.length > 0 ? [{ label: 'File', submenu: fileItems }] : [];
     const viewMenu: MenuItemConstructorOptions = {
         label: 'View',
         submenu: [
@@ -97,7 +103,7 @@ export const staticMenuTemplate = (options: StaticMenuOptions): MenuItemConstruc
             { role: 'togglefullscreen' }
         ]
     };
-    return [appMenu, { role: 'editMenu' }, viewMenu, { role: 'windowMenu' }];
+    return [appMenu, ...fileMenu, { role: 'editMenu' }, viewMenu, { role: 'windowMenu' }];
 };
 
 /* The part of a window a menu command reaches. */

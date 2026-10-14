@@ -73,7 +73,7 @@ On macOS the menu fires its accelerator even when the page answered the key itse
 
 ## The menu before the page's
 
-`staticMenuTemplate` is the menu that stands until the page sends its own, and again after a reload or a crash, so Quit is always there. Its View menu has no reload and no zoom roles: their accelerators would be taken before the page sees them.
+`staticMenuTemplate` is the menu that stands until the page sends its own, again after a reload or a crash, and while no window is open, so Quit is always there. Its View menu has no reload and no zoom roles: their accelerators would be taken before the page sees them.
 
 ```ts
 import { staticMenuTemplate } from '@adecore/shell';
@@ -84,12 +84,13 @@ Menu.setApplicationMenu(
             appName: app.name,
             toggleDevTools: () => window.webContents.toggleDevTools(),
             appItems: [{ label: `About ${app.name}…`, click: openAbout }],
+            fileItems: [{ label: 'New Window', accelerator: 'CommandOrControl+Shift+N', click: openWindow }],
             quitItems: []
         })
     )
 );
 ```
 
-`appItems` go at the top of the app menu on macOS; `quitItems` go right above Quit, in a File menu off macOS.
+`appItems` go at the top of the app menu on macOS; `quitItems` go right above Quit, in a File menu off macOS. `fileItems` get a File menu of their own on macOS and lead the File menu elsewhere. A macOS app keeps running after its last window closes, and then this menu is all a person has to open a new one. An item whose accelerator the page answers too, while the menu still stands over a page, can drop a key the page already had with `pageKeys.take()`, the way `createMenuCommands` does.
 
 `MenuTemplateOptions`, `MenuCommandOptions`, `MenuWindow` (the part of a window a command reaches), `StaticMenuOptions`, `PageKey` and `PageKeys` are exported types.
