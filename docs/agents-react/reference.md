@@ -37,7 +37,7 @@ A chat outside its views: the client, actions, drafts, preferences, mentions, fo
 | [`chat/logic/limit`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/limit.ts) | `limitView`, `LimitView` |
 | [`chat/logic/scrubber`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/scrubber.ts) | `TickKind`, `ScrubberTick` |
 | [`chat/logic/thread-cards`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/thread-cards.ts) | `TimedRow`, `withTimedRows`, `timedRowsOf` |
-| [`chat/logic/timeline-target`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/timeline-target.ts) | `TimelineTarget` |
+| [`chat/logic/timeline-target`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/timeline-target.ts) | `EMPTY_TARGET`, `readTimelineTarget`, `TimelineTarget` |
 | [`chat/logic/timeline`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/timeline.ts) | `TimelineRow`, `summarizeGroup`, `deriveTimelineRows`, `SubagentBranch`, `BaseMoved` |
 | [`chat/logic/tools`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/tools.ts) | `toolSummary`, `FileChange` |
 | [`chat/mentions`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/mentions.ts) | `MENTION_DRAG_TYPE`, `LEGACY_MENTION_DRAG_TYPE`, `carriesMentions`, `droppedMentions`, `writeMentionDrag`, `chipText`, `MentionQuery`, `ChipSegment` |

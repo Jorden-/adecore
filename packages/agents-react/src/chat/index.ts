@@ -25,7 +25,7 @@ export { handbackReportOf } from './logic/handback';
 export { limitView, type LimitView } from './logic/limit';
 export type { TickKind, ScrubberTick } from './logic/scrubber';
 export { type TimedRow, withTimedRows, timedRowsOf } from './logic/thread-cards';
-export { type TimelineTarget } from './logic/timeline-target';
+export { EMPTY_TARGET, readTimelineTarget, type TimelineTarget } from './logic/timeline-target';
 export { type TimelineRow, summarizeGroup, deriveTimelineRows, type SubagentBranch, type BaseMoved } from './logic/timeline';
 export { toolSummary, type FileChange } from './logic/tools';
 export {
