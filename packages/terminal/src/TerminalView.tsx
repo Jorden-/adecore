@@ -43,7 +43,7 @@ export interface TerminalViewProps {
     /* What the person types or pastes. */
     onData?(data: string): void;
     /* The grid changed after the container or the font did, which is what the program should be told.
-       Not called for the grid at mount: `size()` has that one. */
+       Not called for the grid at mount, which `size()` has, unless the host had no room then: its first fit comes here. */
     onResize?(cols: number, rows: number): void;
     /* Where a link in the output goes. Without it, a new window opens on the link. */
     onOpenLink?(uri: string, event: MouseEvent): void;
@@ -175,25 +175,25 @@ export function TerminalView({
         if (initial.scaledByAncestor) {
             followAncestorScale(term);
         }
-        fitToHost(term, fit);
-
         /*
          * The grid this terminal fits and tells the program, and the grid the program has. They part while
          * another client sizes the same program; this one then draws that grid, clipped or with room to
-         * spare, until a fit here changes the grid and claims it back.
+         * spare, until a fit here changes the grid and claims it back. Null until a fit had room.
          */
-        let claimed: TerminalSize = { cols: term.cols, rows: term.rows };
+        let claimed: TerminalSize | null = fitToHost(term, fit) ? { cols: term.cols, rows: term.rows } : null;
         let shared = claimed;
         const drawShared = (): void => {
-            if (term.cols !== shared.cols || term.rows !== shared.rows) {
+            if (shared !== null && (term.cols !== shared.cols || term.rows !== shared.rows)) {
                 term.resize(shared.cols, shared.rows);
             }
         };
         // A resize, a font change and a renderer swap all land here: WebGL and the DOM measure a glyph
         // differently, so a swap can change how many cells fit.
         const refit = (): void => {
-            fitToHost(term, fit);
-            if (term.cols !== claimed.cols || term.rows !== claimed.rows) {
+            if (!fitToHost(term, fit)) {
+                return;
+            }
+            if (claimed === null || term.cols !== claimed.cols || term.rows !== claimed.rows) {
                 claimed = { cols: term.cols, rows: term.rows };
                 shared = claimed;
                 latest.current.onResize?.(claimed.cols, claimed.rows);

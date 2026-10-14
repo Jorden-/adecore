@@ -37,7 +37,7 @@ useEffect(() => session.onOutput((data) => view.current?.write(data)), [session]
 <TerminalView ref={view} label="Shell" onData={(data) => session.write(data)} onResize={(cols, rows) => session.resize(cols, rows)} className="h-full" />
 ```
 
-The grid it fits at mount is `size()`, which is what a program starts with. After that `onResize` reports every new grid, debounced while a container is being dragged, and after a font change. Rows that do not fill the height are centered, and the background runs to the edges.
+The grid it fits at mount is `size()`, which is what a program starts with. After that `onResize` reports every new grid, debounced while a container is being dragged, and after a font change. A host the layout has given no room yet is not fitted, since FitAddon would make two columns of it: `size()` is then xterm's default of 80 by 24, and the first fit with room comes through `onResize`, whatever grid it is. Rows that do not fill the height are centered, and the background runs to the edges.
 
 `reset()` clears the screen and the scrollback, in order with the output written before it, so a replay that starts over is `reset()` and a `write` of the whole text. `visibleText()` returns the rows on screen as plain text, such as for a question about what the terminal shows. `paste`, `selectAll` and `selection()` serve a context menu. The scrollback keeps 5000 lines, and Option on a Mac types as Meta.
 

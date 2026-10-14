@@ -10,18 +10,23 @@ import type { Terminal } from '@xterm/xterm';
  * FitAddon measures the host's border box, so a vertical padding on the host would count as room for a
  * row that is cut off. The host has none; what a whole row does not fill is split above and below, as an
  * offset rather than a padding, since FitAddon subtracts the terminal element's own padding too.
+ * False, without a fit, for a host the layout has given no room yet: FitAddon would make two columns
+ * of it, a grid nobody sees that a shell still redraws its prompt for.
  */
-export const fitToHost = (term: Terminal, fit: FitAddon): void => {
-    fit.fit();
+export const fitToHost = (term: Terminal, fit: FitAddon): boolean => {
     const host = term.element?.parentElement;
+    if (!host || host.clientWidth === 0 || host.clientHeight === 0) {
+        return false;
+    }
+    fit.fit();
     // The same private dimensions FitAddon itself divides by.
     const cellHeight: number = (term as unknown as { _core: { _renderService: { dimensions: { css: { cell: { height: number } } } } } })._core._renderService
         .dimensions.css.cell.height;
-    if (!host || cellHeight === 0) {
-        return;
+    if (cellHeight !== 0) {
+        const slack = host.clientHeight - term.rows * cellHeight;
+        host.style.setProperty('--term-offset', `${Math.max(0, Math.floor(slack / 2))}px`);
     }
-    const slack = host.clientHeight - term.rows * cellHeight;
-    host.style.setProperty('--term-offset', `${Math.max(0, Math.floor(slack / 2))}px`);
+    return true;
 };
 
 interface Pointer {
