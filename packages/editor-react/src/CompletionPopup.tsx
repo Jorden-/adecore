@@ -7,6 +7,7 @@ import type { EditorLanguage } from './editor-language.ts';
 import { kindLetterOf, kindToneOf, rowWindow, type KindTone } from './completion-model.ts';
 import { SourceLine, SymbolSections } from './HoverSections.tsx';
 import { PathText } from './PathText.tsx';
+import { keepFocusOutOfList } from './popup-focus.ts';
 import { placeBeside, placePopup } from './popup-placement.ts';
 import type { CompletionView } from './popups.ts';
 
@@ -134,6 +135,7 @@ export function CompletionPopup({ language, view, rect }: { language: EditorLang
                 className={`${CARD} flex w-max max-w-[min(560px,calc(100vw-16px))] min-w-[340px] flex-col`}
                 style={{ visibility: 'hidden' }}
                 onPointerDown={(event) => event.preventDefault()}
+                {...keepFocusOutOfList(() => language.editor.focus())}
             >
                 {/* Sizes the list to the widest rows in the face the rows use; the rows themselves fill that width and truncate inside it. */}
                 <div
@@ -160,6 +162,7 @@ export function CompletionPopup({ language, view, rect }: { language: EditorLang
                                 ref={index === view.active ? activeRow : undefined}
                                 type="button"
                                 role="option"
+                                tabIndex={-1}
                                 aria-selected={index === view.active}
                                 aria-setsize={total}
                                 aria-posinset={index + 1}

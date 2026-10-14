@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { EditorRect } from '@adecore/editor';
 import type { EditorLanguage } from './editor-language.ts';
 import { PathText } from './PathText.tsx';
+import { keepFocusOutOfList } from './popup-focus.ts';
 import { placePopup } from './popup-placement.ts';
 import type { PickPreview, PickView } from './popups.ts';
 
@@ -80,7 +81,13 @@ export function PickPopup({ language, view, rect }: { language: EditorLanguage; 
     }, [language, listId, activeId]);
 
     return createPortal(
-        <div ref={card} className={CARD} style={{ visibility: 'hidden' }} onPointerDown={(event) => event.preventDefault()}>
+        <div
+            ref={card}
+            className={CARD}
+            style={{ visibility: 'hidden' }}
+            onPointerDown={(event) => event.preventDefault()}
+            {...keepFocusOutOfList(() => language.editor.focus())}
+        >
             {view.title !== null && <div className="border-b border-border px-3 py-1.5 text-xs text-text-muted">{view.title}</div>}
             <div id={listId} role="listbox" className="min-h-0 flex-1 overflow-y-auto p-1">
                 {view.groups.map((group, groupIndex) => (
@@ -93,6 +100,7 @@ export function PickPopup({ language, view, rect }: { language: EditorLanguage; 
                                 ref={row.id === view.active ? activeRow : undefined}
                                 type="button"
                                 role="option"
+                                tabIndex={-1}
                                 aria-selected={row.id === view.active}
                                 data-active={row.id === view.active}
                                 className="flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-xs cursor-row"

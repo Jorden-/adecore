@@ -9,6 +9,7 @@ import { formatNumber } from '@adecore/ui/format';
 import { basenameOf, relativeTo } from './paths.ts';
 import { AnchoredPopup } from './AnchoredPopup.tsx';
 import type { EditorLanguage } from './editor-language.ts';
+import { keepFocusOutOfList } from './popup-focus.ts';
 import type { RenameView } from './popups.ts';
 
 const CARD_ATTRIBUTE = 'data-rename-card';
@@ -22,10 +23,10 @@ function staysInside(target: EventTarget | null): boolean {
  * Suggested names from the host, in a list under the input; a press fills the input and the
  * typed name stays what Enter applies. While it is up the card says only its two keys.
  */
-function Suggestions({ names, active, onPick }: { names: readonly string[]; active: number; onPick(name: string): void }) {
+function Suggestions({ names, active, onPick, onFocusBack }: { names: readonly string[]; active: number; onPick(name: string): void; onFocusBack(): void }) {
     const { t } = useTranslation('editor');
     return (
-        <div className="flex w-[250px] flex-col p-1.25">
+        <div className="flex w-[250px] flex-col p-1.25" {...keepFocusOutOfList(onFocusBack)}>
             <div className="flex items-center gap-1.5 px-2.25 pt-1.25 pb-1 text-xs font-semibold text-text-faint">
                 <Icon icon={Sparkles} size={12} className="shrink-0" />
                 {t('language.rename.suggestions')}
@@ -50,7 +51,7 @@ function Suggestions({ names, active, onPick }: { names: readonly string[]; acti
     );
 }
 
-function Hints({ view, active, onPick }: { view: RenameView; active: number; onPick(name: string): void }) {
+function Hints({ view, active, onPick, onFocusBack }: { view: RenameView; active: number; onPick(name: string): void; onFocusBack(): void }) {
     const { t } = useTranslation('editor');
     const { occurrences } = view;
     return (
@@ -61,7 +62,7 @@ function Hints({ view, active, onPick }: { view: RenameView; active: number; onP
                 </div>
             )}
             {view.suggestions.length > 0 ? (
-                <Suggestions names={view.suggestions} active={active} onPick={onPick} />
+                <Suggestions names={view.suggestions} active={active} onPick={onPick} onFocusBack={onFocusBack} />
             ) : (
                 <div className="flex items-center gap-3 px-2.5 py-1.5 text-xs whitespace-nowrap text-text-muted">
                     {occurrences !== null && (
@@ -229,7 +230,11 @@ export function RenameCard({ language, view, rect, endRect }: { language: Editor
             />
             <AnchoredPopup rect={{ ...rect, top: rect.top - 2, bottom: rect.bottom + 2 }} overflow="clip" placement={{ gap: 2 }}>
                 <div {...{ [CARD_ATTRIBUTE]: '' }} onPointerDown={(event) => event.preventDefault()}>
-                    {view.phase === 'preview' ? <Preview language={language} view={view} /> : <Hints view={view} active={active} onPick={fill} />}
+                    {view.phase === 'preview' ? (
+                        <Preview language={language} view={view} />
+                    ) : (
+                        <Hints view={view} active={active} onPick={fill} onFocusBack={() => input.current?.focus()} />
+                    )}
                 </div>
             </AnchoredPopup>
         </>,
