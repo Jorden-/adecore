@@ -78,13 +78,13 @@ A file pasted or dropped becomes an attachment, within the [limits](/agent-contr
 
 Each chat keeps its draft while the composer is away; see [Persistence](/agents-react/guide/persistence). `offerDraft(chatId, text)` puts text under the draft for a person to read and send, whether the composer is mounted or not.
 
-The stash is a shelf of prompts shared by every chat: Mod+S puts the draft there and `StashPicker` lists them. A restored prompt brings back its text, mentions and skills, not its files.
+The stash is a shelf of prompts shared by every chat: Mod+S puts the draft there and the stash picker lists them. A restored prompt brings back its text, mentions and skills, not its files.
 
 A normal send during a turn queues the message until the current turn finishes. Hold Option or Alt when clicking Send or pressing Enter to steer the running agent at its next input boundary. The host can reverse these behaviors with `useSendDelivery`. The composer passes `delivery: "steer"` or `delivery: "queue"` in `ChatSendExtras`. Steering is offered only where the provider reports the [`steer` capability](/agent-contracts/providers-and-accounts#providers); without it every send queues, and a backend without steering keeps the message queued. Queued messages can be sent at once, or taken back into the draft to edit, which merges with what was typed since.
 
 ## Holding a prompt card
 
-While a person types, a prompt card (an approval or a question) stays out of the way, so a key meant for the text never answers it. `holdsPrompt(input)` decides from the typing state, and `holdLiftsIn(input)` says how long the hold has left; `PROMPT_HOLD_PAUSE_MS` is the pause in typing that lifts it, and `HoldInput` and `HoldRelease` are the shapes it reads and reports (`send` and `blur` release at once). `PromptComposer` takes a `PromptHold` and draws a bar with a Show now button while it holds.
+While a person types, a prompt card (an approval or a question) stays out of the way, so a key meant for the text never answers it. `holdsPrompt(input)` decides from the typing state, and `holdLiftsIn(input)` says how long the hold has left; `PROMPT_HOLD_PAUSE_MS` is the pause in typing that lifts it, and `HoldInput` and `HoldRelease` are the shapes it reads and reports (`send` and `blur` release at once). The composer draws a bar with a Show now button while it holds.
 
 ## Menus for screen readers
 
@@ -122,4 +122,4 @@ const input = useRef<ComposerInputHandle>(null);
 
 The handle has `focus()`, `setCaret(pos)` and `insert(text)`. `onKeyDown(event, view)` and `onPaste(event, view)` run before the editor's own and return `true` for a key or paste they handled. `onChange` and `onSelectionChange` get the text, the selection as `InputSelection` and the editor state. Keep `extensions` and an element `placeholder` the same object between renders, since a new one reconfigures the editor. A `value` from outside moves the caret to the end and stays out of the undo history.
 
-The editor parts are exported for an input of your own: `composerEditorExtensions`, `markdownLanguage`, `chipDecorations`, `insertAtSelection`, and the key decisions `enterAction`, `listItemAt`, `inOpenFence` and `recallDirection`, all from `@adecore/agents-react/chat/ui`. `PlainTextarea` is the textarea a written answer uses unless the host's `dictation` hands another.
+`composerEditorExtensions` is exported from `@adecore/agents-react/chat/ui` for an input of your own. `PlainTextarea` is the textarea a written answer uses unless the host's `dictation` hands another.

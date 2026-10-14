@@ -62,7 +62,6 @@ The views of a chat: the thread, the composer, messages, diffs, subagents, limit
 | --- | --- |
 | [`chat/ui/AccountPill`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/AccountPill.tsx) | `AccountPill` |
 | [`chat/ui/AnsiOutput`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/AnsiOutput.tsx) | `AnsiOutput` |
-| [`chat/ui/BookmarkMarker`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/BookmarkMarker.tsx) | `BookmarkMarker` |
 | [`chat/ui/BookmarkSubmenu`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/BookmarkSubmenu.tsx) | `BookmarkSubmenu` |
 | [`chat/ui/ChatActivity`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/ChatActivity.tsx) | `ChatActivity`, `StatusIcon` |
 | [`chat/ui/ChatReferenceChip`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/ChatReferenceChip.tsx) | `ChatReferenceChip` |
@@ -76,38 +75,24 @@ The views of a chat: the thread, the composer, messages, diffs, subagents, limit
 | [`chat/ui/ImageView`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/ImageView.tsx) | `ImageThumb`, `ImageThumbProps` |
 | [`chat/ui/LimitState`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/LimitState.tsx) | `LimitDock`, `LimitPill` |
 | [`chat/ui/Markdown`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/Markdown.tsx) | `ReplyMarkdown`, `MessageMarkdown`, `Markdown` |
-| [`chat/ui/MermaidBlock`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/MermaidBlock.tsx) | `MermaidBlock` |
-| [`chat/ui/MessageActions`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/MessageActions.tsx) | `MessageActions` |
-| [`chat/ui/Pickers`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/Pickers.tsx) | `ModelPicker`, `StashPicker` |
-| [`chat/ui/PromptComposer`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/PromptComposer.tsx) | `PromptHold`, `PromptComposer` |
-| [`chat/ui/QuoteButton`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/QuoteButton.tsx) | `QuoteButton` |
+| [`chat/ui/Pickers`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/Pickers.tsx) | `ModelPicker` |
 | [`chat/ui/ResumeCompactionDock`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/ResumeCompactionDock.tsx) | `ResumeCompactionDock` |
-| [`chat/ui/RowTime`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/RowTime.tsx) | `RowTime` |
-| [`chat/ui/RunSettings`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/RunSettings.tsx) | `RunSettings` |
-| [`chat/ui/Scrubber`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/Scrubber.tsx) | `Scrubber`, `CardChat` |
-| [`chat/ui/SubagentControls`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/SubagentControls.tsx) | `SubagentTitleCrumb`, `SubagentBreadcrumb`, `SubagentActions` |
+| [`chat/ui/SubagentControls`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/SubagentControls.tsx) | `SubagentTitleCrumb`, `SubagentBreadcrumb` |
 | [`chat/ui/SubagentInfo`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/SubagentInfo.tsx) | `SubagentInfo` |
-| [`chat/ui/SubagentStopButton`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/SubagentStopButton.tsx) | `SubagentStopButton` |
 | [`chat/ui/SubagentTimeline`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/SubagentTimeline.tsx) | `SubagentTimeline` |
 | [`chat/ui/Timeline`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/Timeline.tsx) | `Timeline` |
-| [`chat/ui/TimelineMenu`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/TimelineMenu.tsx) | `TimelineMenuPopup`, `BookmarkMenuItems` |
+| [`chat/ui/TimelineMenu`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/TimelineMenu.tsx) | `TimelineMenuPopup` |
 | [`chat/ui/UnifiedDiff`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/UnifiedDiff.tsx) | `UnifiedDiff` |
 | [`chat/ui/UploadThumb`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/UploadThumb.tsx) | `UploadThumb` |
-| [`chat/ui/VisualDialogs`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/VisualDialogs.tsx) | `VisualDialogs` |
-| [`chat/ui/VisualFrame`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/VisualFrame.tsx) | `VisualFrameProps`, `VisualFrame` |
 | [`chat/ui/Welcome`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/Welcome.tsx) | `WelcomeGreeting` |
-| [`chat/ui/composer/chips`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/composer/chips.ts) | `chipDecorations`, `ChipChoices` |
-| [`chat/ui/composer/editor`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/composer/editor.ts) | `externalChange`, `markdownLanguage`, `composerEditorExtensions` |
-| [`chat/ui/composer/insert`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/composer/insert.ts) | `insertAtSelection` |
-| [`chat/ui/composer/keys`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/composer/keys.ts) | `listItemAt`, `enterAction`, `inOpenFence`, `recallDirection`, `EnterAction`, `EnterKeys`, `ListItem`, `EnterContext`, `RecallContext` |
+| [`chat/ui/composer/editor`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/composer/editor.ts) | `externalChange`, `composerEditorExtensions` |
 | [`chat/ui/diff-syntax`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/diff-syntax.ts) | `createDiffSyntaxRuntime`, `diffSyntaxRuntime`, `DiffSyntaxRuntime`, `DiffSyntaxRuntimeOptions`, `DiffSyntaxSession`, `DiffSyntaxMapping`, `DiffSourceTokenSession`, `diffSourceTokens` |
 | [`chat/ui/diff-theme`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/diff-theme.ts) | `useDiffTheme` |
 | [`chat/ui/diff/diff-props`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/diff/diff-props.ts) | `UnifiedDiffProps` |
-| [`chat/ui/file-links`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/file-links.ts) | `FileLinkContext`, `useFileLinkCwd`, `useFileLinkScopeId`, `useOpenFileLink` |
-| [`chat/ui/find-reveal`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/find-reveal.ts) | `ChatFindField`, `FindReveal`, `useOpenForFind` |
+| [`chat/ui/file-links`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/file-links.ts) | `FileLinkContext`, `useFileLinkCwd` |
+| [`chat/ui/find-reveal`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/find-reveal.ts) | `ChatFindField`, `FindReveal` |
 | [`chat/ui/full-diff`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/full-diff.ts) | `DiffContents` |
 | [`chat/ui/intelligent-ui/UiBlockFrame`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/UiBlockFrame.tsx) | `UiBlockFrameProps`, `UiBlockFrame`, `UiBlockFix`, `UiBlockFooterProps` |
-| [`chat/ui/intelligent-ui/UiFallbackPart`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/UiFallbackPart.tsx) | `UiFallbackPart`, `UiFallbackProblem` |
 | [`chat/ui/intelligent-ui/UiReply`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/UiReply.tsx) | `UiReply` |
 | [`chat/ui/intelligent-ui/chart-data`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/chart-data.ts) | `uiChartData`, `UiChartSeries`, `UiChartValues`, `UiChartData` |
 | [`chat/ui/intelligent-ui/node-text`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/intelligent-ui/node-text.ts) | `uiNodeLabel` |
@@ -118,13 +103,9 @@ The views of a chat: the thread, the composer, messages, diffs, subagents, limit
 | [`chat/ui/reply-context`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/reply-context.ts) | `ReplyContext` |
 | [`chat/ui/rows/ForksRow`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/rows/ForksRow.tsx) | `ForksRow` |
 | [`chat/ui/rows/GeneratedImageRow`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/rows/GeneratedImageRow.tsx) | `GeneratedImageRow` |
-| [`chat/ui/rows/MessageRows`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/rows/MessageRows.tsx) | `UserRow`, `ReportRow`, `ReplyHeader`, `AssistantRow`, `ThinkingRow`, `LiveThoughtRow`, `NoteRow`, `AgentTurnRow`, `CompactionRow`, `ApprovalHistoryRow`, `QuestionHistoryRow` |
-| [`chat/ui/rows/RowContainer`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/rows/RowContainer.tsx) | `RowContainerProps`, `RowContainer` |
-| [`chat/ui/rows/Rows`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/rows/Rows.tsx) | `Row`, `RowProps` |
-| [`chat/ui/rows/SubagentRow`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/rows/SubagentRow.tsx) | `SubagentRow`, `SubagentBranchRow` |
+| [`chat/ui/rows/MessageRows`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/rows/MessageRows.tsx) | `ReportRow`, `AssistantRow`, `NoteRow`, `AgentTurnRow`, `CompactionRow` |
 | [`chat/ui/rows/TaskRow`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/rows/TaskRow.tsx) | `TaskRow` |
-| [`chat/ui/rows/VisualRow`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/rows/VisualRow.tsx) | `VisualRow` |
-| [`chat/ui/rows/WorkRows`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/rows/WorkRows.tsx) | `ToggleLine`, `WorkRow`, `RunningFor`, `WorkLiveRow`, `WorkGroupRow`, `TurnFoldRow`, `ChangedFilesRow`, `WorkingRow` |
+| [`chat/ui/rows/WorkRows`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/rows/WorkRows.tsx) | `WorkRow`, `WorkGroupRow`, `WorkingRow` |
 | [`chat/ui/rows/WorkflowRow`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/rows/WorkflowRow.tsx) | `WorkflowRow` |
 | [`chat/ui/use-diff-source-tokens`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/ui/use-diff-source-tokens.ts) | `useDiffSourceTokens` |
 

@@ -22,11 +22,11 @@ Which conversation a chat shows is its trail: the steps down from the main agent
 
 ## Progress
 
-`progressOf(states)` counts the delegated work that is done out of all of it, and the activity chip shows the count; a child that waits on a person shows a question mark and a note that opens it. `SubagentActions` is the row of stop and close buttons in the info header.
+`progressOf(states)` counts the delegated work that is done out of all of it, and the activity chip shows the count; a child that waits on a person shows a question mark and a note that opens it.
 
 ## Stopping
 
-`SubagentStopButton({ chatId, item })` stops a running subagent, or draws nothing when stopping it is not on offer. A subagent the CLI opened and named by task id is ended on its own, turn or not (`stop` `native`); one without a task id can only be marked stopped once the turn ended (`stop` `mark`); one your app opened with a task of its own is stopped through `stopTask`, after the host's `confirm.stopTask`. Shift with the composer's Stop also ends every agent the chat opened, after `confirm.stopSubagents`.
+The stop button of a subagent stops it, or draws nothing when stopping it is not on offer. A subagent the CLI opened and named by task id is ended on its own, turn or not (`stop` `native`); one without a task id can only be marked stopped once the turn ended (`stop` `mark`); one your app opened with a task of its own is stopped through `stopTask`, after the host's `confirm.stopTask`. Shift with the composer's Stop also ends every agent the chat opened, after `confirm.stopSubagents`.
 
 ## Older hosts
 

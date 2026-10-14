@@ -36,7 +36,7 @@ Every block has a Copy icon that copies its `code` text, including whitespace an
 
 ## Mermaid diagrams
 
-A ```` ```mermaid ```` fence in any of the three is drawn as its diagram, by `MermaidBlock({ code })`. [Mermaid](https://mermaid.js.org) (MIT) is large, so it loads only when the first closed diagram fence appears on the page, never with the thread. While the fence is still open the block is its highlighted source, and once it closes the diagram takes its place. A text Mermaid cannot parse or draw stays its source, with a short muted note under it.
+A ```` ```mermaid ```` fence in any of the three is drawn as its diagram. [Mermaid](https://mermaid.js.org) (MIT) is large, so it loads only when the first closed diagram fence appears on the page, never with the thread. While the fence is still open the block is its highlighted source, and once it closes the diagram takes its place. A text Mermaid cannot parse or draw stays its source, with a short muted note under it.
 
 The diagram stands in the frame of a code block and scrolls sideways when it is wider than the reply. A button beside Copy switches between the diagram and its source, and Copy copies the source either way. The colors are the theme's tokens, resolved when the diagram is drawn, so it is drawn again when the mode changes between light and dark.
 

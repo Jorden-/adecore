@@ -1,6 +1,6 @@
 # Model picker
 
-Which model answers and how. The composer draws all of this inside `RunSettings`, behind one pill; `ModelPicker` and `ModelOptionControl` are for a form outside a chat, such as the defaults of a new chat.
+Which model answers and how. The composer draws all of this behind one pill; `ModelPicker` and `ModelOptionControl` are for a form outside a chat, such as the defaults of a new chat.
 
 ```tsx
 import { ModelPicker } from '@adecore/agents-react/chat/ui';
@@ -42,6 +42,6 @@ An option runs at the value picked when it still fits, else the model's default.
 
 ## Run settings and accounts
 
-`RunSettings` is the pill under the composer: the model, its options, the permission mode with what the CLI confirmed, the context the chat holds with its breakdown, compacting, and the account when the CLI has more than one. Its props mirror the composer's state; draw a `Composer` rather than this alone. `RUNTIME_MODES`, `runtimeModeLabel(mode)` and `runtimeModeHint(mode)` name the modes.
+The pill under the composer shows the model, its options, the permission mode with what the CLI confirmed, the context the chat holds with its breakdown, compacting, and the account when the CLI has more than one. `RUNTIME_MODES`, `runtimeModeLabel(mode)` and `runtimeModeHint(mode)` name the modes.
 
 `useAccountChoice(kind, account)` answers the accounts a chat may pick, or `null` while the CLI has only one. `accountFor`, `startingSelection` and the other preference helpers in `@adecore/agents-react/chat` read the remembered model and account per CLI and per host.

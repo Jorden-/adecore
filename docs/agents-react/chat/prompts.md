@@ -1,6 +1,6 @@
 # Prompts
 
-The cards a person answers a chat's approvals and questions in. The [composer](/agents-react/chat/composer) draws them itself, in its own place, for every request the chat waits on (`PromptComposer`). The parts are exported for a stack of cards somewhere else, such as over a canvas of chats.
+The cards a person answers a chat's approvals and questions in. The [composer](/agents-react/chat/composer) draws them itself, in its own place, for every request the chat waits on. The parts are exported for a stack of cards somewhere else, such as over a canvas of chats.
 
 ```tsx
 import { PromptView, usePromptSession } from '@adecore/agents-react/prompts';
