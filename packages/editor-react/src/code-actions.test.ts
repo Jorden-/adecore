@@ -97,6 +97,21 @@ describe('the lightbulb', () => {
         expect(none.editor.gutterAction).toBeNull();
     });
 
+    test('never lights on the line the caret moved to for what was asked where it was', async () => {
+        const { service, editor, timers, requests } = await setup();
+        editor.type('let salary = 1;\nconsole.log(salary);');
+        let answer: (actions: unknown[]) => void = () => undefined;
+        service.respond('textDocument/codeAction', () => new Promise<unknown[]>((resolve) => (answer = resolve)));
+        editor.moveCaret(at(0, 8));
+        timers.advance(250);
+        await settle();
+        expect(contextOf(requests().at(-1))).toMatchObject({ range: range(0, 8, 8) });
+        editor.moveCaret(at(1, 3));
+        answer([EXTRACT]);
+        await settle();
+        expect(editor.gutterAction).toBeNull();
+    });
+
     test('hands the server the problems at the caret', async () => {
         const { service, editor, timers, requests } = await setup();
         const diagnostic: Diagnostic = { range: range(0, 4, 10), message: 'nope', severity: 1 };

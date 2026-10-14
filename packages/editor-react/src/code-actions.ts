@@ -80,6 +80,8 @@ export class CodeActionsFeature {
         const offs = [
             editor.onCaret(() => {
                 editor.setGutterAction(null);
+                // An answer for the caret's last place would light the bulb on the line it moved to.
+                this.refresher.cancel();
                 this.refresher.later();
             }),
             editor.onTextChange(() => editor.setGutterAction(null)),
