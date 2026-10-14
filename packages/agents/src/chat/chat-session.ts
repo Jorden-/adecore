@@ -179,6 +179,9 @@ export class ChatSession {
     private launchedSelection: ModelSelection | null = null;
     // The account the running CLI was started under, which what it reports about a plan belongs to.
     private launchedAccount: string | undefined = undefined;
+    private launchedCwd: string | null = null;
+    // Set while the host moves the chat's folder: messages queue and nothing starts a process until it ends.
+    private relocating = false;
     private launchedRuntimeMode: RuntimeMode | null = null;
     private launchedFolders: readonly string[] = [];
     // The checkpoint of the turn in flight; everything queued for that turn waits for it.
@@ -327,6 +330,36 @@ export class ChatSession {
         return this.thread.info;
     }
 
+    /* The next process starts in this folder; the host moves the chat through `ChatCore.relocate`, which has already ended the old one. */
+    setCwd(cwd: string): ChatInfo {
+        if (cwd === this.thread.info.cwd) {
+            return this.thread.info;
+        }
+        this.emit([this.thread.patchInfo({ cwd })]);
+        this.options.persist();
+        return this.thread.info;
+    }
+
+    /* Whether nothing holds the process: no turn, no work or request beside it, no start under way, no other relocation. */
+    get relocatable(): boolean {
+        return !this.relocating && this.thread.info.activeTurnId === null && !this.processInUse() && this.pendingStart === null;
+    }
+
+    get isRelocating(): boolean {
+        return this.relocating;
+    }
+
+    /* Messages sent from here on queue, and the queue stays put until `endRelocate`. */
+    beginRelocate(): void {
+        this.relocating = true;
+    }
+
+    /* Lets the queue go, in whichever folder the chat has now. */
+    endRelocate(): void {
+        this.relocating = false;
+        this.drainQueue();
+    }
+
     /*
      * Internal follow-ups wait for a new turn. User input goes through `sendInput`, which can steer native work.
      */
@@ -334,7 +367,7 @@ export class ChatSession {
         const extras = this.vetted(sent);
         const turnId = newId('turn');
         // Behind whatever still waits (a CLI that crashed leaves its queue), so everything goes out in the order it was sent.
-        if (this.busy || this.queue.length > 0 || this.replacementWaits()) {
+        if (this.busy || this.queue.length > 0 || this.replacementWaits() || this.relocating) {
             if (this.busy && this.info.queuePaused) {
                 this.sendAfterStop = true;
             }
@@ -579,6 +612,7 @@ export class ChatSession {
             !next ||
             this.steering.size > 0 ||
             this.busy ||
+            this.relocating ||
             (!explicit && (this.info.queuePaused || (limited !== null && (limited.limit.kind === 'usage' || this.info.resumeAt !== undefined))))
         ) {
             return;
@@ -969,7 +1003,7 @@ export class ChatSession {
      * with `origin: 'agent'` and close the wake it just made.
      */
     wake(wake: { text: string; label: string; note?: string; taskIds: string[]; summaryFor?: string; messageFrom?: string[] }): string | null {
-        if (this.frozen || this.thread.info.activeTurnId !== null || this.replacementWaits()) {
+        if (this.frozen || this.relocating || this.thread.info.activeTurnId !== null || this.replacementWaits()) {
             return null;
         }
         this.turnOpened();
@@ -1226,6 +1260,14 @@ export class ChatSession {
         if (this.thread.info.activeTurnId !== null || this.processInUse()) {
             throw new ChatError('chat-busy', `Chat ${this.id} is still working; stop it before restarting its agent session`);
         }
+        return this.dropProcess();
+    }
+
+    /*
+     * Ends the CLI and keeps the conversation, like `restart` without its refusal: the caller has
+     * checked `relocatable` and holds the queue. Settles once the process exited or was sent the SIGKILL.
+     */
+    dropProcess(): Promise<void> {
         this.clearStartWarning();
         this.clearWorkflowWarnings();
         const backend = this.backend;
@@ -1707,6 +1749,7 @@ export class ChatSession {
             (JSON.stringify(this.info.selection) !== JSON.stringify(this.launchedSelection) ||
                 this.info.runtimeMode !== this.launchedRuntimeMode ||
                 this.info.account !== this.launchedAccount ||
+                this.info.cwd !== this.launchedCwd ||
                 !sameFolders(this.options.folders?.() ?? [], this.launchedFolders))
         );
     }
@@ -1748,6 +1791,7 @@ export class ChatSession {
         const info = this.thread.info;
         this.launchedSelection = info.selection;
         this.launchedRuntimeMode = info.runtimeMode;
+        this.launchedCwd = info.cwd;
         const folders = this.options.folders?.() ?? [];
         this.launchedFolders = folders;
         const launch: BackendLaunch = {

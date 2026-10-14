@@ -227,6 +227,8 @@ export class ChatCore {
     private readonly hooks: ChatCoreHooks;
     private readonly chats = new Map<string, ChatSession>();
     private readonly creating = new Map<string, Promise<ChatInfo>>();
+    // The relocations under way, settled (never rejected) when each ends.
+    private readonly relocations = new Map<string, Promise<void>>();
     private readonly sinks = new ClientSinks<AgentEvent>((clientId) => this.composerPreferences.forget(clientId));
     private readonly attached = new Map<string, Set<string>>();
     // How often a chat's bookmarks or visuals changed, so an attach can tell that its read went stale before it joined.
@@ -540,6 +542,7 @@ export class ChatCore {
     configure(payload: ChatConfigurePayload): ChatInfo {
         const session = this.require(payload.chatId);
         if (payload.account !== undefined) {
+            this.refuseWhileRelocating(payload.chatId);
             this.switchAccount(session, payload.account);
         }
         return session.configure(payload);
@@ -942,6 +945,7 @@ export class ChatCore {
     /* Ends the chat's CLI and keeps its conversation; the next message resumes it in a process that reads its skills and plugins again. */
     async restart(chatId: string): Promise<void> {
         const session = this.require(chatId);
+        this.refuseWhileRelocating(chatId);
         const ended = session.restart();
         this.skillIndex.forget(session.info.provider, session.info.cwd);
         await ended;
@@ -949,6 +953,7 @@ export class ChatCore {
 
     compact(chatId: string): void {
         const session = this.require(chatId);
+        this.refuseWhileRelocating(chatId);
         if (session.busy) {
             throw new ChatError('chat-busy', `Chat ${chatId} is still working on the previous message`);
         }
@@ -958,6 +963,7 @@ export class ChatCore {
     /* Empties the thread and drops the CLI's session and the chat's bookmarks and visuals; `force` stops a turn that is in the way. */
     async clear(chatId: string, force = false): Promise<void> {
         const session = this.require(chatId);
+        this.refuseWhileRelocating(chatId);
         if (session.busy && !force) {
             throw new ChatError('chat-busy', `Chat ${chatId} is still working on the previous message`);
         }
@@ -1020,9 +1026,83 @@ export class ChatCore {
         this.chats.get(chatId)?.releaseHold(key);
     }
 
+    /*
+     * Moves a loaded chat to another working folder once its CLI is gone. `during` is the host's own work
+     * (moving files, writing projects) and runs with the CLI ended and new messages held in the queue;
+     * they run in the new folder afterwards, on the same conversation. A `during` that throws leaves the
+     * folder as it was and lets the queue go there. Refused with `chat-busy` while a turn, work beside
+     * it, an open request or a start holds the CLI, or while the chat is being relocated already. A
+     * write of the record that fails throws after the folder changed in memory.
+     */
+    async relocate(chatId: string, cwd: string, during?: () => Promise<void>): Promise<ChatInfo> {
+        const session = this.require(chatId);
+        this.refuseUnlessRelocatable(session);
+        const running = this.relocateNow(session, cwd, during);
+        const tracked = running.then(
+            () => undefined,
+            () => undefined
+        );
+        this.relocations.set(chatId, tracked);
+        try {
+            return await running;
+        } finally {
+            if (this.relocations.get(chatId) === tracked) {
+                this.relocations.delete(chatId);
+            }
+        }
+    }
+
+    /* Whether a relocation of the chat is under way, which a host that forks or copies the chat has to refuse. */
+    isRelocating(chatId: string): boolean {
+        return this.relocations.has(chatId);
+    }
+
+    private async relocateNow(session: ChatSession, cwd: string, during: (() => Promise<void>) | undefined): Promise<ChatInfo> {
+        const chatId = session.id;
+        await this.hooks.admit?.(chatId, cwd);
+        // A message sent while the folder was asked about may have opened a turn.
+        if (!session.relocatable) {
+            throw this.busyRelocating(chatId);
+        }
+        const previous = session.info.cwd;
+        session.beginRelocate();
+        try {
+            await session.dropProcess();
+            await during?.();
+        } catch (e) {
+            session.endRelocate();
+            throw e;
+        }
+        try {
+            session.setCwd(cwd);
+            await this.persistNow(chatId, true);
+        } finally {
+            this.skillIndex.forget(session.info.provider, previous);
+            session.endRelocate();
+        }
+        return session.info;
+    }
+
+    private refuseUnlessRelocatable(session: ChatSession): void {
+        if (this.relocations.has(session.id) || !session.relocatable) {
+            throw this.busyRelocating(session.id);
+        }
+    }
+
+    private busyRelocating(chatId: string): ChatError {
+        return new ChatError('chat-busy', `Chat ${chatId} is still working; stop it before moving it to another folder`);
+    }
+
+    private refuseWhileRelocating(chatId: string): void {
+        if (this.relocations.has(chatId)) {
+            throw new ChatError('chat-busy', `Chat ${chatId} is being moved to another folder`);
+        }
+    }
+
     /* Removes a chat: its CLI, its record, its log, its attachments, its bookmarks and its visuals. */
     async kill(chatId: string): Promise<void> {
         await this.loaded(chatId);
+        await this.relocations.get(chatId);
         const session = this.require(chatId);
         // A write already out would put the record back after the delete.
         const writing = this.writes.get(chatId);
