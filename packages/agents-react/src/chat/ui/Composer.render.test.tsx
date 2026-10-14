@@ -629,8 +629,11 @@ describe('continuing after a stop', () => {
         await composer.type('Instead, do this');
         expect(composer.byLabel('Send')).not.toBeNull();
         expect(composer.page.host.textContent).not.toContain('Continue');
-        await composer.press('a', { metaKey: true, code: 'KeyA' });
-        await composer.press('Backspace');
+        // The editor's own Mod key follows the platform the tests run on, so the box is emptied by a change and not by Mod-a.
+        await act(async () => {
+            const view = composer.view();
+            view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: '' }, userEvent: 'delete.selection' });
+        });
         expect(composer.byLabel('Send')).toBeNull();
         expect(composer.page.host.textContent).toContain('Continue');
     });
