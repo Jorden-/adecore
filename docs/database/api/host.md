@@ -96,16 +96,23 @@ if (path === null) {
 const host = createDatabaseHost({ start: () => spawnHelper(path) });
 ```
 
-Finds the binary of the platform package the package manager installed (`@adecore/database-<platform>-<arch>`), or returns `null` when the platform has none or the install left optional dependencies out. It maps `app.asar` to `app.asar.unpacked`, so an Electron app unpacks the platform packages; see [Getting started](/database/guide/getting-started#package-the-helper).
+Finds the helper for this machine, or returns `null` when there is none. It looks in this order:
+
+1. `ADECORE_DATABASE_HELPER`, a path to another build. It is returned as is, without checking that it exists, so a wrong path fails when the helper starts instead of quietly running another one.
+2. The binary of the platform package the package manager installed (`@adecore/database-<platform>-<arch>`). The platform may have none, or the install may have left optional dependencies out. It maps `app.asar` to `app.asar.unpacked`, so an Electron app unpacks the platform packages; see [Getting started](/database/guide/getting-started#package-the-helper).
+3. The release build in a checkout of the repository (`helper/target/release/adecore-database`), when the package runs from the `src` of that checkout, such as a linked one read through the `source` condition. The published package has no `helper` folder, so an install never looks there.
+
+A binary the app packages itself, outside the platform packages, is the app's to find: pass its path to `spawnHelper`.
 
 `HelperPathOptions` is for tests:
 
-| Option     | Default                              |                                         |
-| ---------- | ------------------------------------ | --------------------------------------- |
-| `platform` | `process.platform`                   |                                         |
-| `arch`     | `process.arch`                       |                                         |
-| `resolve`  | the module resolution of the package | Resolves a package specifier to a file. |
-| `exists`   | `fs.existsSync`                      | Whether a path exists.                  |
+| Option     | Default                              |                                          |
+| ---------- | ------------------------------------ | ---------------------------------------- |
+| `platform` | `process.platform`                   |                                          |
+| `arch`     | `process.arch`                       |                                          |
+| `env`      | `process.env`                        | Where `ADECORE_DATABASE_HELPER` is read. |
+| `resolve`  | the module resolution of the package | Resolves a package specifier to a file.  |
+| `exists`   | `fs.existsSync`                      | Whether a path exists.                   |
 
 ## parseRequest
 

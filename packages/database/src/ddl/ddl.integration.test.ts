@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, test } from 'bun:test';
@@ -20,7 +20,7 @@ import {
     togglePrimaryKey
 } from '../designer/edit.ts';
 import { recoverFrom } from '../designer/recover.ts';
-import { createDatabaseHost, spawnHelper } from '../host/index.ts';
+import { createDatabaseHost, helperPath, spawnHelper } from '../host/index.ts';
 import { PROTOCOL_VERSION, type Cell, type ConnectionConfig, type TableStructure } from '../protocol/index.ts';
 import {
     alterTableSql,
@@ -38,12 +38,12 @@ import {
     type TableDraft
 } from './index.ts';
 
-/* The release build of the helper; cargo builds it, so a checkout without Rust skips these tests. */
-const HELPER = new URL('../../helper/target/release/adecore-database', import.meta.url).pathname;
+/* The override, or the release build cargo leaves in this checkout; a checkout without Rust skips these tests. */
+const HELPER = helperPath();
 
 /* A build from before the protocol last changed would fail every test on the handshake, so it skips them like a missing one. */
 const speaksProtocol = (): boolean => {
-    if (!existsSync(HELPER)) {
+    if (HELPER === null) {
         return false;
     }
 
@@ -56,7 +56,7 @@ const speaksProtocol = (): boolean => {
 };
 
 const folder = mkdtempSync(join(tmpdir(), 'adecore-ddl-'));
-const host = createDatabaseHost({ start: () => spawnHelper(HELPER) });
+const host = createDatabaseHost({ start: () => spawnHelper(HELPER!) });
 const client = createDatabaseClient((request) => host.handle(request, 'test'));
 
 afterAll(async () => {

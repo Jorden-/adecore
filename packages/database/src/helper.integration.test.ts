@@ -1,18 +1,18 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, test } from 'bun:test';
 import { createDatabaseClient } from './client/index.ts';
 import type { Connection } from './client/types.ts';
-import { createDatabaseHost, spawnHelper } from './host/index.ts';
+import { createDatabaseHost, helperPath, spawnHelper } from './host/index.ts';
 import { PROTOCOL_VERSION } from './protocol/index.ts';
 
-/* The release build of the helper; cargo builds it, so a checkout without Rust skips these tests. */
-const HELPER = new URL('../helper/target/release/adecore-database', import.meta.url).pathname;
+/* The override, or the release build cargo leaves in this checkout; a checkout without Rust skips these tests. */
+const HELPER = helperPath();
 
 /* A build from before the protocol last changed would fail every test on the handshake, so it skips them like a missing one. */
 const speaksProtocol = (): boolean => {
-    if (!existsSync(HELPER)) {
+    if (HELPER === null) {
         return false;
     }
 
@@ -25,7 +25,7 @@ const speaksProtocol = (): boolean => {
 };
 
 const folder = mkdtempSync(join(tmpdir(), 'adecore-database-'));
-const host = createDatabaseHost({ start: () => spawnHelper(HELPER) });
+const host = createDatabaseHost({ start: () => spawnHelper(HELPER!) });
 const client = createDatabaseClient((request) => host.handle(request, 'test'));
 const shop: Connection = { id: 'shop', name: 'Shop', config: { engine: 'sqlite', path: join(folder, 'shop.sqlite'), create: true } };
 

@@ -36,7 +36,7 @@ if (path === null) {
 }
 ```
 
-`null` means the platform has no package, or the install left optional dependencies out. The Linux binaries need glibc 2.35 or newer.
+`null` means the platform has no package, or the install left optional dependencies out. The Linux binaries need glibc 2.35 or newer. Set `ADECORE_DATABASE_HELPER` to the path of another build to have `helperPath()` return that instead.
 
 ### Package the helper
 
@@ -58,7 +58,7 @@ For another platform or a patched helper, build it from a checkout of the reposi
 cargo build --release --locked --manifest-path packages/database/helper/Cargo.toml
 ```
 
-The binary lands in `packages/database/helper/target/release/adecore-database` (`.exe` on Windows). SQLite is compiled in and MySQL connections use rustls, so it needs no system library.
+The binary lands in `packages/database/helper/target/release/adecore-database` (`.exe` on Windows). SQLite is compiled in and MySQL connections use rustls, so it needs no system library. An app that links the checkout and reads its `src` gets this build from `helperPath()` when no platform package has a binary.
 
 ## Wire the host
 
