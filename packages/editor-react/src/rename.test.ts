@@ -171,8 +171,11 @@ describe('rename', () => {
 describe('rename suggestions', () => {
     const TEXT = 'const hits = need.filter((n) => has(n));\nreturn hits.length / need.length;';
 
-    async function setup(suggestNames?: LanguageHost['suggestNames']) {
+    async function setup(suggestNames?: LanguageHost['suggestNames'], outline?: unknown) {
         const service = new FakeLanguageService();
+        if (outline !== undefined) {
+            service.respond('textDocument/documentSymbol', () => outline);
+        }
         service.respond('textDocument/rename', () => null, { prepareProvider: true });
         service.respond('textDocument/prepareRename', () => ({ range: range(0, 6, 10), placeholder: 'hits' }));
         service.respond('textDocument/references', () => [
@@ -209,6 +212,12 @@ describe('rename suggestions', () => {
             context: TEXT,
             uses: ['const hits = need.filter((n) => has(n));', 'return hits.length / need.length;', 'log(hits);']
         });
+    });
+
+    test('names the kind of the symbol when the outline of the file lists it', async () => {
+        const { asked, suggestNames } = pending();
+        await setup(suggestNames, [{ name: 'hits', kind: 14, range: range(0, 6, 40), selectionRange: range(0, 6, 10) }]);
+        expect(asked[0]!.request).toMatchObject({ name: 'hits', kind: 'constant' });
     });
 
     test('shows the names the host gave under the input, and nothing is applied', async () => {

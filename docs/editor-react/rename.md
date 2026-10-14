@@ -8,7 +8,7 @@
 
 In the card, Enter renames and Shift+Enter first lists the lines the rename changes, grouped by file, with Enter to apply them. Escape, or an edit in the file, cancels. A refusal of the service stays under the input, so the person can try another name. The edit goes through [`applyWorkspaceEdit`](/editor-react/project#workspace-edits), so open files take it as one undo step and other files become drafts. The preview also lists the files the rename makes, moves and deletes, as `Creates`, `Moves` (old path to new path) and `Deletes` rows under the lines. These come from `resourceOperationsOf` and `RenameView.operations`.
 
-With `suggestNames` on the [host](/editor-react/project#languagehost), the card shows suggested names. The callback gets the name, the code around it and a few of its uses, with an `AbortSignal`; which model or rule answers is the app's choice.
+With `suggestNames` on the [host](/editor-react/project#languagehost), the card shows suggested names. The callback gets the name, its kind when the outline of the file lists it (`function`, `class`), the code around it and a few of its uses, with an `AbortSignal`; which model or rule answers is the app's choice.
 
 ## Code actions
 

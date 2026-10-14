@@ -1,6 +1,6 @@
 import './test-setup.ts';
 import { describe, expect, test } from 'bun:test';
-import { occurrencesOf, renamePreviewOf, renameRowsOf, renameTargetOf, wordRangeAt } from './rename-model.ts';
+import { occurrencesOf, renameKindOf, renamePreviewOf, renameRowsOf, renameTargetOf, wordRangeAt } from './rename-model.ts';
 
 const at = (line: number, character: number) => ({ line, character });
 const range = (line: number, start: number, end: number) => ({ start: at(line, start), end: at(line, end) });
@@ -74,5 +74,40 @@ describe('the rows of a rename preview', () => {
         expect(await renamePreviewOf(deleting, async () => text)).toEqual([
             { uri: 'file:///a.ts', rows: [{ line: 1, before: 'const weights = {};', after: 'const scores = {};' }] }
         ]);
+    });
+});
+
+describe('the kind of the symbol to rename', () => {
+    const outline = [
+        {
+            name: 'Greeter',
+            kind: 5 as const,
+            range: range(0, 0, 9),
+            selectionRange: range(0, 6, 13),
+            children: [{ name: 'greetAll', kind: 6 as const, range: range(1, 4, 40), selectionRange: range(1, 4, 12) }]
+        }
+    ];
+
+    test('is the kind of the deepest symbol whose name holds one of the places, in words', () => {
+        expect(renameKindOf(outline, 'greetAll', [range(1, 4, 12)])).toBe('method');
+        expect(renameKindOf(outline, 'greetAll', [range(7, 2, 10), range(1, 4, 12)])).toBe('method');
+        expect(renameKindOf(outline, 'Greeter', [range(0, 6, 13)])).toBe('class');
+        expect(renameKindOf([{ name: 'T', kind: 26, range: range(0, 0, 1), selectionRange: range(0, 0, 1) }], 'T', [range(0, 0, 1)])).toBe('type parameter');
+    });
+
+    test('is unknown for a name the outline does not list, or without an outline', () => {
+        expect(renameKindOf(outline, 'names', [range(1, 20, 25)])).toBeUndefined();
+        expect(renameKindOf(null, 'greetAll', [range(1, 4, 12)])).toBeUndefined();
+        expect(renameKindOf([], 'greetAll', [range(1, 4, 12)])).toBeUndefined();
+    });
+
+    test('needs the name to match in a flat list, which only gives the whole span', () => {
+        const flat = [
+            { name: 'greetAll', kind: 12 as const, location: { uri: 'file:///a.ts', range: { start: at(1, 0), end: at(3, 1) } } },
+            { name: 'names', kind: 13 as const, location: { uri: 'file:///a.ts', range: range(2, 4, 30) } }
+        ];
+        expect(renameKindOf(flat, 'greetAll', [range(1, 9, 17)])).toBe('function');
+        expect(renameKindOf(flat, 'names', [range(1, 18, 23)])).toBeUndefined();
+        expect(renameKindOf(flat, 'names', [range(2, 10, 15)])).toBe('variable');
     });
 });

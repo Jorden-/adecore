@@ -36,6 +36,8 @@ export interface RenameSuggestionsRequest {
     uri: string;
     languageId: string;
     name: string;
+    /* What the name belongs to, in words (`function`, `class`, `type parameter`), when the outline of the file lists it. */
+    kind?: string;
     context: string;
     uses: readonly string[];
 }

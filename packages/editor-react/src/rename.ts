@@ -4,7 +4,7 @@ import type { EditorRange } from '@adecore/editor';
 import type { EditorLanguage } from './editor-language.ts';
 import { lineTextOf } from './line-text.ts';
 import type { RenameView } from './popups.ts';
-import { occurrencesOf, renamePreviewOf, renameTargetOf, wordRangeAt, type RenameTarget } from './rename-model.ts';
+import { occurrencesOf, renameKindOf, renamePreviewOf, renameTargetOf, wordRangeAt, type RenameTarget } from './rename-model.ts';
 import { isShortcut } from './shortcut-keys.ts';
 import { resourceOperationsOf } from './workspace-edit.ts';
 import { messageOf } from './error-message.ts';
@@ -219,13 +219,28 @@ export class RenameFeature {
                 start: { line: Math.max(0, line - CONTEXT_LINES), character: 0 },
                 end: { line: line + CONTEXT_LINES, character: Number.MAX_SAFE_INTEGER }
             });
-            const uses = await this.linesOf(locations ?? []);
-            const names = await suggestNames({ uri, languageId, name: session.original, context, uses }, session.names.signal);
+            const [uses, kind] = await Promise.all([this.linesOf(locations ?? []), this.kindOf(session, locations ?? [])]);
+            const request = { uri, languageId, name: session.original, ...(kind === undefined ? {} : { kind }), context, uses };
+            const names = await suggestNames(request, session.names.signal);
             if (this.session === session && names.length > 0) {
                 this.publish({ suggestions: names });
             }
         } catch {
             // Suggestions do not prevent a manual rename.
+        }
+    }
+
+    /* So a suggester knows a function from a variable; a rename on a use finds the kind through the declaration's place in this file. */
+    private async kindOf(session: Session, locations: readonly Location[]): Promise<string | undefined> {
+        const { project, uri } = this.language;
+        if (!project.service.supports('textDocument/documentSymbol', uri)) {
+            return undefined;
+        }
+        try {
+            const symbols = await project.service.documentSymbols(uri, { signal: session.names.signal, parallel: true });
+            return renameKindOf(symbols, session.original, [session.target.range, ...occurrencesOf(locations, uri).inFile]);
+        } catch {
+            return undefined;
         }
     }
 
