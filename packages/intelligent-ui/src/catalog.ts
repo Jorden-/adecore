@@ -20,7 +20,7 @@ export const UI_GROUPS = {
     structure: { description: 'Organize distinct topics.', rules: 'Use Tabs for alternatives and Sections for independent topics.' },
     content: {
         description: 'Include code, attachments and sources.',
-        rules: 'Image accepts a chat attachment or generated="latest", never a URL or a local path.'
+        rules: 'Image accepts a chat attachment or generated="latest", never a URL or a local path. Gallery and Compare take chat attachments too. The host says how to attach a file of your own.'
     },
     links: { description: 'Refer to a host-owned resource.', rules: 'Targets are checked by the host. No arbitrary navigation or file reads.' },
     inputs: {
@@ -101,6 +101,12 @@ export const UI_CATALOG = {
         schema: z
             .strictObject({ attachment: name.optional(), generated: z.literal('latest').optional(), alt: text.optional() })
             .refine((props) => Boolean(props.attachment) !== Boolean(props.generated), 'Choose attachment or generated, exclusively.')
+    },
+    Gallery: { group: 'content', description: 'A grid of images with captions; at most 24.', schema: empty, children: ['Image'], count: { min: 1, max: 24 } },
+    Compare: {
+        group: 'content',
+        description: 'Two chat attachments in one frame with a handle to wipe between them; children are the caption.',
+        schema: z.strictObject({ before: name, after: name, beforeLabel: text.optional(), afterLabel: text.optional() })
     },
     Sources: { group: 'content', description: 'Numbered sources without preloading.', schema: empty, children: ['Source'] },
     Source: {

@@ -1,6 +1,6 @@
 # Content
 
-Include code, attachments and sources. Nothing here loads an address or reads a path: an image is an attachment the chat already holds, and a source opens only when a person clicks it.
+Include code, attachments and sources. Nothing here loads an address or reads a path: an image is an attachment the chat already holds, and a source opens only when a person clicks it. `Image`, `Gallery` and `Compare` take attachments of the chat only; how an agent attaches a file of its own is the host's to tell it.
 
 <Demo src="intelligent-ui/content" />
 
@@ -32,6 +32,36 @@ A chat attachment with an optional caption as its children. Give exactly one of 
 | `alt`        | string   | No       | The text for a screen reader                                          |
 
 `generated="latest"` becomes an `attachment` once the backend knows which image it is (`latestAttachment` on [compile](/intelligent-ui/host/compilation)). An Image never takes a URL or a filesystem path.
+
+## Gallery
+
+A grid of images, each with its caption under it. `Gallery` has no props and holds only `Image`, one to 24 of them; a complete `Gallery` without an `Image` or with more than 24 is refused. Each `Image` follows the rules above, and its children are the caption.
+
+```ui
+<Gallery>
+<Image attachment="login" alt="Login">Login</Image>
+<Image attachment="home" alt="Home">Home</Image>
+</Gallery>
+```
+
+The grid has three columns and two in a block narrower than 420px. A cell opens the image large, as a single `Image` does. An image whose attachment is gone shows its alt text in a quiet square.
+
+## Compare
+
+Two attachments in one frame, with a handle between them that a person drags or moves with the arrow keys while it has the focus. Its children are the caption.
+
+| Prop          | Type   | Required | Notes                                            |
+| ------------- | ------ | -------- | ------------------------------------------------ |
+| `before`      | string | Yes      | The id of an attachment, shown left of the handle |
+| `after`       | string | Yes      | The id of an attachment, shown right of it       |
+| `beforeLabel` | string | No       | Written on the left half; `Before` without it    |
+| `afterLabel`  | string | No       | Written on the right half; `After` without it    |
+
+```ui
+<Compare before="old" after="new" beforeLabel="Old" afterLabel="New">The header after the color change</Compare>
+```
+
+The frame takes the shape of the `before` image. With one attachment gone, the other shows alone and says so; with both gone the frame says why. The position of the handle is the renderer's own and is not state of the block. Its fallback is `[Compare: Old a1, New a2] caption`.
 
 ## Sources and Source
 

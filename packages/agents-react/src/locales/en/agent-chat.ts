@@ -578,6 +578,16 @@ export default {
             showValues: 'Show all values',
             hideValues: 'Hide values'
         },
+        gallery: {
+            label_one: '{{count}} image',
+            label_other: '{{count}} images'
+        },
+        compare: {
+            label: 'Compare {{before}} and {{after}}',
+            before: 'Before',
+            after: 'After',
+            missing: 'One image is not available'
+        },
         image: {
             label: 'Image',
             unavailable: 'The image is not available'

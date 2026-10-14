@@ -1,8 +1,8 @@
 import clsx from 'clsx';
-import { createContext, useContext, useId } from 'react';
+import { createContext, useContext, useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { UiProps } from '@adecore/intelligent-ui';
-import { PreviewCard, Tooltip } from '@adecore/ui';
+import { Pill, PreviewCard, Tooltip, Wipe } from '@adecore/ui';
 import { formatNumber } from '@adecore/ui/format';
 import { useChatHost } from '../../../../host';
 import { CodeBlock } from '../../CodeBlock';
@@ -24,11 +24,39 @@ export function CodeBlockRenderer({ node }: UiRendererProps<UiProps<'CodeBlock'>
     );
 }
 
-/* Its own component, so the host's hook is only called for an image that names an attachment. */
-function AttachedImage({ scopeId, chatId, attachmentId, alt }: { scopeId: string; chatId: string; attachmentId: string; alt: string }) {
+// Set by a Gallery, so the images inside it draw as cells of its grid.
+const GalleryContext = createContext(false);
+
+/*
+ * Its own component, so the host's hook is only called for an image that names an attachment. In a
+ * gallery a cell that cannot show its picture says what it was, since the square alone tells nothing.
+ */
+function AttachedImage({
+    scopeId,
+    chatId,
+    attachmentId,
+    alt,
+    cell,
+    unnamed
+}: {
+    scopeId: string;
+    chatId: string;
+    attachmentId: string;
+    alt: string;
+    cell: boolean;
+    unnamed: boolean;
+}) {
     const host = useChatHost();
     const source = host.attachments.useUrl(scopeId, chatId, attachmentId);
-    return <ImageThumb source={source} alt={alt} className="max-h-70 max-w-full object-contain" />;
+    if (!cell) {
+        return <ImageThumb source={source} alt={alt} className="max-h-70 max-w-full object-contain" />;
+    }
+    return (
+        <>
+            <ImageThumb source={source} alt={alt} aspect={1} />
+            {unnamed && source.failure !== null && <figcaption className="text-xs wrap-anywhere text-text-faint">{alt}</figcaption>}
+        </>
+    );
 }
 
 /*
@@ -37,18 +65,116 @@ function AttachedImage({ scopeId, chatId, attachmentId, alt }: { scopeId: string
  */
 export function ImageRenderer({ node, children, context }: UiRendererProps<UiProps<'Image'>>) {
     const { t } = useTranslation('agent-chat');
+    const cell = useContext(GalleryContext);
     const { attachment, alt } = node.props;
     const caption = uiNodeLabel(node);
     const name = alt ?? (caption === '' ? t('blocks.image.label') : caption);
     return (
-        <figure className="flex flex-col items-start gap-1.5">
+        <figure className={cell ? 'flex min-w-0 flex-col gap-1' : 'flex flex-col items-start gap-1.5'}>
             {attachment === undefined ? (
-                <ImageThumb source={{ url: null, failure: t('blocks.image.unavailable') }} alt={name} />
+                <ImageThumb source={{ url: null, failure: t('blocks.image.unavailable') }} alt={name} aspect={cell ? 1 : undefined} />
             ) : (
-                <AttachedImage scopeId={context.scopeId} chatId={context.chatId} attachmentId={attachment} alt={name} />
+                <AttachedImage scopeId={context.scopeId} chatId={context.chatId} attachmentId={attachment} alt={name} cell={cell} unnamed={caption === ''} />
             )}
-            {caption !== '' && <figcaption className="px-2 text-xs text-text-muted">{children}</figcaption>}
+            {caption !== '' && <figcaption className={cell ? 'text-xs wrap-anywhere text-text-muted' : 'px-2 text-xs text-text-muted'}>{children}</figcaption>}
+            {cell && caption === '' && attachment === undefined && (
+                <figcaption className="text-xs wrap-anywhere text-text-faint">{alt ?? t('blocks.image.unavailable')}</figcaption>
+            )}
         </figure>
+    );
+}
+
+/* Three columns, two in a narrow block; the container decides, not the window, since a chat can be any width. */
+export function GalleryRenderer({ node, children }: UiRendererProps<UiProps<'Gallery'>>) {
+    const { t } = useTranslation('agent-chat');
+    return (
+        <GalleryContext value>
+            <div role="group" aria-label={t('blocks.gallery.label', { count: uiChildrenOf(node, 'Image').length })} className="@container px-2">
+                <div className="chat-ui-nodes grid grid-cols-2 gap-2 @min-[420px]:grid-cols-3">{children}</div>
+            </div>
+        </GalleryContext>
+    );
+}
+
+// The shape of the frame until the first picture reports its own.
+const COMPARE_ASPECT = 4 / 3;
+
+/*
+ * Two attachments in one frame, shaped like the first. The split is only this renderer's state. With one
+ * attachment gone the other stands alone with the reason; with both gone the thumbnail says why.
+ */
+export function CompareRenderer({ node, children, context }: UiRendererProps<UiProps<'Compare'>>) {
+    const { t } = useTranslation('agent-chat');
+    const host = useChatHost();
+    const { before, after } = node.props;
+    const beforeLabel = node.props.beforeLabel || t('blocks.compare.before');
+    const afterLabel = node.props.afterLabel || t('blocks.compare.after');
+    const first = host.attachments.useUrl(context.scopeId, context.chatId, before);
+    const second = host.attachments.useUrl(context.scopeId, context.chatId, after);
+    const [split, setSplit] = useState(0.5);
+    const [aspect, setAspect] = useState(COMPARE_ASPECT);
+    const caption = uiNodeLabel(node);
+    const loading = (source: typeof first) => source.url === null && source.failure === null;
+    const label = t('blocks.compare.label', { before: beforeLabel, after: afterLabel });
+    let body: ReactNode;
+    if (loading(first) || loading(second)) {
+        body = <ImageThumb source={{ url: null, failure: null }} alt={label} aspect={COMPARE_ASPECT} />;
+    } else if (first.url !== null && second.url !== null) {
+        body = (
+            <div className="relative w-full max-h-96 overflow-hidden rounded-lg border border-border bg-surface-sunken" style={{ aspectRatio: aspect }}>
+                <Wipe
+                    value={split}
+                    onValueChange={setSplit}
+                    label={label}
+                    before={
+                        <img
+                            src={first.url}
+                            alt={beforeLabel}
+                            draggable={false}
+                            className="size-full object-contain select-none"
+                            onLoad={(event) => {
+                                const { naturalWidth, naturalHeight } = event.currentTarget;
+                                if (naturalWidth > 0 && naturalHeight > 0) {
+                                    setAspect(naturalWidth / naturalHeight);
+                                }
+                            }}
+                        />
+                    }
+                    after={<img src={second.url} alt={afterLabel} draggable={false} className="size-full object-contain select-none" />}
+                />
+                <CompareChip side="left" label={beforeLabel} />
+                <CompareChip side="right" label={afterLabel} />
+            </div>
+        );
+    } else if (first.url === null && second.url === null) {
+        body = <ImageThumb source={first} alt={label} aspect={COMPARE_ASPECT} />;
+    } else {
+        const shown = first.url !== null ? { source: first, name: beforeLabel } : { source: second, name: afterLabel };
+        body = (
+            <>
+                <ImageThumb source={shown.source} alt={shown.name} className="max-h-70 max-w-full object-contain" />
+                <span className="px-2 text-xs text-text-faint">{t('blocks.compare.missing')}</span>
+            </>
+        );
+    }
+    return (
+        <figure className="flex flex-col items-start gap-1.5 px-2">
+            {body}
+            {caption !== '' && <figcaption className="text-xs text-text-muted">{children}</figcaption>}
+        </figure>
+    );
+}
+
+/* A chip on the picture gets a ground of its own, since a pill's alpha ground would vanish over an image. */
+function CompareChip({ side, label }: { side: 'left' | 'right'; label: string }) {
+    return (
+        <span
+            className={clsx('pointer-events-none absolute top-2 z-20 max-w-2/5 truncate rounded-md bg-surface-raised', side === 'left' ? 'left-2' : 'right-2')}
+        >
+            <Pill shape="tag" size="sm" tone="muted">
+                {label}
+            </Pill>
+        </span>
     );
 }
 

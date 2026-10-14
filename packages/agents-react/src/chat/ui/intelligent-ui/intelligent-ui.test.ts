@@ -63,7 +63,7 @@ const REVIEW =
 describe('the registry of intelligent UI renderers', () => {
     test('accounts for every catalog name, and only those', () => {
         expect(Object.keys(UI_RENDERERS).sort()).toEqual(Object.keys(UI_CATALOG).sort());
-        expect(Object.keys(UI_RENDERERS)).toHaveLength(38);
+        expect(Object.keys(UI_RENDERERS)).toHaveLength(40);
         const empty = Object.entries(UI_RENDERERS)
             .filter(([, renderer]) => renderer === null)
             .map(([name]) => name)
@@ -556,6 +556,56 @@ describe('content', () => {
         const html = markup('<Image attachment="rabbit" alt="A rabbit">The rabbit</Image>');
         expect(html).toContain('src="blob:rabbit"');
         expect(html).toContain('<figcaption');
+    });
+
+    test('a gallery draws each image as a square cell in a grid that narrows with its container, and a missing one says so', () => {
+        host = {
+            attachments: {
+                useUrl: (_scope, _chat, id) => (id === 'gone' ? { url: null, failure: 'Gone' } : { url: `blob:${id}`, failure: null }),
+                read: () => Promise.reject(new Error('Not read here'))
+            }
+        };
+        const html = markup(
+            '<Gallery><Image attachment="a1" alt="Login">First screen</Image><Image attachment="gone" alt="Home"/><Image generated="latest" alt="Never made"/></Gallery>'
+        );
+        expect(html).toContain('@container');
+        expect(html).toContain('grid-cols-2');
+        expect(html).toContain('@min-[420px]:grid-cols-3');
+        expect(html).toContain('aria-label="3 images"');
+        expect(html).toContain('src="blob:a1"');
+        expect(html).toContain('aspect-ratio:1');
+        expect(html).toContain('<figcaption class="text-xs wrap-anywhere text-text-muted">First screen</figcaption>');
+        expect(html).toContain('>Never made</figcaption>');
+        expect(html).toContain('>Home</figcaption>');
+        expect(markup('<Gallery><Image attachment="a1"/></Gallery>')).toContain('aria-label="1 image"');
+    });
+
+    test('a comparison wipes between two attachments, labeled, and shows the one left when the other is gone', () => {
+        const use = (urls: Record<string, { url: string | null; failure: string | null }>) => {
+            host = { attachments: { useUrl: (_scope, _chat, id) => urls[id]!, read: () => Promise.reject(new Error('Not read here')) } };
+        };
+        const source = '<Compare before="a1" after="a2" beforeLabel="Old" afterLabel="New">Header color</Compare>';
+        use({ a1: { url: 'blob:a1', failure: null }, a2: { url: 'blob:a2', failure: null } });
+        const both = markup(source);
+        expect(both).toContain('role="slider"');
+        expect(both).toContain('aria-label="Compare Old and New"');
+        expect(both).toContain('aria-valuenow="50"');
+        expect(both).toContain('src="blob:a1"');
+        expect(both).toContain('src="blob:a2"');
+        expect(both).toMatch(/>Old<\/span>[\s\S]*>New<\/span>/);
+        expect(both).toContain('Header color</figcaption>');
+        expect(markup('<Compare before="a1" after="a2"/>')).toContain('aria-label="Compare Before and After"');
+        use({ a1: { url: 'blob:a1', failure: null }, a2: { url: null, failure: 'Gone' } });
+        const alone = markup(source);
+        expect(alone).not.toContain('role="slider"');
+        expect(alone).toContain('src="blob:a1"');
+        expect(alone).toContain('One image is not available');
+        use({ a1: { url: null, failure: 'Gone' }, a2: { url: null, failure: 'Gone' } });
+        expect(markup(source)).not.toContain('One image is not available');
+        use({ a1: { url: 'blob:a1', failure: null }, a2: { url: null, failure: null } });
+        const loading = markup(source);
+        expect(loading).not.toContain('role="slider"');
+        expect(loading).not.toContain('src=');
     });
 
     test('sources are numbered and open through the host only', () => {

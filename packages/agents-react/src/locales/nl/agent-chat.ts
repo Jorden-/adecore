@@ -578,6 +578,16 @@ export default {
             showValues: 'Alle waarden tonen',
             hideValues: 'Waarden verbergen'
         },
+        gallery: {
+            label_one: '{{count}} afbeelding',
+            label_other: '{{count}} afbeeldingen'
+        },
+        compare: {
+            label: 'Vergelijk {{before}} en {{after}}',
+            before: 'Voor',
+            after: 'Na',
+            missing: 'Eén afbeelding is niet beschikbaar'
+        },
         image: {
             label: 'Afbeelding',
             unavailable: 'De afbeelding is niet beschikbaar'

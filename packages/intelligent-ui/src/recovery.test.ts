@@ -126,6 +126,8 @@ const MARKED: Partial<Record<UiComponentName, string>> = {
     Tabs: '<Tabs><Tab title="mark-title">mark-body</Tab></Tabs>',
     Sections: '<Sections><Section title="mark-title">mark-body</Section></Sections>',
     Image: '<Image attachment="a1" alt="mark-alt"/>',
+    Gallery: '<Gallery><Image attachment="a1" alt="mark-alt">mark-caption</Image></Gallery>',
+    Compare: '<Compare before="mark-before" after="mark-after" beforeLabel="mark-old" afterLabel="mark-new">mark-caption</Compare>',
     Sources: '<Sources><Source title="mark-title" url="https://mark.example/"/></Sources>',
     File: '<File path="mark/path.ts" line={37}>mark-body</File>',
     Diff: '<Diff path="mark/path.ts"/>',

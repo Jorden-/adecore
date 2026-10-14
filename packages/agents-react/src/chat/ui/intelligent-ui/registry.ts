@@ -1,7 +1,7 @@
 import type { UiRenderers } from './render-context';
 import { ChartRenderer } from './renderers/chart';
 import { ChoiceRenderer, ChoicesRenderer } from './renderers/choices';
-import { CodeBlockRenderer, ImageRenderer, SourceRenderer, SourcesRenderer } from './renderers/content';
+import { CodeBlockRenderer, CompareRenderer, GalleryRenderer, ImageRenderer, SourceRenderer, SourcesRenderer } from './renderers/content';
 import { EntityListRenderer, EntryRenderer, StatRenderer, StatsRenderer, TableRenderer } from './renderers/data';
 import { ButtonRenderer, ChecklistRenderer, ItemRenderer, SegmentedRenderer, SliderRenderer, SwitchRenderer } from './renderers/inputs';
 import { CommitRenderer, DiffRenderer, FileRenderer, NodeRenderer } from './renderers/links';
@@ -44,6 +44,8 @@ export const UI_RENDERERS: UiRenderers = {
     Section: SectionRenderer,
     CodeBlock: CodeBlockRenderer,
     Image: ImageRenderer,
+    Gallery: GalleryRenderer,
+    Compare: CompareRenderer,
     Sources: SourcesRenderer,
     Source: SourceRenderer,
     File: FileRenderer,

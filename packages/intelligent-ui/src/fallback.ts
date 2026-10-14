@@ -42,6 +42,8 @@ export function uiNodeFallback(type: string, props: Readonly<Record<string, unkn
         }
         case 'Chart':
             return `${uiPlainText(props.data ?? [])}${given(props.unit) ? ` (${uiPlainText(props.unit)})` : ''}\n`;
+        case 'Compare':
+            return `[Compare: ${uiPlainText(props.beforeLabel || 'Before')} ${uiPlainText(props.before)}, ${uiPlainText(props.afterLabel || 'After')} ${uiPlainText(props.after)}]${children.trim() ? ` ${children.trim()}` : ''}\n`;
         case 'Image':
             return `[Image: ${uiPlainText(props.alt ?? props.attachment ?? props.generated ?? 'unavailable')}]${children}\n`;
     }
