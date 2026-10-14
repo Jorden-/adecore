@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent, type PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { ChevronDown } from 'lucide-react';
@@ -40,6 +40,7 @@ import { useNotice } from './composer/use-notice';
 import { usePendingRequests } from './composer/use-pending-requests';
 import { usePromptHistory } from './composer/use-prompt-history';
 import { usePromptHold } from './composer/use-prompt-hold';
+import { surfacePartOf } from './composer/surface';
 import { useTakeBack } from './composer/use-take-back';
 
 interface ComposerProps {
@@ -154,6 +155,19 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
         submit
     });
 
+    const pointSurface = (event: PointerEvent<HTMLDivElement>) => {
+        event.currentTarget.toggleAttribute('data-text-cursor', surfacePartOf(event.target, event.currentTarget) !== 'action');
+    };
+
+    const pressSurface = (event: MouseEvent<HTMLDivElement>) => {
+        if (!writable || event.button !== 0 || event.defaultPrevented || surfacePartOf(event.target, event.currentTarget) !== 'surface') {
+            return;
+        }
+        // Nothing around the field selects, so the default would only blur it on the way, closing its picker and lifting a held prompt card.
+        event.preventDefault();
+        inputRef.current?.setCaret(Infinity);
+    };
+
     return (
         <div className="chat-composer-content pointer-events-none relative z-10 w-full">
             {/* Over the composer rather than in the thread, since the composer's height is the one it always clears.
@@ -191,104 +205,106 @@ export function Composer({ chatId, info, focused, answerPromptsElsewhere, disabl
                     onAllAnswered={() => inputRef.current?.focus()}
                     hold={hold}
                 >
-                    <LimitDock chatId={chatId} info={info} />
-                    <GoalDock chatId={chatId} info={info} goals={capabilities?.goals} />
-                    {compactionOffer && (
-                        <ResumeCompactionDock
-                            tokens={compactionOffer.tokens}
-                            onCompact={controls.compact}
-                            onDismiss={() => dismissResumeCompaction(scope, chatId, compactionOffer.turnId)}
+                    <div className={clsx(writable && 'data-[text-cursor]:cursor-text')} onPointerOver={pointSurface} onMouseDown={pressSurface}>
+                        <LimitDock chatId={chatId} info={info} />
+                        <GoalDock chatId={chatId} info={info} goals={capabilities?.goals} />
+                        {compactionOffer && (
+                            <ResumeCompactionDock
+                                tokens={compactionOffer.tokens}
+                                onCompact={controls.compact}
+                                onDismiss={() => dismissResumeCompaction(scope, chatId, compactionOffer.turnId)}
+                            />
+                        )}
+                        <ComposerMenu menus={menus} />
+                        {queue.length > 0 && (
+                            <QueuedMessages
+                                chatId={chatId}
+                                queue={queue}
+                                paused={info.queuePaused === true}
+                                takingBack={takingBack !== null}
+                                onEdit={(message) => void takeBack(message)}
+                            />
+                        )}
+                        {draft.quote !== '' && (
+                            <DraftQuote
+                                chatId={chatId}
+                                quote={draft.quote}
+                                source={draft.quoteSource}
+                                onRemove={box.removeQuote}
+                                onSourceGone={() => notice.setNotice(t('rows.user.quoteGone'))}
+                            />
+                        )}
+                        {draft.chats.length > 0 && <DraftChats chats={draft.chats} onRemove={box.removeChat} />}
+                        {draft.attachments.length > 0 && <DraftAttachments attachments={draft.attachments} onRemove={box.removeAttachment} />}
+                        <ComposerInput
+                            ref={inputRef}
+                            dictationToolbar={dictationToolbar}
+                            className="composer-input select-text text-sm leading-normal text-text"
+                            value={draft.text}
+                            placeholder={placeholder}
+                            disabled={!writable}
+                            tabbable={focused}
+                            extensions={editorExtensions}
+                            aria={menus.inputAria}
+                            onChange={(value, selection, state) => {
+                                hold.noteInput();
+                                box.setText(value);
+                                menus.setMenuIndex(0);
+                                menus.trackTriggers(value, selection, state);
+                                history.edited(value);
+                            }}
+                            onSelectionChange={menus.trackTriggers}
+                            onBlur={() => {
+                                menus.close();
+                                hold.release('blur');
+                            }}
+                            onComposing={hold.setComposing}
+                            onKeyDown={onKeyDown}
+                            onPaste={files.onPaste}
                         />
-                    )}
-                    <ComposerMenu menus={menus} />
-                    {queue.length > 0 && (
-                        <QueuedMessages
+                        {notice.notice && (
+                            <div className="px-5 pb-1 text-xs text-status-error @max-md/composer:px-3.5" role="alert">
+                                {notice.notice}
+                            </div>
+                        )}
+                        {guard.visible && (
+                            <div
+                                className={clsx(
+                                    'px-5 pb-1 text-right text-xs tabular-nums @max-md/composer:px-3.5',
+                                    guard.tooLong ? 'text-status-error' : 'text-text-faint'
+                                )}
+                            >
+                                {formatNumber(guard.count)} / {formatNumber(PROMPT_MAX_CHARS)}
+                                {guard.tooLong && ` ${t('composer.tooLong')}`}
+                            </div>
+                        )}
+                        <ComposerControls
                             chatId={chatId}
-                            queue={queue}
-                            paused={info.queuePaused === true}
-                            takingBack={takingBack !== null}
-                            onEdit={(message) => void takeBack(message)}
+                            info={info}
+                            providerFixed={providerFixed}
+                            writable={writable}
+                            attachable={capabilities?.attachments !== false}
+                            controls={controls}
+                            send={{
+                                visible: !busy || !empty,
+                                disabled: empty || !writable || guard.tooLong,
+                                label: t(sendLabelKey(busy, steerable, sendDelivery)),
+                                kbd: sendShortcut(sendKey, draft.text.includes('\n')),
+                                onSend: (alternate) => submit(alternate ? 'alternate' : 'default')
+                            }}
+                            dictationToolbar={setDictationToolbar}
+                            onFiles={(picked) => {
+                                files.addFiles(picked);
+                                inputRef.current?.focus();
+                            }}
+                            onRestore={restoreStashed}
+                            insert={(added) => {
+                                if (writable) {
+                                    inputRef.current?.insert(added);
+                                }
+                            }}
                         />
-                    )}
-                    {draft.quote !== '' && (
-                        <DraftQuote
-                            chatId={chatId}
-                            quote={draft.quote}
-                            source={draft.quoteSource}
-                            onRemove={box.removeQuote}
-                            onSourceGone={() => notice.setNotice(t('rows.user.quoteGone'))}
-                        />
-                    )}
-                    {draft.chats.length > 0 && <DraftChats chats={draft.chats} onRemove={box.removeChat} />}
-                    {draft.attachments.length > 0 && <DraftAttachments attachments={draft.attachments} onRemove={box.removeAttachment} />}
-                    <ComposerInput
-                        ref={inputRef}
-                        dictationToolbar={dictationToolbar}
-                        className="composer-input select-text text-sm leading-normal text-text"
-                        value={draft.text}
-                        placeholder={placeholder}
-                        disabled={!writable}
-                        tabbable={focused}
-                        extensions={editorExtensions}
-                        aria={menus.inputAria}
-                        onChange={(value, selection, state) => {
-                            hold.noteInput();
-                            box.setText(value);
-                            menus.setMenuIndex(0);
-                            menus.trackTriggers(value, selection, state);
-                            history.edited(value);
-                        }}
-                        onSelectionChange={menus.trackTriggers}
-                        onBlur={() => {
-                            menus.close();
-                            hold.release('blur');
-                        }}
-                        onComposing={hold.setComposing}
-                        onKeyDown={onKeyDown}
-                        onPaste={files.onPaste}
-                    />
-                    {notice.notice && (
-                        <div className="px-5 pb-1 text-xs text-status-error @max-md/composer:px-3.5" role="alert">
-                            {notice.notice}
-                        </div>
-                    )}
-                    {guard.visible && (
-                        <div
-                            className={clsx(
-                                'px-5 pb-1 text-right text-xs tabular-nums @max-md/composer:px-3.5',
-                                guard.tooLong ? 'text-status-error' : 'text-text-faint'
-                            )}
-                        >
-                            {formatNumber(guard.count)} / {formatNumber(PROMPT_MAX_CHARS)}
-                            {guard.tooLong && ` ${t('composer.tooLong')}`}
-                        </div>
-                    )}
-                    <ComposerControls
-                        chatId={chatId}
-                        info={info}
-                        providerFixed={providerFixed}
-                        writable={writable}
-                        attachable={capabilities?.attachments !== false}
-                        controls={controls}
-                        send={{
-                            visible: !busy || !empty,
-                            disabled: empty || !writable || guard.tooLong,
-                            label: t(sendLabelKey(busy, steerable, sendDelivery)),
-                            kbd: sendShortcut(sendKey, draft.text.includes('\n')),
-                            onSend: (alternate) => submit(alternate ? 'alternate' : 'default')
-                        }}
-                        dictationToolbar={setDictationToolbar}
-                        onFiles={(picked) => {
-                            files.addFiles(picked);
-                            inputRef.current?.focus();
-                        }}
-                        onRestore={restoreStashed}
-                        insert={(added) => {
-                            if (writable) {
-                                inputRef.current?.insert(added);
-                            }
-                        }}
-                    />
+                    </div>
                 </PromptComposer>
             </div>
             <PromptDialog

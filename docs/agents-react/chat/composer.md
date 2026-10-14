@@ -56,6 +56,10 @@ Which key sends is the person's `sendKey` in the [chat preferences](/agents-reac
 
 `/model`, `/compact` and `/clear` are handled by the composer; the CLI's own commands go to it as text, except those that only make sense in its terminal (`usableSlashCommands`). `/goal` is listed for every CLI with the `goals` capability, also one that lists no commands of its own.
 
+## Pointer
+
+The box reads as one text field. Its empty space shows the text cursor, and a press there puts the caret at the end of the text; a press in the text places it as the editor does. Actions keep their own cursor and never take the focus: a link, a button, a form control, an element with an interactive role or a tab stop, and anything inside one. A control of your own in the `ComposerSlot` that is none of these marks itself with `data-composer-action`. A composer that is disabled or read-only takes no focus this way.
+
 ## Goals
 
 While the chat has a goal, `GoalDock({ chatId, info, goals })` stands at the top of the composer, which draws it itself: where the goal stands, the objective, how far it got in what the CLI counts, and the actions the CLI takes. The whole objective and what the last check said are in its tooltip. `goalView(info, goals, canAct)` answers which actions those are: pause, resume and clear on a CLI with `goals: 'native'`, clear between turns on one with `goals: 'command'`, and none where the host's actions have no `goal`. `GoalPill({ chatId })` says a goal works in a header that shows the chat without its thread, from the status every client gets.

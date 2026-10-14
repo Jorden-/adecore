@@ -74,6 +74,7 @@ interface Options {
     actions?: Partial<ChatActions>;
     skills?: ChatSkill[];
     items?: ChatItem[];
+    disabled?: boolean;
 }
 
 interface Modifiers {
@@ -245,7 +246,7 @@ async function mount(options: Options = {}): Promise<Mounted> {
                     chatId={CHAT}
                     info={info}
                     focused={false}
-                    disabled={false}
+                    disabled={options.disabled ?? false}
                     providerFixed={false}
                     onSend={(text, extras) => {
                         sent.push({ text, extras });
@@ -580,5 +581,93 @@ describe('the queue', () => {
         expect(composer.calls).toEqual([['unqueue', CHAT, 'queued']]);
         expect(composer.text()).toBe('Later\n\nTyped');
         expect(readDraft(CHAT).mentions).toEqual(['src/app.ts']);
+    });
+});
+
+describe('the surface around the text', () => {
+    /* Counts the editor taking the focus; linkedom has no focus of its own. */
+    const watchFocus = (composer: Mounted): { count: number } => {
+        const focus = { count: 0 };
+        composer.view().contentDOM.focus = () => {
+            focus.count += 1;
+        };
+        return focus;
+    };
+    const surfaceOf = (composer: Mounted): HTMLElement => composer.page.host.querySelector('.composer-input')!.parentElement!.parentElement!;
+    const press = async (composer: Mounted, target: Element): Promise<Event> => {
+        let pressed: Event | null = null;
+        target.addEventListener('mousedown', (event) => {
+            pressed = event;
+        });
+        await composer.fire(target, 'mousedown', { button: 0 });
+        return pressed!;
+    };
+
+    test('a press on its empty space writes at the end of the text', async () => {
+        const composer = await mount();
+        await composer.type('Hello there');
+        await composer.caret(2);
+        const focus = watchFocus(composer);
+        const event = await press(composer, composer.page.host.querySelector('span.grow')!);
+        expect(event.defaultPrevented).toBe(true);
+        expect(focus.count).toBe(1);
+        expect(composer.view().state.selection.main.head).toBe('Hello there'.length);
+    });
+
+    // The editor's own part that places no caret, since linkedom has no layout to place one from.
+    test('a press in the editor is left to it', async () => {
+        const composer = await mount();
+        await composer.type('Hello there');
+        await composer.caret(2);
+        const focus = watchFocus(composer);
+        const event = await press(composer, composer.page.host.querySelector('.cm-announced')!);
+        expect(event.defaultPrevented).toBe(false);
+        expect(focus.count).toBe(0);
+        expect(composer.view().state.selection.main.head).toBe(2);
+    });
+
+    test('a press on an action keeps the focus where it is and still runs the action', async () => {
+        const composer = await mount();
+        await composer.type('Hello');
+        await composer.caret(2);
+        const focus = watchFocus(composer);
+        const send = composer.byLabel('Send')!;
+        const picker = composer.page.host.querySelector('[aria-haspopup="menu"]')!;
+        expect((await press(composer, send)).defaultPrevented).toBe(false);
+        expect((await press(composer, picker.querySelector('span')!)).defaultPrevented).toBe(false);
+        expect(focus.count).toBe(0);
+        expect(composer.view().state.selection.main.head).toBe(2);
+        await composer.click(send);
+        expect(composer.sent.map((entry) => entry.text)).toEqual(['Hello']);
+    });
+
+    test('a control of the host that marks itself as an action is one', async () => {
+        const composer = await mount({
+            host: { ComposerSlot: () => <span data-composer-action>Playhead</span> }
+        });
+        const focus = watchFocus(composer);
+        const event = await press(composer, composer.page.host.querySelector('[data-composer-action]')!);
+        expect(event.defaultPrevented).toBe(false);
+        expect(focus.count).toBe(0);
+    });
+
+    test('a composer that cannot be written to takes no focus and shows no text cursor', async () => {
+        const composer = await mount({ disabled: true });
+        const focus = watchFocus(composer);
+        const event = await press(composer, composer.page.host.querySelector('span.grow')!);
+        expect(event.defaultPrevented).toBe(false);
+        expect(focus.count).toBe(0);
+        expect(surfaceOf(composer).className).not.toContain('cursor-text');
+    });
+
+    test('the text cursor shows over the empty space and the text, and not over an action', async () => {
+        const composer = await mount();
+        const surface = surfaceOf(composer);
+        await composer.fire(composer.page.host.querySelector('span.grow')!, 'pointerover', {});
+        expect(surface.hasAttribute('data-text-cursor')).toBe(true);
+        await composer.fire(composer.byLabel('Send')!, 'pointerover', {});
+        expect(surface.hasAttribute('data-text-cursor')).toBe(false);
+        await composer.fire(composer.view().contentDOM, 'pointerover', {});
+        expect(surface.hasAttribute('data-text-cursor')).toBe(true);
     });
 });
