@@ -1,4 +1,5 @@
-import { Suspense, useMemo } from 'react';
+import { useMemo } from 'react';
+import { LazyBoundary } from '@adecore/ui';
 import { useTranslation } from 'react-i18next';
 import { lazyNamed } from '../../lazy';
 import { diffSourceBudget, legacyDiffBudget } from './diff/diff-source-budget';
@@ -22,9 +23,9 @@ export default function EditDiff({ change, allowEditor = true, maxHeight }: { ch
     const omitted = <DiffOmitted path={change.path} />;
     const fallback = legacyAllowed ? (
         <DiffFallbackBoundary fallback={omitted} resetKeys={[change.path, change.before, change.after]}>
-            <Suspense fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
+            <LazyBoundary fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
                 <LegacyEditDiff change={change} maxHeight={maxHeight} />
-            </Suspense>
+            </LazyBoundary>
         </DiffFallbackBoundary>
     ) : (
         omitted
@@ -38,9 +39,9 @@ export default function EditDiff({ change, allowEditor = true, maxHeight }: { ch
     const unavailable = <DiffUnavailable path={change.path} />;
     return (
         <DiffFallbackBoundary fallback={unavailable} resetKeys={[change.path, change.before, change.after, loadEngine]}>
-            <Suspense fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
+            <LazyBoundary fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
                 <EditorEditDiff change={change} loadEngine={loadEngine!} fallback={unavailable} maxHeight={maxHeight} sourceChecked />
-            </Suspense>
+            </LazyBoundary>
         </DiffFallbackBoundary>
     );
 }

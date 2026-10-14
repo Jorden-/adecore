@@ -1,4 +1,4 @@
-import { Fragment, Suspense, useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { Fragment, useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import clsx from 'clsx';
 import i18next from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -28,7 +28,7 @@ import { useChatScope } from '../../../scope';
 import { useCurrentItem } from '../../../state/chats';
 import { useTimelineFlash } from '../../timeline-flash';
 import { formatClockDuration, formatElapsedShort } from '@adecore/ui/format';
-import { Icon, MiddleTruncate, Spinner, useTickingText } from '@adecore/ui';
+import { Icon, LazyBoundary, MiddleTruncate, Spinner, useTickingText } from '@adecore/ui';
 import { ROW_GUTTER, toolIcon } from '../icons';
 import { AnsiOutput } from '../AnsiOutput';
 import { RowTime } from '../RowTime';
@@ -122,7 +122,7 @@ export function ToggleLine({
 /* The diff renderers load lazily, so a diff waits on them under a line that says so. */
 function DiffSuspense({ children }: { children: ReactNode }) {
     const { t } = useTranslation('agent-chat');
-    return <Suspense fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>{children}</Suspense>;
+    return <LazyBoundary fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>{children}</LazyBoundary>;
 }
 
 /* A file in a changed files card, which opens its diff under it. */

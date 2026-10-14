@@ -1,4 +1,5 @@
 import { lazy, type ComponentProps, type ComponentType } from 'react';
+import { LoadedComponent } from '@adecore/ui';
 
 type Loader = () => Promise<unknown>;
 
@@ -38,12 +39,9 @@ export function lazyNamed<Module extends Record<Name, ComponentType<any>>, Name 
     name: Name,
     options?: { readonly prefetch?: boolean }
 ): ComponentType<ComponentProps<Module[Name]>> {
-    let loaded: ComponentType<any> | null = null;
-    const open = async (): Promise<ComponentType<any>> => {
-        const component = (await load())[name];
-        loaded ??= component;
-        return component;
-    };
+    // Through `LoadedComponent`, so a `LazyBoundary` around it draws the moment the module lands.
+    const loaded = new LoadedComponent<ComponentType<any>>(async () => (await load())[name]);
+    const open = (): Promise<ComponentType<any>> => loaded.load();
     if (options?.prefetch !== false) {
         loaders.push(open);
         register?.(open);
@@ -60,7 +58,7 @@ export function lazyNamed<Module extends Record<Name, ComponentType<any>>, Name 
         }
     });
     const LazyNamed = (props: ComponentProps<Module[Name]>) => {
-        const Component: ComponentType<any> = loaded ?? Lazy;
+        const Component: ComponentType<any> = loaded.current ?? Lazy;
         return <Component {...props} />;
     };
     return LazyNamed;

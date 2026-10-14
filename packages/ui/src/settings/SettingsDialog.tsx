@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type Ref } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode, type Ref } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { Tabs } from '@base-ui/react/tabs';
@@ -8,6 +8,7 @@ import { DialogDescription, DialogPopup, DialogRoot, DialogTitle } from '../dial
 import { ErrorBoundary } from '../ErrorBoundary.tsx';
 import { Icon } from '../Icon.tsx';
 import { IconButton } from '../IconButton.tsx';
+import { LazyBoundary } from '../LazyBoundary.tsx';
 import { Input } from '../Input.tsx';
 import { Select } from '../Select.tsx';
 import { SettingsTargetContext } from './target.ts';
@@ -18,7 +19,7 @@ export interface SettingsSectionEntry {
     label: string;
     /* One line under the pane title that says what the pane is about. */
     description: string;
-    /* Rendered in a Suspense, so a lazy component loads when its section is opened. */
+    /* Rendered in a `LazyBoundary`, so a lazy component loads when its section is opened. */
     pane: ComponentType;
     /* A list beside a detail that scrolls on its own (`MasterDetail`), instead of one padded column. */
     split?: boolean;
@@ -320,14 +321,14 @@ export function SettingsDialog({
                                         }}
                                     >
                                         <ErrorBoundary label={t('settings.failed')} className="min-h-0 grow">
-                                            <Suspense fallback={null}>
+                                            <LazyBoundary>
                                                 {Hero && (
                                                     <div className="-mx-8 shrink-0 max-[960px]:-mx-4">
                                                         <Hero />
                                                     </div>
                                                 )}
                                                 <Pane />
-                                            </Suspense>
+                                            </LazyBoundary>
                                         </ErrorBoundary>
                                     </Tabs.Panel>
                                 );

@@ -1,4 +1,5 @@
-import { Suspense, useMemo } from 'react';
+import { useMemo } from 'react';
+import { LazyBoundary } from '@adecore/ui';
 import { useTranslation } from 'react-i18next';
 import { lazyNamed } from '../../lazy';
 import { diffSourceBudget, legacyDiffBudget, patchSourceBudget } from './diff/diff-source-budget';
@@ -27,9 +28,9 @@ export default function UnifiedDiff(props: UnifiedDiffProps) {
     const omitted = <DiffOmitted path={change.path} />;
     const fallback = legacyAllowed ? (
         <DiffFallbackBoundary fallback={omitted} resetKeys={[change.path, change.diff, oldText, newText, diffStyle]}>
-            <Suspense fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
+            <LazyBoundary fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
                 <LegacyUnifiedDiff {...props} />
-            </Suspense>
+            </LazyBoundary>
         </DiffFallbackBoundary>
     ) : (
         omitted
@@ -46,7 +47,7 @@ export default function UnifiedDiff(props: UnifiedDiffProps) {
     const unavailable = <DiffUnavailable path={change.path} />;
     return (
         <DiffFallbackBoundary fallback={unavailable} resetKeys={[change.path, change.diff, oldText, newText, ignoreWhitespace, diffStyle, loadEngine]}>
-            <Suspense fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
+            <LazyBoundary fallback={<div className="px-3 py-2 text-xs text-text-faint">{t('work.loadingDiff')}</div>}>
                 <EditorPatchDiff
                     change={change}
                     sourceChecked
@@ -59,7 +60,7 @@ export default function UnifiedDiff(props: UnifiedDiffProps) {
                     loadEngine={loadEngine!}
                     fallback={unavailable}
                 />
-            </Suspense>
+            </LazyBoundary>
         </DiffFallbackBoundary>
     );
 }

@@ -3,7 +3,7 @@
 Components loaded on first use, and a prefetcher that loads them ahead of that once the app is idle.
 
 ```tsx
-import { lazyDialog, lazyNamed, onLazyOpenError, prefetcher } from '@adecore/ui';
+import { LazyBoundary, lazyDialog, lazyNamed, onLazyOpenError, prefetcher } from '@adecore/ui';
 ```
 
 <Demo src="utilities/lazy-loading" />
@@ -14,6 +14,22 @@ import { lazyDialog, lazyNamed, onLazyOpenError, prefetcher } from '@adecore/ui'
 
 ```tsx
 const HistoryPanel = lazyNamed(() => import('./HistoryPanel'), 'HistoryPanel');
+```
+
+What it returns is a `LazyComponent`: a component with `preload()`, which loads the module ahead of the first render, so that render draws straight away and never shows the fallback. Hand it to the prefetcher to load one surface first, such as the screen a person is about to open.
+
+```tsx
+void prefetcher.prefetch(HistoryPanel.preload);
+```
+
+## LazyBoundary
+
+`LazyBoundary` is `Suspense` for what `lazyNamed` loads, with the same `fallback` (`LazyBoundaryProps`). React holds content that arrives as a retry back until 300 ms after its fallback showed, so a module that loads in 20 ms would still show its fallback for 300 ms. A `LazyBoundary` draws again as an ordinary update the moment a module lands, and the content shows when its module is here.
+
+```tsx
+<LazyBoundary fallback={<PanelSkeleton />}>
+    <HistoryPanel />
+</LazyBoundary>
 ```
 
 ## lazyDialog

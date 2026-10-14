@@ -1,4 +1,5 @@
 import { Suspense, lazy, useState, useSyncExternalStore, type ComponentProps, type ComponentType } from 'react';
+import { noteLanding } from './lazy-landings.ts';
 import { prefetcher } from './prefetch.ts';
 
 /*
@@ -22,6 +23,7 @@ export class LoadedComponent<Component> {
             for (const listener of this.listeners) {
                 listener();
             }
+            noteLanding();
         }
         return component;
     }
@@ -60,6 +62,9 @@ async function open<Component>(loaded: LoadedComponent<Component>): Promise<{ de
     }
 }
 
+/* A lazy component, with `preload` to have its module before the first render, so that render never suspends. */
+export type LazyComponent<Props> = ComponentType<Props> & { readonly preload: () => Promise<void> };
+
 /*
  * `React.lazy` for a module that exports its component by name, `default` included. Every module
  * loaded through here, or through `lazyDialog`, registers with `prefetcher`, which loads it ahead of
@@ -68,7 +73,7 @@ async function open<Component>(loaded: LoadedComponent<Component>): Promise<{ de
 export function lazyNamed<Module extends Record<Name, ComponentType<any>>, Name extends keyof Module>(
     load: () => Promise<Module>,
     name: Name
-): ComponentType<ComponentProps<Module[Name]>> {
+): LazyComponent<ComponentProps<Module[Name]>> {
     const loaded = new LoadedComponent(async () => (await load())[name]);
     prefetcher.register(() => loaded.load());
     const Lazy = lazy(() => open(loaded));
@@ -77,7 +82,11 @@ export function lazyNamed<Module extends Record<Name, ComponentType<any>>, Name 
         const Component: ComponentType<any> = loaded.current ?? Lazy;
         return <Component {...props} />;
     };
-    return LazyNamed;
+    return Object.assign(LazyNamed, {
+        preload: async () => {
+            await loaded.load();
+        }
+    });
 }
 
 /* Stays true after the first opening, so every close after it still has something mounted to animate. */
