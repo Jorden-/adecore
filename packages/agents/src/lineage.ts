@@ -70,14 +70,13 @@ export class AgentLineageStore {
         return found;
     }
 
-    /* Moves a node's record to another project with its dates as they were; false when nothing was written down for it. */
+    /* Moves a node's record to another project with its dates as they were; false when nothing was written down for it or a prune took it meanwhile. */
     async rehome(nodeId: string, projectId: string): Promise<boolean> {
         const entry = this.opened.get(nodeId);
         if (entry === undefined) {
             return false;
         }
-        await this.opened.write({ ...entry, projectId });
-        return true;
+        return this.opened.write({ ...entry, projectId });
     }
 
     /* The project a node was made in, for work owed about it after the node that opened it is gone. */

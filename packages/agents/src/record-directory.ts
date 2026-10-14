@@ -122,9 +122,12 @@ export class RecordDirectory<T> {
     }
 
     async prune(drop: (record: T) => boolean): Promise<void> {
-        for (const record of this.all()) {
-            if (drop(record)) {
-                await this.remove(this.idOf(record));
+        for (const listed of this.all()) {
+            const id = this.idOf(listed);
+            // Read again after each await: a record written meanwhile may no longer be one to drop.
+            const current = this.records.get(id);
+            if (current !== undefined && drop(current)) {
+                await this.remove(id);
             }
         }
     }

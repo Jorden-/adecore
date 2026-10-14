@@ -127,6 +127,22 @@ test('a rehomed fork leaves the old project, and keeps its dates, its original a
     expect(restarted.forksLeaving('b', new Set())).toEqual(['chat-b']);
 });
 
+test('a fork rehomed while its old project is pruned survives the prune', async () => {
+    await store.put({ projectId: 'a', nodeId: 'chat-x', openedBy: 'chat-root', depth: 1, agent: true, relation: 'fork' });
+    await store.put({ projectId: 'a', nodeId: 'chat-y', openedBy: 'chat-root', depth: 1, agent: true, relation: 'fork' });
+
+    const pruning = store.prune('a', new Set());
+    const moved = store.rehome('chat-y', 'b');
+    await pruning;
+
+    expect(await moved).toBe(true);
+    expect(store.projectOf('chat-x')).toBeNull();
+    expect(store.projectOf('chat-y')).toBe('b');
+    const restarted = new AgentLineageStore(home);
+    await restarted.load();
+    expect(restarted.projectOf('chat-y')).toBe('b');
+});
+
 test('rehoming a node nobody wrote down changes nothing', async () => {
     expect(await store.rehome('nobody', 'b')).toBe(false);
     expect(store.projectOf('nobody')).toBeNull();
