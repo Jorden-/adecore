@@ -187,10 +187,14 @@ export class TaskStore {
         return [...new Set(ids)];
     }
 
-    /* A parent nobody can wake any more: its settled tasks stop waiting for it. */
+    /*
+     * A parent nobody can wake any more: its settled tasks stop waiting for it. Each record is read again
+     * just before its write, since a task may settle while an earlier write of this loop waits.
+     */
     async dropWake(parentId: string): Promise<void> {
-        for (const task of this.ofParent(parentId)) {
-            if (task.wake === 'pending') {
+        for (const { id } of this.ofParent(parentId)) {
+            const task = this.tasks.get(id);
+            if (task && task.wake === 'pending') {
                 await this.write({ ...task, wake: 'none' });
             }
         }

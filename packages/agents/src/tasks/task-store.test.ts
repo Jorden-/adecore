@@ -48,3 +48,16 @@ test('a new task is written in the shape an older daemon reads, and every client
     );
     expect(heard).toEqual([{ event: 'task.changed', payload: { task } }]);
 });
+
+test('a task that settles while the wakes of its parent are dropped stays settled', async () => {
+    const store = new TaskStore(home);
+    const record = (childId: string) => ({ projectId: 'p', parentId: 'lead', childId, title: childId, prompt: 'Go' });
+    const first = await store.open(record('a'), 1);
+    const second = await store.open(record('b'), 2);
+
+    await Promise.all([store.dropWake('lead'), store.settle(second.id, 'failed', { text: 'gone', source: 'exit', at: 3 }, 3)]);
+
+    expect(store.get(second.id)).toMatchObject({ status: 'failed', result: { text: 'gone' } });
+    expect(store.get(first.id)).toMatchObject({ status: 'open' });
+    expect(store.pendingWake('lead')).toEqual([]);
+});
