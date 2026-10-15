@@ -166,7 +166,15 @@
             "refactor": "Refactor",
             "cut": "Cut",
             "copy": "Copy",
-            "paste": "Paste"
+            "paste": "Paste",
+            "renameSymbol": "Rename symbol…",
+            "goTo": {
+                "menu": "Go to",
+                "definition": "Definition",
+                "declaration": "Declaration",
+                "typeDefinition": "Type definition",
+                "implementation": "Implementation"
+            }
         },
         "snippet": {
             "choices": "Snippet choice"

@@ -166,7 +166,15 @@
             "refactor": "Refactor",
             "cut": "Knip",
             "copy": "Kopieer",
-            "paste": "Plak"
+            "paste": "Plak",
+            "renameSymbol": "Symbool hernoemen…",
+            "goTo": {
+                "menu": "Ga naar",
+                "definition": "Definitie",
+                "declaration": "Declaratie",
+                "typeDefinition": "Typedefinitie",
+                "implementation": "Implementatie"
+            }
         },
         "snippet": {
             "choices": "Snippetkeuze"

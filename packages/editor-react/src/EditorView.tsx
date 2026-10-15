@@ -32,7 +32,7 @@ export interface EditorViewProps {
     ref?: Ref<HTMLDivElement>;
     /* Read when the editor mounts, so an inline function does not mount it again. */
     onMount?(editor: Editor, language: EditorLanguage | null): void | (() => void);
-    /* Rows of the app in the context menu, between the refactorings and the clipboard rows. */
+    /* A group of the app's own rows in the context menu, set apart between the refactorings and the clipboard rows. */
     contextMenuItems?(language: EditorLanguage): ReactNode;
     /* Sections of the app at the foot of the hover card, such as actions on its problems. */
     hoverFooter?(view: HoverView, language: EditorLanguage): ReactNode;

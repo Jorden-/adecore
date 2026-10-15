@@ -27,7 +27,7 @@
 | `timers`           | `Timers`                                     | The clock of the language features, such as `ManualTimers` in a test                                                             |
 | `languageOptions`  | `EditorLanguageOptions`                      | What the app tunes about the features, as the last argument of `EditorLanguage`                                                  |
 | `onMount`          | `(editor, language) => void \| (() => void)` | Called after mounting with the `Editor` and the `EditorLanguage`, or `null`; the function it returns runs before the editor goes |
-| `contextMenuItems` | `(language) => ReactNode`                    | Rows of the app in the [context menu](/editor-react/rename#context-menu)                                                         |
+| `contextMenuItems` | `(language) => ReactNode`                    | A group of the app in the [context menu](/editor-react/rename#context-menu)                                                      |
 | `hoverFooter`      | `(view, language) => ReactNode`              | Sections of the app at the foot of the [hover card](#languagepopups)                                                             |
 | `className`, `ref` |                                              | On the outer element, which needs a height                                                                                       |
 
@@ -77,7 +77,7 @@ An app adds its own parts through `LanguagePopupsProps`, so it never needs a cop
 | Prop               | Type                            | Meaning                                                                                                                                                                                                       |
 | ------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `language`         | `EditorLanguage` or a subclass  | The editor's features; the callbacks below get the same type back                                                                                                                                             |
-| `contextMenuItems` | `(language) => ReactNode`       | Rows of the app in the [context menu](/editor-react/rename#context-menu)                                                                                                                                      |
+| `contextMenuItems` | `(language) => ReactNode`       | A group of the app in the [context menu](/editor-react/rename#context-menu)                                                                                                                                   |
 | `hoverFooter`      | `(view, language) => ReactNode` | Sections at the foot of the hover card, below its problems, such as actions on them. `view` is the `HoverView` the card shows; each element at the top level gets a divider above it, and `null` adds nothing |
 | `children`         | `ReactNode`                     | A layer of the app over the editor, drawn after the cards and before the rename field, such as an inline prompt                                                                                               |
 

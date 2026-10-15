@@ -17,7 +17,7 @@ import type { HoverView } from './popups.ts';
 
 export interface LanguagePopupsProps<Language extends EditorLanguage = EditorLanguage> {
     language: Language;
-    /* Rows of the app in the context menu, between the refactorings and the clipboard rows. */
+    /* A group of the app's own rows in the context menu, set apart between the refactorings and the clipboard rows. */
     contextMenuItems?(language: Language): ReactNode;
     /* Sections of the app at the foot of the hover card, such as actions on its problems; each element gets a divider above it. */
     hoverFooter?(view: HoverView, language: Language): ReactNode;

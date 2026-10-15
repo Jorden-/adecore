@@ -29,18 +29,15 @@ The preview of an action notes the other files it edits, and how many files it m
 
 ## Context menu
 
-A right click asks the editor for a context menu, and the editor draws it: go to definition, type definition and implementation, peek references, call hierarchy, rename and code actions where the service supports them, a submenu of refactorings, cut, copy and paste, and format document. Each row shows its key from the key table. A right click outside the selection moves the caret there first.
+A right click asks the editor for a context menu, and the editor draws it in groups: a Go to submenu with definition, declaration, type definition and implementation; peek references and call hierarchy; rename symbol, code actions and a submenu of refactorings; then cut, copy and paste, and format document. A row is there where the service supports it, and a group without rows leaves no line behind. Each row shows its key, from the key table or the clipboard's own. A right click outside the selection moves the caret there first.
 
-`contextMenuItems` on `EditorView` or `LanguagePopups` adds rows of the app between the refactorings and the clipboard rows. It gets the `EditorLanguage`, so a row can call a feature:
+`contextMenuItems` on `EditorView` or `LanguagePopups` adds a group of the app's own rows between the refactorings and the clipboard rows, with a line on either side. It gets the `EditorLanguage`, so a row can read its document or call a feature:
 
 ```tsx
 <EditorView
     {...props}
     contextMenuItems={(language) => (
-        <>
-            <ContextMenu.Separator />
-            <ContextMenu.Item onClick={() => void language.navigation.go('declaration')}>Go to declaration</ContextMenu.Item>
-        </>
+        <ContextMenu.Item onClick={() => copyText(language.uri)}>Copy file address</ContextMenu.Item>
     )}
 />
 ```
