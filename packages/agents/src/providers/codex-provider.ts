@@ -13,6 +13,9 @@ export function createCodexProvider(options: CodexBackendOptions = {}): ChatProv
         capabilities: CODEX_CAPABILITIES,
         command: ['codex', ...CODEX_CHAT_ARGS],
         resumeCommand: CODEX_RESUME_COMMAND,
+        // A folder's `.codex` layer loads once the person's own config trusts the folder or its repository, which a worktree inherits;
+        // neither `-c` nor `project_root_markers` turns it off, and `--disable hooks` would take the person's hooks along (Codex 0.162.1).
+        ignoresProjectConfig: false,
         // The auth variables Codex 0.157 names in its own "no Codex credentials were found" advice.
         home: { env: 'CODEX_HOME', fallback: '.codex', loginEnv: ['OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_ACCESS_TOKEN'], loginCommand: 'codex login' },
         detect: detectCli,

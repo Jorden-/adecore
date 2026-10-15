@@ -10,6 +10,8 @@ export type ChatErrorCode =
     | 'chat-busy'
     | 'request-not-found'
     | 'chat-unsupported'
+    // The host asked for a chat that ignores the configuration of its folder, and this CLI cannot.
+    | 'project-config-unsupported'
     | 'invalid-attachments'
     | 'subagent-not-found'
     // The sub-agent was started by a CLI process that has ended, so no process here can stop it.

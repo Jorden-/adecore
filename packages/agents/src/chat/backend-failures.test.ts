@@ -444,3 +444,19 @@ test('a Codex frame past the line limit is dropped and reported, and the frames 
     expect(frames).toEqual([{ method: 'after', params: {} }]);
     cli.end();
 });
+
+test('Claude starts without the settings and MCP servers of its folder when the launch says so', async () => {
+    const fake = inProcess(() => ({ onLine: () => undefined }));
+    const commands: string[][] = [];
+    const spawn = (options: ChatSpawnOptions): ChatProcess => {
+        commands.push(options.command);
+        return fake.spawn(options);
+    };
+    for (const projectConfig of [false, undefined]) {
+        const backend = new ClaudeBackend({ ...launch, spawn, ...(projectConfig === undefined ? {} : { projectConfig }) }, { onEvent: () => undefined });
+        await backend.start();
+        backend.stop();
+    }
+    expect(commands[0]).toEqual(expect.arrayContaining(['--setting-sources=user', '--strict-mcp-config']));
+    expect(commands[1]).not.toContain('--setting-sources=user');
+});

@@ -78,6 +78,8 @@ export interface ChatSessionOptions {
     resumeNote?(): string | null;
     // The folders beside the working directory, asked before every turn; a change starts the next turn in a new process.
     folders?(): readonly string[];
+    // False runs the CLI without the configuration of the working folder; asked before every turn like the folders.
+    projectConfig?(): boolean;
     promptNotes?: PromptNotes;
     references?: ChatReferences;
     // Trees per turn, so a settled turn can show what the working tree holds against its start.
@@ -184,6 +186,7 @@ export class ChatSession {
     private relocating = false;
     private launchedRuntimeMode: RuntimeMode | null = null;
     private launchedFolders: readonly string[] = [];
+    private launchedProjectConfig = true;
     // The checkpoint of the turn in flight; everything queued for that turn waits for it.
     private turnReady: Promise<void> = Promise.resolve();
     // Turns we settled ourselves whose `result` is still on its way; it may not close the turn after them.
@@ -1760,8 +1763,13 @@ export class ChatSession {
                 this.info.runtimeMode !== this.launchedRuntimeMode ||
                 this.info.account !== this.launchedAccount ||
                 this.info.cwd !== this.launchedCwd ||
-                !sameFolders(this.options.folders?.() ?? [], this.launchedFolders))
+                !sameFolders(this.options.folders?.() ?? [], this.launchedFolders) ||
+                this.loadsProjectConfig() !== this.launchedProjectConfig)
         );
+    }
+
+    private loadsProjectConfig(): boolean {
+        return this.options.projectConfig?.() !== false;
     }
 
     private hasNativeWork(): boolean {
@@ -1789,6 +1797,12 @@ export class ChatSession {
         if (this.backend && this.starting) {
             return this.starting;
         }
+        const projectConfig = this.loadsProjectConfig();
+        if (!projectConfig && !this.options.provider.ignoresProjectConfig) {
+            return Promise.reject(
+                new ChatError('project-config-unsupported', `${this.options.provider.name} cannot run without the configuration of its folder`)
+            );
+        }
         let env: Record<string, string>;
         try {
             env = this.options.env(this.thread.info.account);
@@ -1804,6 +1818,7 @@ export class ChatSession {
         this.launchedCwd = info.cwd;
         const folders = this.options.folders?.() ?? [];
         this.launchedFolders = folders;
+        this.launchedProjectConfig = projectConfig;
         const launch: BackendLaunch = {
             command: this.options.command,
             cwd: info.cwd,
@@ -1818,6 +1833,7 @@ export class ChatSession {
             resumeNote: this.options.resumeNote?.() ?? null,
             ...(info.goal === undefined ? {} : { goal: info.goal }),
             ...(folders.length > 0 ? { folders } : {}),
+            ...(projectConfig ? {} : { projectConfig }),
             ...(this.options.spawn ? { spawn: this.options.spawn } : {})
         };
         const made: { backend: ChatBackend | null } = { backend: null };

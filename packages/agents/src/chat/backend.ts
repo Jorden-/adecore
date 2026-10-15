@@ -45,6 +45,8 @@ export interface BackendLaunch {
     // Folders outside `cwd` the agent may reach without asking. Claude Code takes them as `--add-dir`; Codex's
     // sandbox reads the whole disk already and keeps writes to the workspace, so it needs nothing.
     folders?: readonly string[];
+    // False keeps the CLI from loading configuration out of `cwd` (settings, hooks, MCP servers); absent loads it.
+    projectConfig?: boolean;
     // How the CLI is started; a test runs a fake in the same process, everything else spawns it.
     spawn?: SpawnChatProcess;
     saveGeneratedImage?(ref: string, upload: ChatAttachmentUpload): Promise<ChatAttachment>;

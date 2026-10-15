@@ -12,6 +12,7 @@ export function createClaudeProvider(options: ClaudeBackendOptions = {}): ChatPr
         capabilities: CLAUDE_CAPABILITIES,
         command: ['claude'],
         resumeCommand: CLAUDE_RESUME_COMMAND,
+        ignoresProjectConfig: true,
         // Read from the strings of Claude Code 2.1.282; never HOME, which moves the keychain lookup along with it.
         home: {
             env: 'CLAUDE_CONFIG_DIR',

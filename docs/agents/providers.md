@@ -58,6 +58,19 @@ Codex has no policy that matches every mode of Claude Code exactly; this is the 
 
 `claude.allowedTools` lets Claude Code use the named tools without asking, in every mode. `codexRules` writes command prefixes Codex may run without asking into the rules of every Codex home; a folder it cannot write to only costs an approval per call.
 
+## Folders you do not trust
+
+A CLI reads configuration out of its working folder: settings with hooks and permission allow-lists, MCP servers, skills and commands. When the folder's contents came from somewhere the host does not trust, that configuration would run commands outside the chat's runtime mode. Return `false` from `projectConfigFor(chatId)` for such a chat. It is asked before every turn like `foldersFor`, and a change starts the next turn in a new process. Absent or `true` loads the configuration as the CLI does.
+
+Check `provider.ignoresProjectConfig` before you offer a provider for such a chat. A provider that cannot ignore the configuration of its folder refuses the turn with `project-config-unsupported` rather than run with it.
+
+| Provider    | `ignoresProjectConfig` | What `projectConfig: false` does                                                                                                                                  |
+| ----------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code | `true`                 | Starts with `--setting-sources=user` and `--strict-mcp-config`. The project and local settings, the project's `.mcp.json`, skills and commands stay out; the person's own settings, where a host installs its hooks, still load. The person's own MCP servers and connectors do not load either. A `CLAUDE.md` in the folder is still read, since it is an instruction and not a setting. |
+| Codex       | `false`                | Nothing. A folder's `.codex` layer loads once the person's config trusts the folder or its repository, and a worktree inherits that trust. No flag turns the layer off without also turning off the person's own hooks. |
+
+Both rows were measured on Claude Code 2.1.300 and Codex 0.162.1. A provider of your own sets `ignoresProjectConfig` when its backend honors `BackendLaunch.projectConfig`.
+
 ## A provider of your own
 
 A `ChatProvider` is data plus a backend: its `kind`, `name`, `catalog`, `capabilities`, `command`, `resumeCommand`, `home` for accounts, `detect`, the arguments for a first prompt and for a one-shot prompt, and `createBackend(launch, host)`. The `ChatBackend` owns the process, speaks the CLI's protocol, and reports what happens as `BackendEvent`s through `host.onEvent`; the session turns those into thread items. See [`chat/backend`](https://github.com/basmilius/adecore/blob/main/packages/agents/src/chat/backend.ts) for the whole interface, exported from `@adecore/agents/chat`, and the built-ins for two that work.

@@ -120,6 +120,49 @@ describe('the hooks of ChatCore', () => {
         });
     });
 
+    test('run a chat without the configuration of its folder, or refuse a CLI that cannot', async () => {
+        let trusted = false;
+        const chats = open({ projectConfigFor: () => trusted });
+        await chats.create({ chatId: 'untrusted', cwd: home });
+        await chats.send('untrusted', 'hello');
+        await settle();
+        expect(launches.at(-1)).toMatchObject({ projectConfig: false });
+        trusted = true;
+        await chats.create({ chatId: 'trusted', cwd: home });
+        await chats.send('trusted', 'hello');
+        await settle();
+        expect(launches.at(-1)?.projectConfig).toBeUndefined();
+    });
+
+    test('refuse the turn of a CLI that cannot ignore the configuration of its folder', async () => {
+        const incapable = new ProviderRegistry({
+            detect: async () => ({ installed: true, version: 'test' }),
+            providers: [{ ...providers.get('claude'), ignoresProjectConfig: false }]
+        });
+        core = new ChatCore({
+            providers: incapable,
+            store,
+            attachments: new AttachmentStore(home),
+            env: { HOME: home, PATH: '/bin' },
+            hooks: { projectConfigFor: () => false }
+        });
+        await core.create({ chatId: 'refused', cwd: home });
+        const before = launches.length;
+        await core.send('refused', 'hello');
+        await settle();
+        const items = core.attach('refused', 'client').items;
+        expect(JSON.stringify(items)).toContain('cannot run without the configuration of its folder');
+        expect(launches.length).toBe(before);
+    });
+
+    test('leave the configuration of the folder alone without the hook', async () => {
+        const chats = open();
+        await chats.create({ chatId: 'plain', cwd: home });
+        await chats.send('plain', 'hello');
+        await settle();
+        expect(launches.at(-1)?.projectConfig).toBeUndefined();
+    });
+
     test('hear a chat open and keep extras in its record', async () => {
         const opened: { chatId: string; stored: boolean }[] = [];
         const chats = open({

@@ -28,6 +28,8 @@ export interface ChatProvider {
     readonly command: string[];
     // What a terminal runs to continue one of this CLI's sessions; `{id}` stands for the session id.
     readonly resumeCommand: string;
+    /* Whether `BackendLaunch.projectConfig: false` keeps this CLI from loading configuration out of the working folder; absent is no. */
+    readonly ignoresProjectConfig?: boolean;
     /* Where this CLI keeps its login, settings and transcripts, which is what an account is. Absent on a
        CLI with no variable to move that folder, which then only has its default account. */
     readonly home?: ProviderHome;

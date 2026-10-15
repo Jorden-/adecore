@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { ModelCatalogDataSchema, type ModelCatalogData } from '@adecore/agent-contracts';
 import { ModelCatalog } from './catalog.ts';
 import { claudeArgs, claudeEnv, promptPrefix } from './claude.ts';
+import { providerFor } from './registry.ts';
 import claudeManifest from './claude-models.json' with { type: 'json' };
 import codexManifest from './codex-models.json' with { type: 'json' };
 
@@ -127,6 +128,15 @@ describe('claudeArgs', () => {
         ).not.toContain('--settings');
     });
 
+    test("a launch without the configuration of its folder loads the person's settings only", () => {
+        const base = { selection: { model: 'claude-sonnet-5', options: {} }, runtimeMode: 'supervised' as const, resume: null, allowedTools: ['Read'] };
+        const ignored = claudeArgs({ ...base, projectConfig: false });
+        expect(ignored).toContain('--setting-sources=user');
+        expect(ignored).toContain('--strict-mcp-config');
+        expect(claudeArgs(base)).not.toContain('--setting-sources=user');
+        expect(claudeArgs({ ...base, projectConfig: true })).not.toContain('--strict-mcp-config');
+    });
+
     test('supervised has no permission flag and ultrathink goes into the prompt', () => {
         const selection = { model: 'claude-sonnet-5', options: { effort: 'ultrathink', contextWindow: '200k' } };
         const supervised = claudeArgs({ selection, runtimeMode: 'supervised', resume: null });
@@ -166,5 +176,13 @@ describe('claudeArgs', () => {
         const args = claudeArgs({ selection, runtimeMode: 'auto', resume: null, folders: ['/brand/kit', '/shared/assets'] });
         expect(args.filter((arg) => arg.startsWith('--add-dir'))).toEqual(['--add-dir=/brand/kit', '--add-dir=/shared/assets']);
         expect(claudeArgs({ selection, runtimeMode: 'auto', resume: null }).some((arg) => arg.startsWith('--add-dir'))).toBe(false);
+    });
+});
+
+describe('ignoresProjectConfig', () => {
+    test('only Claude Code can run without the configuration of its folder', () => {
+        expect(providerFor('claude').ignoresProjectConfig).toBe(true);
+        expect(providerFor('codex').ignoresProjectConfig).toBe(false);
+        expect(providerFor('opencode' as never).ignoresProjectConfig).toBeUndefined();
     });
 });

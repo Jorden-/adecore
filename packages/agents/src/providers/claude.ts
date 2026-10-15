@@ -14,6 +14,13 @@ const CLAUDE_CHAT_ARGS = [
     'stdio'
 ];
 
+/*
+ * Only the person's own settings load, and only the MCP servers a caller passes: the project and
+ * local settings files, the project's `.mcp.json` and the project's skills and commands stay out.
+ * The latter flag also drops the person's own MCP servers and connectors (measured on Claude Code 2.1.300).
+ */
+const CLAUDE_WITHOUT_PROJECT_CONFIG_ARGS = ['--setting-sources=user', '--strict-mcp-config'];
+
 // Effort values the CLI takes on its flag; anything else is asked for in the prompt instead.
 const FLAG_EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
 
@@ -37,6 +44,7 @@ interface ClaudeLaunch {
     resume: string | null;
     allowedTools?: readonly string[];
     folders?: readonly string[];
+    projectConfig?: boolean;
 }
 
 export function claudeArgs(launch: ClaudeLaunch): string[] {
@@ -44,7 +52,8 @@ export function claudeArgs(launch: ClaudeLaunch): string[] {
     const args = [
         ...CLAUDE_CHAT_ARGS,
         ...(launch.allowedTools ?? []).map((tool) => `--allowedTools=${tool}`),
-        ...(launch.folders ?? []).map((folder) => `--add-dir=${folder}`)
+        ...(launch.folders ?? []).map((folder) => `--add-dir=${folder}`),
+        ...(launch.projectConfig === false ? CLAUDE_WITHOUT_PROJECT_CONFIG_ARGS : [])
     ];
     const contextWindow = launch.selection.options.contextWindow;
     args.push('--model', `${launch.selection.model}${contextWindow === '1m' ? '[1m]' : ''}`);

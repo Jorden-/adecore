@@ -52,6 +52,7 @@ A refusal carries a code; branch on it, show the message.
 | `request-not-found`                                      | The approval, question or queued message is no longer there: read the state again. |
 | `history-expired`                                        | The cursor is gone; attach again.                                                 |
 | `chat-unsupported`                                       | This host or this CLI does not do that.                                           |
+| `project-config-unsupported`                             | `projectConfigFor` turned the folder's configuration off and this CLI cannot ignore it; the turn does not start. |
 | `invalid-attachments`                                    | An attachment the host could not take.                                            |
 | `account-unavailable`, `account-incompatible`, `invalid-account` | The account is not there, cannot take the chat over, or is not valid.     |
 | `secrets-unavailable`                                    | No keychain on this machine.                                                      |

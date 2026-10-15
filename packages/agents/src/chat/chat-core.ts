@@ -125,6 +125,12 @@ export interface ChatCoreHooks {
      * next turn in a new process that resumes the thread, and never cuts a turn in flight.
      */
     foldersFor?(chatId: string): readonly string[];
+    /*
+     * Whether this chat's CLI loads the configuration of its working folder; false for a folder whose contents
+     * the host does not trust. Asked before every turn, like the folders. A provider with `ignoresProjectConfig`
+     * unset refuses the turn with `project-config-unsupported`, so a host can check the flag first.
+     */
+    projectConfigFor?(chatId: string): boolean;
     /* Whether no list of chats shows this one, which `ChatInfo.hidden` says to every client. */
     hiddenFor?(chatId: string): boolean;
     /* What the host says in front of a chat's next real prompt, beside what the chat keeps itself. */
@@ -490,6 +496,7 @@ export class ChatCore {
             instructions: () => (this.hooks.instructionsFor ? this.hooks.instructionsFor(payload.chatId) : this.instructions),
             resumeNote: () => this.hooks.resumeNoteFor?.(payload.chatId) ?? null,
             folders: () => this.hooks.foldersFor?.(payload.chatId) ?? [],
+            projectConfig: () => this.hooks.projectConfigFor?.(payload.chatId) ?? true,
             ...(promptNotes ? { promptNotes } : {}),
             ...(references ? { references } : {}),
             ...(this.checkpoints ? { checkpoints: this.checkpoints } : {}),
