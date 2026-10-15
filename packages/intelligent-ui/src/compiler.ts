@@ -3,6 +3,7 @@ import { isUiComponent, UI_CATALOG, UI_CATALOG_VERSION } from './catalog.ts';
 import { uiActionProp, uiActionTarget, uiLocalState } from './actions.ts';
 import { unreadableEventTime } from './event-warning.ts';
 import { uiNodeFallback, uiPlainText } from './fallback.ts';
+import { aliasedProp } from './prop-alias.ts';
 import { evaluateUiExpression, sameUiValue, type UiExpression, type UiValue } from './expression.ts';
 import { parseUiSyntax, uiDiagnostic, type UiDiagnostic, type UiSyntaxNode } from './syntax.ts';
 import { type z } from 'zod';
@@ -266,15 +267,24 @@ export function compileUiBlock(source: string, options: UiCompileOptions): UiBlo
                 }
             }
             const actionProp = uiActionProp(syntax.type);
-            for (const [key, expression] of Object.entries(syntax.props)) {
-                safeKey(key);
-                if (key === actionProp) {
-                    node.expressions[key] = checkedAction(expression);
+            for (const [written, expression] of Object.entries(syntax.props)) {
+                safeKey(written);
+                if (written === actionProp) {
+                    node.expressions[written] = checkedAction(expression);
                     continue;
                 }
+                const key = aliasedProp(entry, written, syntax.props);
                 if (!Object.hasOwn(entry.schema.shape, key)) {
-                    diagnose(new UiFailure('refused_prop', `${syntax.type} does not accept ${key}.`), syntax.start, syntax.end, syntax.id);
+                    diagnose(new UiFailure('refused_prop', `${syntax.type} does not accept ${written}.`), syntax.start, syntax.end, syntax.id);
                     continue;
+                }
+                if (key !== written && syntax.complete) {
+                    diagnose(
+                        new UiFailure('renamed_prop', `${syntax.type} takes ${key}, not ${written}; read as ${key}.`),
+                        syntax.start,
+                        syntax.end,
+                        syntax.id
+                    );
                 }
                 if (isConstant(expression)) {
                     node.props[key] = evaluateUiExpression(expression, {}, budget);

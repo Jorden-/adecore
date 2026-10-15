@@ -54,7 +54,7 @@ A prop is `name="text"`, `name='text'` or `name={expression}`. A name on its own
 
 A braced value that is a constant becomes a static prop. Anything that reads a variable stays an expression, evaluated against state when the block draws. The compiler checks every prop against the component's schema once it can: at once for constants, and for expressions with the defaults of the block.
 
-A prop the component does not have is dropped with `refused_prop`, and the rest of the node still draws. A prop written twice gets `duplicate_prop`. A value that fails the schema marks the node `invalid_props`, and the node draws as its fallback.
+A prop the component does not have is dropped with `refused_prop`, and the rest of the node still draws. A component can list a few likely misspellings of its props as `aliases` in the catalog (`time` on an `Event` for `at`): the compiler reads such a prop as the real one and reports `renamed_prop`, a warning, unless the real prop is written too. A prop written twice gets `duplicate_prop`. A value that fails the schema marks the node `invalid_props`, and the node draws as its fallback.
 
 ## Text
 
@@ -99,6 +99,7 @@ Every problem becomes a `UiDiagnostic` with a `code`, a `message`, a source rang
 | `invalid_declaration`, `duplicate_declaration`, `invalid_default` | A declaration that is malformed, repeated or not a literal |
 | `unclosed_tag`, `unmatched_tag`              | Tags that do not pair                                        |
 | `duplicate_prop`, `refused_prop`, `invalid_props` | A prop written twice, unknown, or failing its schema    |
+| `renamed_prop`                               | A prop written under an alias from the catalog, read as the real prop |
 | `too_many_series`                            | A Chart with more numeric series than a drawing holds; the rest stay in its values |
 | `unknown_component`                          | A name outside the catalog                                   |
 | `invalid_parent`, `invalid_child`            | A component in the wrong place                               |

@@ -74,6 +74,47 @@ describe('Timeline and Event', () => {
         expect(block('<Timeline><Event at="15:41:55">Deployed</Event></Timeline>').diagnostics).toEqual([]);
     });
 
+    test('reads the time an agent wrote as time on an event as its at, with a warning for the agent', () => {
+        const compiled = block('<Timeline><Event time="14:30" tone="info">Rolled back</Event><Event at="14:02">Alert</Event></Timeline>');
+        expect(compiled.diagnostics.map((item) => [item.code, item.severity, item.message])).toEqual([
+            ['renamed_prop', 'warning', 'Event takes at, not time; read as at.']
+        ]);
+        const [renamed, plain] = compiled.nodes[0].children;
+        expect(compiled.diagnostics[0].nodeId).toBe(renamed.id);
+        expect(renamed.error).toBeUndefined();
+        expect(renamed.props).toEqual({ at: '14:30', tone: 'info' });
+        expect(renamed.fallback).toBe('14:30 Rolled back (info)\n');
+        expect(plain.props).toEqual({ at: '14:02' });
+        expect(problems('<Timeline><Event time="14:30">One</Event></Timeline>')).toEqual({ diagnostics: ['renamed_prop'], errors: [] });
+    });
+
+    test('reads a time that an expression gives, and checks it as an at', () => {
+        const compiled = block('$when = "soon"\n<Timeline><Event time={$when}>One</Event></Timeline>');
+        expect(compiled.diagnostics.map((item) => item.code)).toEqual(['renamed_prop', 'unreadable_time']);
+        expect(compiled.nodes[0].children[0].error).toBeUndefined();
+    });
+
+    test('lets at win when an event has both at and time', () => {
+        for (const source of ['<Event at="14:02" time="14:30">One</Event>', '<Event time="14:30" at="14:02">One</Event>']) {
+            const compiled = block(`<Timeline>${source}</Timeline>`);
+            expect(compiled.diagnostics.map((item) => [item.code, item.severity, item.message])).toEqual([
+                ['refused_prop', 'warning', 'Event does not accept time.']
+            ]);
+            expect(compiled.nodes[0].children[0].props).toEqual({ at: '14:02' });
+            expect(compiled.nodes[0].children[0].error).toBeUndefined();
+        }
+    });
+
+    test('keeps the note of a renamed prop off an event that is still being written', () => {
+        const open = block('<Timeline><Event time="14:30">One', false);
+        expect(open.diagnostics).toEqual([]);
+        expect(open.nodes[0].children[0].props).toEqual({ at: '14:30' });
+    });
+
+    test('still refuses an event without a time', () => {
+        expect(problems('<Timeline><Event when="14:30">One</Event></Timeline>').errors).toEqual(['Event:invalid_props']);
+    });
+
     test('warns about an unreadable time that only an Each or a declared value can name, once per event', () => {
         const each =
             '$rows = [{at: "later", name: "One"}, {at: "soon", name: "Two"}, {at: "14:02", name: "Three"}]\n<Timeline><Each items={$rows} as="row"><Event at={row.at}>{row.name}</Event></Each></Timeline>';

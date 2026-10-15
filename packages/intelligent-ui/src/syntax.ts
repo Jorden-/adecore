@@ -31,7 +31,7 @@ export interface UiSyntax {
     diagnostics: UiDiagnostic[];
 }
 
-const WARNING_CODES = new Set(['refused_prop', 'too_many_series', 'too_many_children', 'unreadable_time']);
+const WARNING_CODES = new Set(['refused_prop', 'renamed_prop', 'too_many_series', 'too_many_children', 'unreadable_time']);
 
 export function uiDiagnostic(error: unknown, start: number, end: number, nodeId?: string): UiDiagnostic {
     const code = error instanceof UiFailure ? error.code : 'invalid_syntax';

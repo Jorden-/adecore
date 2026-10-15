@@ -65,7 +65,8 @@ export const UI_CATALOG = {
             detail: text.optional()
         }),
         parent: 'Timeline',
-        text: 'title'
+        text: 'title',
+        aliases: { time: 'at' }
     },
     Stats: { group: 'data', description: 'A small set of key numbers.', schema: empty, children: ['Stat'] },
     Stat: {

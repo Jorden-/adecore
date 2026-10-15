@@ -79,6 +79,8 @@ Events in time order. `Timeline` has no props and holds only `Event`; a complete
 
 The host writes the time the way the person's language and region ask for it, and the year as well once it is not the current one. A time (a lone `HH:MM:SS` keeps its seconds, fractions of a second are dropped), date or date-time without an offset reads as written, in every time zone, also when it names an hour that the reader's clocks skip. One with an offset (`Z`, `+02:00`) is an instant and shows in the reader's own time zone. An offset runs from `-12:00` to `+14:00`; any other is refused. An `Event` whose `at` is none of these still draws, with `at` written as it came (no formatting, in no zone) and its title, tone and detail. The compiler reports it as a diagnostic with the code `unreadable_time` and `severity: 'warning'`, so the agent hears about it without a failure box; the text of the part for another reader stays `at title (tone): detail`. The order is the order written, so the agent sorts.
 
+An agent that writes `time` where the catalog says `at` is read as if it had written `at`, so the event draws. The compiler adds a diagnostic with the code `renamed_prop` and `severity: 'warning'` ("Event takes at, not time; read as at."), which stays with the agent. When `at` is written too, `at` wins and `time` is refused with `refused_prop`. The catalog lists such spellings per component in `aliases`, and the compiler reads them from there.
+
 A row is read to a screen reader as its time, its title, its tone unless it is neutral, and its detail.
 
 A `Timeline` holds one `Event` at least, also after an `Each` or a `Show` drew its children: one that draws none fails as a whole and shows as text. A `Timeline` has no upper limit.
