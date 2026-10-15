@@ -78,12 +78,12 @@ The tree takes one tab stop. The arrow keys move, Right and Left expand and coll
 
 ## Context menus
 
-| Row              | Items                                                                                                |
-| ---------------- | ---------------------------------------------------------------------------------------------------- |
-| Connection       | New console, Refresh, Edit connection, Disconnect                                                    |
-| Schema or folder | New table, New console here, Refresh                                                                 |
-| Table or view    | Open data, Open structure, Edit table, New console here, Copy name, Copy DDL, Rename, Truncate, Drop |
-| Column           | Open, Copy name                                                                                      |
+| Row              | Items                                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------------------- |
+| Connection       | New console, Refresh, Edit connection, Disconnect                                                       |
+| Schema or folder | New table, New console here, Refresh                                                                    |
+| Table or view    | Open data, Open structure, Edit table, New console here, Copy name, Copy DDL, Rename…, Truncate…, Drop… |
+| Column           | Open, Copy name                                                                                         |
 
 - Without `onAction` on the provider, the items that ask the app are left out: the open items, the console items, New table, Edit table and Edit connection.
 - On a read only connection the items that write are left out: New table, Edit table, Rename, Truncate and Drop. A view has no Edit table, Rename or Truncate.

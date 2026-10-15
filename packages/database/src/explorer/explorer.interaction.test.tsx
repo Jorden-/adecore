@@ -287,7 +287,7 @@ describe.skipIf(typeof document === 'undefined')('DatabaseExplorer in a DOM', ()
         recorded.onExecute((sql) => [done(sql, 2)]);
         await openTables();
         await contextMenu(row('customers'));
-        await click(byText('[role=menuitem]', 'Truncate'));
+        await click(byText('[role=menuitem]', 'Truncate…'));
 
         expect(find('[role=dialog]').textContent).toContain('Truncate "customers"?');
         expect(recorded.executed()).toEqual([]);
@@ -305,7 +305,7 @@ describe.skipIf(typeof document === 'undefined')('DatabaseExplorer in a DOM', ()
         const stop = client.onSchemaChange((change) => changes.push(change));
         await openTables();
         await contextMenu(row('customers'));
-        await click(byText('[role=menuitem]', 'Truncate'));
+        await click(byText('[role=menuitem]', 'Truncate…'));
         await click(byText('[role=dialog] button', 'Truncate'));
         await waitFor(() => expect(findAll('[role=dialog]')).toEqual([]));
         stop();
@@ -319,7 +319,7 @@ describe.skipIf(typeof document === 'undefined')('DatabaseExplorer in a DOM', ()
         const stop = client.onSchemaChange((change) => changes.push(change));
         await openTables();
         await contextMenu(row('orders'));
-        await click(byText('[role=menuitem]', 'Drop'));
+        await click(byText('[role=menuitem]', 'Drop…'));
         await type(find('[role=dialog] input') as HTMLInputElement, 'orders');
         await click(byText('[role=dialog] button', 'Drop table'));
         await waitFor(() => expect(findAll('[role=dialog]')).toEqual([]));
@@ -333,7 +333,7 @@ describe.skipIf(typeof document === 'undefined')('DatabaseExplorer in a DOM', ()
         recorded.onExecute((sql) => [done(sql)]);
         await openTables();
         await contextMenu(row('orders'));
-        await click(byText('[role=menuitem]', 'Truncate'));
+        await click(byText('[role=menuitem]', 'Truncate…'));
         await click(byText('[role=dialog] button', 'Cancel'));
 
         expect(recorded.executed()).toEqual([]);
@@ -344,7 +344,7 @@ describe.skipIf(typeof document === 'undefined')('DatabaseExplorer in a DOM', ()
         recorded.onExecute((sql) => [{ kind: 'error', sql, error: { code: 'query-failed', message: 'FOREIGN KEY constraint failed' }, elapsedMs: 0 }]);
         await openTables();
         await contextMenu(row('customers'));
-        await click(byText('[role=menuitem]', 'Truncate'));
+        await click(byText('[role=menuitem]', 'Truncate…'));
         await click(byText('[role=dialog] button', 'Truncate'));
 
         expect(find('[role=dialog]').textContent).toContain('FOREIGN KEY constraint failed');

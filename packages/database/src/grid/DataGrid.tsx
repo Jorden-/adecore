@@ -819,6 +819,7 @@ export function DataGrid({
                                 )}
                             </>
                         )}
+                        <ContextMenu.Separator />
                         {menuContext !== null && menu?.(menuContext)}
                     </ContextMenu.Popup>
                 </ContextMenu.Root>

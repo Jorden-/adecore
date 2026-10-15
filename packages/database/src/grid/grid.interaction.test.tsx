@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { ContextMenu } from '@adecore/ui';
 import type { DatabaseNotice } from '../actions.ts';
 import type { Value } from '../protocol/index.ts';
 import type { Mounted } from '../testing/dom/harness.tsx';
@@ -66,6 +67,38 @@ describe.skipIf(typeof document === 'undefined')('DataGrid in a DOM', () => {
         await pressIn(columnHeaders()[1]!);
         await click(columnHeaders()[1]!);
         expect(columnHeaders().map((header) => header.getAttribute('aria-selected'))).toEqual(['false', 'true']);
+    });
+});
+
+describe.skipIf(typeof document === 'undefined')('DataGrid menu of an editable cell', () => {
+    let mounted: Mounted;
+    let client: ReturnType<typeof clientOver>;
+
+    const menuRows = (): string[] => findAll('[role=menuitem], [role=separator]').map((row) => (row.getAttribute('role') === 'separator' ? '---' : (row.textContent ?? '')));
+
+    beforeEach(async () => {
+        client = clientOver(fakeDatabaseTransport({ databases: {} }));
+        mounted = await mount(
+            <DataGrid
+                label="Customers"
+                columns={[columns[0]!, { ...columns[1]!, nullable: true, defaultValue: "'unknown'" }]}
+                rows={rows}
+                editable
+                menu={() => <ContextMenu.Item>Duplicate row</ContextMenu.Item>}
+            />,
+            { client }
+        );
+    });
+
+    afterEach(async () => {
+        await mounted.unmount();
+        await client.dispose();
+    });
+
+    test('sets the rows the table adds apart from what changes the value', async () => {
+        await contextMenu(findAll('[role=gridcell]')[1]!);
+        const items = menuRows();
+        expect(items.slice(items.indexOf('Set DEFAULT'))).toEqual(['Set DEFAULT', '---', 'Duplicate row']);
     });
 });
 

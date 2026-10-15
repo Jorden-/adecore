@@ -148,13 +148,13 @@ export default {
         editConnection: 'Edit connection',
         copyDdl: 'Copy DDL',
         rename: {
-            action: 'Rename',
+            action: 'Rename…',
             title: 'Rename "{{name}}"',
             field: 'New name',
             confirm: 'Rename'
         },
         truncate: {
-            action: 'Truncate',
+            action: 'Truncate…',
             title: 'Truncate "{{name}}"?',
             description: 'Deletes every row in "{{name}}". This cannot be undone.',
             confirm: 'Truncate'
@@ -163,13 +163,13 @@ export default {
             field: 'Type "{{name}}" to confirm',
             mismatch: 'The name does not match.',
             table: {
-                action: 'Drop',
+                action: 'Drop…',
                 title: 'Drop "{{name}}"?',
                 description: 'Deletes the table and every row in it. This cannot be undone.',
                 confirm: 'Drop table'
             },
             view: {
-                action: 'Drop view',
+                action: 'Drop view…',
                 title: 'Drop "{{name}}"?',
                 description: 'Deletes the view. The tables behind it are not touched.',
                 confirm: 'Drop view'

@@ -148,13 +148,13 @@ export default {
         editConnection: 'Verbinding bewerken',
         copyDdl: 'DDL kopiëren',
         rename: {
-            action: 'Hernoemen',
+            action: 'Hernoemen…',
             title: '"{{name}}" hernoemen',
             field: 'Nieuwe naam',
             confirm: 'Hernoemen'
         },
         truncate: {
-            action: 'Leegmaken',
+            action: 'Leegmaken…',
             title: '"{{name}}" leegmaken?',
             description: 'Verwijdert elke rij in "{{name}}". Dit kan niet ongedaan worden gemaakt.',
             confirm: 'Leegmaken'
@@ -163,13 +163,13 @@ export default {
             field: 'Typ "{{name}}" om te bevestigen',
             mismatch: 'De naam komt niet overeen.',
             table: {
-                action: 'Verwijderen',
+                action: 'Verwijderen…',
                 title: '"{{name}}" verwijderen?',
                 description: 'Verwijdert de tabel en elke rij erin. Dit kan niet ongedaan worden gemaakt.',
                 confirm: 'Tabel verwijderen'
             },
             view: {
-                action: 'View verwijderen',
+                action: 'View verwijderen…',
                 title: '"{{name}}" verwijderen?',
                 description: 'Verwijdert de view. De tabellen erachter blijven ongemoeid.',
                 confirm: 'View verwijderen'
