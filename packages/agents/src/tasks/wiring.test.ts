@@ -182,3 +182,39 @@ test('a terminal parent gets no note about a waiting child and is never woken, a
     ).toBe(false);
     expect(claude.started.length).toBe(spawned);
 });
+
+test('a task whose child runs on another machine wakes the parent once, from the result it is told, and ignores the local chat of that id', async () => {
+    const task = await wiring.verbs.open({
+        projectId: 'project',
+        parentId: 'lead',
+        childId: 'child',
+        title: 'Lexer',
+        prompt: 'fix the lexer',
+        machine: 'machine-b'
+    });
+    await host.chats.send('child', 'tool: rm -rf build');
+    await until(() =>
+        host.chats
+            .get('child')!
+            .thread.list()
+            .some((item) => item.kind === 'approval' && item.decision === 'pending')
+    );
+    clock.advance(15_000);
+    await worker.settled();
+    expect(turnsOf('lead')).toHaveLength(0);
+    expect(
+        host.chats
+            .get('lead')!
+            .thread.list()
+            .filter((item) => item.kind === 'note')
+    ).toHaveLength(0);
+    expect(tasks.get(task.id)?.status).toBe('open');
+
+    const result = { text: 'fixed on the other machine', source: 'done', at: clock.now() } as const;
+    await wiring.coordinator.settleFromElsewhere(task.id, result);
+    await wiring.coordinator.settleFromElsewhere(task.id, result);
+    await until(() => tasks.get(task.id)?.wake === 'sent');
+    await worker.settled();
+    expect(tasks.get(task.id)).toMatchObject({ status: 'done', machine: 'machine-b', result });
+    expect(turnsOf('lead')).toHaveLength(1);
+});

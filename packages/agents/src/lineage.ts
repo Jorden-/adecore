@@ -19,7 +19,9 @@ const LineageSchema = z.object({
     ceiling: RuntimeModeSchema.optional(),
     createdAt: z.number(),
     /* When stopping or deleting the node that opened it ended this one too; a cascade never ends a node twice. */
-    endedAt: z.number().optional()
+    endedAt: z.number().optional(),
+    /* Set when the agent that opened this one runs on another machine; `openedBy` then names it there, not a node here. */
+    peer: z.object({ machineId: z.string().min(1) }).optional()
 });
 
 type Lineage = z.infer<typeof LineageSchema>;
@@ -113,6 +115,11 @@ export class AgentLineageStore {
     ceilingOf(nodeId: string): RuntimeMode | null {
         const entry = this.opened.get(nodeId);
         return entry !== undefined && openedByAgent(entry) ? (entry.ceiling ?? null) : null;
+    }
+
+    /* The machine whose agent opened this node, or null for a node opened on this one. */
+    peerOf(nodeId: string): { machineId: string } | null {
+        return this.opened.get(nodeId)?.peer ?? null;
     }
 
     /* How deep a node sits. A node nobody wrote down is one a person made, which is where a chain starts. */

@@ -351,6 +351,66 @@ describe('the coordinator', () => {
         coordinator.agentEnded('terminal-child', 'It ended without a result.');
         expect(tasks.get(task.id)?.status).toBe('open');
     });
+
+    describe('a task whose child runs on another machine', () => {
+        const REMOTE = { text: 'Done over there.', source: 'done', at: 20 } as const;
+
+        function openRemote(parentId: string, childId: string): Promise<Task> {
+            return tasks.open({ projectId: 'p', parentId, childId, title: childId, prompt: 'go', machine: 'machine-b' }, 1);
+        }
+
+        test('settles with the result it is told and wakes the parent once, however often it is told', async () => {
+            const task = await openRemote('chat-lead', 'chat-far');
+            const settled = await Promise.all([
+                coordinator.settleFromElsewhere(task.id, REMOTE),
+                coordinator.settleFromElsewhere(task.id, REMOTE),
+                coordinator.settleFromElsewhere(task.id, { ...REMOTE, text: 'again' })
+            ]);
+            expect(settled.filter((entry) => entry !== null)).toHaveLength(1);
+            expect(await coordinator.settleFromElsewhere(task.id, REMOTE)).toBeNull();
+            expect(owed).toEqual([task.id]);
+            expect(tasks.get(task.id)).toMatchObject({ status: 'done', machine: 'machine-b', wake: 'pending', result: REMOTE, settledAt: 10 });
+        });
+
+        test('fails when told it failed, and a restart of the host keeps the machine', async () => {
+            const task = await openRemote('chat-lead', 'chat-far');
+            await coordinator.settleFromElsewhere(task.id, { text: 'The machine restarted.', source: 'exit', at: 20 }, 'failed');
+            expect(owed).toEqual([task.id]);
+            const reloaded = new TaskStore(home);
+            await reloaded.load();
+            expect(reloaded.get(task.id)).toMatchObject({ status: 'failed', machine: 'machine-b' });
+        });
+
+        test('is refused for a task that has no machine, which a local chat settles', async () => {
+            const task = await open('chat-lead', 'chat-near');
+            expect(await coordinator.settleFromElsewhere(task.id, REMOTE)).toBeNull();
+            expect(await coordinator.settleFromElsewhere('task-unknown', REMOTE)).toBeNull();
+            expect(tasks.get(task.id)?.status).toBe('open');
+            expect(owed).toEqual([]);
+        });
+
+        test('is not settled by anything a chat of the same id does here', async () => {
+            const task = await openRemote('chat-lead', 'chat-far');
+            threads.set('chat-far', [turn('t1', 'done'), answer('t1', 'finished here')]);
+            ends('chat-far', turn('t1', 'done'));
+            coordinator.agentEnded('chat-far', 'It ended without a result.');
+            coordinator.startFailed('chat-far', new Error('no'));
+            coordinator.giveFailed('chat-far', new Error('no'));
+            expect(await coordinator.done('chat-far', 'done here')).toBeNull();
+            expect(await coordinator.outlasted('chat-far', ['dev server'])).toBeNull();
+            await coordinator.settled();
+            expect(tasks.get(task.id)?.status).toBe('open');
+            expect(owed).toEqual([]);
+        });
+
+        test('does not pause or resume on a limit seen here', async () => {
+            const task = await openRemote('chat-lead', 'chat-far');
+            const limited: ChatTurnItem = { ...turn('t1', 'error'), limit: { kind: 'usage', resetsAt: 99 } };
+            threads.set('chat-far', [limited]);
+            ends('chat-far', limited);
+            expect(tasks.get(task.id)?.paused).toBeUndefined();
+        });
+    });
 });
 
 describe('the task store', () => {

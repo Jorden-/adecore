@@ -51,7 +51,16 @@ export class TaskStore {
     }
 
     async open(
-        record: { projectId: string; parentId: string; childId: string; title: string; prompt: string; batchId?: string; requiresTaskTurn?: boolean },
+        record: {
+            projectId: string;
+            parentId: string;
+            childId: string;
+            title: string;
+            prompt: string;
+            batchId?: string;
+            requiresTaskTurn?: boolean;
+            machine?: string;
+        },
         now: number
     ): Promise<Task> {
         const task: Task = {

@@ -18,6 +18,7 @@ import { TaskSchema, type Task } from '@adecore/agent-contracts/task';
 | `batchId`                            | Tasks asked in one call; the parent is woken once all of them settled.                                    |
 | `background`, `requiresTaskTurn`     | Work that keeps the task open after the turn ended, and an assignment that still owes the child a turn.   |
 | `paused`                             | `{ kind: 'usage' \| 'overload', until? }` while the child waits out a limit; the task stays open.          |
+| `machine`                            | The machine the child runs on when it is not this one; no chat here settles the task.                      |
 
 A child that is idle has not finished its task: read `status`. `TaskChangedEventSchema` is `{ task }`, for an app that sends task changes over its own protocol; the agent event table does not carry it.
 

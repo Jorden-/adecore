@@ -33,7 +33,9 @@ export const TaskSchema = z.object({
     // Whether the parent has been woken about this task yet; `none` for a task that never wakes anybody.
     wake: z.enum(['pending', 'sent', 'none']),
     // Set while the child's last turn stopped on a limit: the task stays open and wakes nobody, `until` the limit lifts when known.
-    paused: z.object({ kind: z.enum(['usage', 'overload']), until: z.number().optional() }).optional()
+    paused: z.object({ kind: z.enum(['usage', 'overload']), until: z.number().optional() }).optional(),
+    // The machine the child runs on, when that is not this one: no chat here observes it, so its result arrives through `settleFromElsewhere`.
+    machine: z.string().min(1).optional()
 });
 export type Task = z.infer<typeof TaskSchema>;
 

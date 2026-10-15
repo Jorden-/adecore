@@ -164,3 +164,14 @@ test('a record an older host wrote reads back whole, and a new one is written in
         `{"projectId":"p1","nodeId":"chat-3","openedBy":"chat-1","depth":1,"agent":true,"ceiling":"auto","createdAt":${written.createdAt}}`
     );
 });
+
+test('an opener on another machine is kept, read back after a restart, and absent for every other node', async () => {
+    await store.put({ projectId: 'p1', nodeId: 'chat-4', openedBy: 'peer:machine-a:chat-1', depth: 1, agent: true, peer: { machineId: 'machine-a' } });
+    await store.put({ projectId: 'p1', nodeId: 'chat-5', openedBy: 'chat-1', depth: 1, agent: true });
+    const restarted = new AgentLineageStore(home);
+    await restarted.load();
+    expect(restarted.peerOf('chat-4')).toEqual({ machineId: 'machine-a' });
+    expect(restarted.startedBy('chat-4')).toBe('peer:machine-a:chat-1');
+    expect(restarted.peerOf('chat-5')).toBeNull();
+    expect(restarted.peerOf('chat-unknown')).toBeNull();
+});

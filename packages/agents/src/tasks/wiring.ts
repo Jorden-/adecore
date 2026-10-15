@@ -22,6 +22,8 @@ export interface TaskRecord {
     childId: string;
     title: string;
     prompt: string;
+    /* The machine the child runs on, when it is not this one. */
+    machine?: string;
 }
 
 /* What the verbs of a context CLI reach of the tasks. */
@@ -127,7 +129,15 @@ export function wireTasks(deps: TaskWiringDeps): TaskWiring {
     });
 
     const requests = chatRequests(chats);
-    const waiting = new WaitingObserver({ openTask: (childId) => deps.tasks.openFor(childId), enqueue, now });
+    const waiting = new WaitingObserver({
+        // A child on another machine asks its questions there.
+        openTask: (childId) => {
+            const task = deps.tasks.openFor(childId);
+            return task?.machine === undefined ? task : undefined;
+        },
+        enqueue,
+        now
+    });
 
     chats.observe((event) => {
         coordinator.chatEvent(event);

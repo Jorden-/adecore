@@ -126,6 +126,19 @@ export class TaskCoordinator {
         await this.deps.tasks.settled();
     }
 
+    /*
+     * Settles a task whose child runs on another machine, which no chat here observes: the answer comes
+     * from there. Wakes the parent once however often it is told; null when the task is no such task or
+     * was not open any more.
+     */
+    async settleFromElsewhere(taskId: string, result: TaskResult, status: 'done' | 'failed' = 'done'): Promise<Task | null> {
+        const task = this.deps.tasks.get(taskId);
+        if (task?.machine === undefined || task.status !== 'open') {
+            return null;
+        }
+        return this.settleNow(task, status, result);
+    }
+
     chatEvent(event: AgentEvent): void {
         if (this.stopped || event.event !== 'chat.event') {
             return;
@@ -154,7 +167,7 @@ export class TaskCoordinator {
         if (this.stopped) {
             return;
         }
-        const task = this.deps.tasks.openFor(childId);
+        const task = this.localTask(childId);
         if (!task || !this.deps.placed(childId)) {
             return;
         }
@@ -172,7 +185,7 @@ export class TaskCoordinator {
 
     /* `done` from the child itself, which wins over whatever else was about to settle it. */
     async done(childId: string, text: string): Promise<Task | null> {
-        const task = this.deps.tasks.openFor(childId);
+        const task = this.localTask(childId);
         if (!task) {
             return null;
         }
@@ -185,7 +198,7 @@ export class TaskCoordinator {
      * does when the CLI goes within one run.
      */
     async outlasted(childId: string, commands: readonly string[], cause: 'limit' | 'restart' = 'limit'): Promise<Task | null> {
-        const task = this.deps.tasks.openFor(childId);
+        const task = this.localTask(childId);
         const items = this.deps.chatItems(childId);
         if (this.stopped || !task || items === null || this.delegating(childId)) {
             return null;
@@ -208,9 +221,15 @@ export class TaskCoordinator {
         }
     }
 
+    /* The open task a chat here works on; one whose child runs on another machine is settled from there. */
+    private localTask(childId: string): Task | undefined {
+        const task = this.deps.tasks.openFor(childId);
+        return task?.machine === undefined ? task : undefined;
+    }
+
     /* An open task of this child that nothing can carry any more. */
     private failed(childId: string, text: string): void {
-        const task = this.deps.tasks.openFor(childId);
+        const task = this.localTask(childId);
         if (!task || this.stopped) {
             return;
         }
@@ -236,7 +255,7 @@ export class TaskCoordinator {
     }
 
     private turnEnded(chatId: string, turn: ChatTurnItem): void {
-        const task = this.deps.tasks.openFor(chatId);
+        const task = this.localTask(chatId);
         const items = this.deps.chatItems(chatId);
         if (!task || items === null || !this.answers(items, turn, task) || this.delegating(chatId)) {
             return;
@@ -360,7 +379,7 @@ export class TaskCoordinator {
 
     /* A child that took up work again is no longer waiting out a limit. */
     private turnStarted(chatId: string): void {
-        const task = this.deps.tasks.openFor(chatId);
+        const task = this.localTask(chatId);
         if (task?.paused !== undefined) {
             this.hold(task, null);
         }
@@ -371,7 +390,7 @@ export class TaskCoordinator {
     }
 
     private recheck(chatId: string): void {
-        const task = this.deps.tasks.openFor(chatId);
+        const task = this.localTask(chatId);
         const items = this.deps.chatItems(chatId);
         if (!task || items === null || this.delegating(chatId)) {
             return;
