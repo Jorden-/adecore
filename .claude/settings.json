@@ -1,0 +1,23 @@
+{
+    "permissions": {
+        "allow": [
+            "Bash(bun install)",
+            "Bash(bun test *)",
+            "Bash(bun run build)",
+            "Bash(bun run typecheck)",
+            "Bash(bun run lint)",
+            "Bash(bun run check)",
+            "Bash(bun run test)",
+            "Bash(bun run format)",
+            "Bash(bun run format:check)",
+            "Bash(bun run pack *)",
+            "Bash(bun run test:pack *)",
+            "Bash(bun run --cwd docs build)"
+        ],
+        "deny": [
+            "Bash(git stash *)",
+            "Bash(git reset --hard *)",
+            "Bash(git clean *)"
+        ]
+    }
+}
