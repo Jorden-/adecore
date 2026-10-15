@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, expect, mock, test } from 'bun:test';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { UiMapSource } from '../../../../host';
+import { ChatHostProvider, type UiMapSource } from '../../../../host';
 import type { MapViewProps, MapViewStatus } from './map-view';
 
 type Handler = (event?: unknown) => void;
@@ -365,4 +365,31 @@ test.skipIf(typeof document === 'undefined')('the zoom buttons zoom the map', as
     expect(FakeMap.made[0].zoomIn).toHaveBeenCalledTimes(1);
     await act(async () => buttons[1].click());
     expect(FakeMap.made[0].zoomOut).toHaveBeenCalledTimes(1);
+});
+
+test.skipIf(typeof document === 'undefined')('points MapLibre to the worker the host names instead of the built-in address', async () => {
+    const host = { maps: { useSource: () => TILES, workerUrl: 'https://app.example/assets/maplibre-gl-worker.mjs' } };
+    await act(async () =>
+        root.render(
+            createElement(
+                ChatHostProvider,
+                { host },
+                createElement(MapView, { markers: MARKERS, source: TILES, selected: null, onPick: null, onStatus: (status) => statuses.push(status) })
+            )
+        )
+    );
+    expect(workerUrls.at(-1)).toBe('https://app.example/assets/maplibre-gl-worker.mjs');
+    const count = workerUrls.length;
+    await act(async () => root.unmount());
+    root = createRoot(element);
+    await act(async () =>
+        root.render(
+            createElement(
+                ChatHostProvider,
+                { host: { maps: host.maps } },
+                createElement(MapView, { markers: MARKERS, source: TILES, selected: null, onPick: null, onStatus: (status) => statuses.push(status) })
+            )
+        )
+    );
+    expect(workerUrls).toHaveLength(count);
 });

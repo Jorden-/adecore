@@ -33,13 +33,18 @@ const PICKED = 'z-1 bg-accent text-accent-text outline-2 outline-surface';
 // A tile that fails this many times with none loading in between leaves the map empty, so the outline stands in.
 const TILE_ERRORS_IN_A_ROW = 4;
 
-let workerReady = false;
+let workerUrlSet: string | null = null;
 
-/* The worker is a file of the package, so the bundler of the app has to serve it: the default address beside the chunk would not exist. */
-function ensureBundledWorker(): void {
-    if (!workerReady) {
-        setWorkerUrl(new URL('maplibre-gl/dist/maplibre-gl-worker.mjs', import.meta.url).href);
-        workerReady = true;
+/*
+ * The worker is a file of the package, so the bundler of the app has to serve it: the default address beside the chunk
+ * would not exist. A dev server that pre-bundles this package rewrites the fallback to a folder that is gone, so the
+ * host hands the address from its own source.
+ */
+function ensureBundledWorker(hosted: string | undefined): void {
+    const url = hosted ?? new URL('maplibre-gl/dist/maplibre-gl-worker.mjs', import.meta.url).href;
+    if (url !== workerUrlSet) {
+        setWorkerUrl(url);
+        workerUrlSet = url;
     }
 }
 
@@ -56,7 +61,9 @@ function readColors(element: HTMLElement): MapColors {
  */
 export function MapView({ markers, source, selected, onPick, onStatus }: MapViewProps) {
     const { t, i18n } = useTranslation('agent-chat');
-    const mode = useChatHost().code.useMode();
+    const host = useChatHost();
+    const mode = host.code.useMode();
+    const workerUrl = host.maps?.workerUrl;
     const element = useRef<HTMLDivElement>(null);
     const [map, setMap] = useState<MapLibreMap | null>(null);
     const [outline, setOutline] = useState(false);
@@ -79,7 +86,7 @@ export function MapView({ markers, source, selected, onPick, onStatus }: MapView
         const tiles = current.state === 'tiles' && !offline;
         let created: MapLibreMap;
         try {
-            ensureBundledWorker();
+            ensureBundledWorker(workerUrl);
             created = new MapLibreMap({
                 container,
                 style: current.state === 'tiles' && tiles ? current.styleUrl(mode) : baseMapStyle(colors),

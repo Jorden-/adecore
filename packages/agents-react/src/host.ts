@@ -236,6 +236,11 @@ export interface ChatHost {
     /* The map tiles of a Map block; left out, a map draws its outline and its list of places only. */
     maps?: {
         useSource(scopeId: string): UiMapSource;
+        /*
+         * The address of MapLibre's worker file (`maplibre-gl/dist/maplibre-gl-worker.mjs`) as the app's bundler serves it,
+         * for a bundler that moves this package and breaks the address the map would otherwise work out.
+         */
+        workerUrl?: string;
     };
     /* The colors an account may wear in the order a picker offers them, the few it shows first, and their names. */
     accents: {
