@@ -47,6 +47,13 @@ describe('the words of @adecore/agents-react', () => {
         }
     });
 
+    test.each([...AGENTS_NAMESPACES])('%s writes Markdown, the name of the format, with a capital in every language', async (namespace) => {
+        for (const language of Object.keys(AGENTS_LOCALES)) {
+            const lowercase = strings(await read(language, namespace)).filter(([, text]) => /\bmarkdown\b/.test(text));
+            expect(lowercase).toEqual([]);
+        }
+    });
+
     test('a loader answers every namespace of its language', async () => {
         for (const load of Object.values(AGENTS_LOCALES)) {
             expect(Object.keys(await load()).sort()).toEqual([...AGENTS_NAMESPACES].sort());

@@ -4,7 +4,7 @@ import { stripAnsi } from './ansi';
 /*
  * What a row of the thread puts on the clipboard. An answer is markdown on the wire and rendered
  * text on the screen, so copying it as text has to undo the marks the renderer swallowed; the
- * source itself stays available as "Copy as markdown".
+ * source itself stays available as "Copy as Markdown".
  */
 
 /*

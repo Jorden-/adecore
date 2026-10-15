@@ -227,7 +227,7 @@ export default {
         menu: {
             copyMessage: 'Bericht kopiëren',
             copyCode: 'Code kopiëren',
-            copyMarkdown: 'Kopiëren als markdown',
+            copyMarkdown: 'Kopiëren als Markdown',
             forkFromHere: 'Vanaf hier forken',
             openInPreview: 'Openen in preview'
         }
