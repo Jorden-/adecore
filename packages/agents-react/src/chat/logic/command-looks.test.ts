@@ -116,6 +116,15 @@ describe('matchCommandLook', () => {
         ]);
     });
 
+    test('a word knows the option it follows', () => {
+        const run = matchCommandLook('orbit probe go probe-3f2a --view main', LOOKS)!;
+        expect(run.words.map(({ text, option }) => [text, option])).toEqual([
+            ['go', null],
+            ['probe-3f2a', null],
+            ['main', '--view']
+        ]);
+    });
+
     test('a quoted word is named by what the program gets', () => {
         const run = matchCommandLook(`orbit probe tap 'probe-1' --view "main"`, LOOKS)!;
         expect(run.words.map(({ text }) => text)).toEqual(['tap', 'probe-1', 'main']);

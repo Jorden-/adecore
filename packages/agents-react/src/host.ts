@@ -230,9 +230,10 @@ export interface CommandLook {
     sentence?(count: number): string;
     /*
      * Names for words in the detail, such as ids, as a hook the row calls once. A word it names is drawn as
-     * that name, with the word itself in a tooltip; null leaves the word as it was typed.
+     * that name, with the word itself in a tooltip; null leaves the word as it was typed. `option` is the
+     * option the word is the value of, or null for a word that follows none.
      */
-    useNames?(scopeId: string, chatId: string): (word: string) => CommandName | null;
+    useNames?(scopeId: string, chatId: string): (word: string, option: string | null) => CommandName | null;
 }
 
 /*

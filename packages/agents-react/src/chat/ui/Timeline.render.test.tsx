@@ -329,7 +329,7 @@ const ORBIT: CommandLook = {
         area === undefined
             ? null
             : { label: area === 'probe' ? 'Probe' : 'Link', detailFrom: 1, group: { key: area, sentence: (count) => `Used Orbit ${area} ${count} times` } },
-    useNames: () => (word) => (word === 'probe-1' ? { name: 'Main Deck' } : null)
+    useNames: () => (word, option) => (word === 'probe-1' && option === null ? { name: 'Main Deck' } : null)
 };
 
 const LOOKS_HOST: Partial<ChatHost> = { commandLooks: [ORBIT] };

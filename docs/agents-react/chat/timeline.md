@@ -47,11 +47,11 @@ const DEPLOY: CommandLook = {
                   fold: ['--message'],
                   languages: { '--query': 'sql' }
               },
-    useNames: () => (word) => (word === 'web-1' ? { name: 'Website' } : null)
+    useNames: () => (word, option) => (word === 'web-1' && option === '--site' ? { name: 'Website' } : null)
 };
 ```
 
-A program counts only where the shell runs it, past assignments and wrappers and by its last path segment, so `grep deploy` stays a shell call, and so does a command past `EMBEDDED_CODE_LIMIT`. The first run in a line is the one drawn; redirects and a heredoc drop out of the detail, the other programs of the line follow it in a quiet tag (`+ sleep, grep`), and a second run of a look counts as `+1`. A value of an option in `fold` stops after 40 characters, so the words after it stay in sight, and one in `languages` is colored as that language. `useNames` is a hook each row calls once; a word it names is drawn as that name in a small frame, with the word itself on a tooltip and still found by a find in the thread. A run of calls of one look with the same `group.key` reads as that group's sentence, in a group and in a folded turn, and calls of one look under different keys read as the look's own `sentence` when it has one. The opened call still shows the whole command. `matchCommandLook(command, looks)` gives what a row draws, for a find of your own.
+A program counts only where the shell runs it, past assignments and wrappers and by its last path segment, so `grep deploy` stays a shell call, and so does a command past `EMBEDDED_CODE_LIMIT`. The first run in a line is the one drawn; redirects and a heredoc drop out of the detail, the other programs of the line follow it in a quiet tag (`+ sleep, grep`), and a second run of a look counts as `+1`. A value of an option in `fold` stops after 40 characters, so the words after it stay in sight, and one in `languages` is colored as that language. `useNames` is a hook each row calls once, and what it returns gets each word that is no option with the option it follows; a word it names is drawn as that name in a small frame, with the word itself on a tooltip and still found by a find in the thread. A run of calls of one look with the same `group.key` reads as that group's sentence, in a group and in a folded turn, and calls of one look under different keys read as the look's own `sentence` when it has one. The opened call still shows the whole command. `matchCommandLook(command, looks)` gives what a row draws, for a find of your own.
 
 ## Reading width
 

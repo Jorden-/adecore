@@ -76,7 +76,7 @@ function NamedLookDetail({ run, chatId, useNames }: { run: CommandLookRun; chatI
     const scope = useContext(ChatScopeContext);
     const nameOf = useNames(scope?.id ?? '', chatId);
     const names = run.words.flatMap((word): NamedWord[] => {
-        const name = nameOf(word.text);
+        const name = nameOf(word.text, word.option);
         return name === null ? [] : [{ start: word.start, end: word.end, word: word.text, name }];
     });
     return <ShellCommand command={run.detail} code={run.code} names={names} />;

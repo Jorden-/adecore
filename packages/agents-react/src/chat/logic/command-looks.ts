@@ -12,6 +12,8 @@ export interface CommandLookWord {
     readonly end: number;
     /* The word as the program gets it, quotes taken out. */
     readonly text: string;
+    /* The option right before it, whose value it may be; null when it follows none. */
+    readonly option: string | null;
 }
 
 /* A shell call read as a tool of its own: the first command of the line a look knows. */
@@ -93,7 +95,7 @@ function detailOf(source: string, command: ShellSimpleCommand, match: CommandLoo
         detail += text;
         const isOption = word.text.startsWith('-') && word.text !== '-';
         if (!isOption) {
-            words.push({ start, end: detail.length, text: word.text });
+            words.push({ start, end: detail.length, text: word.text, option });
         }
         option = isOption ? word.text : null;
         previous = word;
