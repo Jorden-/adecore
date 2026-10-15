@@ -11,6 +11,7 @@ const files = [
     'intelligent-ui/UiReply.media.test.ts',
     'intelligent-ui/UiReply.fields.test.ts',
     'intelligent-ui/UiReply.map.test.ts',
+    'intelligent-ui/UiReply.timeline.test.ts',
     'intelligent-ui/renderers/map-view.test.ts',
     'intelligent-ui/renderers/map-frame.test.ts'
 ];

@@ -26,7 +26,8 @@ export const UiDiagnosticSchema = z.object({
     message: z.string(),
     start: position,
     end: position,
-    nodeId: z.string().optional()
+    nodeId: z.string().optional(),
+    severity: z.literal('warning').optional()
 });
 
 export const UiBlockSchema: z.ZodType<UiBlock> = z.object({

@@ -1,6 +1,7 @@
 import { safeKey, UI_LIMITS, UiBudget, UiFailure, type UiLimits } from './budget.ts';
 import { isUiComponent, UI_CATALOG, UI_CATALOG_VERSION } from './catalog.ts';
 import { uiActionProp, uiActionTarget, uiLocalState } from './actions.ts';
+import { unreadableEventTime } from './event-warning.ts';
 import { uiNodeFallback, uiPlainText } from './fallback.ts';
 import { evaluateUiExpression, sameUiValue, type UiExpression, type UiValue } from './expression.ts';
 import { parseUiSyntax, uiDiagnostic, type UiDiagnostic, type UiSyntaxNode } from './syntax.ts';
@@ -311,6 +312,10 @@ export function compileUiBlock(source: string, options: UiCompileOptions): UiBlo
                 if (!parsed.success) {
                     throw new UiFailure('invalid_props', parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; '));
                 }
+            }
+            const unreadable = !unresolved && syntax.complete && syntax.type === 'Event' ? unreadableEventTime(evaluated.at) : null;
+            if (unreadable !== null) {
+                diagnose(unreadable, syntax.start, syntax.end, syntax.id);
             }
             // The catalog promises six series, one per chart color; more still reach the values a person can open.
             if (!unresolved && syntax.complete && syntax.type === 'Chart' && chartSeries(evaluated.data) > CHART_SERIES) {

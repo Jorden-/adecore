@@ -4,6 +4,7 @@ import { isUiComponent, UI_CATALOG, UI_CATALOG_VERSION } from './catalog.ts';
 import { type UiBlock, type UiNode } from './compiler.ts';
 import { uiActionProp, uiActionTarget, uiLocalState } from './actions.ts';
 import { uiCompiledNodes, uiVisibleInputs } from './inputs.ts';
+import { unreadableEventTime } from './event-warning.ts';
 import { uiDiagnostic, type UiDiagnostic } from './syntax.ts';
 
 export interface UiBinding<Value> {
@@ -185,6 +186,16 @@ export function evaluateUiBlock(block: UiBlock, state = new UiState(block), limi
                 throw new UiFailure('invalid_props', parsed.error.issues.map((issue) => issue.message).join('; '));
             }
             view.props = parsed.data;
+            const unreadable = node.complete && node.type === 'Event' ? unreadableEventTime(props.at) : null;
+            // The compiler already warned about a time it could read from the source; this one waited on an Each or a query.
+            if (
+                unreadable !== null &&
+                ![...block.diagnostics, ...result.diagnostics].some((item) => item.code === 'unreadable_time' && item.nodeId === node.id)
+            ) {
+                if (result.diagnostics.length < budget.limits.diagnostics) {
+                    result.diagnostics.push(uiDiagnostic(unreadable, node.start, node.end, node.id));
+                }
+            }
             if (node.type === 'Show') {
                 return props.when ? children(node.children, variables, depth + 1, suffix) : [];
             }

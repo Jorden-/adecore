@@ -54,16 +54,49 @@ describe('Timeline and Event', () => {
         expect(problems(show)).toEqual({ diagnostics: [], errors: [] });
     });
 
-    test('an event with a bad time fails alone and shows as text', () => {
+    test('an event with a time nobody can read still draws, with a warning and its text as written', () => {
         const source = '<Timeline><Event at="14:02">Alert</Event><Event at="soon" tone="info" detail="later">Rolled back</Event></Timeline>';
         const compiled = block(source);
-        expect(compiled.diagnostics.map((item) => item.code)).toEqual(['invalid_props']);
+        expect(compiled.diagnostics.map((item) => [item.code, item.severity])).toEqual([['unreadable_time', 'warning']]);
+        expect(compiled.diagnostics[0].message).toContain('HH:MM[:SS]');
         const [good, bad] = compiled.nodes[0].children;
         expect(good.error).toBeUndefined();
-        expect(bad.error).toBe('invalid_props');
+        expect(bad.error).toBeUndefined();
         expect(bad.fallback).toBe('soon Rolled back (info): later\n');
         expect(compiled.nodes[0].error).toBeUndefined();
-        expect(problems('<Timeline><Event at="2026-02-30">Never</Event></Timeline>').errors).toEqual(['Event:invalid_props']);
+        expect(compiled.diagnostics[0].nodeId).toBe(bad.id);
+        const evaluated = evaluateUiBlock(compiled);
+        expect(evaluated.diagnostics).toEqual([]);
+        expect(evaluated.nodes[0].children[1].props).toEqual({ at: 'soon', tone: 'info', detail: 'later' });
+        expect(evaluated.nodes[0].children[1].error).toBeUndefined();
+        const calendar = problems('<Timeline><Event at="2026-02-30">Never</Event></Timeline>');
+        expect(calendar).toEqual({ diagnostics: ['unreadable_time'], errors: [] });
+        expect(block('<Timeline><Event at="15:41:55">Deployed</Event></Timeline>').diagnostics).toEqual([]);
+    });
+
+    test('warns about an unreadable time that only an Each or a declared value can name, once per event', () => {
+        const each =
+            '$rows = [{at: "later", name: "One"}, {at: "soon", name: "Two"}, {at: "14:02", name: "Three"}]\n<Timeline><Each items={$rows} as="row"><Event at={row.at}>{row.name}</Event></Each></Timeline>';
+        const compiled = block(each);
+        expect(compiled.diagnostics).toEqual([]);
+        const evaluated = evaluateUiBlock(compiled);
+        expect(evaluated.diagnostics.map((item) => [item.code, item.severity])).toEqual([['unreadable_time', 'warning']]);
+        expect(evaluated.nodes[0].children.map((child) => [child.props.at, child.error])).toEqual([
+            ['later', undefined],
+            ['soon', undefined],
+            ['14:02', undefined]
+        ]);
+        const declared = block('$when = "soon"\n<Timeline><Event at={$when}>One</Event></Timeline>');
+        expect(declared.diagnostics.map((item) => item.code)).toEqual(['unreadable_time']);
+        expect(evaluateUiBlock(declared).diagnostics).toEqual([]);
+    });
+
+    test('keeps the warning off an event that is still being written', () => {
+        expect(block('<Timeline><Event at="soon">One', false).diagnostics).toEqual([]);
+    });
+
+    test('names the accepted forms of at in the catalog', () => {
+        expect(UI_CATALOG.Event.description).toContain('HH:MM[:SS], YYYY-MM-DD, or YYYY-MM-DDTHH:MM[:SS] with an optional Z or ±HH:MM');
     });
 
     test('an event stands only in a timeline, which holds only events', () => {

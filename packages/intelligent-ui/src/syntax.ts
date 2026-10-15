@@ -7,6 +7,8 @@ export interface UiDiagnostic {
     start: number;
     end: number;
     nodeId?: string;
+    // Only a warning says so: the part it names still drew. Absent means an error, a part that could not be drawn.
+    severity?: 'warning';
 }
 
 export interface UiSyntaxNode {
@@ -29,9 +31,13 @@ export interface UiSyntax {
     diagnostics: UiDiagnostic[];
 }
 
+const WARNING_CODES = new Set(['refused_prop', 'too_many_series', 'too_many_children', 'unreadable_time']);
+
 export function uiDiagnostic(error: unknown, start: number, end: number, nodeId?: string): UiDiagnostic {
+    const code = error instanceof UiFailure ? error.code : 'invalid_syntax';
     return {
-        code: error instanceof UiFailure ? error.code : 'invalid_syntax',
+        code,
+        ...(WARNING_CODES.has(code) ? { severity: 'warning' as const } : {}),
         message: error instanceof Error ? error.message : 'Invalid UI syntax.',
         start,
         end,

@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { parseUiEventTime } from './event-time.ts';
 import { uiPropList } from './prop-list.ts';
 
 export const UI_CATALOG_VERSION = 1;
@@ -56,9 +55,10 @@ export const UI_CATALOG = {
     Timeline: { group: 'status', description: 'Events in time order.', schema: empty, children: ['Event'], count: { min: 1 } },
     Event: {
         group: 'status',
-        description: 'One event at a time or date; children are the title.',
+        description:
+            'One event at a time or date; children are the title. at is HH:MM[:SS], YYYY-MM-DD, or YYYY-MM-DDTHH:MM[:SS] with an optional Z or ±HH:MM.',
         schema: z.strictObject({
-            at: text.refine((value) => parseUiEventTime(value) !== null, 'At must be HH:MM[:SS], YYYY-MM-DD or an ISO date-time.'),
+            at: text,
             tone,
             detail: text.optional()
         }),
