@@ -62,7 +62,10 @@ export function Wipe({ value: split, onValueChange: onSplit, before, after, labe
 
     return (
         <div ref={mergeRefs(frame, ref)} className={clsx('absolute inset-0', className)}>
-            <div className="absolute inset-0">{before}</div>
+            {/* Both sides are cut, since a picture with transparency would show the other one through it. */}
+            <div className="absolute inset-0" style={{ clipPath: `inset(0 ${(1 - split) * 100}% 0 0)` }}>
+                {before}
+            </div>
             <div className="absolute inset-0" style={{ clipPath: `inset(0 0 0 ${percent})` }}>
                 {after}
             </div>

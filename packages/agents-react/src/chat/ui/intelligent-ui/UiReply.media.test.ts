@@ -51,3 +51,29 @@ test.skipIf(typeof document === 'undefined')('the arrows move the comparison onl
         element.remove();
     }
 });
+
+test.skipIf(typeof document === 'undefined')('each picture of a comparison shows only on its own side of the handle', async () => {
+    const text = '```ui\n<Compare before="a1" after="a2">Header</Compare>\n```';
+    const blocks = compileUi(text, { id: 'compare-sides', final: true });
+    const element = document.createElement('div');
+    document.body.append(element);
+    const root = createRoot(element);
+    try {
+        await act(async () =>
+            root.render(
+                createElement(
+                    ChatHostProvider,
+                    { host },
+                    createElement(UiReply, { text, blocks, context: { scopeId: 'media', chatId: 'chat', itemId: 'item', phase: 'final' } })
+                )
+            )
+        );
+        const cuts = [...element.querySelectorAll<HTMLElement>('div')].flatMap((layer) =>
+            layer.style.clipPath ? [layer.style.clipPath.replaceAll('0px', '0')] : []
+        );
+        expect(cuts).toEqual(['inset(0 50% 0 0)', 'inset(0 0 0 50%)']);
+    } finally {
+        await act(async () => root.unmount());
+        element.remove();
+    }
+});
