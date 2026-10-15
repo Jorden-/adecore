@@ -31,14 +31,18 @@ function rig() {
     const thread = new ChatThread(info());
     const emitted: ChatEvent[] = [];
     const repairs: string[] = [];
+    const audiences: string[] = [];
     const replies = new UiReplies({
         thread,
         fenceLanguage: 'ui',
         clock: new ManualClock(),
         emit: (event) => emitted.push(event),
-        repair: (note) => repairs.push(note)
+        repair: (note, audience) => {
+            repairs.push(note);
+            audiences.push(audience);
+        }
     });
-    return { thread, emitted, repairs, replies };
+    return { thread, emitted, repairs, audiences, replies };
 }
 
 describe('UiReplies', () => {
@@ -71,6 +75,22 @@ describe('UiReplies', () => {
         replies.pass(thread.upsert(reply('```ui\n<Summary tone="huge">Result</Summary>\n```')));
         expect(repairs).toHaveLength(1);
         expect(repairs[0]).toContain('Your last ui block had these diagnostics');
+    });
+
+    test('tells the agent about a warning without showing it to the person', () => {
+        const { thread, repairs, audiences, replies } = rig();
+        replies.pass(thread.upsert(reply('```ui\n<Timeline><Event at="about three o\'clock">Deployed</Event></Timeline>\n```')));
+        expect(repairs).toHaveLength(1);
+        expect(repairs[0]).toContain('about three');
+        expect(audiences).toEqual(['agent']);
+    });
+
+    test('keeps an error for the person and a warning for the agent apart', () => {
+        const { thread, repairs, audiences, replies } = rig();
+        replies.pass(thread.upsert(reply('```ui\n<Timeline><Event at="soon">Deployed</Event><Widget>Odd</Widget></Timeline>\n```')));
+        expect(audiences).toEqual(['person', 'agent']);
+        expect(repairs[0]).not.toContain('soon');
+        expect(repairs[1]).toContain('soon');
     });
 
     test('previews a streaming reply until it is cleared', () => {

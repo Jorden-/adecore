@@ -70,6 +70,32 @@ test('compiler diagnostics are retained for the next real prompt', async () => {
     await run.session.dispose();
 });
 
+test('a warning reaches the agent at the next prompt and never becomes a note in the thread', async () => {
+    const run = rig();
+    await run.session.send('Show results');
+    await flush();
+    run.event({ type: 'text.done', ref: 'answer', text: '```ui\n<Timeline><Event at="about three">Deployed</Event></Timeline>\n```', parentRef: null });
+    expect(run.session.preambles).toEqual([]);
+    run.event({ type: 'turn.done', state: 'done', costUsd: 0 });
+    await run.session.send('Next');
+    await flush();
+    expect(run.sent.at(-1)?.preamble).toContain('about three');
+    expect(run.session.thread.list().filter((item) => item.kind === 'note')).toEqual([]);
+    await run.session.dispose();
+});
+
+test('an error is still drawn as a note in the thread', async () => {
+    const run = rig();
+    await run.session.send('Show results');
+    await flush();
+    run.event({ type: 'text.done', ref: 'answer', text: '```ui\n<Summary tone="huge">Result</Summary>\n```', parentRef: null });
+    run.event({ type: 'turn.done', state: 'done', costUsd: 0 });
+    await run.session.send('Next');
+    await flush();
+    expect(run.session.thread.list().some((item) => item.kind === 'note' && item.text.includes('Your last ui block'))).toBe(true);
+    await run.session.dispose();
+});
+
 test('a fence and a host reference split across deltas are found by scanning only the tail', async () => {
     const observed: boolean[] = [];
     const events: ChatEvent[] = [];

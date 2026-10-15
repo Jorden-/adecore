@@ -507,7 +507,7 @@ function UiBlockBody({
                 live={queries.live}
                 nodes={evaluation.nodes}
                 phase={context.phase}
-                fixes={[...block.diagnostics, ...evaluation.diagnostics]}
+                fixes={[...block.diagnostics, ...evaluation.diagnostics].filter((diagnostic) => diagnostic.severity !== 'warning')}
                 shownAsText={shownAsText}
                 answered={answered}
             >

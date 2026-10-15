@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { GeneratedImageInputSchema, type ChatAssistantItem, type ChatEvent, type ChatItem } from '@adecore/agent-contracts';
-import { uiHasFence, uiMayReferenceHost } from '@adecore/intelligent-ui';
+import { uiHasFence, uiMayReferenceHost, type UiDiagnostic } from '@adecore/intelligent-ui';
 import type { UiCompileOptions } from '@adecore/intelligent-ui/compiler';
 import { UiStream, type UiStreamPreview } from '@adecore/intelligent-ui/stream';
 import type { OutboxClock } from '../outbox/outbox-worker.ts';
@@ -21,8 +21,12 @@ export interface UiRepliesOptions {
     clock: OutboxClock;
     host?: UiReplyHost;
     emit(event: ChatEvent): void;
-    // What the agent hears in front of its next prompt about a block that compiled with diagnostics.
-    repair(note: string): void;
+    /*
+     * What the agent hears in front of its next prompt about a block that compiled with diagnostics.
+     * `agent` is for a warning: the person sees the block, not the note. `person` is for an error,
+     * which the thread shows as a note.
+     */
+    repair(note: string, audience: 'person' | 'agent'): void;
 }
 
 /*
@@ -114,19 +118,34 @@ export class UiReplies {
             .map((block) => ({ ...block, revision: createHash('sha256').update(JSON.stringify(block)).digest('hex') }));
         this.streams.delete(item.id);
         this.compiled.delete(item.id);
-        const diagnostics = [...new Set(ui.flatMap((block) => block.diagnostics.map((diagnostic) => diagnostic.message)))].slice(0, 6);
-        if (diagnostics.length > 0) {
-            this.options.repair(
-                `Your last ${this.options.fenceLanguage} block had these diagnostics: ${diagnostics.join(' ')} Use the catalog's supported props and components.`.slice(
-                    0,
-                    1200
-                )
-            );
-        }
+        this.repair(ui.flatMap((block) => block.diagnostics));
         const current = thread.get(item.id);
         const completed = { ...item, ui, ...(current?.kind === 'assistant' && current.uiQueries ? { uiQueries: current.uiQueries } : {}) };
         emit(thread.upsert(completed));
         this.options.host?.observe(completed, true);
+    }
+
+    private repair(diagnostics: UiDiagnostic[]): void {
+        const say = (found: UiDiagnostic[], audience: 'person' | 'agent') => {
+            const messages = [...new Set(found.map((diagnostic) => diagnostic.message))].slice(0, 6);
+            if (messages.length > 0) {
+                this.options.repair(
+                    `Your last ${this.options.fenceLanguage} block had these diagnostics: ${messages.join(' ')} Use the catalog's supported props and components.`.slice(
+                        0,
+                        1200
+                    ),
+                    audience
+                );
+            }
+        };
+        say(
+            diagnostics.filter((diagnostic) => diagnostic.severity !== 'warning'),
+            'person'
+        );
+        say(
+            diagnostics.filter((diagnostic) => diagnostic.severity === 'warning'),
+            'agent'
+        );
     }
 
     clear(): void {

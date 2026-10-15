@@ -205,6 +205,8 @@ export class ChatSession {
     // Background subagents a load found running whose transcript did not show an end yet; no CLI here will report them.
     private readonly orphans = new Set<string>();
     private pendingPreambles: readonly string[];
+    // Said once like the preambles, but never drawn as a note; kept in memory only, since a lost hint costs nothing.
+    private pendingHints: readonly string[] = [];
     private submission: { turnId: string; input: TurnInput } | null = null;
     private readonly steering = new Set<string>();
     private readonly capturedUiAccess: Map<string, unknown>;
@@ -222,8 +224,12 @@ export class ChatSession {
             clock: options.clock ?? systemClock,
             ...(options.ui ? { host: options.ui } : {}),
             emit: (event) => options.emit(event),
-            repair: (note) => {
-                if (!this.pendingPreambles.includes(note)) {
+            repair: (note, audience) => {
+                if (audience === 'agent') {
+                    if (!this.pendingHints.includes(note)) {
+                        this.pendingHints = [...this.pendingHints, note];
+                    }
+                } else if (!this.pendingPreambles.includes(note)) {
                     this.pendingPreambles = [...this.pendingPreambles, note];
                 }
             }
@@ -828,6 +834,7 @@ export class ChatSession {
         this.options.promptNotes?.reset();
         // A cleared chat starts a new conversation, which what was waiting to be said no longer describes.
         this.pendingPreambles = [];
+        this.pendingHints = [];
         this.submission = null;
         this.staleResults = 0;
         this.sendAfterStop = false;
@@ -1658,9 +1665,11 @@ export class ChatSession {
         const preambles = this.preambles;
         this.pendingPreambles = [];
         this.submission = null;
+        const hints = this.pendingHints;
+        this.pendingHints = [];
         const read = [...preambles, ...host.shown];
         const joined = (parts: string[]): string | null => (parts.length === 0 ? null : parts.join('\n\n'));
-        return { preamble: joined([...read, ...host.heard]), note: joined(read) };
+        return { preamble: joined([...read, ...host.heard, ...hints]), note: joined(read) };
     }
 
     private submit(turnId: string, input: TurnInput): void {

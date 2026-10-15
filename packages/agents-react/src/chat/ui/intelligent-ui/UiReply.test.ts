@@ -187,7 +187,7 @@ test('an event with a time nobody can read keeps its place in the timeline with 
     expect(markup).toContain('>soon</span>');
     expect(markup).toContain('aria-label="soon, Rolled back, Info, later"');
     expect(markup).toContain('Rolled back');
-    expect(markup).toContain('unreadable_time');
+    expect(markup).not.toContain('unreadable_time');
     expect(markup).toContain('After');
     const text = '```ui\n<Summary>Before</Summary><FutureTimeline><FutureEvent at="14:02">Alert</FutureEvent></FutureTimeline><Summary>After</Summary>\n```';
     const blocks = compileUi(text, { id: 'item', final: true });
