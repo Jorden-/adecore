@@ -23,7 +23,6 @@ import { Icon } from '../Icon.tsx';
 import { IconButton } from '../IconButton.tsx';
 import { MenuItem, MenuPopup, MenuRoot, MenuTrigger } from '../menu/parts.tsx';
 import { Pill } from '../Pill.tsx';
-import { Tooltip } from '../Tooltip.tsx';
 import { shownTabs } from './overflow.ts';
 
 export type TabsValue = BaseTabs.Tab.Value;
@@ -46,23 +45,18 @@ const TAB =
 const MORE = clsx(TAB, 'ml-auto data-[popup-open]:text-text');
 
 /* A tab as a key in a bar, for tabs that share a toolbar with buttons and must not read as the tabs of a pane under it. */
-const PILL_SHAPE =
-    'relative flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text data-[active]:bg-surface-active data-[active]:text-text data-[disabled]:opacity-50';
-
-const PILL = clsx(PILL_SHAPE, 'px-2 has-[button]:pr-1');
+const PILL =
+    'relative flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-xs font-medium text-text-muted hover:bg-surface-hover hover:text-text data-[active]:bg-surface-active data-[active]:text-text data-[disabled]:opacity-50 has-[button]:pr-1';
 
 const PILL_MORE = clsx(PILL, 'ml-auto data-[popup-open]:bg-surface-active data-[popup-open]:text-text');
-
-/* A square around a 16px mark, which grows only for what follows it, such as a dot for unsaved changes. */
-const PILL_PINNED = clsx(PILL_SHAPE, 'min-w-7 justify-center px-1.5');
 
 export type TabsVariant = 'line' | 'pill';
 
 const VariantContext = createContext<TabsVariant>('line');
 
 const STYLES = {
-    line: { strip: 'gap-4 border-b border-border', list: 'items-end gap-4', row: 'gap-4', tab: TAB, pinned: TAB, more: MORE },
-    pill: { strip: 'gap-1', list: 'items-center gap-1', row: 'gap-1', tab: PILL, pinned: PILL_PINNED, more: PILL_MORE }
+    line: { strip: 'gap-4 border-b border-border', list: 'items-end gap-4', row: 'gap-4', tab: TAB, more: MORE },
+    pill: { strip: 'gap-1', list: 'items-center gap-1', row: 'gap-1', tab: PILL, more: PILL_MORE }
 } as const;
 
 export type TabsRootProps = Omit<ComponentProps<typeof BaseTabs.Root>, 'onValueChange'> & {
@@ -267,7 +261,7 @@ export function TabsList({ className, children, start, end, after, variant = 'li
                 {!scrolls && (
                     <div ref={measure} aria-hidden inert className={clsx('pointer-events-none invisible absolute top-0 left-0 flex', style.row)}>
                         {tabs.map((tab) => (
-                            <span key={tab.key} className={tab.props.pinned === true ? style.pinned : style.tab}>
+                            <span key={tab.key} className={style.tab}>
                                 {tab.props.children}
                                 {tab.props.onClose !== undefined && tab.props.pinned !== true && <span className="size-5 shrink-0" />}
                             </span>
@@ -285,26 +279,22 @@ type TabProps = ComponentProps<typeof BaseTabs.Tab>;
 export type TabsTabProps = TabProps & {
     /* Makes the tab closable: a close button in it, a middle click, and Delete or Backspace while the tab has focus. */
     onClose?(): void;
-    /* Draws the tab as its mark alone, never hides it in the menu, and leaves it unclosable even with `onClose`. Its `aria-label` is its tooltip. */
+    /* Keeps the tab in the strip, never in the menu, and leaves it unclosable even with `onClose`. */
     pinned?: boolean;
 };
 
 /* The close button stays out of the tab order, so a closable tab is still one stop; the keys close it from the tab itself. */
 export function TabsTab({ className, onClose, pinned = false, children, ...props }: TabsTabProps) {
     const { t } = useTranslation('ui');
-    const style = STYLES[useContext(VariantContext)];
+    const tab = STYLES[useContext(VariantContext)].tab;
 
     if (pinned) {
-        const name = props['aria-label'];
-        const tab = (
-            <BaseTabs.Tab className={withClass(style.pinned, className)} data-pinned="" {...props}>
+        return (
+            <BaseTabs.Tab className={withClass(tab, className)} data-pinned="" {...props}>
                 {children}
             </BaseTabs.Tab>
         );
-        return name === undefined ? tab : <Tooltip label={name}>{tab}</Tooltip>;
     }
-
-    const tab = style.tab;
 
     if (onClose === undefined) {
         return (

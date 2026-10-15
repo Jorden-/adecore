@@ -28,17 +28,11 @@ export default function TabsPinnedDemo() {
     return (
         <Tabs.Root value={picked} onValueChange={(value) => setPicked(String(value))} className="w-full max-w-md">
             <Tabs.List aria-label="Pages" variant="pill">
-                {pages.map((page) =>
-                    page.pinned ? (
-                        <Tabs.Tab key={page.id} value={page.id} pinned aria-label={page.name}>
-                            <Icon icon={page.id === 'home' ? House : Database} size={16} />
-                        </Tabs.Tab>
-                    ) : (
-                        <Tabs.Tab key={page.id} value={page.id} onClose={() => close(page.id)}>
-                            <Icon icon={FileCode} size={14} /> {page.name}
-                        </Tabs.Tab>
-                    )
-                )}
+                {pages.map((page) => (
+                    <Tabs.Tab key={page.id} value={page.id} pinned={page.pinned} onClose={() => close(page.id)}>
+                        <Icon icon={page.id === 'home' ? House : page.id === 'schema' ? Database : FileCode} size={14} /> {page.name}
+                    </Tabs.Tab>
+                ))}
             </Tabs.List>
         </Tabs.Root>
     );
