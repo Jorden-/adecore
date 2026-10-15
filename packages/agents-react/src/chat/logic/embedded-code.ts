@@ -12,22 +12,46 @@ export const SHELL_LANGUAGE = 'shellscript';
 export const EMBEDDED_CODE_LIMIT = 20_000;
 const MAX_DEPTH = 3;
 
-interface Span {
+/* A stretch of a shell command, as offsets into it. */
+export interface ShellSpan {
     readonly start: number;
     readonly end: number;
 }
 
-interface Word extends Span {
+export interface ShellWord extends ShellSpan {
     /* The word as the shell hands it to the program, quotes and escapes taken out. */
     readonly text: string;
     /* The source of what the program gets, for a word that is bare or one quoted string; null for a mix. */
-    readonly body: Span | null;
+    readonly body: ShellSpan | null;
 }
+
+/* A redirect such as `2>&1` or `> out.txt`, its descriptor included. */
+export interface ShellRedirect extends ShellSpan {
+    readonly op: string;
+    readonly target: ShellWord;
+}
+
+/* The `<<'EOF'` of a heredoc, and the lines it feeds the command. */
+export interface ShellHeredoc extends ShellSpan {
+    readonly body: ShellSpan;
+}
+
+/* One simple command of a line, as a shell would split it: the words it runs and what it reads and writes. */
+export interface ShellSimpleCommand {
+    readonly words: readonly ShellWord[];
+    /* The word it runs, past variable assignments, wrappers and runners; null for a command of assignments only. */
+    readonly program: { readonly index: number; readonly name: string } | null;
+    readonly redirects: readonly ShellRedirect[];
+    readonly heredocs: readonly ShellHeredoc[];
+}
+
+type Span = ShellSpan;
+type Word = ShellWord;
 
 interface SimpleCommand {
     readonly words: Word[];
-    readonly redirects: { readonly op: string; readonly target: Word }[];
-    readonly heredocs: Span[];
+    readonly redirects: ShellRedirect[];
+    readonly heredocs: ShellHeredoc[];
 }
 
 interface Interpreter {
@@ -126,12 +150,15 @@ function programOf(word: string): string {
 function parseCommands(source: string, from: number, to: number): SimpleCommand[] {
     const commands: SimpleCommand[] = [];
     let current: SimpleCommand = { words: [], redirects: [], heredocs: [] };
-    const pending: { command: SimpleCommand; delimiter: string; strip: boolean }[] = [];
+    const pending: { command: SimpleCommand; delimiter: string; strip: boolean; operator: Span }[] = [];
+    // The start of the `2` of a `2>&1` just read, which the redirect after it begins at.
+    let descriptorStart: number | null = null;
     const finish = (): void => {
         if (current.words.length > 0 || current.redirects.length > 0) {
             commands.push(current);
         }
         current = { words: [], redirects: [], heredocs: [] };
+        descriptorStart = null;
     };
     const skipBlanks = (index: number): number => {
         while (index < to && BLANKS.includes(source[index]!)) {
@@ -215,7 +242,7 @@ function parseCommands(source: string, from: number, to: number): SimpleCommand[
             index++;
             for (const heredoc of pending) {
                 const { body, next } = readHeredoc(index, heredoc.delimiter, heredoc.strip);
-                heredoc.command.heredocs.push(body);
+                heredoc.command.heredocs.push({ ...heredoc.operator, body });
                 index = next;
             }
             pending.length = 0;
@@ -230,11 +257,12 @@ function parseCommands(source: string, from: number, to: number): SimpleCommand[
         } else if (source.startsWith('<<<', index)) {
             index = readWord(skipBlanks(index + 3)).end;
         } else if (source.startsWith('<<', index)) {
+            const start = index;
             index += 2;
             const strip = source[index] === '-';
             const word = readWord(skipBlanks(strip ? index + 1 : index));
             if (word.text !== '') {
-                pending.push({ command: current, delimiter: word.text, strip });
+                pending.push({ command: current, delimiter: word.text, strip, operator: { start, end: word.end } });
             }
             index = word.end;
         } else if (char === '<' || char === '>' || (char === '&' && source[index + 1] === '>')) {
@@ -244,7 +272,8 @@ function parseCommands(source: string, from: number, to: number): SimpleCommand[
             }
             const op = source.slice(index, end);
             const target = readWord(skipBlanks(end));
-            current.redirects.push({ op, target });
+            current.redirects.push({ start: descriptorStart ?? index, end: Math.max(target.end, end), op, target });
+            descriptorStart = null;
             index = Math.max(target.end, end);
         } else if (SEPARATORS.includes(char)) {
             index++;
@@ -253,7 +282,9 @@ function parseCommands(source: string, from: number, to: number): SimpleCommand[
             const word = readWord(index);
             // The `2` of `2>&1` is a file descriptor, not an argument.
             const descriptor = /^\d+$/.test(word.text) && (source[word.end] === '>' || source[word.end] === '<');
-            if (!descriptor) {
+            if (descriptor) {
+                descriptorStart = word.start;
+            } else {
                 current.words.push(word);
             }
             index = Math.max(word.end, index + 1);
@@ -350,7 +381,7 @@ function codeOf(command: SimpleCommand): EmbeddedCode[] {
     }
     const heredocLanguage = interpreter !== undefined && (!readsFile || interpreter.client === true) ? interpreter.language : writtenLanguage(command, program);
     if (heredocLanguage !== null) {
-        for (const body of command.heredocs) {
+        for (const { body } of command.heredocs) {
             found.push({ ...body, language: heredocLanguage });
         }
     }
@@ -390,6 +421,21 @@ function collect(source: string, from: number, to: number, depth: number, into: 
             }
         }
     }
+}
+
+/*
+ * The simple commands of a shell line, in the order they come: a pipeline, a list and a line each split
+ * apart, a heredoc with the command it feeds. Only the line itself: the script of a `bash -lc '…'` stays a word.
+ */
+export function shellCommands(source: string): ShellSimpleCommand[] {
+    return parseCommands(source, 0, source.length).map((command) => {
+        const index = programIndex(command.words);
+        const word = command.words[index];
+        return {
+            ...command,
+            program: word === undefined ? null : { index, name: word.text.slice(word.text.lastIndexOf('/') + 1) }
+        };
+    });
 }
 
 /*

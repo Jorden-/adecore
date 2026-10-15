@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { EMBEDDED_CODE_LIMIT, embeddedCode } from './embedded-code';
+import { EMBEDDED_CODE_LIMIT, embeddedCode, shellCommands } from './embedded-code';
 
 /* The code found in a command as its text and language, which reads better than offsets. */
 function found(command: string): [string, string][] {
@@ -84,5 +84,36 @@ describe('embeddedCode', () => {
 
     test('a command past the limit is not scanned', () => {
         expect(embeddedCode(`python3 -c '${'x'.repeat(EMBEDDED_CODE_LIMIT)}'`)).toEqual([]);
+    });
+});
+
+describe('shellCommands', () => {
+    test('splits a line into its commands, each with its words unquoted and its program', () => {
+        const source = `FOO=1 /opt/bin/tool run "a b" --x 2>&1 | grep -E 'x' && sleep 3`;
+        const commands = shellCommands(source);
+        expect(commands.map(({ words }) => words.map(({ text }) => text))).toEqual([
+            ['FOO=1', '/opt/bin/tool', 'run', 'a b', '--x'],
+            ['grep', '-E', 'x'],
+            ['sleep', '3']
+        ]);
+        expect(commands.map(({ program }) => program)).toEqual([
+            { index: 1, name: 'tool' },
+            { index: 0, name: 'grep' },
+            { index: 0, name: 'sleep' }
+        ]);
+        const [first] = commands;
+        expect(first!.words.map(({ start, end }) => source.slice(start, end))).toEqual(['FOO=1', '/opt/bin/tool', 'run', '"a b"', '--x']);
+        expect(first!.redirects.map(({ start, end, op }) => [source.slice(start, end), op])).toEqual([['2>&1', '>&']]);
+    });
+
+    test('keeps the operator and the body of a heredoc apart', () => {
+        const source = "tool write --name a.txt <<'EOF'\nhello\nEOF\nls";
+        const [first, second] = shellCommands(source);
+        expect(first!.heredocs.map(({ start, end, body }) => [source.slice(start, end), source.slice(body.start, body.end)])).toEqual([["<<'EOF'", 'hello\n']]);
+        expect(second!.program?.name).toBe('ls');
+    });
+
+    test('a command of assignments only runs no program', () => {
+        expect(shellCommands('A=1 B=2').map(({ program }) => program)).toEqual([null]);
     });
 });
