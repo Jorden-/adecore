@@ -535,6 +535,26 @@ describe('tabs', () => {
         expect(markup).toContain('>after</span>');
     });
 
+    test('draw a pinned tab as its mark alone, named but without a close button', () => {
+        const markup = render(
+            <Tabs.Root value="one">
+                <Tabs.List aria-label="Views" variant="pill">
+                    <Tabs.Tab value="home" pinned aria-label="Home" onClose={() => {}}>
+                        <span>mark</span>
+                    </Tabs.Tab>
+                    <Tabs.Tab value="one" onClose={() => {}}>
+                        One
+                    </Tabs.Tab>
+                </Tabs.List>
+            </Tabs.Root>
+        );
+        const pinned = /<[^>]*data-pinned=""[^>]*>/.exec(markup)?.[0] ?? '';
+        expect(pinned).toContain('aria-label="Home"');
+        expect(pinned).toContain('px-1.5');
+        expect(pinned).not.toContain('px-2');
+        expect(markup.match(/aria-label="Close tab"/g)).toHaveLength(1);
+    });
+
     test('draw what comes before the tabs ahead of the list', () => {
         const markup = render(
             <Tabs.Root value="one">
