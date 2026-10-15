@@ -66,13 +66,13 @@ export function Row({ row, chatId, toggleGroup, toggleTurn, toggleSubagent, open
         case 'live-thought':
             return <LiveThoughtRow chatId={chatId} item={row.item} />;
         case 'work':
-            return isImageGeneration(row.tool) ? <GeneratedImageRow chatId={chatId} tool={row.tool} /> : <WorkRow tool={row.tool} />;
+            return isImageGeneration(row.tool) ? <GeneratedImageRow chatId={chatId} tool={row.tool} /> : <WorkRow chatId={chatId} tool={row.tool} />;
         case 'work-live':
             return isImageGeneration(row.tool) ? <GeneratedImageRow chatId={chatId} tool={row.tool} /> : <WorkLiveRow chatId={chatId} tool={row.tool} />;
         case 'workflow':
             return <WorkflowRow chatId={chatId} tool={row.tool} workflow={row.workflow} onOpenAgent={openConversation} />;
         case 'work-group':
-            return <WorkGroupRow tools={row.tools} summary={row.summary} expanded={row.expanded} onToggle={() => toggleGroup(row.id)} />;
+            return <WorkGroupRow tools={row.tools} summary={row.summary} look={row.look} expanded={row.expanded} onToggle={() => toggleGroup(row.id)} />;
         case 'subagent':
             return <SubagentBranchRow chatId={chatId} branch={row} onToggle={toggleSubagent} onOpenConversation={openConversation} />;
         case 'turn-fold':

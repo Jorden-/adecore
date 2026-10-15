@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { ChatItem, ChatToolItem, ChatTurnItem } from '@adecore/agent-contracts';
 import { notResumedNote } from '@adecore/agent-contracts';
+import type { CommandLook } from '../../host';
 import { agentTurnLabel, deriveTimelineRows, findSubagentBranch, isBlock, summarizeGroup, summarizeTurn, turnLabel } from './timeline';
 
 function tool(id: string, name: string, input: unknown, state: ChatToolItem['state'] = 'done', turnId = 't1'): ChatToolItem {
@@ -484,4 +485,42 @@ test("a subagent's handback call reads as its report, and one without a message 
     const rows = deriveTimelineRows(items, options);
     expect(rows.map((row) => row.kind)).toEqual(['work', 'report', 'work']);
     expect(rows[1]).toEqual({ kind: 'report', id: 'h1', text: '## Review\n\nAll good.' });
+});
+
+describe('runs of a command look', () => {
+    /* An invented CLI whose areas are its group keys. */
+    const ORBIT: CommandLook = {
+        program: 'orbit',
+        brand: 'Orbit',
+        Mark: () => null,
+        describe: ([area]) =>
+            area === undefined ? null : { label: area, detailFrom: 1, group: { key: area, sentence: (count) => `Used Orbit ${area} ${count} times` } },
+        sentence: (count) => `Used Orbit ${count} times`
+    };
+    const LOOKS = [ORBIT];
+    const bash = (id: string, command: string): ChatToolItem => tool(id, 'Bash', { command });
+    const loose = (calls: ChatToolItem[]): ChatItem[] => calls.map((call) => ({ ...call, turnId: null }));
+
+    test('a group of one key reads as its sentence, and carries the look', () => {
+        const calls = [bash('1', 'orbit probe a'), bash('2', 'sleep 1; orbit probe b')];
+        expect(summarizeGroup(calls, LOOKS)).toBe('Used Orbit probe 2 times');
+        const rows = deriveTimelineRows(loose(calls), { ...options, commandLooks: LOOKS });
+        expect(rows).toEqual([expect.objectContaining({ kind: 'work-group', summary: 'Used Orbit probe 2 times', look: ORBIT })]);
+    });
+
+    test('keys apart read as the look, a look without a sentence of its own and a mix with plain shell as commands', () => {
+        expect(summarizeGroup([bash('1', 'orbit probe a'), bash('2', 'orbit link b')], LOOKS)).toBe('Used Orbit 2 times');
+        expect(summarizeGroup([bash('1', 'orbit probe a'), bash('2', 'orbit link b')], [{ ...ORBIT, sentence: undefined }])).toBe('Ran 2 commands');
+        expect(summarizeGroup([bash('1', 'orbit probe a'), bash('2', 'ls')], LOOKS)).toBe('Ran 2 commands');
+        expect(summarizeGroup([bash('1', 'orbit probe a'), bash('2', 'orbit probe b')])).toBe('Ran 2 commands');
+        const rows = deriveTimelineRows(loose([bash('1', 'orbit probe a'), bash('2', 'ls')]), { ...options, commandLooks: LOOKS });
+        expect(rows).toEqual([expect.objectContaining({ kind: 'work-group', summary: 'Ran 2 commands' })]);
+        expect(rows[0]).not.toHaveProperty('look');
+    });
+
+    test('a folded turn says each key once, where its first call came, and counts the rest of the shell as commands', () => {
+        const calls = [tool('r', 'Read', {}), bash('1', 'orbit probe a'), bash('2', 'ls'), bash('3', 'orbit probe b'), bash('4', 'orbit link c')];
+        expect(summarizeTurn(calls, LOOKS)).toEqual(['Read 1 file', 'Used Orbit probe 2 times', 'Ran 1 command', 'Used Orbit link 1 times']);
+        expect(summarizeTurn(calls)).toEqual(['Read 1 file', 'Ran 4 commands']);
+    });
 });

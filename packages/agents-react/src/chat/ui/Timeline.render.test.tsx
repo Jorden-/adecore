@@ -3,7 +3,7 @@ import { act, Profiler } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { ChatInfo, ChatItem } from '@adecore/agent-contracts';
 import { createPage } from '@adecore/editor/testing';
-import { ChatHostProvider } from '../../host';
+import { ChatHostProvider, type ChatHost, type CommandLook } from '../../host';
 import { ChatScopeContext, type ChatScope } from '../../scope';
 import { useChats } from '../../state/chats';
 import { Timeline } from './Timeline';
@@ -167,7 +167,15 @@ class ManualResizeObserver {
     }
 }
 
-async function mounted(layout: Layout, activeTurnId: string | null, run: (mount: Mounted) => Promise<void>): Promise<void> {
+/* What a test draws in place of the thread of three questions, and the host around it. */
+interface Setup {
+    items?: ChatItem[];
+    host?: Partial<ChatHost>;
+}
+
+const NO_HOST: Partial<ChatHost> = {};
+
+async function mounted(layout: Layout, activeTurnId: string | null, run: (mount: Mounted) => Promise<void>, setup: Setup = {}): Promise<void> {
     const page = createPage();
     const fromPage = [
         'window',
@@ -221,10 +229,10 @@ async function mounted(layout: Layout, activeTurnId: string | null, run: (mount:
     const tracker = renderTracker(page.host);
     const commits: Fiber[][] = [];
     try {
-        useChats.getState().reset(KEY, infoOf(activeTurnId), threadOf());
+        useChats.getState().reset(KEY, infoOf(activeTurnId), setup.items ?? threadOf());
         await act(async () =>
             root.render(
-                <ChatHostProvider host={{}}>
+                <ChatHostProvider host={setup.host ?? NO_HOST}>
                     <ChatScopeContext.Provider value={scope}>
                         <div className="chat-column">
                             <Profiler id="timeline" onRender={() => commits.push(tracker.rendered())}>
@@ -310,4 +318,82 @@ test('the strip follows a message coming out from under the composer while the r
         await scrollTo(2700);
         expect(propsOf('Scrubber')).toMatchObject({ firstInView: 0, lastInView: 1 });
     });
+});
+
+/* An invented CLI with ids of its own, which the host names. */
+const ORBIT: CommandLook = {
+    program: 'orbit',
+    brand: 'Orbit',
+    Mark: ({ size }) => <svg data-mark="orbit" width={size} height={size} />,
+    describe: ([area]) =>
+        area === undefined
+            ? null
+            : { label: area === 'probe' ? 'Probe' : 'Link', detailFrom: 1, group: { key: area, sentence: (count) => `Used Orbit ${area} ${count} times` } },
+    useNames: () => (word) => (word === 'probe-1' ? { name: 'Main Deck' } : null)
+};
+
+const LOOKS_HOST: Partial<ChatHost> = { commandLooks: [ORBIT] };
+
+/* A call of the CLI, a run of two, and a plain shell call, each on a line of its own between replies. */
+function shellThread(): ChatItem[] {
+    const bash = (id: string, command: string, createdAt: number): ChatItem => ({
+        id,
+        kind: 'tool',
+        createdAt,
+        turnId: null,
+        toolUseId: id,
+        name: 'Bash',
+        input: { command },
+        output: '',
+        state: 'done',
+        parentToolUseId: null
+    });
+    const reply = (id: string, createdAt: number): ChatItem => ({ id, kind: 'assistant', turnId: null, createdAt, text: 'Done.', streaming: false });
+    return [
+        bash('probe', 'sleep 1; orbit probe launch probe-1 --wait 5 2>&1 | grep ok', 1),
+        reply('reply-1', 2),
+        bash('link-a', 'orbit link new a', 3),
+        bash('link-b', 'orbit link new b', 4),
+        reply('reply-2', 5),
+        bash('plain', 'ls -la', 6)
+    ];
+}
+
+/* The text of each tool line without its time, semibold in asterisks and what only a screen reader reads in parentheses. */
+function linesOf(host: HTMLElement): string[] {
+    return [...host.querySelectorAll('.group\\/line')].map((line) => {
+        const copy = line.cloneNode(true) as HTMLElement;
+        copy.querySelector('time')?.remove();
+        for (const bold of copy.querySelectorAll('.font-semibold')) {
+            bold.textContent = `*${bold.textContent}*`;
+        }
+        for (const hidden of copy.querySelectorAll('.sr-only')) {
+            hidden.textContent = `(${hidden.textContent})`;
+        }
+        return copy.textContent ?? '';
+    });
+}
+
+test('a run of a program the host names reads as its tool, a run of them as its sentence, and any other shell call as itself', async () => {
+    await mounted(
+        { rowHeights: [40, 60, 40, 60, 40], composerHeight: 0 },
+        null,
+        async ({ page }) => {
+            expect(linesOf(page.host)).toEqual(['*Orbit* Probelaunch Main Deck(probe-1) --wait 5+ sleep, grep', 'Used *Orbit* link 2 times', 'Bashls -la']);
+            expect(page.host.querySelectorAll('[data-mark="orbit"]')).toHaveLength(2);
+        },
+        { items: shellThread(), host: LOOKS_HOST }
+    );
+});
+
+test('without looks every shell call reads as itself', async () => {
+    await mounted(
+        { rowHeights: [40, 60, 40, 60, 40], composerHeight: 0 },
+        null,
+        async ({ page }) => {
+            expect(linesOf(page.host)).toEqual(['Bashsleep 1; orbit probe launch probe-1 --wait 5 2>&1 | grep ok', 'Ran 2 commands', 'Bashls -la']);
+            expect(page.host.querySelector('[data-mark]')).toBeNull();
+        },
+        { items: shellThread() }
+    );
 });

@@ -26,6 +26,33 @@ A message has its actions under it on hover: bookmark, fork (only with a host `f
 
 The path of a file a call reads or writes, in its line and in the line of an approval, and a file in the changed files card, is cut in the middle when it does not fit, so the folder it starts in and the name it ends with both stay in sight ([`MiddleTruncate`](/ui/display/middle-truncate)). The cut part is still in the line for a copy or a find, and a tooltip shows the whole path.
 
+### Programs as tools
+
+A shell call reads as `Bash` and its command. A program of your own can read as a tool instead: hand the host a `commandLooks` list, one `CommandLook` per program, and a call that runs it is drawn with its `Mark` in the gutter, its `brand` in semibold before the label `describe` gives it, and the command from the word `detailFrom` names.
+
+```tsx
+import type { CommandLook } from '@adecore/agents-react';
+
+const DEPLOY: CommandLook = {
+    program: 'deploy',
+    brand: 'Deploy',
+    Mark: ({ size }) => <RocketIcon size={size} />,
+    describe: ([target]) =>
+        target === undefined
+            ? null
+            : {
+                  label: target === 'preview' ? 'Preview' : 'Production',
+                  detailFrom: 1,
+                  group: { key: target, sentence: (count) => `Deployed ${count} times` },
+                  fold: ['--message'],
+                  languages: { '--query': 'sql' }
+              },
+    useNames: () => (word) => (word === 'web-1' ? { name: 'Website' } : null)
+};
+```
+
+A program counts only where the shell runs it, past assignments and wrappers and by its last path segment, so `grep deploy` stays a shell call, and so does a command past `EMBEDDED_CODE_LIMIT`. The first run in a line is the one drawn; redirects and a heredoc drop out of the detail, the other programs of the line follow it in a quiet tag (`+ sleep, grep`), and a second run of a look counts as `+1`. A value of an option in `fold` stops after 40 characters, so the words after it stay in sight, and one in `languages` is colored as that language. `useNames` is a hook each row calls once; a word it names is drawn as that name in a small frame, with the word itself on a tooltip and still found by a find in the thread. A run of calls of one look with the same `group.key` reads as that group's sentence, in a group and in a folded turn, and calls of one look under different keys read as the look's own `sentence` when it has one. The opened call still shows the whole command. `matchCommandLook(command, looks)` gives what a row draws, for a find of your own.
+
 ## Reading width
 
 In a parent with the class `chat-column`, a chat that is a view of its own, the rows and the composer stand in a centered column. Its width is the person's reading width in the [chat preferences](/agents-react/guide/persistence): `narrow` (640 pixels), `comfortable` (768 pixels, the default) or `full`, the whole width of the view. The thread's right click menu offers the three in such a view, and a settings page of your own can offer them with `CHAT_READING_WIDTHS`, `readingWidthLabel` and `readingWidthHint` and `rememberReadingWidth` from `@adecore/agents-react/chat`. A node on a canvas, without `chat-column`, always runs the width it has. `SubagentTimeline` follows the same width.

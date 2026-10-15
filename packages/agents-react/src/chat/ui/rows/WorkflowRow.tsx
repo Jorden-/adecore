@@ -99,7 +99,7 @@ export function WorkflowRow({
         <div>
             <div className="flex items-center gap-1">
                 <div className="min-w-0 grow">
-                    {running ? <WorkLiveRow chatId={chatId ?? ''} tool={tool} /> : <WorkRow tool={tool} detail={workflow.name ?? undefined} />}
+                    {running ? <WorkLiveRow chatId={chatId ?? ''} tool={tool} /> : <WorkRow chatId={chatId} tool={tool} detail={workflow.name ?? undefined} />}
                 </div>
                 {running && chatId && workflow.taskId && <IconButton icon={Square} size="xs" label={t('activity.stop')} onClick={stop} />}
             </div>

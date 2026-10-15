@@ -198,7 +198,11 @@ export default {
         edits_one: '{{count}} edit',
         edits_other: '{{count}} edits',
         workingFor: 'Working for',
-        exitCode: 'Exit code {{code}}'
+        exitCode: 'Exit code {{code}}',
+        alsoRan: '+ {{programs}}',
+        heredoc: 'heredoc',
+        moreRuns_one: '+{{count}}',
+        moreRuns_other: '+{{count}}'
     },
     timeline: {
         welcome: {

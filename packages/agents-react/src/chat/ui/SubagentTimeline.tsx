@@ -19,6 +19,7 @@ import { FileLinkContext } from './file-links';
 import { useChatRow } from '../../state/chats';
 import { useChatPreferences } from '../preferences';
 import { readingWidthStyle } from '../reading-width';
+import { useChatHost } from '../../host';
 import { useChatScope } from '../../scope';
 import { EmptyState, ContextMenu, Icon } from '@adecore/ui';
 
@@ -31,6 +32,7 @@ const NO_TURNS = new Set<string>();
 export function SubagentTimeline({ chatId, toolUseId }: { chatId: string; toolUseId: string }) {
     const { t } = useTranslation('agent-chat');
     const scope = useChatScope();
+    const { commandLooks } = useChatHost();
     const connected = useSyncExternalStore(
         useCallback((changed) => scope.transport.subscribeStatus(changed), [scope]),
         useCallback(() => scope.transport.status === 'open', [scope]),
@@ -71,8 +73,15 @@ export function SubagentTimeline({ chatId, toolUseId }: { chatId: string; toolUs
     }, [state.unsupported, scope]);
 
     const rows = useMemo(
-        () => deriveTimelineRows(state.items, { expandedGroups: groups.ids, expandedTurns: NO_TURNS, expandedSubagents: subagents.ids, activeTurnId: null }),
-        [state.items, groups.ids, subagents.ids]
+        () =>
+            deriveTimelineRows(state.items, {
+                expandedGroups: groups.ids,
+                expandedTurns: NO_TURNS,
+                expandedSubagents: subagents.ids,
+                activeTurnId: null,
+                commandLooks
+            }),
+        [state.items, groups.ids, subagents.ids, commandLooks]
     );
 
     useLayoutEffect(() => {

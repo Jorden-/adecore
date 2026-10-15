@@ -252,9 +252,16 @@ export function Timeline({ chatId, composer, overlay }: { chatId: string; compos
         }
         return deriveTimelineRows(
             order.map((id) => items[id]!),
-            { expandedGroups: groups.ids, expandedTurns: turns.ids, expandedSubagents: subagents.ids, activeTurnId, forkedTurns }
+            {
+                expandedGroups: groups.ids,
+                expandedTurns: turns.ids,
+                expandedSubagents: subagents.ids,
+                activeTurnId,
+                forkedTurns,
+                commandLooks: host.commandLooks
+            }
         );
-    }, [order, items, groups.ids, turns.ids, subagents.ids, activeTurnId, forkedTurns]);
+    }, [order, items, groups.ids, turns.ids, subagents.ids, activeTurnId, forkedTurns, host.commandLooks]);
     const cards = host.useThreadCards(scopeId, chatId);
     const drawsVisuals = host.visuals !== null;
     // Where the part of the thread this client holds begins, while there is a page before it.

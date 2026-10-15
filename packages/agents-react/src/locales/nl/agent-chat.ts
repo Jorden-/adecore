@@ -198,7 +198,11 @@ export default {
         edits_one: '{{count}} bewerking',
         edits_other: '{{count}} bewerkingen',
         workingFor: 'Werkt al',
-        exitCode: 'Afsluitcode {{code}}'
+        exitCode: 'Afsluitcode {{code}}',
+        alsoRan: '+ {{programs}}',
+        heredoc: 'heredoc',
+        moreRuns_one: '+{{count}}',
+        moreRuns_other: '+{{count}}'
     },
     timeline: {
         welcome: {

@@ -1,10 +1,11 @@
-import { Fragment, useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { Fragment, useContext, useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import clsx from 'clsx';
 import i18next from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, FileDiff, X } from 'lucide-react';
 import type { ChatCheckpointDiff, ChatCheckpointFile, ChatFileChange, ChatToolItem, ChatTurnItem } from '@adecore/agent-contracts';
 import type { BaseMoved } from '../../logic/timeline';
+import { matchCommandLook, type CommandLookRun } from '../../logic/command-looks';
 import {
     exitCodeOf,
     fileChanges,
@@ -21,10 +22,10 @@ import {
     type FileChange
 } from '../../logic/tools';
 import { useOpenForFind } from '../find-reveal';
-import { useChatHost } from '../../../host';
+import { useChatHost, type CommandLook } from '../../../host';
 import { lazyNamed } from '../../../lazy';
 import { useChatActions } from '../../actions';
-import { useChatScope } from '../../../scope';
+import { ChatScopeContext, useChatScope } from '../../../scope';
 import { useCurrentItem } from '../../../state/chats';
 import { useTimelineFlash } from '../../timeline-flash';
 import { formatClockDuration, formatElapsedShort } from '@adecore/ui/format';
@@ -32,7 +33,7 @@ import { Icon, LazyBoundary, MiddleTruncate, Spinner, useTickingText } from '@ad
 import { ROW_GUTTER, toolIcon } from '../icons';
 import { AnsiOutput } from '../AnsiOutput';
 import { RowTime } from '../RowTime';
-import { ShellCommand } from '../ShellCommand';
+import { ShellCommand, type NamedWord } from '../ShellCommand';
 import { DiffStack, ReviewStackView } from '../diff/DiffStack';
 import { reviewEntries, type ReviewEntry } from '../diff/review-plan';
 import { useReviewStack } from '../diff/use-review-stack';
@@ -51,6 +52,59 @@ function clip(text: string): string {
     return text.slice(0, OUTPUT_LIMIT) + clipNotice(text);
 }
 
+const BRAND = 'font-semibold';
+
+/* `text` with `brand` in semibold where it names it, as a sentence about a look does. */
+function withBrand(text: string, brands: readonly string[]): ReactNode {
+    for (const brand of brands) {
+        const at = brand === '' ? -1 : text.indexOf(brand);
+        if (at !== -1) {
+            return (
+                <>
+                    {text.slice(0, at)}
+                    <span className={BRAND}>{brand}</span>
+                    {text.slice(at + brand.length)}
+                </>
+            );
+        }
+    }
+    return text;
+}
+
+/* The detail of a look's run, with the words its host names drawn as those names. */
+function NamedLookDetail({ run, chatId, useNames }: { run: CommandLookRun; chatId: string; useNames: NonNullable<CommandLook['useNames']> }) {
+    const scope = useContext(ChatScopeContext);
+    const nameOf = useNames(scope?.id ?? '', chatId);
+    const names = run.words.flatMap((word): NamedWord[] => {
+        const name = nameOf(word.text);
+        return name === null ? [] : [{ start: word.start, end: word.end, word: word.text, name }];
+    });
+    return <ShellCommand command={run.detail} code={run.code} names={names} />;
+}
+
+function LookDetail({ run, chatId }: { run: CommandLookRun; chatId: string }) {
+    const { useNames } = run.look;
+    if (useNames === undefined) {
+        return <ShellCommand command={run.detail} code={run.code} />;
+    }
+    // Keyed by the look, so a row whose command turns into another look's starts its hooks again.
+    return <NamedLookDetail key={run.look.program} run={run} chatId={chatId} useNames={useNames} />;
+}
+
+const TAG = 'shrink-0 rounded bg-surface-hover px-1.5 text-text-faint';
+
+/* What else the line ran, in quiet tags: the other programs and a heredoc, and how many more runs of a look. */
+function LookTags({ run }: { run: CommandLookRun }) {
+    const { t } = useTranslation('agent-chat');
+    const also = run.heredoc ? [...run.others, t('work.heredoc')] : run.others;
+    return (
+        <>
+            {also.length > 0 && <span className={TAG}>{t('work.alsoRan', { programs: also.join(', ') })}</span>}
+            {run.more > 0 && <span className={TAG}>{t('work.moreRuns', { count: run.more })}</span>}
+        </>
+    );
+}
+
 /*
  * The line of a call, a subagent or a group. Without `onToggle` it has nothing to open: no chevron, and
  * not a button. `time` shows at the right edge while the line is hovered or focused.
@@ -58,8 +112,10 @@ function clip(text: string): string {
 export function ToggleLine({
     icon,
     label,
+    brand,
     detail,
     command,
+    look,
     path,
     open = false,
     onToggle,
@@ -70,10 +126,14 @@ export function ToggleLine({
     className
 }: {
     icon: ReactNode;
-    label: string;
+    label: ReactNode;
+    /* Drawn in semibold before the label. */
+    brand?: string;
     detail?: string;
     /* Draws `detail` as a shell command, in the colors of the code theme. */
     command?: boolean;
+    /* A shell call read as a look's tool, whose detail and tags take the place of `detail`. */
+    look?: { run: CommandLookRun; chatId: string };
     /* `detail` is the path of a file, cut in the middle so its name stays in sight. */
     path?: boolean;
     open?: boolean;
@@ -94,11 +154,26 @@ export function ToggleLine({
     const content = (
         <>
             <span className={clsx(ROW_GUTTER, live && 'text-accent')}>{icon}</span>
-            <span className={clsx('shrink-0', live && 'chat-live-text')}>{label}</span>
-            {detail && (
-                <span data-find-field="summary" className="min-w-0 truncate font-mono text-text-faint">
-                    {command ? <ShellCommand command={detail} /> : path ? <MiddleTruncate text={detail} /> : detail}
-                </span>
+            <span className={clsx('shrink-0', live && 'chat-live-text')}>
+                {brand !== undefined && <span className={BRAND}>{brand}</span>}
+                {brand !== undefined && label !== '' && ' '}
+                {label}
+            </span>
+            {look !== undefined ? (
+                <>
+                    {look.run.detail !== '' && (
+                        <span data-find-field="summary" className="min-w-0 truncate font-mono text-text-faint">
+                            <LookDetail run={look.run} chatId={look.chatId} />
+                        </span>
+                    )}
+                    <LookTags run={look.run} />
+                </>
+            ) : (
+                detail && (
+                    <span data-find-field="summary" className="min-w-0 truncate font-mono text-text-faint">
+                        {command ? <ShellCommand command={detail} /> : path ? <MiddleTruncate text={detail} /> : detail}
+                    </span>
+                )
             )}
             <span className="grow" />
             {trailing}
@@ -237,6 +312,7 @@ function ToolBody({ tool }: { tool: ChatToolItem }) {
  */
 export function WorkRow({
     tool,
+    chatId,
     nested,
     detail,
     icon,
@@ -244,6 +320,8 @@ export function WorkRow({
     failed
 }: {
     tool: ChatToolItem;
+    /* The chat the call is in, which names the words of a look's run. */
+    chatId?: string;
     nested?: boolean;
     detail?: string;
     icon?: ReactNode;
@@ -257,13 +335,17 @@ export function WorkRow({
     useOpenForFind(tool.id, 'output', setOpen);
     const summary = detail ?? toolSummary(tool.name, tool.input);
     const opens = hasToolBody(tool);
+    const shell = shellCommand(tool.name, tool.input);
+    const run = detail === undefined && icon === undefined && label === undefined && shell !== null ? matchCommandLook(shell, host.commandLooks) : null;
     return (
         <div data-find-item={tool.id} className={nested ? 'ml-6' : undefined}>
             <ToggleLine
-                icon={icon ?? toolIcon(tool.name)}
-                label={label ?? tool.name}
+                icon={run === null ? (icon ?? toolIcon(tool.name)) : <run.look.Mark size={12} />}
+                label={run === null ? (label ?? tool.name) : run.match.label}
+                brand={run?.look.brand}
                 detail={summary}
-                command={detail === undefined && summary === shellCommand(tool.name, tool.input)}
+                look={run === null ? undefined : { run, chatId: chatId ?? '' }}
+                command={detail === undefined && summary === shell}
                 path={detail === undefined && toolSummaryIsPath(tool.name, tool.input)}
                 open={open && opens}
                 onToggle={opens ? () => setOpen((o) => !o) : undefined}
@@ -290,11 +372,16 @@ export function WorkLiveRow({ chatId, tool: derived }: { chatId: string; tool: C
     const tail = liveOutput(tool);
     const summary = toolSummary(tool.name, tool.input);
     const opens = hasToolBody(tool);
+    const shell = shellCommand(tool.name, tool.input);
+    const { commandLooks } = useChatHost();
+    const run = shell === null ? null : matchCommandLook(shell, commandLooks);
     return (
         <div>
             <ToggleLine
-                icon={toolIcon(tool.name)}
-                label={tool.name}
+                icon={run === null ? toolIcon(tool.name) : <run.look.Mark size={12} />}
+                label={run === null ? tool.name : run.match.label}
+                brand={run?.look.brand}
+                look={run === null ? undefined : { run, chatId }}
                 detail={summary || tool.progress?.description || ''}
                 command={summary !== '' && summary === shellCommand(tool.name, tool.input)}
                 path={summary !== '' && toolSummaryIsPath(tool.name, tool.input)}
@@ -313,12 +400,31 @@ export function WorkLiveRow({ chatId, tool: derived }: { chatId: string; tool: C
     );
 }
 
-/* A run of tool calls as one line ("Read 4 files"); opening it lists every call. */
-export function WorkGroupRow({ tools, summary, expanded, onToggle }: { tools: ChatToolItem[]; summary: string; expanded: boolean; onToggle(): void }) {
+/* A run of tool calls as one line ("Read 4 files"); opening it lists every call. A run of one look wears its mark and its brand. */
+export function WorkGroupRow({
+    tools,
+    summary,
+    look,
+    expanded,
+    onToggle
+}: {
+    tools: ChatToolItem[];
+    summary: string;
+    look?: CommandLook;
+    expanded: boolean;
+    onToggle(): void;
+}) {
     const failed = tools.some((tool) => tool.state === 'error');
     return (
         <div>
-            <ToggleLine icon={toolIcon(tools[0]!.name)} label={summary} open={expanded} onToggle={onToggle} failed={failed} time={tools[0]!.createdAt} />
+            <ToggleLine
+                icon={look === undefined ? toolIcon(tools[0]!.name) : <look.Mark size={12} />}
+                label={look?.brand === undefined ? summary : withBrand(summary, [look.brand])}
+                open={expanded}
+                onToggle={onToggle}
+                failed={failed}
+                time={tools[0]!.createdAt}
+            />
         </div>
     );
 }
@@ -340,6 +446,8 @@ export function TurnFoldRow({
     expanded: boolean;
     onToggle(): void;
 }) {
+    const { commandLooks } = useChatHost();
+    const brands = commandLooks?.flatMap(({ brand }) => (brand === undefined ? [] : [brand])) ?? [];
     return (
         <button
             className={clsx(
@@ -353,7 +461,16 @@ export function TurnFoldRow({
                 <Icon icon={ChevronRight} size={12} className={clsx('transition-transform', expanded && 'rotate-90')} />
             </span>
             <span className="shrink-0 group-hover:text-text">{label}</span>
-            {work.length > 0 && <span className="min-w-0 truncate text-text-faint">{work.map((part) => ` · ${part}`).join('')}</span>}
+            {work.length > 0 && (
+                <span className="min-w-0 truncate text-text-faint">
+                    {work.map((part, index) => (
+                        <Fragment key={index}>
+                            {' · '}
+                            {withBrand(part, brands)}
+                        </Fragment>
+                    ))}
+                </span>
+            )}
             <span className="grow" />
             <RowTime at={turn.createdAt} />
         </button>

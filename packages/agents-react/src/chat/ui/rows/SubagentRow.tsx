@@ -32,7 +32,7 @@ function ChildRow({ chatId, item }: { chatId: string; item: ChatItem }) {
         if (isImageGeneration(item)) {
             return <GeneratedImageRow chatId={chatId} tool={item} />;
         }
-        return item.state === 'running' ? <WorkLiveRow chatId={chatId} tool={item} /> : <WorkRow tool={item} />;
+        return item.state === 'running' ? <WorkLiveRow chatId={chatId} tool={item} /> : <WorkRow chatId={chatId} tool={item} />;
     }
     if (item.kind === 'assistant') {
         return <ChildText chatId={chatId} item={item} />;
