@@ -44,7 +44,7 @@ const core = (options) =>
 
 `uiReferenceText()` is the long form, with every component's description and every group's rules. Hand it out on request, through a command or a skill the agent reads, rather than in every session.
 
-A host that wants an even shorter note passes `catalog: 'names'`: the note then lists only the component names of each group, and `detailHint` says how the agent gets the props of one, such as a command the host runs. `uiGroupReference(group)` gives the text of that command: the group's description, its rules and every component with its props.
+A host that wants a note without the optional props passes `catalog: 'names'`: the note then lists the components of each group with the props each one requires and, where a component takes its words between its tags, what those words are (`Event at (text: title)`). `detailHint` says how the agent gets the optional props of a group, such as a command the host runs. `uiGroupReference(group)` gives the text of that command: the group's description, its rules and every component with its props.
 
 ```ts
 const note = uiSessionNote({ catalog: 'names', detailHint: '`tool help ui <group>` gives props' });

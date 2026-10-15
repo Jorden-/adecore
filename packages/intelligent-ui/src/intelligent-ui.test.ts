@@ -367,20 +367,41 @@ describe('open wire and agent text', () => {
         expect(uiSessionNote().length).toBeLessThan(2400);
     });
 
-    test('names the components per group in a shorter note that still carries the example', () => {
+    test('names the components per group with their required props in a note that still carries the example', () => {
         const names = uiSessionNote({ catalog: 'names', detailHint: '`tool help ui <group>` gives props' });
-        expect(names.length).toBeLessThan(uiSessionNote().length);
+        expect(names.length).toBeLessThan(2200);
         expect(names).toContain('```ui\n');
         expect(names).toContain('(`tool help ui <group>` gives props)');
-        expect(names).toContain('status: Summary, Callout, Tag, Progress, Steps, Step');
+        expect(names).toContain(
+            'status: Summary, Callout tone, Tag, Progress (text: label), Steps, Step state (text: label), Timeline, Event at (text: title)'
+        );
         expect(names).not.toContain('Slider: value');
-        expect(uiSessionNote({ catalog: 'names' })).toContain('Components by group:\n');
+        expect(names).not.toContain('step?');
+        expect(uiSessionNote({ catalog: 'names' })).toContain('Components by group, required props (text: words between the tags):\n');
         for (const group of Object.keys(UI_GROUPS)) {
             expect(names).toContain(`\n${group}: `);
         }
         const example = /```ui\n([\s\S]*?)\n```/.exec(names)![0];
         expect(compileUi(example, { id: 'names-example', final: true })[0].diagnostics).toEqual([]);
         expect(uiSessionNote({ catalog: 'props' })).toBe(uiSessionNote());
+    });
+
+    test('names the required props and the role of the text in the short note', () => {
+        const names = uiSessionNote({ catalog: 'names' });
+        expect(names).toContain('(text: words between the tags)');
+        expect(names).toContain('Event at (text: title)');
+        expect(names).toContain('Place lat lon|address (text: name)');
+        expect(names).toContain('TextField value (text: label)');
+        expect(names).toContain('Option value (text: label)');
+        for (const [name, entry] of Object.entries(UI_CATALOG)) {
+            const line = names.split('\n').find((candidate) => candidate.startsWith(`${entry.group}: `))!;
+            const own = new RegExp(`(?:: |, )${name}( [^,(]*)?(?: \\(text: \\w+\\))?(?:,|$)`).exec(line);
+            expect(own, name).not.toBeNull();
+            for (const prop of Object.entries(entry.schema.shape).filter(([, schema]) => !schema.isOptional())) {
+                const words = 'needs' in entry ? entry.needs : own![1];
+                expect(words, `${name} ${prop[0]}`).toContain(prop[0]);
+            }
+        }
     });
 
     test('gives one group with its rules and the props of each component', () => {

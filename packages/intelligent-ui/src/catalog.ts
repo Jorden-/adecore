@@ -43,14 +43,16 @@ export const UI_CATALOG = {
     Progress: {
         group: 'status',
         description: 'Progress with a label; omit value for indeterminate progress.',
-        schema: z.strictObject({ value: number.nonnegative().optional(), max: number.positive().optional() })
+        schema: z.strictObject({ value: number.nonnegative().optional(), max: number.positive().optional() }),
+        text: 'label'
     },
     Steps: { group: 'status', description: 'An ordered sequence of steps.', schema: empty, children: ['Step'] },
     Step: {
         group: 'status',
         description: 'One step in a sequence.',
         schema: z.strictObject({ state: z.enum(['done', 'running', 'pending', 'failed', 'skipped']), detail: text.optional() }),
-        parent: 'Steps'
+        parent: 'Steps',
+        text: 'label'
     },
     Timeline: { group: 'status', description: 'Events in time order.', schema: empty, children: ['Event'], count: { min: 1 } },
     Event: {
@@ -62,7 +64,8 @@ export const UI_CATALOG = {
             tone,
             detail: text.optional()
         }),
-        parent: 'Timeline'
+        parent: 'Timeline',
+        text: 'title'
     },
     Stats: { group: 'data', description: 'A small set of key numbers.', schema: empty, children: ['Stat'] },
     Stat: {
@@ -72,7 +75,7 @@ export const UI_CATALOG = {
         parent: 'Stats'
     },
     EntityList: { group: 'data', description: 'Labeled facts about an entity.', schema: empty, children: ['Entry'] },
-    Entry: { group: 'data', description: 'One labeled fact.', schema: z.strictObject({ label: text }), parent: 'EntityList' },
+    Entry: { group: 'data', description: 'One labeled fact.', schema: z.strictObject({ label: text }), parent: 'EntityList', text: 'value' },
     Table: { group: 'data', description: 'Rows with named columns.', schema: z.strictObject({ rows }), children: ['Column'] },
     Column: {
         group: 'data',
@@ -104,13 +107,16 @@ export const UI_CATALOG = {
         description: 'A chat attachment with an optional caption.',
         schema: z
             .strictObject({ attachment: name.optional(), generated: z.literal('latest').optional(), alt: text.optional() })
-            .refine((props) => Boolean(props.attachment) !== Boolean(props.generated), 'Choose attachment or generated, exclusively.')
+            .refine((props) => Boolean(props.attachment) !== Boolean(props.generated), 'Choose attachment or generated, exclusively.'),
+        needs: 'attachment|generated',
+        text: 'caption'
     },
     Gallery: { group: 'content', description: 'A grid of images with captions; at most 24.', schema: empty, children: ['Image'], count: { min: 1, max: 24 } },
     Compare: {
         group: 'content',
         description: 'Two chat attachments in one frame with a handle to wipe between them; children are the caption.',
-        schema: z.strictObject({ before: name, after: name, beforeLabel: text.optional(), afterLabel: text.optional() })
+        schema: z.strictObject({ before: name, after: name, beforeLabel: text.optional(), afterLabel: text.optional() }),
+        text: 'caption'
     },
     Map: {
         group: 'places',
@@ -136,7 +142,9 @@ export const UI_CATALOG = {
                 (props) => (props.lat === undefined) === (props.lon === undefined) && (props.lat !== undefined || props.address !== undefined),
                 'Give lat with lon, or an address.'
             ),
-        parent: 'Map'
+        parent: 'Map',
+        needs: 'lat lon|address',
+        text: 'name'
     },
     Sources: { group: 'content', description: 'Numbered sources without preloading.', schema: empty, children: ['Source'] },
     Source: {
@@ -160,15 +168,16 @@ export const UI_CATALOG = {
         children: ['Item'],
         binding: 'value'
     },
-    Item: { group: 'inputs', description: 'One selectable value.', schema: z.strictObject({ value: scalar }), parent: 'Checklist' },
-    Switch: { group: 'inputs', description: 'A local boolean.', schema: z.strictObject({ value: z.boolean() }), binding: 'value' },
+    Item: { group: 'inputs', description: 'One selectable value.', schema: z.strictObject({ value: scalar }), parent: 'Checklist', text: 'label' },
+    Switch: { group: 'inputs', description: 'A local boolean.', schema: z.strictObject({ value: z.boolean() }), binding: 'value', text: 'label' },
     Slider: {
         group: 'inputs',
         description: 'A local number in a range.',
         schema: z
             .strictObject({ value: number, min: number, max: number, step: number.positive().optional(), unit: text.optional() })
             .refine((props) => props.min < props.max && props.value >= props.min && props.value <= props.max, 'Value must lie within an increasing range.'),
-        binding: 'value'
+        binding: 'value',
+        text: 'label'
     },
     Segmented: { group: 'inputs', description: 'Choose one local value.', schema: z.strictObject({ value: scalar }), children: ['Option'], binding: 'value' },
     Select: {
@@ -176,22 +185,31 @@ export const UI_CATALOG = {
         description: 'Choose one local value from a dropdown, for more or longer options than Segmented holds; the text beside its Options is its label.',
         schema: z.strictObject({ value: scalar }),
         children: ['Option'],
-        binding: 'value'
+        binding: 'value',
+        text: 'label'
     },
-    Option: { group: 'inputs', description: 'One local alternative.', schema: z.strictObject({ value: scalar }), parent: ['Segmented', 'Select'] },
+    Option: {
+        group: 'inputs',
+        description: 'One local alternative.',
+        schema: z.strictObject({ value: scalar }),
+        parent: ['Segmented', 'Select'],
+        text: 'label'
+    },
     TextField: {
         group: 'inputs',
         description: 'A line of local text up to maxLength characters (256 without one, at most 1024); children are the label.',
         schema: z
             .strictObject({ value: text, maxLength: z.number().int().min(1).max(1024).optional(), placeholder: text.max(128).optional() })
             .refine((props) => props.value.length <= (props.maxLength ?? 256), 'Value must not be longer than maxLength.'),
-        binding: 'value'
+        binding: 'value',
+        text: 'label'
     },
     Button: {
         group: 'inputs',
         description: 'Run one local state action when pressed; children are the label.',
         schema: z.strictObject({ disabled: z.boolean().optional() }),
-        action: 'action'
+        action: 'action',
+        text: 'label'
     },
     Show: { group: 'inputs', description: 'Show children when the condition is true.', schema: z.strictObject({ when: z.boolean() }) },
     Each: {
@@ -204,7 +222,8 @@ export const UI_CATALOG = {
         group: 'choices',
         description: 'Send its label and visible context once.',
         schema: z.strictObject({ context: text.optional(), primary: z.boolean().optional(), disabled: z.boolean().optional() }),
-        parent: 'Choices'
+        parent: 'Choices',
+        text: 'label'
     }
 } as const;
 

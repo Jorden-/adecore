@@ -122,8 +122,8 @@ Text for an agent or a tool comes from the same schemas:
 
 | Option       | What it does                                                                                              |
 | ------------ | --------------------------------------------------------------------------------------------------------- |
-| `catalog`    | `'props'` (the default) lists every component with its props; `'names'` lists only the names, per group   |
-| `detailHint` | With `'names'`, the host's own words for how the agent gets the props of a group, written after the heading |
+| `catalog`    | `'props'` (the default) lists every component with its props; `'names'` lists the names per group with the props each requires |
+| `detailHint` | With `'names'`, the host's own words for how the agent gets the optional props of a group, written after the heading |
 
 `UiGroupName` is the union of the keys of `UI_GROUPS`. A component's `parent` is one name or a list of names.
 

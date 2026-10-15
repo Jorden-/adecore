@@ -1,5 +1,5 @@
 import { UI_CATALOG, UI_GROUPS, type UiGroupName } from './catalog.ts';
-import { uiPropList } from './prop-list.ts';
+import { uiPropList, uiRequirement } from './prop-list.ts';
 import { UI_FENCE_LANGUAGE, type UiBlock } from './compiler.ts';
 
 export function uiCompactCatalog(): string {
@@ -39,15 +39,15 @@ function uiGroupComponents(group: string) {
     return Object.entries(UI_CATALOG).filter(([, entry]) => entry.group === group);
 }
 
-/* One line per group with the names of its components, for a host that hands the props out per group. */
+/* One line per group with its components and what each needs, for a host that hands the optional props out per group. */
 function uiGroupNames(detailHint: string | undefined): string {
     const lines = Object.keys(UI_GROUPS).map(
         (group) =>
             `${group}: ${uiGroupComponents(group)
-                .map(([name]) => name)
+                .map(([name, entry]) => uiRequirement(name, entry))
                 .join(', ')}`
     );
-    return `Components by group${detailHint ? ` (${detailHint})` : ''}:\n${lines.join('\n')}`;
+    return `Components by group${detailHint ? ` (${detailHint})` : ''}, required props (text: words between the tags):\n${lines.join('\n')}`;
 }
 
 export function uiSessionNote({ fenceLanguage = UI_FENCE_LANGUAGE, catalog = 'props', detailHint }: UiTextOptions = {}): string {
