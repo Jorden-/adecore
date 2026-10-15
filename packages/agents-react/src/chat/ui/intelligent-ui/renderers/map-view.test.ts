@@ -63,6 +63,20 @@ class FakeMap {
         this.fitted.push([bounds, options]);
     }
 
+    // Twenty pixels to a degree, which puts places a degree apart one marker apart.
+    project([lon, lat]: number[]): { x: number; y: number } {
+        return { x: lon * this.scale, y: lat * this.scale };
+    }
+
+    scale = 20;
+
+    off(name: string, handler: Handler): void {
+        this.handlers.set(
+            name,
+            (this.handlers.get(name) ?? []).filter((known) => known !== handler)
+        );
+    }
+
     zoomIn = mock(() => undefined);
     zoomOut = mock(() => undefined);
 
@@ -82,8 +96,15 @@ class FakeMarker {
         FakeMarker.made.push(this);
     }
 
+    offset: number[] = [0, 0];
+
     setLngLat(lngLat: number[]): this {
         this.lngLat = lngLat;
+        return this;
+    }
+
+    setOffset(offset: number[]): this {
+        this.offset = offset;
         return this;
     }
 
@@ -360,7 +381,7 @@ test.skipIf(typeof document === 'undefined')('a browser that cannot start the ma
 test.skipIf(typeof document === 'undefined')('the zoom buttons zoom the map', async () => {
     await draw();
     const buttons = [...element.querySelectorAll<HTMLButtonElement>('button')];
-    expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual(['Zoom in', 'Zoom out']);
+    expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual(['Zoom in', 'Zoom out', 'Show all places']);
     await act(async () => buttons[0].click());
     expect(FakeMap.made[0].zoomIn).toHaveBeenCalledTimes(1);
     await act(async () => buttons[1].click());
@@ -392,4 +413,53 @@ test.skipIf(typeof document === 'undefined')('points MapLibre to the worker the 
         )
     );
     expect(workerUrls).toHaveLength(count);
+});
+
+test.skipIf(typeof document === 'undefined')('the way back fits every place again with the padding and the zoom limit of the first view', async () => {
+    await draw();
+    const [map] = FakeMap.made;
+    const back = [...element.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.getAttribute('aria-label') === 'Show all places')!;
+    await act(async () => back.click());
+    expect(map.fitted).toHaveLength(2);
+    expect(map.fitted[1][0]).toEqual(map.fitted[0][0]);
+    expect(map.fitted[1][1]).toMatchObject({ padding: map.fitted[0][1].padding, maxZoom: map.fitted[0][1].maxZoom });
+    await draw({ source: { state: 'off', reason: 'disabled' } });
+    const outline = FakeMap.made.at(-1)!;
+    await act(async () =>
+        [...element.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.getAttribute('aria-label') === 'Show all places')!.click()
+    );
+    expect(outline.fitted.at(-1)![1]).toMatchObject({ padding: 32, maxZoom: 6 });
+});
+
+test.skipIf(typeof document === 'undefined')('one place has no way back, since nothing else is out of view', async () => {
+    await draw({ markers: [MARKERS[0]] });
+    expect([...element.querySelectorAll('button')].map((button) => button.getAttribute('aria-label'))).toEqual(['Zoom in', 'Zoom out']);
+});
+
+test.skipIf(typeof document === 'undefined')('markers that would cover each other are offset until a zoom pulls them apart', async () => {
+    await draw({
+        markers: [
+            { id: 'a', number: 1, lat: 52, lon: 5 },
+            { id: 'b', number: 2, lat: 52, lon: 5.5 },
+            { id: 'c', number: 3, lat: 40, lon: 5 }
+        ]
+    });
+    const [map] = FakeMap.made;
+    const [first, second, third] = FakeMarker.made;
+    expect([first.offset, second.offset, third.offset]).toEqual([
+        [0, 0],
+        [20, 0],
+        [0, 0]
+    ]);
+    map.scale = 2000;
+    await act(async () => map.emit('zoomend'));
+    expect(second.offset).toEqual([0, 0]);
+});
+
+test.skipIf(typeof document === 'undefined')('stops following the zoom when the markers go', async () => {
+    await draw();
+    const [map] = FakeMap.made;
+    expect(map.handlers.get('zoomend')).toHaveLength(1);
+    await draw({ markers: [MARKERS[0]] });
+    expect(map.handlers.get('zoomend')).toHaveLength(1);
 });

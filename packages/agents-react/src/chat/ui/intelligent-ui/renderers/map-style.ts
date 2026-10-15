@@ -21,6 +21,62 @@ export interface MapPoint {
 /* How far a map zooms to fit its points: street level with tiles, and only a country or two on the outline, which has nothing finer. */
 export const MAP_MAX_ZOOM = { tiles: 16, outline: 6 } as const;
 
+/* The room around the places in a fitted view, in pixels. */
+export const MAP_FIT_PADDING = 32;
+
+/* What fits every place in view: the first view and the way back to it share it, so they cannot drift apart. */
+export function mapFitOptions(outline: boolean): { padding: number; maxZoom: number } {
+    return { padding: MAP_FIT_PADDING, maxZoom: outline ? MAP_MAX_ZOOM.outline : MAP_MAX_ZOOM.tiles };
+}
+
+/* The width of a marker, in pixels. */
+export const MAP_MARKER_SIZE = 20;
+
+export interface ScreenPoint {
+    id: string;
+    x: number;
+    y: number;
+}
+
+// Whole pixels to try around a place, nearest ring first: right, below, left, above, then the corners.
+const SPREAD_STEPS: readonly (readonly [number, number])[] = [
+    [20, 0],
+    [0, 20],
+    [-20, 0],
+    [0, -20],
+    [15, 15],
+    [-15, 15],
+    [-15, -15],
+    [15, -15],
+    [40, 0],
+    [0, 40],
+    [-40, 0],
+    [0, -40],
+    [30, 30],
+    [-30, 30],
+    [-30, -30],
+    [30, -30]
+];
+
+/*
+ * Offsets, in pixels, that keep markers from covering each other. A marker that fits where it is stays; one
+ * that lands on an earlier marker moves to the nearest free spot beside it. The places are not moved on the
+ * map, only their markers, and the offsets are worked out again at every zoom, so a map zoomed in far
+ * enough draws them where they are.
+ */
+export function spreadOverlaps(points: readonly ScreenPoint[]): Map<string, [number, number]> {
+    const offsets = new Map<string, [number, number]>();
+    const placed: { x: number; y: number }[] = [];
+    for (const point of points) {
+        const free = ([dx, dy]: readonly [number, number]): boolean =>
+            placed.every((other) => Math.hypot(other.x - (point.x + dx), other.y - (point.y + dy)) >= MAP_MARKER_SIZE);
+        const step = [[0, 0] as const, ...SPREAD_STEPS].find(free) ?? ([0, 0] as const);
+        offsets.set(point.id, [step[0], step[1]]);
+        placed.push({ x: point.x + step[0], y: point.y + step[1] });
+    }
+    return offsets;
+}
+
 /* The map a page draws without tiles: land over water, from the outline of the world that ships with the package. */
 export function baseMapStyle({ land, water }: MapColors): MapStyle {
     return {

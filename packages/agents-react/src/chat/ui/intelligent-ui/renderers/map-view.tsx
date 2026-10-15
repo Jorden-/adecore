@@ -1,11 +1,11 @@
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef, useState } from 'react';
 import { Map as MapLibreMap, Marker, setWorkerUrl } from 'maplibre-gl';
-import { Minus, Plus } from 'lucide-react';
+import { Maximize, Minus, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ButtonGroup, IconButton } from '@adecore/ui';
 import { useChatHost, type UiMapSource } from '../../../../host';
-import { baseMapStyle, boundsOf, localizedTextField, MAP_MAX_ZOOM, type MapColors, type MapPoint } from './map-style';
+import { baseMapStyle, boundsOf, localizedTextField, mapFitOptions, spreadOverlaps, type MapColors, type MapPoint } from './map-style';
 
 /*
  * What the view is drawing: `base` by the source's choice, `offline` and `unavailable` as a fallback from tiles that
@@ -219,7 +219,7 @@ export function MapView({ markers, source, selected, onPick, onStatus }: MapView
         if (map === null || bounds === null) {
             return;
         }
-        map.fitBounds(bounds, { padding: 32, maxZoom: outline ? MAP_MAX_ZOOM.outline : MAP_MAX_ZOOM.tiles, duration: 0 });
+        map.fitBounds(bounds, { ...mapFitOptions(outline), duration: 0 });
         // The points are compared by their coordinates, so a render that rebuilt the same list does not move the map.
         // oxlint-disable-next-line react-hooks/exhaustive-deps
     }, [map, pointsKey, outline]);
@@ -236,15 +236,31 @@ export function MapView({ markers, source, selected, onPick, onStatus }: MapView
             node.className = `${MARKER} ${marker.id === selected ? PICKED : ''} ${pickable ? 'cursor-pointer' : ''}`;
             node.textContent = String(marker.number);
             node.addEventListener('click', () => latest.current.onPick?.(marker.id));
-            return new Marker({ element: node }).setLngLat([marker.lon, marker.lat]).addTo(map);
+            return { marker, drawing: new Marker({ element: node }).setLngLat([marker.lon, marker.lat]).addTo(map) };
         });
+        const spread = (): void => {
+            const offsets = spreadOverlaps(drawn.map(({ marker }) => ({ id: marker.id, ...map.project([marker.lon, marker.lat]) })));
+            for (const { marker, drawing } of drawn) {
+                drawing.setOffset(offsets.get(marker.id) ?? [0, 0]);
+            }
+        };
+        spread();
+        map.on('zoomend', spread);
         return () => {
-            for (const marker of drawn) {
-                marker.remove();
+            map.off('zoomend', spread);
+            for (const { drawing } of drawn) {
+                drawing.remove();
             }
         };
         // oxlint-disable-next-line react-hooks/exhaustive-deps
     }, [map, pointsKey, selected, pickable]);
+
+    const showAll = (): void => {
+        const bounds = boundsOf(markers);
+        if (map !== null && bounds !== null) {
+            map.fitBounds(bounds, mapFitOptions(outline));
+        }
+    };
 
     return (
         <div className="absolute inset-0">
@@ -252,6 +268,7 @@ export function MapView({ markers, source, selected, onPick, onStatus }: MapView
             <ButtonGroup className="absolute top-2 right-2 rounded-md border border-border bg-surface-raised shadow-raised">
                 <IconButton icon={Plus} size="sm" label={t('blocks.map.zoomIn')} onClick={() => map?.zoomIn()} />
                 <IconButton icon={Minus} size="sm" label={t('blocks.map.zoomOut')} onClick={() => map?.zoomOut()} />
+                {markers.length > 1 && <IconButton icon={Maximize} size="sm" label={t('blocks.map.showAll')} onClick={showAll} />}
             </ButtonGroup>
         </div>
     );

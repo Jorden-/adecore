@@ -599,6 +599,7 @@ export default {
             notFound: 'Niet op de kaart',
             zoomIn: 'Inzoomen',
             zoomOut: 'Uitzoomen',
+            showAll: 'Alle plekken tonen',
             scrollHint: 'Houd ⌘ of Ctrl ingedrukt en scrol om te zoomen',
             touchHint: 'Gebruik twee vingers om de kaart te bewegen',
             offline: 'Kaarttegels zijn offline niet beschikbaar. De plekken blijven in de lijst.',

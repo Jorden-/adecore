@@ -599,6 +599,7 @@ export default {
             notFound: 'Not on the map',
             zoomIn: 'Zoom in',
             zoomOut: 'Zoom out',
+            showAll: 'Show all places',
             scrollHint: 'Hold ⌘ or Ctrl and scroll to zoom',
             touchHint: 'Use two fingers to move the map',
             offline: 'Map tiles are not available offline. The places stay listed.',

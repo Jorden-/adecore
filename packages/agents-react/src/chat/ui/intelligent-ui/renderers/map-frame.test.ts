@@ -26,6 +26,12 @@ class FakeMap {
 
     fitBounds(): void {}
 
+    project(): { x: number; y: number } {
+        return { x: 0, y: 0 };
+    }
+
+    off(): void {}
+
     remove(): void {
         this.removed = true;
     }
@@ -33,6 +39,10 @@ class FakeMap {
 
 class FakeMarker {
     setLngLat(): this {
+        return this;
+    }
+
+    setOffset(): this {
         return this;
     }
 

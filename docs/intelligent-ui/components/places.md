@@ -44,7 +44,7 @@ A renderer does not look anything up. `UiRenderContext.place(nodeId, address)` h
 
 ## What the host draws
 
-The host chooses the map, so a block cannot name tiles, a style or a vendor. A renderer that draws the picture has the host's tiles when it has them, and otherwise an outline of the world with the same numbered markers, always with the list under it. The picture is not part of the block: it is not saved, and the same block reads on a page without tiles. A point drawn at street level on the outline would be a blank patch, so the outline never zooms closer than about a country. The outline is the 110m land of Natural Earth, which is in the public domain.
+The host chooses the map, so a block cannot name tiles, a style or a vendor. A renderer that draws the picture has the host's tiles when it has them, and otherwise an outline of the world with the same numbered markers, always with the list under it. The picture is not part of the block: it is not saved, and the same block reads on a page without tiles. A point drawn at street level on the outline would be a blank patch, so the outline never zooms closer than about a country. The outline is the 110m land of Natural Earth, which is in the public domain. Beside the zoom buttons a third one fits every place in view again, and markers that would cover each other at the current zoom are drawn a marker's width apart until a zoom pulls them apart.
 
 ## Fallback
 
