@@ -74,7 +74,8 @@ describe.skipIf(typeof document === 'undefined')('DataGrid menu of an editable c
     let mounted: Mounted;
     let client: ReturnType<typeof clientOver>;
 
-    const menuRows = (): string[] => findAll('[role=menuitem], [role=separator]').map((row) => (row.getAttribute('role') === 'separator' ? '---' : (row.textContent ?? '')));
+    const menuRows = (): string[] =>
+        findAll('[role=menuitem], [role=separator]').map((row) => (row.getAttribute('role') === 'separator' ? '---' : (row.textContent ?? '')));
 
     beforeEach(async () => {
         client = clientOver(fakeDatabaseTransport({ databases: {} }));
