@@ -21,6 +21,7 @@ export {
     type ForkPoint,
     type ForkWorktreeChoice
 } from './logic/fork';
+export { matchCommandLook, type CommandLookRun, type CommandLookWord } from './logic/command-looks';
 export { handbackReportOf } from './logic/handback';
 export { limitView, type LimitView } from './logic/limit';
 export type { TickKind, ScrubberTick } from './logic/scrubber';

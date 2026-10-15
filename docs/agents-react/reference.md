@@ -10,7 +10,7 @@ Wiring the views into an app: the host adapters, the scope, the transport, stora
 
 | Module | Exports |
 | --- | --- |
-| [`host`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/host.ts) | `ChatActions`, `FileRef`, `ShellCodeBlockContext`, `ChatPlace`, `SubagentTask`, `TimelineFindOptions`, `TimelineFind`, `ComposerDictationProps`, `ComposerSlotProps`, `SubagentSlotProps`, `ThreadCard`, `VisualHost`, `ReplyAuthor`, `ChatHost`, `UiMapSource`, `ChatHostProvider`, `useChatHost`, `AccentChoice`, `ChatToast`, `TextareaProps`, `ResourceUrl` |
+| [`host`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/host.ts) | `ChatActions`, `FileRef`, `ShellCodeBlockContext`, `ChatPlace`, `SubagentTask`, `TimelineFindOptions`, `TimelineFind`, `ComposerDictationProps`, `ComposerSlotProps`, `SubagentSlotProps`, `ThreadCard`, `VisualHost`, `ReplyAuthor`, `ChatHost`, `UiMapSource`, `CommandLook`, `CommandLookMatch`, `CommandName`, `ChatHostProvider`, `useChatHost`, `AccentChoice`, `ChatToast`, `TextareaProps`, `ResourceUrl` |
 | [`scope`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/scope.ts) | `ChatScope`, `ChatScopeContext`, `useChatScope` |
 | [`transport`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/transport.ts) | `ChatRequestMap`, `ChatEventMap`, `ChatTransportStatus`, `ChatTransport`, `ChatTransportError`, `errorCode`, `isConnectionError` |
 | [`port-transport`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/port-transport.ts) | `portTransport`, `PortTransport` |
@@ -32,6 +32,7 @@ A chat outside its views: the client, actions, drafts, preferences, mentions, fo
 | [`chat/composer-send`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/composer-send.ts) | `sendFromComposer`, `ComposerSend` |
 | [`chat/drafts`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/drafts.ts) | `EMPTY_DRAFT`, `useDrafts`, `readDraft`, `writeDraft`, `offerDraft`, `ChatDraft` |
 | [`chat/logic/ansi`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/ansi.ts) | `stripAnsi` |
+| [`chat/logic/command-looks`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/command-looks.ts) | `matchCommandLook`, `CommandLookRun`, `CommandLookWord` |
 | [`chat/logic/fork`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/fork.ts) | `FORKABLE_PROVIDERS`, `forkRefusal`, `summaryRefusal`, `lastSettledTurn`, `forkPointOf`, `forkPointLabel`, `ForkShape`, `forkShapes`, `ForkCliChoice`, `forkPayload`, `branchRefusal`, `ForkPoint`, `ForkWorktreeChoice` |
 | [`chat/logic/handback`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/handback.ts) | `handbackReportOf` |
 | [`chat/logic/limit`](https://github.com/basmilius/adecore/blob/main/packages/agents-react/src/chat/logic/limit.ts) | `limitView`, `LimitView` |

@@ -195,6 +195,46 @@ export interface ReplyAuthor {
     mark?: ReactNode;
 }
 
+/* A name a host gives a word of a command, such as the title of what an id stands for. */
+export interface CommandName {
+    name: string;
+    /* Drawn before the name, at the size of the detail. */
+    icon?: ReactNode;
+}
+
+/* What one run of a program is about, as its look reads it from the words. */
+export interface CommandLookMatch {
+    /* Drawn where the tool name is, after the brand; empty draws the brand alone. */
+    label: string;
+    /* The word the detail starts at, counted from the first word after the program; the detail is the source from there, as it was typed. */
+    detailFrom: number;
+    /* Calls with the same key read as one sentence in a group or a folded turn. */
+    group?: { key: string; sentence(count: number): string };
+    /* Options whose value the line shortens past 40 characters, such as a prompt. */
+    fold?: readonly string[];
+    /* Options whose value is code, by Shiki language id, such as `{ '--sql': 'sql' }`. */
+    languages?: Readonly<Record<string, string>>;
+}
+
+/* A program the app recognizes inside a shell call and draws as a tool of its own. */
+export interface CommandLook {
+    /* The program as it is run, matched on its last path segment. */
+    program: string;
+    /* Drawn in semibold before every label of this look, such as a product name. */
+    brand?: string;
+    /* The mark in the gutter, drawn in `currentColor` at the size of a tool icon. */
+    Mark: ComponentType<{ size: number }>;
+    /* What one run is about, from its words with the quotes taken out; null leaves it a shell call. */
+    describe(args: readonly string[]): CommandLookMatch | null;
+    /* Calls of this look under different group keys, as one sentence; left out, such a run reads as shell calls. */
+    sentence?(count: number): string;
+    /*
+     * Names for words in the detail, such as ids, as a hook the row calls once. A word it names is drawn as
+     * that name, with the word itself in a tooltip; null leaves the word as it was typed.
+     */
+    useNames?(scopeId: string, chatId: string): (word: string) => CommandName | null;
+}
+
 /*
  * Where the tiles of a Map come from. The host owns the service and whatever admits a request to it, so
  * a chat never knows an address, a key or a vendor: it asks for the style of the theme and lets the host
@@ -363,6 +403,8 @@ export interface ChatHost {
     useReplyAuthor(scopeId: string, chatId: string): ReplyAuthor | null;
     /* The pages agents publish, drawn in the thread above their reply; null draws none. */
     visuals: VisualHost | null;
+    /* Programs drawn as tools of their own; left out, every shell call reads as itself. */
+    commandLooks?: readonly CommandLook[];
 }
 
 const NO_PROMPTS: readonly HostPrompt[] = [];
