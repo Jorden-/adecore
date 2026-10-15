@@ -157,11 +157,11 @@ export function TextFieldRenderer({ node, children, context }: UiRendererProps<U
                 placeholder={placeholder}
                 disabled={binding === null}
                 aria-describedby={counting ? countId : undefined}
-                className="max-w-96"
+                className="max-w-96 bg-surface-sunken"
                 onChange={(event) => binding?.onValueChange(event.target.value)}
             />
             {counting && (
-                <span id={countId} className="text-xs text-text-faint tabular-nums">
+                <span id={countId} className="text-xs text-text-muted tabular-nums">
                     {t('blocks.textField.count', { used: formatNumber(value.length), max: formatNumber(maxLength) })}
                 </span>
             )}

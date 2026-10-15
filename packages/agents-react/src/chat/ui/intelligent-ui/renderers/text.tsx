@@ -152,14 +152,14 @@ export function EventRenderer({ node, children }: UiRendererProps<UiProps<'Event
             <div className="flex min-w-0 grow flex-col gap-0.5">
                 {/* A time nobody could read stays as written and is no `dateTime` for a machine to read. */}
                 {parseUiEventTime(at) === null ? (
-                    <span className="text-xs wrap-anywhere text-text-faint tabular-nums">{time}</span>
+                    <span className="text-xs wrap-anywhere text-text-muted tabular-nums">{time}</span>
                 ) : (
-                    <time dateTime={at} className="text-xs text-text-faint tabular-nums">
+                    <time dateTime={at} className="text-xs text-text-muted tabular-nums">
                         {time}
                     </time>
                 )}
                 <div className="text-sm wrap-break-word text-text">{children}</div>
-                {detail !== undefined && detail !== '' && <div className="text-xs wrap-anywhere text-text-faint">{detail}</div>}
+                {detail !== undefined && detail !== '' && <div className="text-xs wrap-anywhere text-text-muted">{detail}</div>}
             </div>
         </li>
     );
