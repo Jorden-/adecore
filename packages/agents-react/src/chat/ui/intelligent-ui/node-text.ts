@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
 import { parseUiEventTime, type UiComponentName, type UiProps, type UiViewNode } from '@adecore/intelligent-ui';
-import { formatClock, formatDay, formatDayClock, formatDayClockWithYear, formatDayWithYear } from '@adecore/ui/format';
+import { formatClock, formatDateTime, formatDay, formatDayClock, formatDayClockWithYear, formatDayWithYear } from '@adecore/ui/format';
 import type { UiLiveStatus } from './render-context';
 
 /* The text a node holds, every `$text` below it joined as written, such as the code of a CodeBlock. */
@@ -143,7 +143,9 @@ export function uiEventTime(at: string, now: Date | number = Date.now()): string
     const year = moment.written ? moment.date.getUTCFullYear() : moment.date.getFullYear();
     const withYear = year !== new Date(now).getFullYear();
     if (moment.kind === 'time') {
-        return formatClock(moment.date, zone);
+        return moment.seconds
+            ? formatDateTime(moment.date, { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' })
+            : formatClock(moment.date, zone);
     }
     if (moment.kind === 'date') {
         return withYear ? formatDayWithYear(moment.date, zone) : formatDay(moment.date, zone);

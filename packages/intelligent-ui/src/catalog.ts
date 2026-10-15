@@ -58,7 +58,7 @@ export const UI_CATALOG = {
         group: 'status',
         description: 'One event at a time or date; children are the title.',
         schema: z.strictObject({
-            at: text.refine((value) => parseUiEventTime(value) !== null, 'At must be HH:MM, YYYY-MM-DD or an ISO date-time.'),
+            at: text.refine((value) => parseUiEventTime(value) !== null, 'At must be HH:MM[:SS], YYYY-MM-DD or an ISO date-time.'),
             tone,
             detail: text.optional()
         }),

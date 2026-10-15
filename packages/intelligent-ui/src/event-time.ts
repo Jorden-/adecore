@@ -1,10 +1,13 @@
-const EVENT_TIME = /^(?:(\d{2}):(\d{2})|(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})?)?)$/;
+const EVENT_TIME =
+    /^(?:(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?|(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})?)?)$/;
 
 export interface UiEventTime {
     kind: 'time' | 'date' | 'datetime';
     date: Date;
     // True when the text gave no offset: `date` then holds the parts as written in UTC, to be written in UTC, so no zone or clock change moves them. False is a real instant, to be written in the reader's zone.
     written: boolean;
+    // True for a lone time that wrote seconds (`14:05:30`), which then shows them. A date-time shows its minutes only.
+    seconds: boolean;
 }
 
 function validClock(hour: number, minute: number, second = 0): boolean {
@@ -21,17 +24,23 @@ function zoneOffset(zone: string): number | null {
     return minutes > 59 || offset < -12 * 60 || offset > 14 * 60 ? null : offset;
 }
 
-/* The moment an Event's `at` names, or null when it is no `HH:MM`, `YYYY-MM-DD` or ISO date-time with an optional offset. */
+/* The moment an Event's `at` names, or null when it is no `HH:MM[:SS]`, `YYYY-MM-DD` or ISO date-time with an optional offset. */
 export function parseUiEventTime(at: string): UiEventTime | null {
     const match = EVENT_TIME.exec(at);
     if (match === null) {
         return null;
     }
-    const [, clockHour, clockMinute, year, month, day, hour, minute, second, zone] = match.map((part) => part as string | undefined);
+    const [, clockHour, clockMinute, clockSecond, year, month, day, hour, minute, second, zone] = match.map((part) => part as string | undefined);
     if (clockHour !== undefined) {
         // The day is not shown for a time, so any day will do.
-        return validClock(Number(clockHour), Number(clockMinute))
-            ? { kind: 'time', date: new Date(Date.UTC(2000, 0, 1, Number(clockHour), Number(clockMinute))), written: true }
+        const clockSeconds = Number(clockSecond ?? 0);
+        return validClock(Number(clockHour), Number(clockMinute), clockSeconds)
+            ? {
+                  kind: 'time',
+                  date: new Date(Date.UTC(2000, 0, 1, Number(clockHour), Number(clockMinute), clockSeconds)),
+                  written: true,
+                  seconds: clockSecond !== undefined
+              }
             : null;
     }
     const [y, m, d] = [Number(year), Number(month), Number(day)];
@@ -40,15 +49,15 @@ export function parseUiEventTime(at: string): UiEventTime | null {
         return null;
     }
     if (hour === undefined) {
-        return { kind: 'date', date: calendar, written: true };
+        return { kind: 'date', date: calendar, written: true, seconds: false };
     }
     const [h, min, sec] = [Number(hour), Number(minute), Number(second ?? 0)];
     if (!validClock(h, min, sec)) {
         return null;
     }
     if (zone === undefined) {
-        return { kind: 'datetime', date: new Date(Date.UTC(y, m - 1, d, h, min, sec)), written: true };
+        return { kind: 'datetime', date: new Date(Date.UTC(y, m - 1, d, h, min, sec)), written: true, seconds: false };
     }
     const offset = zoneOffset(zone);
-    return offset === null ? null : { kind: 'datetime', date: new Date(Date.UTC(y, m - 1, d, h, min, sec) - offset * 60000), written: false };
+    return offset === null ? null : { kind: 'datetime', date: new Date(Date.UTC(y, m - 1, d, h, min, sec) - offset * 60000), written: false, seconds: false };
 }

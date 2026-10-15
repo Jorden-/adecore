@@ -344,6 +344,20 @@ describe('text and status', () => {
         }
     });
 
+    test('a time that wrote seconds keeps them, and one that did not stays to the minute', () => {
+        const previous = setFormatSource(Object.assign(fakeFormatSource(), { region: () => 'nl-NL' }) as FormatSource);
+        try {
+            expect(uiEventTime('15:41:55')).toBe('15:41:55');
+            expect(uiEventTime('15:41:55.250')).toBe('15:41:55');
+            expect(uiEventTime('15:41')).toBe('15:41');
+        } finally {
+            setFormatSource(previous);
+        }
+        const html = markup('<Timeline><Event at="15:41:55" tone="info">Deployed</Event></Timeline>');
+        expect(html).toContain('<time dateTime="15:41:55"');
+        expect(html).not.toContain('Could not draw this part');
+    });
+
     test('an event writes the year once it is not this one, and a time inside a clock change as written', () => {
         setSystemTime(new Date(2026, 9, 14, 12));
         expect(uiEventTime('2026-03-02')).toBe(formatDay(new Date(2026, 2, 2)));

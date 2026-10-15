@@ -29,6 +29,16 @@ describe('the time an event names', () => {
         expect(parseUiEventTime('2026-10-14T14:05:30.250')!.kind).toBe('datetime');
     });
 
+    test('reads a lone time with seconds, and with fractional seconds, and keeps whether the seconds were written', () => {
+        const withSeconds = parseUiEventTime('15:41:55')!;
+        expect([withSeconds.kind, withSeconds.written, withSeconds.seconds]).toEqual(['time', true, true]);
+        expect([withSeconds.date.getUTCHours(), withSeconds.date.getUTCMinutes(), withSeconds.date.getUTCSeconds()]).toEqual([15, 41, 55]);
+        expect(parseUiEventTime('15:41:55.123456789')!.seconds).toBe(true);
+        expect(parseUiEventTime('23:59:59')).not.toBeNull();
+        expect(parseUiEventTime('15:41')!.seconds).toBe(false);
+        expect(parseUiEventTime('2026-10-14T14:05:30')!.seconds).toBe(false);
+    });
+
     test('puts a date-time with an offset on the instant it names', () => {
         expect(parseUiEventTime('2026-10-14T14:05Z')!.date.toISOString()).toBe('2026-10-14T14:05:00.000Z');
         expect(parseUiEventTime('2026-10-14T14:05:00+02:00')!.date.toISOString()).toBe('2026-10-14T12:05:00.000Z');
@@ -58,6 +68,12 @@ describe('the time an event names', () => {
             '2pm',
             '24:00',
             '14:60',
+            '14:05:60',
+            '24:00:00',
+            '14:05:3',
+            '14:05:30.',
+            '14:05:30Z',
+            '14:05:30.1234567890',
             '9:05',
             '2026-02-30',
             '2026-13-01',
