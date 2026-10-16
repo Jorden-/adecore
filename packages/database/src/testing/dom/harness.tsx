@@ -57,7 +57,8 @@ export const recordTransport = (inner: DatabaseTransport): RecordedTransport => 
 export const done = (sql: string, affected = 1): StatementResult => ({ kind: 'done', sql, affected, lastInsertId: null, elapsedMs: 0 });
 
 export interface MountOptions {
-    readonly client: DatabaseClient;
+    /* Without it the view is mounted with no `DatabaseProvider`, as a grid of an app's own rows is. */
+    readonly client?: DatabaseClient;
     readonly actions?: DatabaseAction[];
     /* Collects what the views hand the app as notices; without it they show their own. */
     readonly notices?: DatabaseNotice[];
@@ -97,22 +98,26 @@ export const memoryStorage = (): DatabaseStorage & { readonly entries: Map<strin
 };
 
 /* Mounts a view the way an app does: inside `UIProvider` and `DatabaseProvider`, in a document that is part of the page so focus and portals behave. */
-export const mount = async (node: ReactNode, { client, actions, notices, storage, files }: MountOptions): Promise<Mounted> => {
+export const mount = async (node: ReactNode, { client, actions, notices, storage, files }: MountOptions = {}): Promise<Mounted> => {
     const i18n = await createI18n();
     const container = document.createElement('div');
     document.body.append(container);
     const root: Root = createRoot(container);
     const wrap = (inner: ReactNode): ReactNode => (
         <UIProvider i18n={i18n}>
-            <DatabaseProvider
-                client={client}
-                storage={storage}
-                files={files}
-                onAction={actions === undefined ? undefined : (action) => actions.push(action)}
-                onNotice={notices === undefined ? undefined : (notice) => notices.push(notice)}
-            >
-                {inner}
-            </DatabaseProvider>
+            {client === undefined ? (
+                inner
+            ) : (
+                <DatabaseProvider
+                    client={client}
+                    storage={storage}
+                    files={files}
+                    onAction={actions === undefined ? undefined : (action) => actions.push(action)}
+                    onNotice={notices === undefined ? undefined : (notice) => notices.push(notice)}
+                >
+                    {inner}
+                </DatabaseProvider>
+            )}
         </UIProvider>
     );
     await act(async () => {

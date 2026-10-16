@@ -18,6 +18,7 @@ The demos on these pages run on [`fakeDatabaseTransport`](/database/api/testing)
 - [`StructureView`](/database/views/structure-view) shows the structure of a table, and [`TableDesigner`](/database/views/table-designer) creates and alters one.
 - [`QueryConsole`](/database/views/query-console) runs SQL, with history, paging, transactions and export.
 - [`DatabaseWorkbench`](/database/views/workbench) puts the explorer beside tabs for all of these. An app with tabs of its own answers the [actions](/database/guide/tabs) of the views instead.
+- [`DataGrid`](/database/views/data-grid) is the grid of the table view and the console, for rows an app has on its own, without a connection.
 
 ## Three layers
 

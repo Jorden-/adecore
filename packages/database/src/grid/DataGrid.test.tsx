@@ -42,6 +42,31 @@ const rows: GridRow[] = [
 ];
 
 describe('DataGrid', () => {
+    test('draws rows of plain text without a DatabaseProvider, in the words of the package', async () => {
+        const own = i18next.createInstance();
+        await own.init({ lng: 'en', fallbackLng: 'en', resources: {}, interpolation: { escapeValue: false } });
+        const markup = renderToStaticMarkup(
+            <UIProvider i18n={own}>
+                <DataGrid
+                    label="cities.csv"
+                    columns={[
+                        { name: 'city', type: '', kind: 'text' },
+                        { name: 'country', type: '', kind: 'text' }
+                    ]}
+                    rows={[
+                        { key: '0', number: 1, cells: ['Utrecht', 'NL'] },
+                        { key: '1', number: 2, cells: ['Antwerp', ''] }
+                    ]}
+                />
+            </UIProvider>
+        );
+        expect(markup).toContain('aria-label="cities.csv"');
+        expect(markup.match(/aria-label="Column menu"/g)).toHaveLength(2);
+        expect(markup).toContain('Utrecht');
+        expect(markup).toContain('Antwerp');
+        expect(markup).not.toContain('NULL');
+    });
+
     test('is a grid with its counts, header row and a row per row', () => {
         const markup = render(<DataGrid label="Users" columns={columns} rows={rows} />);
         expect(markup).toContain('role="grid"');

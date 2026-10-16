@@ -23,6 +23,7 @@ export interface GridRow {
     readonly key: string;
     /* The number in the gutter; `null` for a row that does not exist yet. */
     readonly number: number | null;
+    /* One per column, in the order of the columns. A `null` draws as a faint NULL, so an empty text is `''`. */
     readonly cells: readonly Shown[];
     readonly state?: GridRowState;
     /* Indexes of the cells with a pending edit. */

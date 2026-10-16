@@ -326,7 +326,7 @@ Without the second `@source` the views render unstyled.
 
 ## Words and languages
 
-The package's words live in the `database` namespace (`DATABASE_NAMESPACE`), in English and Dutch. `DatabaseProvider` adds them, and skips a language that already has a `database` bundle.
+The package's words live in the `database` namespace (`DATABASE_NAMESPACE`), in English and Dutch. `DatabaseProvider` adds them, and so does a [`DataGrid`](/database/views/data-grid) drawn without one; both skip a language that already has a `database` bundle.
 
 To add a language, add its bundle before the provider mounts. `DATABASE_RESOURCES`, keyed by language code, holds the English source to translate from:
 

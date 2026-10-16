@@ -156,7 +156,8 @@ const database: DefaultTheme.SidebarItem[] = [
         ['StructureView', '/database/views/structure-view'],
         ['TableDesigner', '/database/views/table-designer'],
         ['QueryConsole', '/database/views/query-console'],
-        ['DatabaseWorkbench', '/database/views/workbench']
+        ['DatabaseWorkbench', '/database/views/workbench'],
+        ['DataGrid', '/database/views/data-grid']
     ]),
     group('API', [
         ['Client', '/database/api/client'],

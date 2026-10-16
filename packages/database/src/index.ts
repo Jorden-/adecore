@@ -21,6 +21,8 @@ export {
 } from './client/index.ts';
 
 export type { DatabaseAction, DatabaseFiles, DatabaseNotice, DatabaseStorage, ExplorerSelection } from './actions.ts';
+export type { Cell, Value, ValueKind } from './protocol/index.ts';
+export type { SortDirection } from './sql.ts';
 
 export { ConnectionForm, type ConnectionFormProps } from './connections/ConnectionForm.tsx';
 export { isValidConfig, type ConfigProblem, type ConfigProblems } from './connections/connection-config.ts';
@@ -31,7 +33,11 @@ export type { ExplorerFolder, ExplorerItem } from './explorer/folders.ts';
 export { TableDesigner, type TableDesignerProps } from './designer/TableDesigner.tsx';
 export { DatabaseProvider, type DatabaseProviderProps } from './DatabaseProvider.tsx';
 export { useDatabaseClient } from './client-context.ts';
+export { DataGrid, type DataGridProps } from './grid/DataGrid.tsx';
+export type { GridLayout } from './grid/column-layout.ts';
 export type { NumberNotation } from './grid/display.ts';
+export type { GridSort } from './grid/sort.ts';
+export type { FocusedCell, GridColumn, GridMenuContext, GridRow, GridRowState } from './grid/types.ts';
 export { QueryConsole, type QueryConsoleProps } from './console/QueryConsole.tsx';
 export type { QueryConsoleEditorHandle, QueryConsoleEditorProps, QueryConsoleRunScope } from './console/editor-slot.ts';
 export { runScopeOf } from './console/shortcuts.ts';

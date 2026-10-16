@@ -22,6 +22,7 @@ import { assignRef } from '../assign-ref.ts';
 import type { SqlTarget } from '../sql.ts';
 import { useNumberNotation } from '../client-context.ts';
 import { usePopupPress } from '../use-popup-press.ts';
+import { useDatabaseResources } from '../use-database-resources.ts';
 import { useStableCallback } from '../use-stable-callback.ts';
 import type { RangeBlock } from './aggregates.ts';
 import { fullRect, rectBetween, rectContains } from './cell-range.ts';
@@ -75,6 +76,7 @@ export interface DataGridProps {
     onNotice?(notice: DatabaseNotice): void;
     /* The sorted columns by name, in order. Only shown unless `onSortsChange` is given, which is what makes the headers sort. */
     sorts?: readonly GridSort[];
+    /* A header's menu picked a sort. The grid draws `rows` in the order given, so the handler orders them and passes `sorts` back. */
     onSortsChange?(sorts: readonly GridSort[]): void;
     /* The cell that holds the focus changed, or lost it. */
     onFocusedCellChange?(cell: FocusedCell | null): void;
@@ -141,7 +143,8 @@ const estimateWidths = (columns: readonly GridColumn[], rows: readonly GridRow[]
     );
 
 /*
- * The table of the table view and of the console. Only the rows in view are drawn, at a fixed
+ * The table of the table view and of the console, and of any rows an app has on its own: it needs no
+ * `DatabaseProvider`, only the `UIProvider` of `@adecore/ui`. Only the rows in view are drawn, at a fixed
  * height, inside a box as tall as all of them; the header and the row-number gutter stick to the edges
  * of the scroll box. Focus stays on that box and points at the cell with `aria-activedescendant`, so
  * a cell scrolled out of the window loses nothing.
@@ -175,6 +178,8 @@ export function DataGrid({
     className,
     ref
 }: DataGridProps) {
+    // A grid drawn without a `DatabaseProvider`, such as one over the rows of a file, still reads its words.
+    useDatabaseResources();
     const { t } = useTranslation('database');
     const gridId = useId();
     const scroller = useRef<HTMLDivElement | null>(null);

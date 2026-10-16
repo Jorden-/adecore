@@ -68,6 +68,7 @@ describe('the public API', () => {
             'ConnectionManager',
             'DATABASE_NAMESPACE',
             'DATABASE_RESOURCES',
+            'DataGrid',
             'DatabaseExplorer',
             'DatabaseProvider',
             'DatabaseRequestError',

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { useState } from 'react';
 import { ContextMenu } from '@adecore/ui';
 import type { DatabaseNotice } from '../actions.ts';
 import type { Value } from '../protocol/index.ts';
@@ -6,6 +7,7 @@ import type { Mounted } from '../testing/dom/harness.tsx';
 import { byText, clientOver, click, contextMenu, findAll, mount, perform, waitFor } from '../testing/dom/harness.tsx';
 import { fakeDatabaseTransport } from '../testing/index.ts';
 import { DataGrid } from './DataGrid.tsx';
+import type { GridSort } from './sort.ts';
 import type { GridColumn, GridRow } from './types.ts';
 
 const columns: GridColumn[] = [
@@ -248,5 +250,61 @@ describe.skipIf(typeof document === 'undefined')('DataGrid copying a preview', (
                 description: 'Some values were copied cut off, since only their start was read and the whole values could not be loaded.'
             }
         ]);
+    });
+});
+
+describe.skipIf(typeof document === 'undefined')('DataGrid without a connection', () => {
+    let mounted: Mounted;
+
+    const fileColumns: GridColumn[] = [
+        { name: 'city', type: '', kind: 'text' },
+        { name: 'country', type: '', kind: 'text' }
+    ];
+
+    const fileRows: GridRow[] = [
+        { key: '0', number: 1, cells: ['Utrecht', 'NL'] },
+        { key: '1', number: 2, cells: ['Antwerp', ''] },
+        { key: '2', number: 3, cells: ['Zwolle', 'NL'] }
+    ];
+
+    /* Sorts the rows itself, the way an app with all of its rows at hand does. */
+    function FileGrid() {
+        const [sorts, setSorts] = useState<readonly GridSort[]>([]);
+        const sorted = sorts.length === 0 ? fileRows : [...fileRows].sort((left, right) => compareRows(left, right, sorts[0]!));
+        return <DataGrid label="cities.csv" columns={fileColumns} rows={sorted} sorts={sorts} onSortsChange={setSorts} />;
+    }
+
+    const compareRows = (left: GridRow, right: GridRow, sort: GridSort): number => {
+        const column = fileColumns.findIndex((candidate) => candidate.name === sort.column);
+        const order = String(left.cells[column]).localeCompare(String(right.cells[column]));
+        return sort.direction === 'asc' ? order : -order;
+    };
+
+    const cities = (): string[] =>
+        findAll('[role=row]').flatMap((row) =>
+            findAll('[role=gridcell]', row)
+                .slice(0, 1)
+                .map((cell) => cell.textContent ?? '')
+        );
+
+    beforeEach(async () => {
+        mounted = await mount(<FileGrid />);
+    });
+
+    afterEach(async () => {
+        await mounted.unmount();
+    });
+
+    test('sorts from a header menu through the rows the app orders', async () => {
+        expect(cities()).toEqual(['Utrecht', 'Antwerp', 'Zwolle']);
+
+        await contextMenu(columnHeaders()[0]!.firstElementChild!);
+        await click(byText('[role=menuitem]', 'Sort descending'));
+        expect(cities()).toEqual(['Zwolle', 'Utrecht', 'Antwerp']);
+        expect(columnHeaders()[0]!.getAttribute('aria-sort')).toBe('descending');
+
+        await contextMenu(columnHeaders()[0]!.firstElementChild!);
+        await click(byText('[role=menuitem]', 'Clear sorting'));
+        expect(cities()).toEqual(['Utrecht', 'Antwerp', 'Zwolle']);
     });
 });
