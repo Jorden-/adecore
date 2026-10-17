@@ -28,8 +28,9 @@ export function ChatActivity({ chatId }: { chatId: string }) {
     const host = useChatHost();
     const { t } = useTranslation('agent-chat');
     const order = useChatRow(chatId, (row) => row?.order) ?? NO_ITEMS;
+    const before = useChatRow(chatId, (row) => row?.subagentsBefore) ?? NO_ITEMS;
     const structure = useChatRow(chatId, (row) => row?.structure);
-    const subagents = useMemo(() => (structure === undefined ? [] : flyoutSubagents(order, structure)), [order, structure]);
+    const subagents = useMemo(() => (structure === undefined ? [] : flyoutSubagents([...before, ...order], structure)), [before, order, structure]);
     const { id, keyOf } = useChatScope();
     const tasks = host.tasks.useTasks(id);
     // The infos of these sub-agents' own chats, so the info of any other chat changing does not draw this again.

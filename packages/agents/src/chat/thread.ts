@@ -1,5 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import type { AgentStatus, ChatApprovalItem, ChatEvent, ChatHistoryResult, ChatInfo, ChatItem, ChatQuestionItem } from '@adecore/agent-contracts';
+import {
+    activeSubagents,
+    type AgentStatus,
+    type ChatApprovalItem,
+    type ChatEvent,
+    type ChatHistoryResult,
+    type ChatInfo,
+    type ChatItem,
+    type ChatQuestionItem,
+    type ChatSubagentItem
+} from '@adecore/agent-contracts';
 import { appendToolOutput } from '@adecore/agent-contracts/text';
 import { ChatError } from './errors.ts';
 import { requestSummaries } from './request-summary.ts';
@@ -164,7 +174,7 @@ export class ChatThread {
         this.info = pending.length === 0 ? rest : { ...rest, requests: requestSummaries(pending) };
     }
 
-    history(limit = 60, cursor?: string): ChatHistoryResult {
+    history(limit = 90, cursor?: string): ChatHistoryResult {
         let end = this.order.length;
         if (cursor) {
             const [generation, offset] = cursor.split(':');
@@ -188,6 +198,11 @@ export class ChatThread {
             start--;
         }
         return { items, history: { start, cursor: start ? `${this.historyGeneration}:${start}` : null } };
+    }
+
+    /* The active sub-agents a page that begins at `start` leaves out. */
+    subagentsBefore(start: number): ChatSubagentItem[] {
+        return activeSubagents(this.list()).filter((item) => this.indices.get(item.id)! < start);
     }
 
     snapshot(): { info: ChatInfo; items: ChatItem[] } {

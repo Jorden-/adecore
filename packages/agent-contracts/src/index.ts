@@ -124,6 +124,7 @@ export {
     abortedByMachine,
     ENDED_NOTE_PREFIX,
     abortedByEnd,
+    activeSubagents,
     WAITING_NOTE_PREFIX,
     ChatNoteItemSchema,
     ChatCompactionItemSchema,

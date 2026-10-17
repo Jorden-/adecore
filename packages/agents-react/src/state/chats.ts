@@ -9,6 +9,7 @@ import type {
     ChatInfo,
     ChatItem,
     ChatQuestionItem,
+    ChatSubagentItem,
     ChatVisual
 } from '@adecore/agent-contracts';
 import { appendToolOutput } from '@adecore/agent-contracts/text';
@@ -32,6 +33,11 @@ export interface ChatState {
      * `structure` but not in `order`, since the thread on screen does not reach back to them yet.
      */
     waitingBefore?: string[];
+    /*
+     * Sub-agents from before that part, held the same way, so the pill over the composer knows of one
+     * that a message woke again without a scroll reaching back to its row.
+     */
+    subagentsBefore?: string[];
     /* The messages marked to come back to, as the host last said; absent until it said anything. */
     bookmarks?: ChatBookmark[];
     /* The pages agents published in the chat, as the host last said; absent until it said anything. */
@@ -45,6 +51,8 @@ export interface ChatPage {
     history: ChatHistoryPage;
     /* Every request of the chat that still waits, wherever in the thread it is. */
     pending: ChatItem[];
+    /* The active sub-agents from before the page; absent from a host that sends none. */
+    subagents?: ChatSubagentItem[];
 }
 
 /* Rows keyed with the scope's `keyOf`, so a thread says which host it runs on. */
@@ -93,10 +101,19 @@ function stateOf(info: ChatInfo, items: ChatItem[], page?: ChatPage): ChatState 
         return { info, items: byId, structure: byId, order };
     }
     const before = page.pending.filter((item) => !(item.id in byId));
-    for (const item of before) {
+    const subagents = (page.subagents ?? []).filter((item) => !(item.id in byId));
+    for (const item of [...before, ...subagents]) {
         byId[item.id] = item;
     }
-    return { info, items: byId, structure: byId, order, history: page.history, waitingBefore: before.map((item) => item.id) };
+    return {
+        info,
+        items: byId,
+        structure: byId,
+        order,
+        history: page.history,
+        waitingBefore: before.map((item) => item.id),
+        subagentsBefore: subagents.map((item) => item.id)
+    };
 }
 
 /* An older host names no place in the thread, and it always hands over the whole of it. */
@@ -104,8 +121,12 @@ function isBeforePage(state: ChatState, historyIndex: number | undefined): boole
     return state.history !== undefined && historyIndex !== undefined && historyIndex < state.history.start;
 }
 
-/* An item from before the page this client holds matters only as a request that waits, or one that stopped waiting. */
+/* An item from before the page this client holds matters only as a sub-agent, a request that waits, or one that stopped waiting. */
 function withEarlierItem(state: ChatState, item: ChatItem): ChatState {
+    if (item.kind === 'subagent') {
+        const subagents = state.subagentsBefore ?? [];
+        return { ...withItem(state, item), subagentsBefore: subagents.includes(item.id) ? subagents : [...subagents, item.id] };
+    }
     const waiting = state.waitingBefore ?? [];
     const held = waiting.includes(item.id);
     if (isWaiting(item)) {
@@ -129,11 +150,12 @@ export function prependPage(state: ChatState, cursor: string, page: ChatHistoryR
     }
     const order = [...olderIds, ...state.order];
     if (page.history.cursor === null) {
-        const { history: _history, waitingBefore: _waitingBefore, ...rest } = state;
+        const { history: _history, waitingBefore: _waitingBefore, subagentsBefore: _subagentsBefore, ...rest } = state;
         return { ...rest, items, structure: items, order };
     }
     const waitingBefore = (state.waitingBefore ?? []).filter((id) => !olderIds.has(id));
-    return { ...state, items, structure: items, order, history: page.history, waitingBefore };
+    const subagentsBefore = (state.subagentsBefore ?? []).filter((id) => !olderIds.has(id));
+    return { ...state, items, structure: items, order, history: page.history, waitingBefore, subagentsBefore };
 }
 
 /* The requests that still wait, oldest first: those from before the page this client holds, then the thread's own. */

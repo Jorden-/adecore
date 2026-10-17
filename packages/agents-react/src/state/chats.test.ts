@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { compileUi } from '@adecore/intelligent-ui';
-import type { ChatInfo, ChatItem } from '@adecore/agent-contracts';
+import type { ChatInfo, ChatItem, ChatSubagentItem } from '@adecore/agent-contracts';
+import { flyoutSubagents } from '../chat/subagent-list';
 import { applyEvent, chatSink, prependPage, useChats, waitingRequestsOf, type ChatState } from './chats';
 
 function info(patch: Partial<ChatInfo> = {}): ChatInfo {
@@ -303,6 +304,39 @@ describe('a thread held from its newest page', () => {
     test('a page for a cursor the thread no longer has changes nothing', () => {
         const state = held();
         expect(prependPage(state, 'g:9', { items: [user('u1', 'first')], history: { start: 0, cursor: null } })).toBe(state);
+    });
+
+    describe('with sub-agents from before it', () => {
+        const subagent = (id: string, status: 'running' | 'done'): ChatSubagentItem =>
+            ({ id, kind: 'subagent', createdAt: 0, turnId: null, toolUseId: id, status, finishedAt: status === 'done' ? 1 : null }) as ChatSubagentItem;
+        const flyout = (state: ChatState) => flyoutSubagents([...(state.subagentsBefore ?? []), ...state.order], state.structure).map((item) => item.id);
+
+        test('holds the ones the host sent outside the thread, where the flyout finds them', () => {
+            useChats.getState().reset(key, info(), newest, { history: { start: 2, cursor: 'g:2' }, pending: [], subagents: [subagent('s0', 'running')] });
+            const state = useChats.getState().byKey[key]!;
+            useChats.getState().forget(key);
+            expect(state.order).toEqual(['u3', 'u4']);
+            expect(state.subagentsBefore).toEqual(['s0']);
+            expect(flyout(state)).toEqual(['s0']);
+        });
+
+        test('keeps one a message woke again, and follows it as it settles', () => {
+            let state = applyEvent(held(), { type: 'item', item: subagent('s1', 'running'), historyIndex: 1 });
+            expect(state.order).toEqual(['u3', 'u4']);
+            expect(flyout(state)).toEqual(['s1']);
+            state = applyEvent(state, { type: 'item', item: subagent('s1', 'done'), historyIndex: 1 });
+            expect(state.subagentsBefore).toEqual(['s1']);
+            expect(state.items.s1).toEqual(subagent('s1', 'done'));
+        });
+
+        test('moves one into the thread once a page reaches it, never twice', () => {
+            const woken = applyEvent(held(), { type: 'item', item: subagent('s1', 'running'), historyIndex: 1 });
+            const partial = prependPage(woken, 'g:2', { items: [subagent('s1', 'done')], history: { start: 1, cursor: 'g:1' } });
+            expect(partial.order).toEqual(['s1', 'u3', 'u4']);
+            expect(partial.subagentsBefore).toEqual([]);
+            expect(partial.items.s1).toEqual(subagent('s1', 'running'));
+            expect(flyout(partial)).toEqual(['s1']);
+        });
     });
 });
 

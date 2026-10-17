@@ -47,7 +47,7 @@ interface Mounted extends ChatOpenOptions, MountedEntry {
 }
 
 /* How many items a chat reads at once, on attach and for every page before it. */
-const HISTORY_PAGE = 60;
+const HISTORY_PAGE = 90;
 
 interface ProviderSink {
     setProviders(providers: ProviderInfo[]): void;
@@ -339,7 +339,8 @@ export class ChatClient {
                 this.sink.apply(chatId, event);
             }
         } else {
-            const page = result.history === undefined ? undefined : { history: result.history, pending: result.pending ?? [] };
+            const page =
+                result.history === undefined ? undefined : { history: result.history, pending: result.pending ?? [], subagents: result.subagents ?? [] };
             this.sink.reset(chatId, result.info, result.items, page);
         }
         // A host without bookmarks or visuals sends none, and then this chat has none.

@@ -709,6 +709,28 @@ export type ChatTurnItem = z.infer<typeof ChatTurnItemSchema>;
 export type ChatNoteItem = z.infer<typeof ChatNoteItemSchema>;
 export type ChatCompactionItem = z.infer<typeof ChatCompactionItemSchema>;
 
+/*
+ * The sub-agents a chat still speaks of beside its thread: every one at work, and the ones that settled
+ * since the last message, so a finished batch stays until the next message is sent. That includes an
+ * older row a message woke again. A settled one from before that message stays too while a sibling of
+ * its turn still runs. Older ones are only in the thread. `items` is in thread order.
+ */
+export function activeSubagents(items: readonly ChatItem[]): ChatSubagentItem[] {
+    const lastMessage = items.findLastIndex((item) => item.kind === 'user');
+    const lastMessageAt = lastMessage < 0 ? null : items[lastMessage]!.createdAt;
+    const rows = items.flatMap((item, index) => (item.kind === 'subagent' ? [{ item, index }] : []));
+    const turns = new Set(rows.flatMap(({ item }) => (item.status === 'running' && item.turnId !== null ? [item.turnId] : [])));
+    return rows
+        .filter(
+            ({ item, index }) =>
+                item.status === 'running' ||
+                index > lastMessage ||
+                (lastMessageAt !== null && item.finishedAt !== null && item.finishedAt > lastMessageAt) ||
+                (item.turnId !== null && turns.has(item.turnId))
+        )
+        .map(({ item }) => item);
+}
+
 // Events apply after the `chat.attach` snapshot; item ids make upserts and streamed deltas replayable.
 export const ChatEventSchema = z.discriminatedUnion('type', [
     z.object({ type: z.literal('item'), item: ChatItemSchema, historyIndex: z.number().int().nonnegative().optional() }),
@@ -929,7 +951,9 @@ export const ChatAttachResultSchema = z.object({
     // Absent from a daemon that keeps no bookmarks.
     bookmarks: ChatBookmarksSchema.optional(),
     // Absent from a host that keeps no visuals.
-    visuals: ChatVisualsSchema.optional()
+    visuals: ChatVisualsSchema.optional(),
+    // With a page: the active sub-agents (`activeSubagents`) from before it, so the pill over the composer never waits on a scroll.
+    subagents: z.array(ChatSubagentItemSchema).optional()
 });
 export type ChatAttachResult = z.infer<typeof ChatAttachResultSchema>;
 

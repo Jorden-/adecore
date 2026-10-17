@@ -597,12 +597,17 @@ export class ChatCore {
         if (events !== null) {
             return { info: session.info, items: [], events: [...events, ...session.uiPreviews], seq: log.seq };
         }
-        const page = historyLimit === undefined ? session.thread.snapshot() : session.thread.history(historyLimit);
+        if (historyLimit === undefined) {
+            const snapshot = session.thread.snapshot();
+            return { ...snapshot, info: session.info, items: session.previewItems(snapshot.items), seq: log.seq };
+        }
+        const page = session.thread.history(historyLimit);
         return {
             ...page,
             info: session.info,
             items: session.previewItems(page.items),
-            ...(historyLimit === undefined ? {} : { pending: session.previewItems(session.thread.pending()) }),
+            pending: session.previewItems(session.thread.pending()),
+            subagents: session.thread.subagentsBefore(page.history.start),
             seq: log.seq
         };
     }

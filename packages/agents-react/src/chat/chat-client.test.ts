@@ -208,7 +208,7 @@ describe('ChatClient', () => {
             selection: undefined,
             runtimeMode: 'auto'
         });
-        expect(transport.of('chat.attach')[0]?.payload).toEqual({ chatId: 'c', historyLimit: 60 });
+        expect(transport.of('chat.attach')[0]?.payload).toEqual({ chatId: 'c', historyLimit: 90 });
         expect(sink.resets).toEqual([{ chatId: 'c', items: transport.items }]);
     });
 
@@ -278,7 +278,7 @@ describe('ChatClient', () => {
         transport.calls.length = 0;
         transport.setStatus('open');
         await flush();
-        expect(transport.of('chat.attach').map((c) => c.payload)).toEqual([{ chatId: 'a', historyLimit: 60 }]);
+        expect(transport.of('chat.attach').map((c) => c.payload)).toEqual([{ chatId: 'a', historyLimit: 90 }]);
         expect(sink.resets.map((r) => r.chatId)).toEqual(['a', 'b', 'a']);
     });
 
@@ -287,13 +287,13 @@ describe('ChatClient', () => {
         const later: ChatEvent = { type: 'delta', itemId: 'a1', text: 'more' };
         transport.attachResult = (payload) => (payload.since === undefined ? { seq: 4 } : { items: [], seq: 6, events: [later] });
         await client.open('a', {});
-        expect(transport.of('chat.attach')[0]?.payload).toEqual({ chatId: 'a', historyLimit: 60 });
+        expect(transport.of('chat.attach')[0]?.payload).toEqual({ chatId: 'a', historyLimit: 90 });
         transport.emit('chat.event', { chatId: 'a', event: { type: 'delta', itemId: 'a1', text: 'x' }, seq: 5 });
 
         transport.setStatus('closed');
         transport.setStatus('open');
         await flush();
-        expect(transport.of('chat.attach').at(-1)?.payload).toEqual({ chatId: 'a', historyLimit: 60, since: 5 });
+        expect(transport.of('chat.attach').at(-1)?.payload).toEqual({ chatId: 'a', historyLimit: 90, since: 5 });
         expect(sink.resets).toHaveLength(1);
         expect(sink.events.at(-1)).toEqual({ chatId: 'a', event: later });
 
@@ -302,7 +302,7 @@ describe('ChatClient', () => {
         transport.setStatus('closed');
         transport.setStatus('open');
         await flush();
-        expect(transport.of('chat.attach').at(-1)?.payload).toEqual({ chatId: 'a', historyLimit: 60, since: 6 });
+        expect(transport.of('chat.attach').at(-1)?.payload).toEqual({ chatId: 'a', historyLimit: 90, since: 6 });
         expect(sink.resets).toHaveLength(2);
     });
 
@@ -311,7 +311,7 @@ describe('ChatClient', () => {
         const waiting: ChatItem = { id: 'q1', kind: 'question', createdAt: 0, turnId: null, requestId: 'r1', questions: [], answers: null, state: 'pending' };
         transport.attachResult = () => ({ history: { start: 40, cursor: 'g:40' }, pending: [waiting] });
         await client.open('a', {});
-        expect(sink.resets[0]?.page).toEqual({ history: { start: 40, cursor: 'g:40' }, pending: [waiting] });
+        expect(sink.resets[0]?.page).toEqual({ history: { start: 40, cursor: 'g:40' }, pending: [waiting], subagents: [] });
     });
 
     test('a page before is asked for once while it is on its way and handed to the store with its cursor', async () => {
@@ -319,7 +319,7 @@ describe('ChatClient', () => {
         await client.open('a', {});
         transport.history = { items: [{ id: 'u0', kind: 'user', createdAt: 0, turnId: null, text: 'first' }], history: { start: 0, cursor: null } };
         await Promise.all([client.loadEarlier('a', 'g:40'), client.loadEarlier('a', 'g:40')]);
-        expect(transport.of('chat.history').map((call) => call.payload)).toEqual([{ chatId: 'a', cursor: 'g:40', limit: 60 }]);
+        expect(transport.of('chat.history').map((call) => call.payload)).toEqual([{ chatId: 'a', cursor: 'g:40', limit: 90 }]);
         expect(sink.prepended).toEqual([{ chatId: 'a', cursor: 'g:40', page: transport.history }]);
     });
 
@@ -329,7 +329,7 @@ describe('ChatClient', () => {
         await client.open('a', {});
         transport.history = new ChatTransportError('history-expired', 'The conversation changed.');
         await client.loadEarlier('a', 'g:40');
-        expect(transport.of('chat.attach').at(-1)?.payload).toEqual({ chatId: 'a', historyLimit: 60 });
+        expect(transport.of('chat.attach').at(-1)?.payload).toEqual({ chatId: 'a', historyLimit: 90 });
         expect(sink.resets).toHaveLength(2);
         expect(sink.prepended).toEqual([]);
     });
@@ -343,7 +343,7 @@ describe('ChatClient', () => {
         await client.retarget('fresh', 'codex', { model: 'gpt-5.5', options: {} });
 
         expect(transport.of('chat.create').at(-1)?.payload).toMatchObject({ chatId: 'fresh', provider: 'codex', cwd: '/tmp' });
-        expect(transport.of('chat.attach').at(-1)?.payload).toEqual({ chatId: 'fresh', historyLimit: 60 });
+        expect(transport.of('chat.attach').at(-1)?.payload).toEqual({ chatId: 'fresh', historyLimit: 90 });
         expect(sink.resets.map((reset) => reset.chatId)).toEqual(['fresh', 'fresh']);
         expect(sink.forgotten).toEqual([]);
         expect(client.isMounted('fresh')).toBe(true);
@@ -400,7 +400,7 @@ describe('ChatClient', () => {
         transport.setStatus('closed');
         transport.setStatus('open');
         await flush();
-        expect(transport.of('chat.attach').at(-1)?.payload).toEqual({ chatId: 'c', historyLimit: 60, since: 5 });
+        expect(transport.of('chat.attach').at(-1)?.payload).toEqual({ chatId: 'c', historyLimit: 90, since: 5 });
 
         // The view mounts again while the reattach is on the wire.
         void client.detach('c');

@@ -11,7 +11,7 @@ describe('chat history', () => {
     test('pages a large synthetic thread without dropping or repeating items', () => {
         const items = Array.from({ length: 2871 }, (_, i) => message(i, 'output '.repeat(900)));
         const thread = new ChatThread(info, items);
-        let page = thread.history();
+        let page = thread.history(60);
         const firstBytes = Buffer.byteLength(JSON.stringify(page));
         expect(firstBytes).toBeLessThan(512 * 1024);
         expect(page.items.length).toBe(60);
@@ -68,5 +68,22 @@ describe('chat history', () => {
         expect(thread.upsert({ ...approval, decision: 'allow' } as ChatItem)).toMatchObject({ historyIndex: 0 });
         expect(thread.pending()).toEqual([]);
         expect(thread.upsert(message(2))).toMatchObject({ historyIndex: 3 });
+    });
+
+    test('sub-agents from before the page that still run or settled since the last message are available outside it', () => {
+        const user = (i: number, createdAt: number): ChatItem => ({ id: `u${i}`, kind: 'user', text: 'Go', createdAt, turnId: null }) as ChatItem;
+        const subagent = (id: string, status: 'running' | 'done', finishedAt: number | null): ChatItem =>
+            ({ id, kind: 'subagent', createdAt: 0, turnId: null, toolUseId: id, status, finishedAt }) as ChatItem;
+        const thread = new ChatThread(info, [
+            subagent('old', 'done', 5),
+            subagent('woken', 'running', null),
+            user(0, 10),
+            subagent('after', 'done', 20),
+            message(0)
+        ]);
+        const page = thread.history(1);
+        expect(page.history.start).toBe(4);
+        expect(thread.subagentsBefore(page.history.start).map((item) => item.id)).toEqual(['woken', 'after']);
+        expect(thread.subagentsBefore(1)).toEqual([]);
     });
 });

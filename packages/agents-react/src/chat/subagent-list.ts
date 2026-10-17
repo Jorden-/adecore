@@ -1,5 +1,5 @@
 import i18next from 'i18next';
-import type { ChatInfo, ChatItem, ChatSubagentItem } from '@adecore/agent-contracts';
+import { activeSubagents, type ChatInfo, type ChatItem, type ChatSubagentItem } from '@adecore/agent-contracts';
 import { formatMoment, formatElapsedShort, formatTokens } from '@adecore/ui/format';
 import type { StatusWord } from '../agents/status-look';
 import type { SubagentTask } from '../host';
@@ -58,29 +58,14 @@ export function progressOf(states: readonly TaskRowState[]): { done: number; tot
     };
 }
 
-/*
- * What the flyout over the composer lists: every sub-agent still at work, and the ones that settled
- * since the last message, so a finished batch stays until the next message is sent. That includes an
- * older row a message woke again. A settled one from before that message stays too while a sibling of
- * its turn still runs. Older ones are only in the thread.
- */
+/* What the flyout over the composer lists (`activeSubagents`); `order` puts the rows from before the page first. */
 export function flyoutSubagents(order: readonly string[], structure: Readonly<Record<string, ChatItem>>): ChatSubagentItem[] {
-    const lastMessage = order.findLastIndex((id) => structure[id]?.kind === 'user');
-    const lastMessageAt = lastMessage < 0 ? null : (structure[order[lastMessage]!]?.createdAt ?? null);
-    const items = order.flatMap((id, index) => {
-        const item = structure[id];
-        return item?.kind === 'subagent' ? [{ item, index }] : [];
-    });
-    const turns = new Set(items.flatMap(({ item }) => (item.status === 'running' && item.turnId !== null ? [item.turnId] : [])));
-    return items
-        .filter(
-            ({ item, index }) =>
-                item.status === 'running' ||
-                index > lastMessage ||
-                (lastMessageAt !== null && item.finishedAt !== null && item.finishedAt > lastMessageAt) ||
-                (item.turnId !== null && turns.has(item.turnId))
-        )
-        .map(({ item }) => item);
+    return activeSubagents(
+        order.flatMap((id) => {
+            const item = structure[id];
+            return item === undefined ? [] : [item];
+        })
+    );
 }
 
 /* The one state the badge shows for all of them: work in progress first, then work held up, then whatever went wrong. */
