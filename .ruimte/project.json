@@ -1,7 +1,7 @@
 {
   "version": 3,
   "name": "ADE CORE",
-  "color": "#7c74ff",
-  "icon": {"kind":"lucide","value":"brain"},
+  "color": "#7f22fe",
+  "icon": {"kind":"lucide","value":"gift"},
   "views": []
 }
