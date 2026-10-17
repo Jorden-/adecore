@@ -57,7 +57,7 @@ useUsageStore.getState().forget(scope.id);
 
 The stores are Zustand stores shared by every scope.
 
-- `useChats` holds a `ChatState` per key: the chat's `info`, its `items` by id, its `order`, `history` when only the newest page is held, `waitingBefore` for requests older than that page, `bookmarks`, and `visuals`, the pages agents published in it. Bookmarks and visuals come with the attach and with their own events, and a fresh thread from the host keeps them. `statusByKey` holds only the info, and changes only when the info does.
+- `useChats` holds a `ChatState` per key: the chat's `info`, its `items` by id, its `order`, `history` when only the newest page is held, `waitingBefore` for requests older than that page, `subagentsBefore` for sub-agents older than it that the host sent or that changed since, `bookmarks`, and `visuals`, the pages agents published in it. Bookmarks and visuals come with the attach and with their own events, and a fresh thread from the host keeps them. `statusByKey` holds only the info, and changes only when the info does.
 - `useChatRow(chatId, select)` reads one chat of the scope in context. Select the field you draw: a streamed word replaces `items`.
 - `structure` is `items` minus the growth of a streaming reply, thought or tool output. Derive rows from it; that keeps a word from redrawing the whole thread.
 - `waitingRequestsOf(chat)` lists every approval and question that waits, also those before the loaded page.
