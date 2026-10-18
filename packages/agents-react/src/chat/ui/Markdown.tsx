@@ -161,6 +161,39 @@ function ExternalLink({ href, children }: { href?: string; children?: ReactNode 
     );
 }
 
+/*
+ * The path on the host's machine an image target names, or null for a URL and for a relative path
+ * nobody gave a folder for. react-markdown has already emptied a target of a scheme it distrusts.
+ */
+function localImagePath(src: string, cwd: string | null): string | null {
+    if (src === '' || /^[a-z][a-z0-9+.-]*:/i.test(src)) {
+        return null;
+    }
+    const target = hrefPath(src);
+    if (target.startsWith('/')) {
+        return target;
+    }
+    if (cwd === null) {
+        return null;
+    }
+    return `${cwd.replace(/\/+$/, '')}/${target.replace(/^\.\//, '')}`;
+}
+
+/* A markdown image, which only the host can read when it names a file on its machine. */
+function MarkdownImage({ src, alt }: { src?: string; alt?: string }) {
+    const { MarkdownImage: HostImage } = useChatHost();
+    const cwd = useFileLinkCwd();
+    const path = typeof src === 'string' ? localImagePath(src, cwd) : null;
+    if (HostImage === undefined || path === null) {
+        return <img src={src} alt={alt} />;
+    }
+    return <HostImage path={path} alt={alt ?? ''} />;
+}
+
+function PlainImage({ src, alt }: { src?: string; alt?: string }) {
+    return <img src={src} alt={alt} />;
+}
+
 /* A ```mermaid fence, which draws what it says. */
 function Diagram({ code }: { code: string }) {
     const { t } = useTranslation('agent-chat');
@@ -190,6 +223,7 @@ const components = {
     a({ href, children }: { href?: string; children?: ReactNode }) {
         return <MarkdownLink href={href}>{children}</MarkdownLink>;
     },
+    img: MarkdownImage,
     table({ children }: { children?: ReactNode }) {
         // A table wider than the column scrolls on its own instead of pushing the thread sideways.
         return (
@@ -210,7 +244,8 @@ const plainComponents = {
             </MarkdownCode>
         );
     },
-    a: ExternalLink
+    a: ExternalLink,
+    img: PlainImage
 };
 
 // A reply sits under the heading of its message, an `h3`, so its own headings start one level below

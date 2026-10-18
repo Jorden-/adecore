@@ -313,6 +313,8 @@ export interface ChatHost {
     };
     /* The image a tool read, drawn under its row; null draws none. */
     ReadImage: ComponentType<{ path: string }> | null;
+    /* An image a reply's markdown names by a path on the host's machine, absolute or under the chat's cwd; left out, the `<img>` stays as written. */
+    MarkdownImage?: ComponentType<{ path: string; alt: string }>;
     code: {
         useMode(): 'light' | 'dark';
         /* The Shiki theme ids code is drawn in, one per mode. */
