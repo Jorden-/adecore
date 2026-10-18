@@ -23,6 +23,18 @@ const window = new BrowserWindow({ ...bounds, ...theme.windowOptions(), show: fa
 
 `windowOptions()` is a new window's chrome and ground: the traffic lights inset on macOS (`trafficLights`, 17 by 17 by default), elsewhere a hidden title bar with the controls of `overlay` drawn over the page, or none without it. A new window opens in the theme the others are in, and dark with `background` before any page reported one.
 
+The colors of `overlay` are one pair per theme. A page whose ground can change within a theme, such as one that lets a person pick a palette, reports the colors of its controls in `overlay` on the `ThemeState` too. They win over the pair of the theme on every open window and on a window opened later, and a state without them falls back to that pair. Only `color` and `symbolColor` are taken; the height stays the shell's, and macOS, without an overlay, ignores them.
+
+```ts
+// In the page, on every change of the theme or the palette.
+desktop.setTheme({
+    resolved,
+    followsSystem,
+    background: tokenOf('--bg'),
+    overlay: { color: tokenOf('--bg'), symbolColor: tokenOf('--fg') }
+});
+```
+
 `nativeTheme.themeSource` is `system` only while the app follows the system; otherwise it is the app's own choice, since a page inside a `<webview>` asks Chromium and not the app.
 
 `current()` returns the last `ThemeState` applied, or `null` before the first. `Theme`, `ThemeOptions` and `TitleBarOverlay` are exported types.

@@ -4,7 +4,7 @@ import type { ThemeState } from './bridge/theme.ts';
 /* The native window controls a page leaves room for off macOS, with their colors per theme. */
 export interface TitleBarOverlay {
     height: number;
-    colors: Record<ThemeState['resolved'], { color: string; symbolColor: string }>;
+    colors: Record<ThemeState['resolved'], NonNullable<ThemeState['overlay']>>;
 }
 
 export interface ThemeOptions {
@@ -29,14 +29,23 @@ export const createTheme = (options: ThemeOptions) => {
     const platform = options.platform ?? process.platform;
     let current: ThemeState | null = null;
 
-    const overlayOf = (resolved: ThemeState['resolved']) =>
-        options.overlay ? { height: options.overlay.height, ...options.overlay.colors[resolved] } : undefined;
+    /*
+     * The colors a page reports win over the ones per theme, so the controls stay on its ground after it
+     * changed and a window opened later starts on it too. Only the two colors are taken from what crossed IPC.
+     */
+    const overlayOf = (theme: Pick<ThemeState, 'resolved' | 'overlay'>) => {
+        if (!options.overlay) {
+            return undefined;
+        }
+        const { color, symbolColor } = theme.overlay ?? options.overlay.colors[theme.resolved];
+        return { height: options.overlay.height, color, symbolColor };
+    };
 
     return {
         apply: (theme: ThemeState): void => {
             current = theme;
             options.nativeTheme.themeSource = theme.followsSystem ? 'system' : theme.resolved;
-            const overlay = platform === 'darwin' ? undefined : overlayOf(theme.resolved);
+            const overlay = platform === 'darwin' ? undefined : overlayOf(theme);
             for (const window of options.windows()) {
                 if (window.isDestroyed()) {
                     continue;
@@ -52,8 +61,7 @@ export const createTheme = (options: ThemeOptions) => {
 
         /* The constructor options of a new window: its own chrome and the ground the others have. Dark until a page says otherwise. */
         windowOptions: (): BrowserWindowConstructorOptions => {
-            const resolved = current?.resolved ?? 'dark';
-            const overlay = overlayOf(resolved);
+            const overlay = overlayOf(current ?? { resolved: 'dark' });
             const chrome: BrowserWindowConstructorOptions =
                 platform === 'darwin'
                     ? { titleBarStyle: 'hiddenInset', trafficLightPosition: options.trafficLights ?? { x: 17, y: 17 } }

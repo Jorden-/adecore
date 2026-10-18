@@ -5,4 +5,9 @@ export interface ThemeState {
     followsSystem: boolean;
     /* The page's ground, so the window paints it before the page does. */
     background: string;
+    /*
+     * The colors of the native window controls off macOS, for a page whose ground is not one fixed color per
+     * theme. Without it the shell takes the colors it was given for `resolved`.
+     */
+    overlay?: { color: string; symbolColor: string };
 }
