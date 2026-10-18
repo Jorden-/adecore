@@ -319,7 +319,10 @@ export interface ChatHost {
         useMode(): 'light' | 'dark';
         /* The Shiki theme ids code is drawn in, one per mode. */
         useThemes(): { light: string; dark: string };
-        /* Themes the app ships itself, found by name; the rest Shiki looks up by id. */
+        /*
+         * Themes the app ships itself, found by name; the rest Shiki looks up by id. Read again whenever a theme is
+         * picked, so a getter that answers a longer array draws a theme made later; a name keeps its first theme.
+         */
         custom: ReadonlyArray<ThemeRegistration & { name: string }>;
         /* One syntax worker shared by chat diffs and standalone review panes; omitted, tokenize on the page. */
         syntaxWorker?: () => Worker;

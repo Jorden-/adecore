@@ -52,7 +52,7 @@ export function Workspace() {
 | `MarkdownImage`                    | An image in a reply loads its target as written    | A component that draws the image at `path`, a file on the host's machine a reply names, absolute or under the chat's cwd. |
 | `intelligentUi`                    | Choices stay closed, live values and links stay as first read | `sendChoice`, `query`, `link`, `openLink`, `openUrl` and `subscribe` for [Intelligent UI](/intelligent-ui/guide/getting-started#draw-the-blocks) blocks. |
 | `fileLinks`                        | Paths in a reply stay text                         | `target(text, cwd, scopeId)` finds a `FileRef`; `open(cwd, ref, scopeId)` opens it on its rendering scope. |
-| `code`                             | Light, `github-light` and `github-dark`            | `useMode()` follows the app's light or dark, `useThemes()` names the Shiki themes, `custom` registers your own, `syntaxWorker?()` supplies the shared diff syntax runtime, `highlighter?()` lends the page highlighter to code blocks and the diff fallback, `editor?()` opts in to bounded editor edit reviews. |
+| `code`                             | Light, `github-light` and `github-dark`            | `useMode()` follows the app's light or dark, `useThemes()` names the Shiki themes, `custom` registers your own and is read again when a theme is picked, `syntaxWorker?()` supplies the shared diff syntax runtime, `highlighter?()` lends the page highlighter to code blocks and the diff fallback, `editor?()` opts in to bounded editor edit reviews. |
 | `useStreaming()`                   | `words`                                            | How a reply appears while it streams: `words`, `blocks` or `whole`.                                    |
 | `useSendDelivery()` | `queue` | What Send does while a turn runs: `queue` waits for the turn to end, `steer` hands the message to the running turn as soon as the backend takes input. Option or Alt picks the other one. |
 | `commandLooks`                     | Every shell call reads as itself                   | Programs of your own drawn as tools of their own in a thread. See [Programs as tools](/agents-react/chat/timeline#programs-as-tools). |
@@ -167,6 +167,20 @@ The diff views and a few heavy parts load on first use. `setLazyPrefetch(registe
 The optional `code.syntaxWorker` factory configures the shared diff syntax runtime. Create a bundler-owned worker entry that explicitly calls `serveDiffSyntax(self)` from `@adecore/editor/shiki-worker`, then return a new worker from this factory.
 
 Every `code` object has one shared runtime, made at its first use from `custom`, `syntaxWorker` and `highlighter`, so a provider inside another that keeps the same `code` shares its runtime too. Changing a theme registration under an existing name requires a new page or an independently owned runtime. The runtime creates one worker lazily and sends the host's custom themes before token requests. If construction, message transport or worker execution fails, it terminates that worker and replays pending requests through the same Shiki service on the main thread. Later requests continue using that fallback. Cache misses resend the mounted document's definition; disposed generations ignore late responses.
+
+A theme made while chats are open, such as one generated from a person's colors, needs no new page either. The chat reads `code.custom` again when a theme is picked: diffs register a name they have not seen, and the runtime sends a theme it has not sent ahead of the first document drawn in it. Add the new theme under a new name before `useThemes()` names it, either to the array `custom` holds or through a getter that answers the current themes. Answer the same array until a theme is added, since code blocks compare it between renders:
+
+```ts
+const code = {
+    useMode,
+    useThemes,
+    get custom() {
+        return useCodeThemes.getState().themes;
+    }
+};
+```
+
+A plain array keeps working as before; its themes go to the worker with the start.
 
 The factory is optional, so a host without it uses the main-thread service with yields between blocks. Optional `code.highlighter` returns the page's existing Shiki highlighter for this fallback; the runtime borrows it and never disposes it. Otherwise it creates its own lazy highlighter. A worker always owns its separate highlighter. Code blocks and shell commands in a thread draw with the same borrowed highlighter, loading only the grammars and themes it lacks; without one they load Shiki's web bundle on the first code they draw. Keep `useMode`, `useThemes` and `custom` in the same `code` object when configuring this field; a provider replaces a whole top-level field.
 

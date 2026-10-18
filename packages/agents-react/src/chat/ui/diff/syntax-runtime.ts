@@ -34,7 +34,8 @@ export interface DiffSyntaxRuntime {
 
 export interface DiffSyntaxRuntimeOptions {
     workerFactory?: () => Worker;
-    themes: readonly ThemeRegistration[];
+    /* The custom themes, or a function read again whenever a document names a theme not yet sent, so a theme made later draws too. */
+    themes: readonly ThemeRegistration[] | (() => readonly ThemeRegistration[]);
     highlighter?: () => Promise<Highlighter>;
 }
 
@@ -45,7 +46,7 @@ const shared = new WeakMap<ChatHost['code'], DiffSyntaxRuntime>();
 export function diffSyntaxRuntime(code: ChatHost['code']): DiffSyntaxRuntime {
     let runtime = shared.get(code);
     if (runtime === undefined) {
-        runtime = createDiffSyntaxRuntime({ workerFactory: code.syntaxWorker, themes: code.custom, highlighter: code.highlighter });
+        runtime = createDiffSyntaxRuntime({ workerFactory: code.syntaxWorker, themes: () => code.custom, highlighter: code.highlighter });
         shared.set(code, runtime);
     }
     return runtime;
@@ -58,6 +59,9 @@ export function createDiffSyntaxRuntime(options: DiffSyntaxRuntimeOptions): Diff
     let highlighter: Promise<Highlighter> | undefined;
     let started = false;
     let stopped = false;
+    // The names of the custom themes the current worker or fallback has, each sent once.
+    const sentThemes = new Set<string>();
+    const themes = (): readonly ThemeRegistration[] => (typeof options.themes === 'function' ? options.themes() : options.themes);
     const settle = (session: Session): void => {
         for (const pending of session.pending.values()) {
             pending.resolve(null);
@@ -75,13 +79,34 @@ export function createDiffSyntaxRuntime(options: DiffSyntaxRuntimeOptions): Diff
         highlighter ??= import('shiki').then(({ createHighlighter }) => createHighlighter({ langs: [], themes: [] }));
         return highlighter;
     };
+    const start = (): void => {
+        const current = themes();
+        sentThemes.clear();
+        for (const theme of current) {
+            if (theme.name !== undefined) {
+                sentThemes.add(theme.name);
+            }
+        }
+        dispatch({ type: 'start', themes: current, maxLines: 100000 });
+    };
+    /* Sends a custom theme the host added after the start, ahead of the first request drawn in it. */
+    const sendTheme = (name: string): void => {
+        if (sentThemes.has(name)) {
+            return;
+        }
+        const theme = themes().find((candidate) => candidate.name === name);
+        if (theme !== undefined) {
+            sentThemes.add(name);
+            dispatch({ type: 'themes', themes: [theme] });
+        }
+    };
     const startFallback = (): void => {
         stopWorker();
         if (fallback !== undefined || stopped) {
             return;
         }
         fallback = createSyntaxService({ highlighter: options.highlighter ?? loadHighlighter, send: receive });
-        dispatch({ type: 'start', themes: options.themes, maxLines: 100000 });
+        start();
         for (const [generation, session] of sessions) {
             session.sent = false;
             for (const index of session.pending.keys()) {
@@ -107,7 +132,7 @@ export function createDiffSyntaxRuntime(options: DiffSyntaxRuntimeOptions): Diff
                 worker.addEventListener('message', onMessage);
                 worker.addEventListener('error', onError);
                 worker.addEventListener('messageerror', onError);
-                dispatch({ type: 'start', themes: options.themes, maxLines: 100000 });
+                start();
                 return;
             } catch {
                 startFallback();
@@ -136,6 +161,9 @@ export function createDiffSyntaxRuntime(options: DiffSyntaxRuntimeOptions): Diff
     };
     const request = (generation: number, session: Session, index: number, resend = false): void => {
         const document = !session.sent || resend ? session.definition : undefined;
+        if (document !== undefined) {
+            sendTheme(document.theme);
+        }
         session.sent = true;
         dispatch({ type: 'request', generation, index, ...(document ? { document } : {}) });
     };

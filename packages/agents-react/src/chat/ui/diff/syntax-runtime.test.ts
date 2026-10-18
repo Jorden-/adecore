@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { createHighlighter, type Highlighter } from 'shiki';
+import { createHighlighter, type Highlighter, type ThemeRegistration } from 'shiki';
 import type { DiffSyntaxDocument, DiffSyntaxInput, DiffSyntaxOutput, DiffSyntaxTokens } from '@adecore/editor/shiki-worker';
 import { createDiffSyntaxRuntime } from './syntax-runtime';
 
 const DOCUMENT: DiffSyntaxDocument = { language: 'typescript', theme: 'github-dark', blocks: ['const answer = 42;'], resets: [] };
+const OWN: ThemeRegistration = { name: 'own', type: 'dark', tokenColors: [] };
+const LATE: ThemeRegistration = { name: 'late', type: 'dark', tokenColors: [{ scope: 'comment', settings: { foreground: '#00FF00' } }] };
 
 class TestWorker {
     sent: DiffSyntaxInput[] = [];
@@ -148,6 +150,60 @@ describe('diff syntax runtime', () => {
         worker.emit(packet({ generation: requests[1]!.generation, index: 0 }));
         expect((await active)?.generation).toBe(requests[1]!.generation);
         expect(await one.request(0)).toBeNull();
+        runtime.dispose();
+    });
+
+    test('sends the start with a static array of themes and no theme after it', async () => {
+        const worker = new TestWorker();
+        const runtime = createDiffSyntaxRuntime({ themes: [OWN], workerFactory: () => worker.worker() });
+        const result = runtime.open({ ...DOCUMENT, theme: 'own' }).request(0);
+        expect(worker.sent.map((message) => message.type)).toEqual(['start', 'request']);
+        expect(worker.sent[0]).toMatchObject({ type: 'start', themes: [OWN] });
+        worker.emit(packet({ generation: worker.requests()[0]!.generation, index: 0 }));
+        expect((await result)?.type).toBe('tokens');
+        runtime.dispose();
+    });
+
+    test('sends a theme the host added after the start once, ahead of the first request drawn in it', async () => {
+        const worker = new TestWorker();
+        let custom: ThemeRegistration[] = [OWN];
+        const runtime = createDiffSyntaxRuntime({ themes: () => custom, workerFactory: () => worker.worker() });
+        runtime.open(DOCUMENT).request(0);
+        expect(worker.sent[0]).toMatchObject({ type: 'start', themes: [OWN] });
+        custom = [OWN, LATE];
+        runtime.open({ ...DOCUMENT, theme: 'late' }).request(0);
+        runtime.open({ ...DOCUMENT, theme: 'late' }).request(0);
+        runtime.open({ ...DOCUMENT, theme: 'own' }).request(0);
+        // A host that answers a new array with the same names sends nothing again.
+        custom = [{ ...OWN }, { ...LATE }];
+        runtime.open({ ...DOCUMENT, theme: 'late' }).request(0);
+        expect(worker.sent.map((message) => message.type)).toEqual(['start', 'request', 'themes', 'request', 'request', 'request', 'request']);
+        expect(worker.sent[2]).toEqual({ type: 'themes', themes: [LATE] });
+        runtime.dispose();
+    });
+
+    test('a theme added after the start draws on the main-thread service', async () => {
+        using highlighter = await createHighlighter({ themes: [], langs: [] });
+        let custom: ThemeRegistration[] = [];
+        const runtime = createDiffSyntaxRuntime({ themes: () => custom, highlighter: fixture(highlighter) });
+        expect((await runtime.open({ ...DOCUMENT, blocks: ['/* comment */'] }).request(0))?.type).toBe('tokens');
+        custom = [LATE];
+        const late = await runtime.open({ ...DOCUMENT, theme: 'late', blocks: ['/* comment */'] }).request(0);
+        expect(late?.colors).toContain('#00FF00');
+        runtime.dispose();
+    });
+
+    test('a fallback after a worker crash starts with the themes the host has by then', async () => {
+        using highlighter = await createHighlighter({ themes: [], langs: [] });
+        const worker = new TestWorker();
+        let custom: ThemeRegistration[] = [];
+        const runtime = createDiffSyntaxRuntime({ themes: () => custom, highlighter: fixture(highlighter), workerFactory: () => worker.worker() });
+        runtime.open(DOCUMENT).request(0);
+        custom = [LATE];
+        const late = runtime.open({ ...DOCUMENT, theme: 'late', blocks: ['/* comment */'] }).request(0);
+        expect(worker.sent.map((message) => message.type)).toEqual(['start', 'request', 'themes', 'request']);
+        worker.crash();
+        expect((await late)?.colors).toContain('#00FF00');
         runtime.dispose();
     });
 

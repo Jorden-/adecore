@@ -12,6 +12,7 @@ export interface DiffSyntaxDocument {
 
 export type DiffSyntaxInput =
     | { readonly type: 'start'; readonly themes: readonly ThemeRegistration[]; readonly maxLines: number }
+    | { readonly type: 'themes'; readonly themes: readonly ThemeRegistration[] }
     | { readonly type: 'request'; readonly generation: number; readonly index: number; readonly document?: DiffSyntaxDocument }
     | { readonly type: 'cancel'; readonly generation: number }
     | { readonly type: 'dispose'; readonly generation: number };
@@ -104,6 +105,16 @@ function packedTokens(
     }
     lines[tokens.length] = cursor / 3;
     return { type: 'tokens', generation, index, colors, ...appearance, lines, tokens: packed };
+}
+
+/* Loads only the themes the highlighter lacks by name, so one another user of a borrowed highlighter loaded keeps its identity. */
+async function loadMissingThemes(loaded: Highlighter, themes: readonly ThemeRegistration[]): Promise<Highlighter> {
+    const known = new Set(loaded.getLoadedThemes());
+    const missing = themes.filter((theme) => theme.name === undefined || !known.has(theme.name));
+    if (missing.length > 0) {
+        await loaded.loadTheme(...missing);
+    }
+    return loaded;
 }
 
 /* The packet omits text and token lengths; its source line supplies the final token's end. */
@@ -259,17 +270,22 @@ export function createSyntaxService(options: DiffSyntaxServiceOptions): DiffSynt
                 }
                 entries.clear();
                 count = 0;
-                ready = options.highlighter().then(async (loaded) => {
-                    const known = new Set(loaded.getLoadedThemes());
-                    const missing = message.themes.filter((theme) => theme.name === undefined || !known.has(theme.name));
-                    if (missing.length > 0) {
-                        await loaded.loadTheme(...missing);
-                    }
-                    return loaded;
-                });
+                ready = options.highlighter().then((loaded) => loadMissingThemes(loaded, message.themes));
                 return ready.then(
                     () => options.send({ type: 'ready' }),
                     (error: unknown) => options.send({ type: 'error', message: error instanceof Error ? error.message : String(error) })
+                );
+            }
+            if (message.type === 'themes') {
+                // The queue awaits `ready` anew for every request, so a request sent after this one draws in these themes.
+                ready = (ready ?? options.highlighter()).then((loaded) =>
+                    // A theme that fails to load fails only the requests drawn in it, never the ones in themes already in.
+                    loadMissingThemes(loaded, message.themes).catch(() => loaded)
+                );
+                // A failed start has already reported its error.
+                return ready.then(
+                    () => undefined,
+                    () => undefined
                 );
             }
             if (message.type === 'cancel' || message.type === 'dispose') {

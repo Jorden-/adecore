@@ -168,6 +168,43 @@ describe('diff syntax service', () => {
         service.dispose();
     });
 
+    test('loads a theme sent after the start before the requests that follow it, and only once', async () => {
+        using highlighter = await createHighlighter({ themes: [], langs: [] });
+        const load = spyOn(highlighter, 'loadTheme');
+        const { service, tokens, messages } = harness(highlighter);
+        const late: ThemeRegistration = {
+            name: 'late',
+            type: 'dark',
+            tokenColors: [{ scope: 'comment', settings: { foreground: '#00FF00' } }]
+        };
+        await service.handle({ type: 'start', themes: [], maxLines: 100 });
+        const themes = service.handle({ type: 'themes', themes: [late] });
+        const request = service.handle({ type: 'request', generation: 1, index: 0, document: { ...DOCUMENT, theme: 'late', blocks: ['/* comment */'] } });
+        await Promise.all([themes, request]);
+        expect(slices(tokens()[0]!, '/* comment */')).toEqual([[{ content: '/* comment */', color: '#00FF00', fontStyle: 0 }]]);
+        await service.handle({ type: 'themes', themes: [late] });
+        expect(load).toHaveBeenCalledTimes(1);
+        expect(messages.filter((message) => message.type === 'error')).toEqual([]);
+        service.dispose();
+        load.mockRestore();
+    });
+
+    test('a theme that fails to load fails only the requests drawn in it', async () => {
+        using highlighter = await createHighlighter({ themes: [THEME], langs: [] });
+        const load = spyOn(highlighter, 'loadTheme').mockImplementation(async () => {
+            throw new Error('Broken theme');
+        });
+        const { service, tokens, messages } = harness(highlighter);
+        await service.handle({ type: 'start', themes: [], maxLines: 100 });
+        await service.handle({ type: 'themes', themes: [{ name: 'broken', type: 'dark', settings: [] }] });
+        await service.handle({ type: 'request', generation: 1, index: 0, document: { ...DOCUMENT, theme: 'broken', blocks: ['/* comment */'] } });
+        await service.handle({ type: 'request', generation: 2, index: 0, document: { ...DOCUMENT, blocks: ['/* comment */'] } });
+        expect(messages.find((message) => message.type === 'failed')).toMatchObject({ generation: 1, reason: 'highlight' });
+        expect(tokens().map((packet) => packet.generation)).toEqual([2]);
+        service.dispose();
+        load.mockRestore();
+    });
+
     test('cancel interrupts between blocks, keeps cache and sends no late response', async () => {
         using highlighter = await createHighlighter({ themes: [THEME], langs: ['typescript'] });
         const clock = steps();
