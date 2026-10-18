@@ -1,6 +1,7 @@
 import { useLayoutEffect, useState, type RefObject } from 'react';
 import { cleanVisualVariables, type VisualAppearance, type VisualTheme, type VisualThemeVariable } from '@adecore/agent-contracts/visual';
 import { useChatHost } from '../../host';
+import { watchTheme } from './theme-watch';
 
 /* The tokens of the app's theme where a frame stands; each answers '' for a token the theme lacks. */
 export interface VisualTokens {
@@ -158,9 +159,6 @@ function readTheme(element: HTMLElement, mode: VisualAppearance): VisualTheme {
     }
 }
 
-/* The attributes an app switches its theme or its accent with. */
-const THEME_ATTRIBUTES = ['class', 'style', 'data-theme'];
-
 /*
  * The app's theme for a visual drawn in `ref`, null until the element is there. It is read again when
  * the app turns light or dark, and when the root of the document changes a theme attribute, so an
@@ -181,16 +179,11 @@ export function useVisualTheme(ref: RefObject<HTMLElement | null>): VisualTheme 
         };
         read();
         const owner = element.ownerDocument;
-        const observer = new MutationObserver(read);
-        for (const root of [owner.documentElement, owner.body]) {
-            if (root !== null) {
-                observer.observe(root, { attributes: true, attributeFilter: THEME_ATTRIBUTES });
-            }
-        }
+        const stopWatching = watchTheme(owner, read);
         const scheme = owner.defaultView?.matchMedia?.('(prefers-color-scheme: dark)') ?? null;
         scheme?.addEventListener('change', read);
         return () => {
-            observer.disconnect();
+            stopWatching();
             scheme?.removeEventListener('change', read);
         };
     }, [ref, mode]);

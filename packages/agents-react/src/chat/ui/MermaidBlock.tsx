@@ -6,6 +6,7 @@ import { useChatHost } from '../../host';
 import { CodeBlock } from './CodeBlock';
 import { CodeStreamingContext } from './code-streaming';
 import { MERMAID_TOKENS, mermaidConfig, sizedSvg, svgDataUrl, type MermaidColors, type SizedSvg } from './mermaid';
+import { watchTheme } from './theme-watch';
 
 type Drawing = { state: 'drawing' } | { state: 'drawn'; image: SizedSvg } | { state: 'failed' };
 
@@ -38,10 +39,20 @@ function themeColors(element: HTMLElement): MermaidColors {
     return Object.fromEntries(entries) as unknown as MermaidColors;
 }
 
-async function drawDiagram(id: string, source: string, element: HTMLElement, dark: boolean): Promise<SizedSvg | null> {
-    const { default: mermaid } = await import('mermaid');
+/* What a diagram reads of the theme where it stands. */
+interface DiagramLook {
+    colors: MermaidColors;
+    font: { family: string; size: string };
+}
+
+function diagramLook(element: HTMLElement): DiagramLook {
     const style = getComputedStyle(element);
-    mermaid.initialize(mermaidConfig(themeColors(element), dark, { family: style.fontFamily, size: style.fontSize }));
+    return { colors: themeColors(element), font: { family: style.fontFamily, size: style.fontSize } };
+}
+
+async function drawDiagram(id: string, source: string, look: DiagramLook, dark: boolean): Promise<SizedSvg | null> {
+    const { default: mermaid } = await import('mermaid');
+    mermaid.initialize(mermaidConfig(look.colors, dark, look.font));
     const { svg } = await mermaid.render(id, source);
     return sizedSvg(svg);
 }
@@ -60,6 +71,22 @@ export function MermaidBlock({ code }: { code: string }) {
     const frame = useRef<HTMLDivElement>(null);
     const [source, setSource] = useState(false);
     const [drawing, setDrawing] = useState<Drawing>({ state: 'drawing' });
+    // The look of the diagram on screen or on its way there, null before the first.
+    const drawnLook = useRef<string | null>(null);
+    const [themeRevision, setThemeRevision] = useState(0);
+
+    // An app may change its colors without turning light or dark, which only the root of the page tells.
+    useEffect(() => {
+        const element = frame.current;
+        if (element === null) {
+            return;
+        }
+        return watchTheme(element.ownerDocument, () => {
+            if (drawnLook.current !== null && JSON.stringify(diagramLook(element)) !== drawnLook.current) {
+                setThemeRevision((revision) => revision + 1);
+            }
+        });
+    }, []);
 
     useEffect(() => {
         const element = frame.current;
@@ -67,8 +94,11 @@ export function MermaidBlock({ code }: { code: string }) {
             return;
         }
         let cancelled = false;
-        setDrawing({ state: 'drawing' });
-        const drawn = queue.then(() => (cancelled ? null : drawDiagram(id, code, element, dark)));
+        const look = diagramLook(element);
+        drawnLook.current = JSON.stringify(look);
+        // A diagram already drawn stays until the next one is there, so a change of the theme does not make it blink.
+        setDrawing((current) => (current.state === 'drawn' ? current : { state: 'drawing' }));
+        const drawn = queue.then(() => (cancelled ? null : drawDiagram(id, code, look, dark)));
         queue = drawn.catch(() => undefined);
         drawn.then(
             (image) => !cancelled && setDrawing(image === null ? { state: 'failed' } : { state: 'drawn', image }),
@@ -77,7 +107,7 @@ export function MermaidBlock({ code }: { code: string }) {
         return () => {
             cancelled = true;
         };
-    }, [code, dark, id, streaming]);
+    }, [code, dark, id, streaming, themeRevision]);
 
     const showsDiagram = !streaming && !source && drawing.state !== 'failed';
     const toggle =

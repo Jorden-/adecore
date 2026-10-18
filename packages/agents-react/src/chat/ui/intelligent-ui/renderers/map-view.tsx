@@ -5,6 +5,7 @@ import { Maximize, Minus, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ButtonGroup, IconButton } from '@adecore/ui';
 import { useChatHost, type UiMapSource } from '../../../../host';
+import { watchTheme } from '../../theme-watch';
 import { baseMapStyle, boundsOf, localizedTextField, mapFitOptions, spreadOverlaps, type MapColors, type MapPoint } from './map-style';
 
 /*
@@ -81,7 +82,7 @@ export function MapView({ markers, source, selected, onPick, onStatus }: MapView
             return;
         }
         const current = latest.current.source;
-        const colors = readColors(container);
+        let colors = readColors(container);
         const offline = current.state === 'tiles' && typeof navigator !== 'undefined' && navigator.onLine === false;
         const tiles = current.state === 'tiles' && !offline;
         let created: MapLibreMap;
@@ -202,8 +203,21 @@ export function MapView({ markers, source, selected, onPick, onStatus }: MapView
             window.addEventListener('online', goOnline);
         }
         canvas.addEventListener('webglcontextlost', contextLost);
+        // Colors that change within the side repaint the outline in place: a style that differs only in its paint is
+        // applied as a diff, so the map, its camera and its markers stay. The tiles draw colors of their own.
+        const stopWatching = watchTheme(container.ownerDocument, () => {
+            const next = readColors(container);
+            if (next.land === colors.land && next.water === colors.water) {
+                return;
+            }
+            colors = next;
+            if (drawing === 'outline') {
+                created.setStyle(baseMapStyle(colors));
+            }
+        });
         setMap(created);
         return () => {
+            stopWatching();
             window.removeEventListener('offline', goOffline);
             window.removeEventListener('online', goOnline);
             canvas.removeEventListener('webglcontextlost', contextLost);

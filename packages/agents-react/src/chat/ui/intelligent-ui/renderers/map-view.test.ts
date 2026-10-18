@@ -463,3 +463,95 @@ test.skipIf(typeof document === 'undefined')('stops following the zoom when the 
     await draw({ markers: [MARKERS[0]] });
     expect(map.handlers.get('zoomend')).toHaveLength(1);
 });
+
+/* Lets the observer deliver what changed on the root, then waits out the frame it asked for. */
+async function nextPaint(): Promise<void> {
+    await act(async () => {
+        await Promise.resolve();
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+}
+
+let revision = 0;
+
+/*
+ * Writes the grounds the way an app writes a palette: into a stylesheet, which tells no one, with a new revision on
+ * the root's style to say so. The rule sits on the map's own element, as the page of the test inherits no token.
+ */
+function writePalette(colors: Partial<{ land: string; water: string }>): void {
+    let sheet = document.getElementById('test-palette');
+    if (sheet === null) {
+        sheet = document.createElement('style');
+        sheet.id = 'test-palette';
+        document.head.append(sheet);
+    }
+    const tokens = Object.entries(colors).map(([name, color]) => `--map-${name}: ${color};`);
+    sheet.textContent = `[aria-hidden="true"] { ${tokens.join(' ')} }`;
+    document.documentElement.style.setProperty('--palette-revision', String(++revision));
+}
+
+function clearPalette(): void {
+    document.getElementById('test-palette')?.remove();
+    document.documentElement.style.removeProperty('--palette-revision');
+}
+
+function paintOf(style: { layers: Array<{ id: string; paint: Record<string, unknown> }> }): Record<string, unknown> {
+    return Object.fromEntries(style.layers.map((layer) => [layer.id, Object.values(layer.paint)[0]]));
+}
+
+test.skipIf(typeof document === 'undefined')('the outline takes the colors the app switches to within the same side, on the map it has', async () => {
+    try {
+        writePalette({ land: '#eeeeee', water: '#dddddd' });
+        await draw({ source: { state: 'off', reason: 'disabled' } });
+        const [map] = FakeMap.made;
+        expect(paintOf(map.options.style)).toEqual({ water: '#dddddd', land: '#eeeeee' });
+
+        // A change of the root that leaves both grounds as they were paints nothing again.
+        writePalette({ land: '#eeeeee', water: '#dddddd' });
+        await nextPaint();
+        expect(map.styles).toEqual([]);
+
+        writePalette({ land: '#ccddcc', water: '#dddddd' });
+        await nextPaint();
+        expect(FakeMap.made).toHaveLength(1);
+        expect(map.removed).toBe(false);
+        expect(map.styles).toHaveLength(1);
+        expect(paintOf(map.styles[0] as never)).toEqual({ water: '#dddddd', land: '#ccddcc' });
+        expect(FakeMarker.made.every((marker) => !marker.removed)).toBe(true);
+        await nextPaint();
+        expect(map.styles).toHaveLength(1);
+    } finally {
+        clearPalette();
+    }
+});
+
+test.skipIf(typeof document === 'undefined')('tiles keep their own colors, and the outline they fall back to has the latest', async () => {
+    try {
+        writePalette({ land: '#eeeeee' });
+        await draw();
+        const [map] = FakeMap.made;
+        writePalette({ land: '#ccddcc' });
+        await nextPaint();
+        expect(map.styles).toEqual([]);
+        await act(async () => map.emit('error'));
+        expect(map.styles).toHaveLength(1);
+        expect(paintOf(map.styles[0] as never).land).toBe('#ccddcc');
+    } finally {
+        clearPalette();
+    }
+});
+
+test.skipIf(typeof document === 'undefined')('a map that is gone stops following the root', async () => {
+    try {
+        writePalette({ land: '#eeeeee' });
+        await draw({ source: { state: 'off', reason: 'disabled' } });
+        const [map] = FakeMap.made;
+        await act(async () => root.unmount());
+        root = createRoot(element);
+        writePalette({ land: '#ccddcc' });
+        await nextPaint();
+        expect(map.styles).toEqual([]);
+    } finally {
+        clearPalette();
+    }
+});
